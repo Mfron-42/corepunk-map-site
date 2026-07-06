@@ -1,13 +1,17 @@
 /* Kwalat — carte communautaire Corepunk.
    Monde : 9600 × 7680 unités ; tuiles natives zoom 0..2 (1/2/4 px par unité).
    L'axe z du monde pointe vers le nord (haut de l'écran) : la ligne de
-   pixels 0 correspond à z = 8704 (voir.
+   pixels 0 correspond à z = 8704.
    Transform : px(zoom 2) = (x*4, (8704 - z)*4). */
 'use strict';
 
 /* ── Constantes ─────────────────────────────────────────────── */
 const WORLD = { w: 9600, h: 7680 };
 const MAP_TOP_Z = 8704; // z monde à la ligne de pixels 0 de la pyramide
+// Les tuiles (~645 Mo) sont hébergées sur un dépôt GitHub Pages dédié,
+// séparé du dépôt principal du site — republié seulement quand la pyramide
+// de tuiles change (rarement), jamais à chaque mise à jour des données.
+const TILE_BASE = 'https://mfron-42.github.io/corepunk-map-tiles';
 const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', filters: 'cpmap_filters' };
 /* Language state (persistence, URL-hash detection, <html lang>) is owned
    entirely by site/js/i18n.js (LANG / setLangCode / detectInitialLang),
@@ -21,8 +25,7 @@ const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', filters: 'cpmap_filte
    stored here, so switching language never needs to rebuild these — only
    the STRUCTURAL fields (color/hex/on/dense/domIcon) live in this file; the
    token keys themselves (npc/poi/.../camp kind tokens) are the game's own
-   neutral identifiers, shipped as-is by the pipeline regardless of language
-   (see, data/SCHEMA.md "i18n"). */
+   neutral identifiers, shipped as-is regardless of language. */
 const CATS = {
   npc:      { color: 'var(--c-npc)',      hex: '#e0a23f', on: true,  dense: true, domIcon: true },
   poi:      { color: 'var(--c-poi)',      hex: '#8fb4c9', on: true,  dense: true, domIcon: true },
@@ -63,12 +66,18 @@ const RARITY = {
 };
 const rarityLabel = key => tbl('rarity', key);
 const itemKindLabel = key => tbl('itemKind', key);
-/* Type d'arme (weapon.weapon_type/use_type/class — neutral engine tokens
-   shipped as-is by the pipeline, see's `weap`
-   dict) : le site compose son propre libellé localisé, même principe que
-   CATS/RARITY/campKindLabel ci-dessus (voir data/SCHEMA.md "i18n"). Résout
-   un nom d'arme "Gun Bom Bm 2H Assault" illisible en "Assault" + un
-   sous-libellé de type séparé ("Pistolet · Deux mains · Bombardier"). */
+/* Métier (item/recette `prof`, ex. "Construction"/"Cooking") et méthode de
+   dépeçage (monstre `harvestMethod`, ex. "Flayer") : tokens neutres repris
+   tels quels de ConstProfession.xml (le jeu les partage entre item.prof,
+   recipe.prof et le nom du "harvest tool" d'un monstre) — le site compose
+   son propre libellé localisé, même principe que weaponType/campKind. */
+const professionLabel = key => tbl('profession', key) || pretty(key);
+const harvestMethodLabel = key => tbl('harvestMethod', key) || tbl('profession', key) || pretty(key);
+/* Type d'arme (weapon.weapon_type/use_type/class — tokens moteur neutres) :
+   le site compose son propre libellé localisé, même principe que
+   CATS/RARITY/campKindLabel ci-dessus. Résout un nom d'arme "Gun Bom Bm 2H
+   Assault" illisible en "Assault" + un sous-libellé de type séparé
+   ("Pistolet · Deux mains · Bombardier"). */
 const weaponTypeLabel = key => tbl('weaponType', key) || pretty(key);
 const useTypeLabel = key => tbl('useType', key) || pretty(key);
 const weaponClassLabel = key => tbl('weaponClass', key) || pretty(key);
@@ -77,8 +86,9 @@ function weaponTypeLine(w) {
   return [weaponTypeLabel(w.weapon_type), useTypeLabel(w.use_type), weaponClassLabel(w.class)]
     .filter(Boolean).join(' · ');
 }
-/* Objectifs de quête machine-exacts :
-   verbe + pictogramme par type d'action. */
+/* Objectifs de quête machine-exacts : verbe + pictogramme par type d'action.
+   repair/craft/mix sont des verbes concrets à part entière (jamais "custom"/
+   "Faire" en repli) — voir actionVerb() ci-dessous. */
 const ACTION_META = {
   kill:    { ico: 'sword' },
   collect: { ico: 'bag' },
@@ -86,6 +96,9 @@ const ACTION_META = {
   talk:    { ico: 'bubble' },
   goto:    { ico: 'pin' },
   deliver: { ico: 'box' },
+  repair:  { ico: 'wrench' },
+  craft:   { ico: 'hammer' },
+  mix:     { ico: 'flask' },
   custom:  { ico: 'spark' },
 };
 const actionVerb = action => tbl('action', action) || tbl('action', 'custom');
@@ -96,6 +109,9 @@ const ACTION_ICON_PATHS = {
   bubble: '<path d="M4 5.5h16v10.2H9.8L5.5 19v-3.3H4V5.5Z"/>',
   pin: '<path d="M12 21s6.5-6.2 6.5-11.3a6.5 6.5 0 1 0-13 0C5.5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.2"/>',
   box: '<path d="M3.5 8 12 4l8.5 4-8.5 4-8.5-4Z"/><path d="M3.5 8v8.3L12 20l8.5-3.7V8"/><path d="M12 12v8"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 1-5.1 5.1L4.6 16.4a2 2 0 0 0 2.9 2.9l5.1-5.1a4 4 0 0 1 5.1-5.1l-2.6 2.6-2-2 2.6-2.6Z"/>',
+  hammer: '<path d="M14.5 3.5 20 9l-1.8 1.8-1.4-1.4L9 17.2l-2.6-2.6 7.6-7.6-1.4-1.4Z"/><path d="M4 20l3.6-3.6"/>',
+  flask: '<path d="M9.5 3h5"/><path d="M10.2 3v5.6L5.8 16.2A2 2 0 0 0 7.6 19h8.8a2 2 0 0 0 1.8-2.8l-4.4-7.4V3"/><path d="M7.8 14.5h8.4"/>',
   spark: '<path d="M12 3.5v3.8M12 16.7v3.8M4.3 12h3.8M15.9 12h3.8M6.8 6.8l2.7 2.7M14.5 14.5l2.7 2.7M17.2 6.8l-2.7 2.7M9.5 14.5l-2.7 2.7"/>',
 };
 function actionIconSvg(kind) {
@@ -152,7 +168,7 @@ const worldBounds = L.latLngBounds(toLL(0, 0), toLL(WORLD.w, WORLD.h));
 map.setMaxBounds(worldBounds.pad(0.12));
 
 const Tiles = L.TileLayer.extend({
-  getTileUrl: c => `tiles/${c.z}/${c.x}_${c.y}.webp`,
+  getTileUrl: c => `${TILE_BASE}/${c.z}/${c.x}_${c.y}.webp`,
 });
 new Tiles('', {
   tileSize: 512, minNativeZoom: 0, maxNativeZoom: 3,
@@ -262,13 +278,12 @@ function clearLocator() {
 
 /* ── Chargement des données ─────────────────────────────────── */
 /* Chaque *.json de data/ est publié en .bin : un en-tête custom de 4 octets
-   (friction anti-scraping "effort S" — voir::
-   pack_binary_blobs ; ce n'est PAS du chiffrement, juste de quoi faire
+   (friction anti-scraping — ce n'est PAS du chiffrement, juste de quoi faire
    échouer `curl | gunzip`/`file`/`zcat` — plus reconnu comme gzip sans
    passer par ce module) suivi d'un flux gzip -9 du JSON. site_meta.json
    reste seul en clair (petit, non sensible). Décodage mesuré < 40 ms/fichier
    (fetch + DecompressionStream natif, même API que tout navigateur récent). */
-const BIN_HEADER_LEN = 4; // doit rester synchro avec pack_binary_blobs()
+const BIN_HEADER_LEN = 4; // doit rester synchro avec le générateur des .bin
 async function fetchBin(path) {
   const r = await fetch(path);
   if (!r.ok) throw new Error(path + ' → ' + r.status);
@@ -284,9 +299,8 @@ async function fetchJson(path) {
 }
 
 /* Every language-sensitive dataset file lives under site/data/<lang>/ (one
-   full, self-contained build per site language — see
-   + data/SCHEMA.md "i18n"). tiles/icons/tiles_meta.json stay unprefixed
-   (language-independent, shared, never duplicated). */
+   full, self-contained build per site language). tiles/icons/tiles_meta.json
+   stay unprefixed (language-independent, shared, never duplicated). */
 const dataPath = name => `data/${S.lang}/${name}`;
 
 /* Chemin critique : tout ce qu'il faut pour la première peinture (carte,
@@ -560,16 +574,7 @@ function openCampFiche(key) {
       <span class="fr-label">${esc(m.name)}</span>
       <span class="muted">${m.lvl ? tr('levelAbbrev', m.lvl) : ''}${m.atk ? ' · ' + esc(m.atk) : ''}</span>
     </div>`).join('');
-  const campDropRow = (d, pct) => {
-    const icon = d.icon ? `icons/${esc(d.icon)}` : null;
-    const linkAct = S.items[d.key] ? 'fiche-item' : null;
-    const rate = pct && d.w != null ? `<span class="muted">${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %</span>` : '';
-    return dropRow(icon, d.name, linkAct, d.key, rate, itemGlyph(S.items[d.key]));
-  };
-  const guaranteed = det.drops.filter(d => d.w === 1);
-  const chance = det.drops.filter(d => d.w !== 1);
-  const drops = (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => campDropRow(d, false)).join('')}` : '')
-    + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => campDropRow(d, true)).join('')}` : '');
+  const drops = lootRowsHtml(det.drops, 'noLootCatalogued');
   openFiche(`
     <div class="fiche-head"><div>
       <div class="fiche-kind" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}</div>
@@ -579,19 +584,47 @@ function openCampFiche(key) {
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(pretty(key))}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
     </div></div>
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : ''}
-    ${drops ? `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>` : ''}`);
+    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash('camp', key);
 }
 
-/* Fiche monstre : niveau/famille/type d'attaque, tags lisibles, butin (taux
-   garanti/%%, item cliquable -> fiche item, même rendu que openCampFiche/
-   openItemFiche ci-dessus), capacités (nom réel ou repli prettifié — voir, la plupart des capacités de
-   monstre n'ont aucune localisation dans le client), et camps où il apparaît
-   (bouton carte vers le camp). Le butin/les capacités/les camps viennent
-   TELS QUELS de monsters.json (voir::
-   monsters_site()) — un monstre sans butin catalogué l'affiche honnêtement
-   plutôt que de ne rien montrer ou d'inventer un lien (liage loot amélioré
-   séparément, hors de ce fichier). */
+/* Rendu commun d'un taux de drop : quantité ("×N", dès que count>1) suivi de
+   « Garanti » ou d'un pourcentage de chance — jamais les deux pour un même
+   drop garanti (un « 100 % » redondant n'apporte rien face à un « ×3
+   garanti » explicite, voir data/SCHEMA.md "Drop rows"). */
+function dropRateHtml(d) {
+  const countBit = d.c > 1 ? `×${d.c}` : '';
+  if (d.g) return `<span class="muted">${esc([countBit, tr('guaranteedLabel')].filter(Boolean).join(' '))}</span>`;
+  if (d.w == null) return countBit ? `<span class="muted">${esc(countBit)}</span>` : '';
+  const pct = `${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %`;
+  return `<span class="muted">${esc([countBit, pct].filter(Boolean).join(' · '))}</span>`;
+}
+
+/* Ligne de butin commune (fiche monstre/camp) : icône + nom cliquable vers
+   la fiche item quand connue + taux (dropRateHtml : ×N/garanti/%). */
+function monsterLootRow(d) {
+  return dropRow(d.icon ? `icons/${esc(d.icon)}` : null, d.name,
+    S.items[d.key] ? 'fiche-item' : null, d.key, dropRateHtml(d), itemGlyph(S.items[d.key]));
+}
+function lootRowsHtml(list, emptyKey) {
+  if (!list?.length) return `<p class="hint">${esc(tr(emptyKey))}</p>`;
+  const guaranteed = list.filter(d => d.g);
+  const chance = list.filter(d => !d.g);
+  return (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(monsterLootRow).join('')}` : '')
+    + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(monsterLootRow).join('')}` : '');
+}
+
+/* Fiche monstre : niveau/famille/type d'attaque, tags lisibles, butin AU KILL
+   (taux garanti/×N/%, item cliquable -> fiche item, même rendu que
+   openCampFiche/openItemFiche ci-dessus) SÉPARÉ du butin de DÉPEÇAGE
+   (harvestLoot — une stratégie de butin distincte, ce que rapporte le fait
+   de dépecer/récolter le cadavre, pas ce qui tombe à la mort ; harvestMethod
+   = l'outil/métier de dépeçage, ex. "Flayer" -> "Boucherie"), capacités (nom
+   réel ou repli prettifié — la plupart des capacités de monstre n'ont aucune
+   localisation dans le client), et camps où il apparaît (bouton carte vers
+   le camp). Butin/capacités/camps viennent TELS QUELS du catalogue — un
+   monstre sans butin catalogué l'affiche honnêtement plutôt que de ne rien
+   montrer ou d'inventer un lien. */
 function openMonsterFiche(key) {
   const m = S.monsters[key];
   if (!m) return;
@@ -603,18 +636,10 @@ function openMonsterFiche(key) {
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
 
-  const lootRow = d => dropRow(d.icon ? `icons/${esc(d.icon)}` : null, d.name,
-    S.items[d.key] ? 'fiche-item' : null, d.key,
-    d.w != null ? `<span class="muted">${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %</span>` : '',
-    itemGlyph(S.items[d.key]));
-  const guaranteed = (m.loot || []).filter(d => d.g);
-  const chance = (m.loot || []).filter(d => !d.g);
-  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>${
-    m.loot?.length
-      ? (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(lootRow).join('')}` : '')
-        + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(lootRow).join('')}` : '')
-      : `<p class="hint">${esc(tr('noLootCatalogued'))}</p>`
-  }</div>`;
+  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>${lootRowsHtml(m.loot, 'noLootCatalogued')}</div>`;
+  const harvestHtml = (m.harvestLoot?.length || m.harvestMethod)
+    ? `<div class="fiche-section"><h3>${esc(tr('harvestTitle'))}${m.harvestMethod ? ' · ' + esc(harvestMethodLabel(m.harvestMethod)) : ''}</h3>${lootRowsHtml(m.harvestLoot, 'noHarvestCatalogued')}</div>`
+    : '';
 
   const abilitiesHtml = `<div class="fiche-section"><h3>${esc(tr('monsterAbilitiesN', m.abilities?.length || 0))}</h3>${
     m.abilities?.length
@@ -641,6 +666,7 @@ function openMonsterFiche(key) {
       <h2>${esc(m.name)}</h2></div></div>
     ${tagsHtml}
     ${lootHtml}
+    ${harvestHtml}
     ${abilitiesHtml}
     ${campsHtml}`);
   setFicheHash('monster', key);
@@ -649,8 +675,7 @@ function openMonsterFiche(key) {
 /* Fiche bestiaire/lore (MapMarkers.xml) : titre, nature (Ville/Bestiaire/
    Ressource…), description, bouton carte si une position est connue (38/208
    depuis un pin _ip), monstres de la même famille cliquables vers leur
-   propre fiche quand connus du catalogue::
-   locations_site()'s family cross-link). Pas de lien profond dédié (`mon`/
+   propre fiche quand connus du catalogue. Pas de lien profond dédié (`mon`/
    `i`/`npc`/etc. sont nettoyés du hash pour éviter qu'un lien partagé rouvre
    la MAUVAISE fiche après un rechargement — voir setFicheHash). */
 function openLocationFiche(idx) {
@@ -677,8 +702,8 @@ function openLocationFiche(idx) {
   setFicheHash(null);
 }
 
-/* Fiche capacité (sorts de héros NOMMÉS uniquement — voir()) : nom, emplacement (Q/W/E/
-   R/MA), description, tags de nature (Stun/AoE/DoT…) en puces. */
+/* Fiche capacité (sorts de héros NOMMÉS uniquement) : nom, emplacement
+   (Q/W/E/R/MA), description, tags de nature (Stun/AoE/DoT…) en puces. */
 function openAbilityFiche(key) {
   const a = S.abilities[key];
   if (!a) return;
@@ -814,7 +839,7 @@ function heroAvatar(iconPath) {
    fiches, popups, objectifs. Un objet/PNJ/vendeur sans position CONNUE reste
    toujours listé (jamais masqué) : ce repli affiche juste un libellé grisé
    au lieu du bouton, pour que le joueur sache que la chose existe même sans
-   coordonnée exploitable (cf., slots sans pos). */
+   coordonnée exploitable. */
 const GOTO_ICON = `<svg class="goto-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 21s6.5-6.2 6.5-11.3a6.5 6.5 0 1 0-13 0C5.5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.2"/></svg>`;
@@ -823,7 +848,7 @@ function gotoBtn(x, z, label) {
   return `<button class="goto" data-act="goto" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(tr('mapLabel'))}</span></button>`;
 }
 
-/* ── Position d'objectif de quête à 3 niveaux ──
+/* ── Position d'objectif de quête à 3 niveaux ──────────────────────────
    Un objectif de quête n'affiche PLUS JAMAIS « position inconnue » : un objet
    à spawn dynamique (géré serveur, pas un trou de donnée) l'annonce
    honnêtement plutôt que de faire croire qu'on ignore où il se trouve.
@@ -847,8 +872,8 @@ function drawGoalZone(sz) {
   const [cx, cz] = sz.centroid;
   const [minX, minZ, maxX, maxZ] = sz.bbox;
   // Le site ne reçoit jamais les points bruts du cluster (payload), juste
-  // centroïde + bbox — repli assumé et documenté : un
-  // cercle centré sur le centroïde, rayon = demi-diagonale de la bbox.
+  // centroïde + bbox — repli assumé et documenté : un cercle centré sur le
+  // centroïde, rayon = demi-diagonale de la bbox.
   const r = Math.max(35, Math.hypot(maxX - minX, maxZ - minZ) / 2);
   const circle = L.circle(toLL(cx, cz), {
     radius: r, color: CATS.quest.hex, weight: 2, dashArray: '5 6',
@@ -993,9 +1018,9 @@ function questItemRow(qi, regionHint) {
    pictogramme générique + badge « Activable »), PNJ/monstre — chacun avec
    soit un bouton carte (position fixe), soit le badge à 3 niveaux
    (dynamicPosBadge, voir plus haut) quand il n'y a pas de position fixe.
-   `kind: "multiple"` (objectif agrégat, cf. n'a jamais de
-   vignette : c'est un en-tête de checklist, ses enfants s'affichent comme
-   des étapes normales juste en dessous. Cf.. */
+   `kind: "multiple"` (objectif agrégat) n'a jamais de vignette : c'est un
+   en-tête de checklist, ses enfants s'affichent comme des étapes normales
+   juste en dessous. */
 const ACTIVABLE_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 2.8 20 7v10l-8 4.2L4 17V7l8-4.2Z"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -1032,25 +1057,72 @@ function goalTargetChip(t, label, regionHint) {
   return '';
 }
 
-/* Étapes numérotées, machine-exactes (goals[] —. Repli sur
-   la liste texte « objectives » historique pour les quêtes sans graphe de
-   goals décodé (dialogue seul). `regionHint` (région du journal, si connue)
-   sert de repli textuel pour les cibles sans aucune position ni zone
-   exploitable (cas « position dynamique » sans plus de précision). */
+/* Détecte si la cible d'un objectif fait partie d'une SÉRIE NUMÉROTÉE (ex.
+   "Broken pipe 1/2/3" — fixing_leaking_pipes' étape "repair" ×3) : le graphe
+   de quête ne résout qu'UNE position par objectif même quand celui-ci porte
+   sur toute une série, alors que tous les membres positionnés existent déjà
+   dans q.actors (même libellé de base + numéro). Ne matche que si le
+   libellé de la cible se termine par un nombre ET qu'au moins un autre
+   acteur du MÊME type de slot partage ce préfixe — sinon (pas une série)
+   renvoie null et l'appelant garde le rendu à cible unique habituel. */
+function seriesActorsFor(q, g) {
+  const kind = g.target?.kind;
+  if (!kind) return null;
+  const m = /^(.*?)[ _]*(\d+)$/.exec((g.label || '').trim());
+  const base = m && m[1].trim();
+  if (!base) return null;
+  const rx = new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[ _]*(\\d+)$', 'i');
+  const members = [];
+  for (const a of q.actors || []) {
+    if (a.kind !== kind) continue;
+    const am = rx.exec((a.label || '').trim());
+    if (am) members.push({ ...a, _n: parseInt(am[1], 10) });
+  }
+  if (members.length < 2) return null;
+  return members.sort((a, b) => a._n - b._n);
+}
+/* Rendu d'une série de cibles positionnées : une vignette PAR MEMBRE (avec
+   son propre libellé numéroté) — la phrase de l'objectif ne cite qu'un seul
+   représentant, mais tous les membres doivent rester trouvables sur la
+   carte, pas seulement celui-là. */
+function seriesTargetChips(members, kind, regionHint) {
+  const badge = kind === 'object'
+    ? `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${tr('activableBadge')}</span>` : '';
+  const icon = kind === 'object' ? `<span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>` : '';
+  return `<span class="goal-target-series">${members.map(a => `
+    <span class="goal-target">
+      ${icon}${badge}
+      <span class="goal-target-mini-label">${esc(a.label)}</span>
+      ${a.x != null ? gotoBtn(a.x, a.z, a.label) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
+    </span>`).join('')}</span>`;
+}
+
+/* Étapes numérotées, machine-exactes (goals[]). Repli sur la liste texte
+   « objectives » historique pour les quêtes sans graphe de goals décodé
+   (dialogue seul). `regionHint` (région du journal, si connue) sert de
+   repli textuel pour les cibles sans aucune position ni zone exploitable
+   (cas « position dynamique » sans plus de précision). Le compteur "×N" est
+   TOUJOURS affiché, y compris ×1 (jamais implicite — un objectif sans
+   compteur visible se lisait comme une quantité manquante, pas "une fois"). */
 function goalStepsSection(q) {
   if (!q.goals?.length) return '';
   const regionHint = q.regions?.length ? q.regions[0] : null;
   const steps = q.goals.map((g, i) => {
     const meta = ACTION_META[g.action] || ACTION_META.custom;
     const verb = actionVerb(g.action);
-    const count = g.count ? `<span class="goal-count">×${g.count}${g.approx ? '<sup>≈</sup>' : ''}</span>` : '';
+    const n = g.count || 1;
+    const count = `<span class="goal-count">×${n}${g.approx ? '<sup>≈</sup>' : ''}</span>`;
     const aggregate = g.target?.kind === 'multiple' ? ' goal-step-aggregate' : '';
+    const series = n > 1 ? seriesActorsFor(q, g) : null;
+    const targetHtml = series
+      ? seriesTargetChips(series, g.target.kind, regionHint)
+      : goalTargetChip(g.target, g.label, regionHint);
     return `<li class="goal-step${aggregate}">
       <span class="goal-num">${i + 1}</span>
       <span class="goal-ico" title="${esc(verb)}">${actionIconSvg(meta.ico)}</span>
       <span class="goal-body">
         <span class="goal-text"><b>${esc(verb)}</b> ${esc(g.label)}${count}</span>
-        ${goalTargetChip(g.target, g.label, regionHint)}
+        ${targetHtml}
       </span>
     </li>`;
   }).join('');
@@ -1058,10 +1130,9 @@ function goalStepsSection(q) {
 }
 
 /* Encart « Comment faire » : texte généré déterministe (donneur, étapes,
-   source d'obtention, position de l'activable) —
-   ::quest_hints(), déjà dans la langue active (un jeu de gabarits par
-   langue côté pipeline — voir data/SCHEMA.md "i18n"). Aucune génération
-   côté client. */
+   source d'obtention, position de l'activable), déjà dans la langue active
+   (un jeu de gabarits par langue — voir data/SCHEMA.md "i18n"). Aucune
+   génération côté client. */
 function hintBox(q) {
   if (!q.hint) return '';
   return `<div class="hint-box">
@@ -1079,8 +1150,7 @@ function openQuestFiche(slug) {
   const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
   // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :
   // (a) position fixe -> gotoBtn normal ; (b)/(c) pas de position fixe mais
-  // une search_zone propagée depuis le goal dont ce slot est la cible
-  //, slotpos fix_spec sec 2) ->
+  // une search_zone propagée depuis le goal dont ce slot est la cible ->
   // dynamicPosBadge (zone dessinée seulement si confiance haute). Ne JAMAIS
   // retomber sur le "position inconnue" de gotoBtn pour un slot de quête.
   const actorRows = (q.actors || []).map(a => `
@@ -1158,12 +1228,14 @@ function openItemFiche(key) {
 
   let dropsHtml = '';
   if (it.drops?.length) {
+    // d.label = nom lisible de la table de butin (camp/source), pas d'un
+    // autre item -- pas d'icône/clé propre, seul le taux (dropRateHtml)
+    // est commun avec monsterLootRow ci-dessus.
     const guaranteed = it.drops.filter(d => d.g);
     const chance = it.drops.filter(d => !d.g);
-    const pct = d => `<span class="muted">${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %</span>`;
     dropsHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>
-      ${guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => dropRow(null, d.label, null, null, '')).join('')}` : ''}
-      ${chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => dropRow(null, d.label, null, null, d.w != null ? pct(d) : '')).join('')}` : ''}
+      ${guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => dropRow(null, d.label, null, null, dropRateHtml(d))).join('')}` : ''}
+      ${chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => dropRow(null, d.label, null, null, dropRateHtml(d))).join('')}` : ''}
     </div>`;
   }
 
@@ -1195,13 +1267,23 @@ function openItemFiche(key) {
 
   let recipeHtml = '';
   if (it.recipes?.length) {
-    const blocks = it.recipes.map(rk => {
+    // Une entrée par rareté ATTEIGNABLE (déjà dédupliqué côté pipeline —
+    // voir data/SCHEMA.md recipes.json "rarity"/"variant_group" : un seul
+    // craft/jeu d'ingrédients peut produire plusieurs raretés en tirage
+    // pondéré). Chaque ref = {key, rarity?} ; métier + rareté affichés en
+    // en-tête de bloc, jamais 17 lignes identiques pour le même craft.
+    const blocks = it.recipes.map(ref => {
+      const rk = typeof ref === 'string' ? ref : ref.key;
+      const rarity = typeof ref === 'string' ? null : ref.rarity;
       const r = S.recipes[rk];
       if (!r) return '';
+      const metaLine = [r.prof ? professionLabel(r.prof) : null, rarity ? rarityLabel(rarity) : null]
+        .filter(Boolean).join(' · ');
+      const meta = metaLine ? `<div class="pop-coords recipe-meta">${esc(metaLine)}</div>` : '';
       const ing = chipList(r.ingredients);
       const out = (r.output && r.output !== key)
         ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(r.output)}</div>` : '';
-      return `<div class="recipe-block"><div class="reward-chips">${ing}</div>${out}</div>`;
+      return `<div class="recipe-block">${meta}<div class="reward-chips">${ing}</div>${out}</div>`;
     }).join('');
     if (blocks) recipeHtml = `<div class="fiche-section"><h3>${esc(tr('recipeTitle'))}</h3>${blocks}</div>`;
   }
@@ -1236,12 +1318,16 @@ function openItemFiche(key) {
       }).join('')}</div>` : '';
 
   const weaponLine = weaponTypeLine(it.weapon);
+  // Bien craftable sans rareté fixe (recette pure, pas d'item.rarity propre) :
+  // liste des raretés ATTEIGNABLES par le craft (it.rarities, tirage pondéré
+  // -- voir data/SCHEMA.md recipes.json) à la place d'une rareté unique.
+  const raritiesLine = !rarity && it.rarities?.length ? it.rarities.map(rarityLabel).join(' / ') : '';
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
-      <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}</div>
+      <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}</div>
       <h2>${esc(it.name)}</h2>
       ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
-      ${it.prof ? `<span class="pop-coords">${esc(it.prof)}</span>` : ''}</div></div>
+      ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>
     ${descHtml}
     ${dropsHtml}
     ${farmHtml}
@@ -1266,7 +1352,8 @@ function drawQuestZone(slug) {
 }
 
 /* Fil d'enquête : relie le donneur aux acteurs positionnés. Un acteur listé
-   sans position connue (« position inconnue » dans la fiche — voir n'a simplement rien à relier sur la carte. */
+   sans position connue (« position inconnue » dans la fiche) n'a simplement
+   rien à relier sur la carte. */
 function drawInvestigation(q) {
   if (S.investLayer) map.removeLayer(S.investLayer);
   const positioned = (q.actors || []).filter(a => a.x != null);
@@ -1459,9 +1546,9 @@ function buildSearch() {
   searchIndex = [];
   const push = pushSearchEntry;
   // Un PNJ connu seulement par le dialogue/graphe de quête (pas de marqueur
-  // carte, voir()) n'a ni x ni
-  // z : la ligne de résultat le dit explicitement plutôt que de laisser un
-  // espace vide (le sous-libellé n'était sinon utilisé que pour x/z absents).
+  // carte) n'a ni x ni z : la ligne de résultat le dit explicitement plutôt
+  // que de laisser un espace vide (le sous-libellé n'était sinon utilisé que
+  // pour x/z absents).
   S.data.npc.forEach((r, i) => push(r.name, 'npc', CATS.npc.hex, r.x, r.z, () => openNpcFiche(i),
     null, r.x == null ? tr('posUnknown') : null, initials(r.name)));
   S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z));
@@ -1587,7 +1674,7 @@ function buildZoneSearchIndex() {
   });
 }
 
-/* Monstres : nom (déjà dédupliqué/regroupé au build — voir()), sous-libellé "niv X ·
+/* Monstres : nom (déjà dédupliqué/regroupé au build), sous-libellé "niv X ·
    famille", clic -> fiche (pas de position fixe unique : un monstre peut
    apparaître dans plusieurs camps, listés DANS la fiche). */
 function buildMonsterSearchIndex() {
@@ -1600,10 +1687,9 @@ function buildMonsterSearchIndex() {
 }
 
 /* Bestiaire/lore (MapMarkers.xml) : index = clé de fiche (S.locations est un
-   tableau, pas un objet — voir.
-   Sous-libellé = nature (Ville/Bestiaire/Ressource…) ; position quand
-   connue (38/208 depuis un pin _ip, le reste sans coordonnée fiable —
-   fiche seule, comme un PNJ connu seulement par le dialogue). */
+   tableau, pas un objet). Sous-libellé = nature (Ville/Bestiaire/Ressource…) ;
+   position quand connue (38/208 depuis un pin _ip, le reste sans coordonnée
+   fiable — fiche seule, comme un PNJ connu seulement par le dialogue). */
 function buildLocationSearchIndex() {
   S.locations.forEach((l, i) => {
     pushSearchEntry(l.title, 'location', LOCATION_HEX, l.x ?? null, l.z ?? null,
@@ -1613,9 +1699,9 @@ function buildLocationSearchIndex() {
 
 /* Capacités NOMMÉES seulement (202/1765 — sorts de héros Q/W/E/R/MA ; les
    capacités de monstre n'ont aucune localisation dans le client, voir
-   data/SCHEMA.md abilities.json /::
-   abilities_site()) : indexer les ~1560 restantes n'aurait affiché que des
-   libellés de repli vides de sens, sans bénéfice pour la recherche. */
+   data/SCHEMA.md abilities.json) : indexer les ~1560 restantes n'aurait
+   affiché que des libellés de repli vides de sens, sans bénéfice pour la
+   recherche. */
 function buildAbilitySearchIndex() {
   Object.entries(S.abilities).forEach(([key, a]) => {
     pushSearchEntry(a.name, 'ability', ABILITY_HEX, null, null, () => openAbilityFiche(key),
@@ -1623,10 +1709,10 @@ function buildAbilitySearchIndex() {
   });
 }
 
-/* Événements de monde NOMMÉS seulement (28/454 — voir() pour la liste exclue : points
-   anonymes WE_SmallPoint/WE_Arena générique/Ghost, sans nom propre à taper).
-   Pas de fiche dédiée (comme les points d'intérêt) : clic -> va juste voir
-   sur la carte. */
+/* Événements de monde NOMMÉS seulement (28/454 — les points anonymes
+   WE_SmallPoint/WE_Arena générique/Ghost n'ont pas de nom propre à taper,
+   donc restent exclus). Pas de fiche dédiée (comme les points d'intérêt) :
+   clic -> va juste voir sur la carte. */
 function buildEventSearchIndex() {
   S.events.forEach(e => pushSearchEntry(e.name, 'event', EVENT_HEX, e.x, e.z, null, null, pretty(e.kind), '⚑'));
 }
@@ -1909,7 +1995,8 @@ $('#panel-toggle').addEventListener('click', () => {
    Cohérence UI ⨯ données : changer de langue recharge TOUT le jeu de
    données (site/data/<lang>/) ET retraduit le chrome — jamais l'un sans
    l'autre (voir data/SCHEMA.md "i18n"). Seules les langues à la fois
-   présentes dans LANGS (site/js/i18n.js) et dans le dataset construit par sont proposées. */
+   présentes dans LANGS (site/js/i18n.js) et dans le dataset construit
+   côté données sont proposées. */
 function applyStaticI18n() {
   document.documentElement.lang = S.lang;
   $$('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });

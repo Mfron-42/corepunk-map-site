@@ -4,9 +4,8 @@
 
    Coherence rule (see data/SCHEMA.md "i18n"): a language code only belongs
    in LANGS once BOTH layers are complete for it — this dictionary (UI) AND
-   the game-data build under site/data/<code>/::
-   SITE_LOCALES +. Never show an interface in one
-   language with game content in another. FR is the default. */
+   the game-data build under site/data/<code>/. Never show an interface in
+   one language with game content in another. FR is the default. */
 'use strict';
 
 const LANGS = {
@@ -32,9 +31,8 @@ function _pluralSlavic(n, one, few, many) {
 /* ui: flat strings/functions for one-off chrome text (titles, buttons,
    messages). Table sections (cat/rarity/kind/itemKind/action/searchCat/
    campKind) mirror the small label dictionaries app.js used to hardcode in
-   French — same keys as the neutral tokens the pipeline now ships, kinds),
-   so a table lookup never needs to know which language is active except
-   here. */
+   French — same keys as the neutral tokens the data layer now ships, so a
+   table lookup never needs to know which language is active except here. */
 const I18N = {
   fr: {
     ui: {
@@ -144,6 +142,8 @@ const I18N = {
       familyMonstersTitle: n => `Monstres de cette famille (${n})`,
       locationLabel: 'Lieu',
       abilityLabel: 'Capacité',
+      harvestTitle: 'Dépeçage',
+      noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
@@ -175,6 +175,7 @@ const I18N = {
     action: {
       kill: 'Éliminer', collect: 'Collecter', use: 'Utiliser', talk: 'Parler à',
       goto: 'Se rendre à', deliver: 'Livrer', custom: 'Faire',
+      repair: 'Réparer', craft: 'Fabriquer', mix: 'Mélanger',
     },
     searchCat: {
       npc: 'PNJ', poi: 'Lieu', quest: 'Quête', qao: 'Objet',
@@ -204,6 +205,19 @@ const I18N = {
       crateCorn: 'Caisse de maïs', crateCabbage: 'Caisse de choux', crateCarrot: 'Caisse de carottes',
       crateOnion: "Caisse d'oignons", crateEggplant: "Caisse d'aubergines", crateBerries: 'Caisse de baies',
       sackCorn: 'Sac de maïs', sackWheat: 'Sac de blé',
+    },
+    // Métier (item/recette `prof`) — termes officiels ConstProfession.xml.
+    profession: {
+      Alchemy: 'Alchimie', Butchery: 'Boucherie', Construction: 'Construction',
+      Cooking: 'Cuisine', Herbalism: 'Herboristerie', Logging: 'Bûcheron',
+      Mining: 'Mineur', Mysticism: 'Mysticisme', Weaponsmithing: "Forge d'armes",
+    },
+    // Méthode de dépeçage d'un monstre (`harvestMethod`, ex. "Flayer") —
+    // même terminologie officielle que profession ci-dessus, mais keyé sur
+    // le nom de nœud ConstProfession (pas toujours identique au libellé
+    // d'activité : "Flayer" -> "Boucherie", "Lumberjack" -> "Bûcheron"…).
+    harvestMethod: {
+      Flayer: 'Boucherie', Herbalism: 'Herboristerie', Lumberjack: 'Bûcheron', Miner: 'Mineur',
     },
   },
   en: {
@@ -313,6 +327,8 @@ const I18N = {
       familyMonstersTitle: n => `Monsters of this family (${n})`,
       locationLabel: 'Place',
       abilityLabel: 'Ability',
+      harvestTitle: 'Harvesting',
+      noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
@@ -337,6 +353,7 @@ const I18N = {
     action: {
       kill: 'Kill', collect: 'Collect', use: 'Use', talk: 'Talk to',
       goto: 'Go to', deliver: 'Deliver', custom: 'Do',
+      repair: 'Repair', craft: 'Craft', mix: 'Mix',
     },
     searchCat: {
       npc: 'NPC', poi: 'Place', quest: 'Quest', qao: 'Object',
@@ -362,6 +379,14 @@ const I18N = {
       crateCorn: 'Corn crate', crateCabbage: 'Cabbage crate', crateCarrot: 'Carrot crate',
       crateOnion: 'Onion crate', crateEggplant: 'Eggplant crate', crateBerries: 'Berry crate',
       sackCorn: 'Corn sack', sackWheat: 'Wheat sack',
+    },
+    profession: {
+      Alchemy: 'Alchemy', Butchery: 'Butchery', Construction: 'Construction',
+      Cooking: 'Cooking', Herbalism: 'Herbalism', Logging: 'Logging',
+      Mining: 'Mining', Mysticism: 'Mysticism', Weaponsmithing: 'Weaponsmithing',
+    },
+    harvestMethod: {
+      Flayer: 'Butchery', Herbalism: 'Herbalism', Lumberjack: 'Logging', Miner: 'Mining',
     },
   },
   ru: {
@@ -471,6 +496,8 @@ const I18N = {
       familyMonstersTitle: n => `Монстры этого вида (${n})`,
       locationLabel: 'Место',
       abilityLabel: 'Способность',
+      harvestTitle: 'Добыча',
+      noHarvestCatalogued: 'Добыча при разделке этого монстра не каталогизирована.',
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
@@ -495,6 +522,7 @@ const I18N = {
     action: {
       kill: 'Уничтожить', collect: 'Собрать', use: 'Использовать', talk: 'Поговорить с',
       goto: 'Отправиться к', deliver: 'Доставить', custom: 'Сделать',
+      repair: 'Починить', craft: 'Создать', mix: 'Смешать',
     },
     searchCat: {
       npc: 'НПС', poi: 'Место', quest: 'Задание', qao: 'Объект',
@@ -520,6 +548,14 @@ const I18N = {
       crateCorn: 'Ящик кукурузы', crateCabbage: 'Ящик капусты', crateCarrot: 'Ящик моркови',
       crateOnion: 'Ящик лука', crateEggplant: 'Ящик баклажанов', crateBerries: 'Ящик ягод',
       sackCorn: 'Мешок кукурузы', sackWheat: 'Мешок пшеницы',
+    },
+    profession: {
+      Alchemy: 'Алхимия', Butchery: 'Разделка', Construction: 'Строительство',
+      Cooking: 'Кулинария', Herbalism: 'Травничество', Logging: 'Лесозаготовка',
+      Mining: 'Горное дело', Mysticism: 'Мистицизм', Weaponsmithing: 'Оружейное дело',
+    },
+    harvestMethod: {
+      Flayer: 'Разделка', Herbalism: 'Травничество', Lumberjack: 'Лесозаготовка', Miner: 'Горное дело',
     },
   },
   uk: {
@@ -629,6 +665,8 @@ const I18N = {
       familyMonstersTitle: n => `Монстри цього виду (${n})`,
       locationLabel: 'Місце',
       abilityLabel: 'Здібність',
+      harvestTitle: 'Здобич',
+      noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
@@ -653,6 +691,7 @@ const I18N = {
     action: {
       kill: 'Знищити', collect: 'Зібрати', use: 'Використати', talk: 'Поговорити з',
       goto: 'Піти до', deliver: 'Доставити', custom: 'Зробити',
+      repair: 'Полагодити', craft: 'Створити', mix: 'Змішати',
     },
     searchCat: {
       npc: 'НПС', poi: 'Місце', quest: 'Квест', qao: 'Об’єкт',
@@ -678,6 +717,14 @@ const I18N = {
       crateCorn: 'Ящик кукурудзи', crateCabbage: 'Ящик капусти', crateCarrot: 'Ящик моркви',
       crateOnion: 'Ящик цибулі', crateEggplant: 'Ящик баклажанів', crateBerries: 'Ящик ягід',
       sackCorn: 'Мішок кукурудзи', sackWheat: 'Мішок пшениці',
+    },
+    profession: {
+      Alchemy: 'Алхімія', Butchery: 'Забій', Construction: 'Будівництво',
+      Cooking: 'Кулінарія', Herbalism: 'Травництво', Logging: 'Лісорубство',
+      Mining: 'Рудокопство', Mysticism: 'Містицизм', Weaponsmithing: 'Зброярство',
+    },
+    harvestMethod: {
+      Flayer: 'Забій', Herbalism: 'Травництво', Lumberjack: 'Лісорубство', Miner: 'Рудокопство',
     },
   },
   es: {
@@ -787,6 +834,8 @@ const I18N = {
       familyMonstersTitle: n => `Monstruos de esta familia (${n})`,
       locationLabel: 'Lugar',
       abilityLabel: 'Habilidad',
+      harvestTitle: 'Recolección',
+      noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
@@ -811,6 +860,7 @@ const I18N = {
     action: {
       kill: 'Eliminar', collect: 'Recolectar', use: 'Usar', talk: 'Hablar con',
       goto: 'Ir a', deliver: 'Entregar', custom: 'Hacer',
+      repair: 'Reparar', craft: 'Fabricar', mix: 'Mezclar',
     },
     searchCat: {
       npc: 'PNJ', poi: 'Lugar', quest: 'Misión', qao: 'Objeto',
@@ -836,6 +886,14 @@ const I18N = {
       crateCorn: 'Cajón de maíz', crateCabbage: 'Cajón de repollo', crateCarrot: 'Cajón de zanahorias',
       crateOnion: 'Cajón de cebollas', crateEggplant: 'Cajón de berenjenas', crateBerries: 'Cajón de bayas',
       sackCorn: 'Saco de maíz', sackWheat: 'Saco de trigo',
+    },
+    profession: {
+      Alchemy: 'Alquimia', Butchery: 'Desuello', Construction: 'Construcción',
+      Cooking: 'Cocina', Herbalism: 'Herboristería', Logging: 'Tala',
+      Mining: 'Minería', Mysticism: 'Misticismo', Weaponsmithing: 'Herrería de armas',
+    },
+    harvestMethod: {
+      Flayer: 'Desuello', Herbalism: 'Herboristería', Lumberjack: 'Tala', Miner: 'Minería',
     },
   },
 };

@@ -693,6 +693,12 @@ body {
 .goal-target-icon .icon-broken { width: 100%; height: 100%; font-size: .58rem; background: none; }
 .goal-target-icon svg { width: 13px; height: 13px; }
 
+/* Série numérotée (ex. "Broken pipe 1/2/3") : une vignette .goal-target par
+   membre, toutes trouvables sur la carte — même style que la vignette de
+   cible unique, juste répétée avec son propre libellé miniature. */
+.goal-target-series { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.goal-target-mini-label { font-size: .72rem; color: var(--ink); white-space: nowrap; }
+
 /* ── Corps de fiche : lignes, chips ── */
 .frow {
   display: flex; align-items: center; gap: 9px;
@@ -766,9 +772,10 @@ body {
 }
 
 /* Objectif de quête sans position fixe (spawn dynamique côté serveur) —
-   jamais « position inconnue » : voir dynamicPosBadge() dans app.js et's search_zone. Même traitement visuel discret que
-   .pos-unknown (texte muet, pas une erreur), avec un bouton « Voir la zone »
-   (.goto) accolé quand une zone de spawn confiance haute est disponible. */
+   jamais « position inconnue » : voir dynamicPosBadge() dans app.js. Même
+   traitement visuel discret que .pos-unknown (texte muet, pas une erreur),
+   avec un bouton « Voir la zone » (.goto) accolé quand une zone de spawn
+   confiance haute est disponible. */
 .pos-dynamic {
   flex: none;
   font-size: .7rem;
@@ -780,12 +787,11 @@ body {
 .pos-region { font-style: normal; opacity: .8; }
 .goal-target .pos-dynamic { padding: 0 4px 0 3px; }
 
-/* Objectif agrégat (checklist header, cf. target.kind ===
-   "multiple") : un peu plus discret que ses enfants (mêmes puces
-   numérotées, pas de traitement spécial nécessaire au-delà de l'absence de
-   vignette de cible) — juste un soupçon d'italique sur son propre libellé
-   pour signaler qu'il chapeaute les étapes suivantes plutôt que d'en être
-   une lui-même. */
+/* Objectif agrégat (checklist header, target.kind === "multiple") : un peu
+   plus discret que ses enfants (mêmes puces numérotées, pas de traitement
+   spécial nécessaire au-delà de l'absence de vignette de cible) — juste un
+   soupçon d'italique sur son propre libellé pour signaler qu'il chapeaute
+   les étapes suivantes plutôt que d'en être une lui-même. */
 .goal-step-aggregate > .goal-body > .goal-text { font-style: italic; opacity: .92; }
 
 .reward-chips { display: flex; flex-wrap: wrap; gap: 7px; }
