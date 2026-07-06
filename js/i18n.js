@@ -43,7 +43,7 @@ const I18N = {
       panelAriaLabel: 'Légende et filtres',
       title: 'Carte de Kwalat',
       subtitle: 'Corepunk · carte communautaire',
-      searchPlaceholder: 'Chercher un PNJ, une quête, un objet…',
+      searchPlaceholder: 'Chercher un PNJ, une quête, un objet, un monstre…',
       searchAriaLabel: 'Recherche',
       filtersAriaLabel: 'Filtres',
       legend: 'Légende',
@@ -134,6 +134,16 @@ const I18N = {
       mapDownload4800: 'Carte 4800px',
       loadErrorPrefix: msg => `Impossible de charger les données (${msg})`,
       closeBtnAria: 'Fermer',
+      monsterLabel: 'Monstre',
+      variantsNote: n => ` · +${n} variantes`,
+      monsterAbilitiesN: n => `Capacités (${n})`,
+      monsterCampsN: n => `Apparaît dans (${n})`,
+      noLootCatalogued: 'Butin non catalogué pour ce monstre.',
+      noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
+      noCampsKnown: 'Aucun camp connu pour ce monstre.',
+      familyMonstersTitle: n => `Monstres de cette famille (${n})`,
+      locationLabel: 'Lieu',
+      abilityLabel: 'Capacité',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
@@ -169,6 +179,8 @@ const I18N = {
     searchCat: {
       npc: 'PNJ', poi: 'Lieu', quest: 'Quête', qao: 'Objet',
       workshop: 'Atelier', camp: 'Camp', item: 'Item',
+      monster: 'Monstre', zone: 'Région', location: 'Lieu',
+      ability: 'Capacité', event: 'Événement', chest: 'Coffre',
     },
     campKind: {
       monsters: 'Monstres', creeps: 'Creeps', herbalism: 'Herboristerie',
@@ -176,6 +188,22 @@ const I18N = {
       destroyable: 'Destructibles', reactive: 'Interactifs', shrines: 'Sanctuaires',
       soulkeeper: 'Soulkeepers', quest: 'Quête', wildlife: 'Animaux',
       guards: 'Gardes', other: 'Autres',
+    },
+    monsterAttack: { Melee: 'Corps à corps', Range: 'Distance', Ranged: 'Distance', Axe: 'Hache' },
+    locationKind: {
+      town: 'Ville', poi: "Point d'intérêt", mob: 'Bestiaire', dungeon_boss: 'Boss de donjon',
+      gathering: 'Ressource', portal: 'Portail', shrine: 'Sanctuaire',
+    },
+    // Libellés des camps « destructibles »/« coffres cherchables » quand un
+    // sous-type précis (tonneau, caisse de légume, sac, tombe…) est détecté
+    // dans la clé du camp (site/js/app.js::campSearchLabel) — sinon repli sur
+    // campKind.destroyable/searchable ci-dessus (déjà générique et traduit).
+    campType: {
+      barrels: 'Tonneaux explosifs', tombstones: 'Pierres tombales', coffins: 'Cercueils',
+      chests: 'Coffres', corpses: 'Corps fouillables', sacks: 'Sacs',
+      crateCorn: 'Caisse de maïs', crateCabbage: 'Caisse de choux', crateCarrot: 'Caisse de carottes',
+      crateOnion: "Caisse d'oignons", crateEggplant: "Caisse d'aubergines", crateBerries: 'Caisse de baies',
+      sackCorn: 'Sac de maïs', sackWheat: 'Sac de blé',
     },
   },
   en: {
@@ -185,7 +213,7 @@ const I18N = {
       panelAriaLabel: 'Legend and filters',
       title: 'Map of Kwalat',
       subtitle: 'Corepunk · community map',
-      searchPlaceholder: 'Search an NPC, a quest, an item…',
+      searchPlaceholder: 'Search an NPC, a quest, an item, a monster…',
       searchAriaLabel: 'Search',
       filtersAriaLabel: 'Filters',
       legend: 'Legend',
@@ -275,6 +303,16 @@ const I18N = {
       mapDownload4800: 'Map 4800px',
       loadErrorPrefix: msg => `Could not load data (${msg})`,
       closeBtnAria: 'Close',
+      monsterLabel: 'Monster',
+      variantsNote: n => ` · +${n} variants`,
+      monsterAbilitiesN: n => `Abilities (${n})`,
+      monsterCampsN: n => `Spawns in (${n})`,
+      noLootCatalogued: 'No catalogued loot for this monster.',
+      noAbilitiesKnown: 'No known abilities for this monster.',
+      noCampsKnown: 'No known camp for this monster.',
+      familyMonstersTitle: n => `Monsters of this family (${n})`,
+      locationLabel: 'Place',
+      abilityLabel: 'Ability',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
@@ -303,6 +341,8 @@ const I18N = {
     searchCat: {
       npc: 'NPC', poi: 'Place', quest: 'Quest', qao: 'Object',
       workshop: 'Workshop', camp: 'Camp', item: 'Item',
+      monster: 'Monster', zone: 'Region', location: 'Place',
+      ability: 'Ability', event: 'Event', chest: 'Chest',
     },
     campKind: {
       monsters: 'Monsters', creeps: 'Creeps', herbalism: 'Herbalism',
@@ -310,6 +350,18 @@ const I18N = {
       destroyable: 'Destroyables', reactive: 'Interactives', shrines: 'Shrines',
       soulkeeper: 'Soulkeepers', quest: 'Quest', wildlife: 'Wildlife',
       guards: 'Guards', other: 'Other',
+    },
+    monsterAttack: { Melee: 'Melee', Range: 'Ranged', Ranged: 'Ranged', Axe: 'Axe' },
+    locationKind: {
+      town: 'Town', poi: 'Point of interest', mob: 'Bestiary', dungeon_boss: 'Dungeon boss',
+      gathering: 'Resource', portal: 'Portal', shrine: 'Shrine',
+    },
+    campType: {
+      barrels: 'Explosive barrels', tombstones: 'Tombstones', coffins: 'Coffins',
+      chests: 'Chests', corpses: 'Searchable corpses', sacks: 'Sacks',
+      crateCorn: 'Corn crate', crateCabbage: 'Cabbage crate', crateCarrot: 'Carrot crate',
+      crateOnion: 'Onion crate', crateEggplant: 'Eggplant crate', crateBerries: 'Berry crate',
+      sackCorn: 'Corn sack', sackWheat: 'Wheat sack',
     },
   },
   ru: {
@@ -319,7 +371,7 @@ const I18N = {
       panelAriaLabel: 'Легенда и фильтры',
       title: 'Карта Квалата',
       subtitle: 'Corepunk · карта сообщества',
-      searchPlaceholder: 'Найти НПС, задание, предмет…',
+      searchPlaceholder: 'Найти НПС, задание, предмет, монстра…',
       searchAriaLabel: 'Поиск',
       filtersAriaLabel: 'Фильтры',
       legend: 'Легенда',
@@ -409,6 +461,16 @@ const I18N = {
       mapDownload4800: 'Карта 4800px',
       loadErrorPrefix: msg => `Не удалось загрузить данные (${msg})`,
       closeBtnAria: 'Закрыть',
+      monsterLabel: 'Монстр',
+      variantsNote: n => ` · ещё ${n} ${_pluralSlavic(n, 'вариант', 'варианта', 'вариантов')}`,
+      monsterAbilitiesN: n => `Способности (${n})`,
+      monsterCampsN: n => `Появляется в (${n})`,
+      noLootCatalogued: 'Добыча для этого монстра не каталогизирована.',
+      noAbilitiesKnown: 'Нет известных способностей у этого монстра.',
+      noCampsKnown: 'Нет известных лагерей для этого монстра.',
+      familyMonstersTitle: n => `Монстры этого вида (${n})`,
+      locationLabel: 'Место',
+      abilityLabel: 'Способность',
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
@@ -437,6 +499,8 @@ const I18N = {
     searchCat: {
       npc: 'НПС', poi: 'Место', quest: 'Задание', qao: 'Объект',
       workshop: 'Мастерская', camp: 'Лагерь', item: 'Предмет',
+      monster: 'Монстр', zone: 'Регион', location: 'Место',
+      ability: 'Способность', event: 'Событие', chest: 'Сундук',
     },
     campKind: {
       monsters: 'Монстры', creeps: 'Крипы', herbalism: 'Травничество',
@@ -444,6 +508,18 @@ const I18N = {
       destroyable: 'Разрушаемые', reactive: 'Интерактивные', shrines: 'Святилища',
       soulkeeper: 'Хранители душ', quest: 'Задание', wildlife: 'Дикие животные',
       guards: 'Стражи', other: 'Другое',
+    },
+    monsterAttack: { Melee: 'Ближний бой', Range: 'Дальний бой', Ranged: 'Дальний бой', Axe: 'Топор' },
+    locationKind: {
+      town: 'Город', poi: 'Точка интереса', mob: 'Бестиарий', dungeon_boss: 'Босс подземелья',
+      gathering: 'Ресурс', portal: 'Портал', shrine: 'Святилище',
+    },
+    campType: {
+      barrels: 'Взрывающиеся бочки', tombstones: 'Надгробия', coffins: 'Гробы',
+      chests: 'Сундуки', corpses: 'Обыскиваемые трупы', sacks: 'Мешки',
+      crateCorn: 'Ящик кукурузы', crateCabbage: 'Ящик капусты', crateCarrot: 'Ящик моркови',
+      crateOnion: 'Ящик лука', crateEggplant: 'Ящик баклажанов', crateBerries: 'Ящик ягод',
+      sackCorn: 'Мешок кукурузы', sackWheat: 'Мешок пшеницы',
     },
   },
   uk: {
@@ -453,7 +529,7 @@ const I18N = {
       panelAriaLabel: 'Легенда та фільтри',
       title: 'Карта Квалата',
       subtitle: 'Corepunk · карта спільноти',
-      searchPlaceholder: 'Знайти НПС, квест, предмет…',
+      searchPlaceholder: 'Знайти НПС, квест, предмет, монстра…',
       searchAriaLabel: 'Пошук',
       filtersAriaLabel: 'Фільтри',
       legend: 'Легенда',
@@ -543,6 +619,16 @@ const I18N = {
       mapDownload4800: 'Карта 4800px',
       loadErrorPrefix: msg => `Не вдалося завантажити дані (${msg})`,
       closeBtnAria: 'Закрити',
+      monsterLabel: 'Монстр',
+      variantsNote: n => ` · ще ${n} ${_pluralSlavic(n, 'варіант', 'варіанти', 'варіантів')}`,
+      monsterAbilitiesN: n => `Здібності (${n})`,
+      monsterCampsN: n => `З'являється в (${n})`,
+      noLootCatalogued: 'Здобич для цього монстра не каталогізована.',
+      noAbilitiesKnown: 'Немає відомих здібностей у цього монстра.',
+      noCampsKnown: 'Немає відомих таборів для цього монстра.',
+      familyMonstersTitle: n => `Монстри цього виду (${n})`,
+      locationLabel: 'Місце',
+      abilityLabel: 'Здібність',
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
@@ -571,6 +657,8 @@ const I18N = {
     searchCat: {
       npc: 'НПС', poi: 'Місце', quest: 'Квест', qao: 'Об’єкт',
       workshop: 'Майстерня', camp: 'Табір', item: 'Предмет',
+      monster: 'Монстр', zone: 'Регіон', location: 'Місце',
+      ability: 'Здібність', event: 'Подія', chest: 'Скриня',
     },
     campKind: {
       monsters: 'Монстри', creeps: 'Кріпи', herbalism: 'Травництво',
@@ -578,6 +666,18 @@ const I18N = {
       destroyable: 'Руйнівні', reactive: 'Інтерактивні', shrines: 'Святилища',
       soulkeeper: 'Охоронці душ', quest: 'Квест', wildlife: 'Дикі тварини',
       guards: 'Стражі', other: 'Інше',
+    },
+    monsterAttack: { Melee: 'Ближній бій', Range: 'Дальній бій', Ranged: 'Дальній бій', Axe: 'Сокира' },
+    locationKind: {
+      town: 'Місто', poi: 'Точка інтересу', mob: 'Бестіарій', dungeon_boss: 'Бос підземелля',
+      gathering: 'Ресурс', portal: 'Портал', shrine: 'Святилище',
+    },
+    campType: {
+      barrels: 'Вибухові бочки', tombstones: 'Надгробки', coffins: 'Труни',
+      chests: 'Скрині', corpses: 'Обшукувані трупи', sacks: 'Мішки',
+      crateCorn: 'Ящик кукурудзи', crateCabbage: 'Ящик капусти', crateCarrot: 'Ящик моркви',
+      crateOnion: 'Ящик цибулі', crateEggplant: 'Ящик баклажанів', crateBerries: 'Ящик ягід',
+      sackCorn: 'Мішок кукурудзи', sackWheat: 'Мішок пшениці',
     },
   },
   es: {
@@ -587,7 +687,7 @@ const I18N = {
       panelAriaLabel: 'Leyenda y filtros',
       title: 'Mapa de Kwalat',
       subtitle: 'Corepunk · mapa comunitario',
-      searchPlaceholder: 'Buscar un PNJ, una misión, un objeto…',
+      searchPlaceholder: 'Buscar un PNJ, una misión, un objeto, un monstruo…',
       searchAriaLabel: 'Búsqueda',
       filtersAriaLabel: 'Filtros',
       legend: 'Leyenda',
@@ -677,6 +777,16 @@ const I18N = {
       mapDownload4800: 'Mapa 4800px',
       loadErrorPrefix: msg => `No se pudieron cargar los datos (${msg})`,
       closeBtnAria: 'Cerrar',
+      monsterLabel: 'Monstruo',
+      variantsNote: n => ` · +${n} variantes`,
+      monsterAbilitiesN: n => `Habilidades (${n})`,
+      monsterCampsN: n => `Aparece en (${n})`,
+      noLootCatalogued: 'Botín no catalogado para este monstruo.',
+      noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
+      noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
+      familyMonstersTitle: n => `Monstruos de esta familia (${n})`,
+      locationLabel: 'Lugar',
+      abilityLabel: 'Habilidad',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
@@ -705,6 +815,8 @@ const I18N = {
     searchCat: {
       npc: 'PNJ', poi: 'Lugar', quest: 'Misión', qao: 'Objeto',
       workshop: 'Taller', camp: 'Campamento', item: 'Ítem',
+      monster: 'Monstruo', zone: 'Región', location: 'Lugar',
+      ability: 'Habilidad', event: 'Evento', chest: 'Cofre',
     },
     campKind: {
       monsters: 'Monstruos', creeps: 'Creeps', herbalism: 'Herboristería',
@@ -712,6 +824,18 @@ const I18N = {
       destroyable: 'Destructibles', reactive: 'Interactivos', shrines: 'Santuarios',
       soulkeeper: 'Guardianes de almas', quest: 'Misión', wildlife: 'Fauna',
       guards: 'Guardias', other: 'Otros',
+    },
+    monsterAttack: { Melee: 'Cuerpo a cuerpo', Range: 'A distancia', Ranged: 'A distancia', Axe: 'Hacha' },
+    locationKind: {
+      town: 'Ciudad', poi: 'Punto de interés', mob: 'Bestiario', dungeon_boss: 'Jefe de mazmorra',
+      gathering: 'Recurso', portal: 'Portal', shrine: 'Santuario',
+    },
+    campType: {
+      barrels: 'Barriles explosivos', tombstones: 'Lápidas', coffins: 'Ataúdes',
+      chests: 'Cofres', corpses: 'Cadáveres registrables', sacks: 'Sacos',
+      crateCorn: 'Cajón de maíz', crateCabbage: 'Cajón de repollo', crateCarrot: 'Cajón de zanahorias',
+      crateOnion: 'Cajón de cebollas', crateEggplant: 'Cajón de berenjenas', crateBerries: 'Cajón de bayas',
+      sackCorn: 'Saco de maíz', sackWheat: 'Saco de trigo',
     },
   },
 };

@@ -41,6 +41,20 @@ const CAMP_COLORS = {
 };
 const campKindLabel = key => tbl('campKind', key) || pretty(key);
 const actorKindLabel = key => tbl('kind', key) || key;
+/* Accent colors for the new search-only categories (monsters/zones/lore/
+   abilities) added on top of the pre-existing CATS/CAMP_COLORS palette —
+   monster reuses CAMP_COLORS.monsters (same creature, same color whether
+   found via a camp or via its own fiche); zone reuses the existing "Zones
+   (régions)" filter-row swatch (#7fc8a9, see buildFilters()) for the same
+   reason. location/ability are new, chosen distinct from every existing
+   swatch above (see frontend-design pass notes in the mission report). */
+const MONSTER_HEX = CAMP_COLORS.monsters;
+const ZONE_HEX = '#7fc8a9';
+const LOCATION_HEX = '#e0c68c';
+const ABILITY_HEX = '#5fa8d3';
+const EVENT_HEX = '#d65db1';
+const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
+const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 const RARITY = {
   Common:   { hex: '#b9c2c8' },
   Uncommon: { hex: '#6fbf73' },
@@ -108,6 +122,10 @@ const S = {
   items: {},                // clé d'item -> fiche (base de données objets)
   recipes: {},              // clé de recette -> {name, icon, output, ingredients}
   vendors: {},              // clé de vendeur -> {name, npcs, sells}
+  monsters: {},             // clé de monstre (variante représentative) -> fiche
+  locations: [],            // bestiaire/lore (MapMarkers.xml), index = id de recherche/fiche
+  abilities: {},            // clé de capacité (nommées seulement) -> fiche
+  events: [],               // événements de monde nommés
   openFiche: null,          // {kind, id} de la fiche ouverte (rafraîchie si les
                             // données différées arrivent pendant qu'elle est ouverte)
   locator: null,            // miroir plat du réticule ambré {x,z,label}, lu par buildHash()
@@ -294,22 +312,32 @@ async function loadCritical() {
 }
 
 /* Chemin différé : camps (1,9 Mo / 116k points, filtres tous décochés par
-   défaut), fiches camp, recettes et stock des vendeurs (consultés
-   uniquement depuis une fiche). Démarré juste après le premier rendu, sans
-   bloquer le panneau ni les fiches quête/item. */
+   défaut), fiches camp, recettes, stock des vendeurs, monstres, bestiaire/
+   lore, capacités nommées et événements de monde (tous consultés uniquement
+   depuis une fiche ou la recherche, jamais la première peinture). Démarré
+   juste après le premier rendu, sans bloquer le panneau ni les fiches
+   quête/item. */
 let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, locations, abilities, events] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
     fetchJson(dataPath('vendors.bin')).catch(() => ({})),
+    fetchJson(dataPath('monsters.bin')).catch(() => ({})),
+    fetchJson(dataPath('locations.bin')).catch(() => []),
+    fetchJson(dataPath('abilities.bin')).catch(() => ({})),
+    fetchJson(dataPath('events.bin')).catch(() => []),
   ]);
   S.campDetails = campDetails;
   S.recipes = recipes;
   S.vendors = vendors;
+  S.monsters = monsters;
+  S.locations = locations;
+  S.abilities = abilities;
+  S.events = events;
   // Re-callable (language switch, see setLang()): capture each kind's on/off
   // state before rebuilding S.camps from scratch, else re-running this would
   // append duplicate points/groups onto the previous load's arrays.
@@ -555,6 +583,117 @@ function openCampFiche(key) {
   setFicheHash('camp', key);
 }
 
+/* Fiche monstre : niveau/famille/type d'attaque, tags lisibles, butin (taux
+   garanti/%%, item cliquable -> fiche item, même rendu que openCampFiche/
+   openItemFiche ci-dessus), capacités (nom réel ou repli prettifié — voir, la plupart des capacités de
+   monstre n'ont aucune localisation dans le client), et camps où il apparaît
+   (bouton carte vers le camp). Le butin/les capacités/les camps viennent
+   TELS QUELS de monsters.json (voir::
+   monsters_site()) — un monstre sans butin catalogué l'affiche honnêtement
+   plutôt que de ne rien montrer ou d'inventer un lien (liage loot amélioré
+   séparément, hors de ce fichier). */
+function openMonsterFiche(key) {
+  const m = S.monsters[key];
+  if (!m) return;
+  S.openFiche = { kind: 'monster', id: key };
+  const icon = m.icon ? `icons/${m.icon}` : null;
+  const kindBits = [m.family ? pretty(m.family) : null, m.level != null ? tr('levelAbbrev', m.level) : null,
+    m.attack ? monsterAttackLabel(m.attack) : null].filter(Boolean);
+  const kindLine = (kindBits.join(' · ') || tr('monsterLabel')) + (m.variants > 1 ? tr('variantsNote', m.variants) : '');
+  const tagsHtml = m.tags?.length
+    ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
+
+  const lootRow = d => dropRow(d.icon ? `icons/${esc(d.icon)}` : null, d.name,
+    S.items[d.key] ? 'fiche-item' : null, d.key,
+    d.w != null ? `<span class="muted">${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %</span>` : '',
+    itemGlyph(S.items[d.key]));
+  const guaranteed = (m.loot || []).filter(d => d.g);
+  const chance = (m.loot || []).filter(d => !d.g);
+  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>${
+    m.loot?.length
+      ? (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(lootRow).join('')}` : '')
+        + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(lootRow).join('')}` : '')
+      : `<p class="hint">${esc(tr('noLootCatalogued'))}</p>`
+  }</div>`;
+
+  const abilitiesHtml = `<div class="fiche-section"><h3>${esc(tr('monsterAbilitiesN', m.abilities?.length || 0))}</h3>${
+    m.abilities?.length
+      ? m.abilities.map(a => `<div class="frow">
+          <span class="k-chip" style="--chip-c:${ABILITY_HEX}">${esc(a.slot || '·')}</span>
+          <span class="fr-label">${esc(a.name)}</span>
+        </div>`).join('')
+      : `<p class="hint">${esc(tr('noAbilitiesKnown'))}</p>`
+  }</div>`;
+
+  const campsHtml = `<div class="fiche-section"><h3>${esc(tr('monsterCampsN', m.camps?.length || 0))}</h3>${
+    m.camps?.length
+      ? m.camps.map(c => `<div class="frow">
+          <span class="fr-icon icon-broken" data-fb="📍"></span>
+          <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
+          ${gotoBtn(c.x, c.z, c.name)}
+        </div>`).join('')
+      : `<p class="hint">${esc(tr('noCampsKnown'))}</p>`
+  }</div>`;
+
+  openFiche(`
+    <div class="fiche-head">${iconTag(icon, 'fiche-avatar', initials(m.name))}
+      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}</div>
+      <h2>${esc(m.name)}</h2></div></div>
+    ${tagsHtml}
+    ${lootHtml}
+    ${abilitiesHtml}
+    ${campsHtml}`);
+  setFicheHash('monster', key);
+}
+
+/* Fiche bestiaire/lore (MapMarkers.xml) : titre, nature (Ville/Bestiaire/
+   Ressource…), description, bouton carte si une position est connue (38/208
+   depuis un pin _ip), monstres de la même famille cliquables vers leur
+   propre fiche quand connus du catalogue::
+   locations_site()'s family cross-link). Pas de lien profond dédié (`mon`/
+   `i`/`npc`/etc. sont nettoyés du hash pour éviter qu'un lien partagé rouvre
+   la MAUVAISE fiche après un rechargement — voir setFicheHash). */
+function openLocationFiche(idx) {
+  const l = S.locations[idx];
+  if (!l) return;
+  S.openFiche = { kind: 'location', id: idx };
+  const monstersHtml = l.monsters?.length
+    ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm => {
+        const known = S.monsters[fm.key];
+        return `<div class="frow">
+          <span class="fr-label${known ? ' link' : ''}"${known ? ` data-act="fiche-monster" data-id="${esc(fm.key)}"` : ''}>${esc(fm.name)}</span>
+          <span class="muted">${fm.level != null ? tr('levelAbbrev', fm.level) : ''}</span>
+        </div>`;
+      }).join('')}</div>` : '';
+  openFiche(`
+    <div class="fiche-head"><div>
+      <div class="fiche-kind" style="color:${LOCATION_HEX}">${esc(locationKindLabel(l.kind))}</div>
+      <h2>${esc(l.title)}</h2></div></div>
+    ${l.x != null ? `<div class="fiche-section"><div class="pop-actions">
+      <button class="act primary" data-act="goto" data-x="${l.x}" data-z="${l.z}" data-label="${esc(l.title)}">${esc(tr('viewOnMapBtn'))}</button>
+    </div></div>` : ''}
+    ${l.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(l.desc)}</p></div>` : ''}
+    ${monstersHtml}`);
+  setFicheHash(null);
+}
+
+/* Fiche capacité (sorts de héros NOMMÉS uniquement — voir()) : nom, emplacement (Q/W/E/
+   R/MA), description, tags de nature (Stun/AoE/DoT…) en puces. */
+function openAbilityFiche(key) {
+  const a = S.abilities[key];
+  if (!a) return;
+  S.openFiche = { kind: 'ability', id: key };
+  const tagsHtml = a.tags?.length
+    ? `<div class="fiche-section reward-chips">${a.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
+  openFiche(`
+    <div class="fiche-head"><div>
+      <div class="fiche-kind" style="color:${ABILITY_HEX}">${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}</div>
+      <h2>${esc(a.name)}</h2></div></div>
+    ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(a.desc)}</p></div>` : ''}
+    ${tagsHtml}`);
+  setFicheHash(null);
+}
+
 /* Délégation des boutons de popup / fiche. */
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
@@ -564,13 +703,14 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
   else if (b.dataset.act === 'fiche-npc') openNpcFiche(+id.split(':')[1]);
   else if (b.dataset.act === 'fiche-camp') openCampFiche(id);
   else if (b.dataset.act === 'fiche-item') openItemFiche(id);
+  else if (b.dataset.act === 'fiche-monster') openMonsterFiche(id);
   else if (b.dataset.act === 'zone-view') {
     const rings = S.zonesQuest[id];
     if (rings?.length) map.flyToBounds(L.latLngBounds(rings.flat().map(([x, z]) => toLL(x, z))).pad(0.3));
@@ -656,10 +796,11 @@ function openFiche(html) {
    fiche et canGoBackLocally()/unfocus() ne fonctionneraient plus jamais. */
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc');
+  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon');
   if (kind === 'quest') p.set('q', id);
   else if (kind === 'item') p.set('i', id);
   else if (kind === 'npc') p.set('npc', id);
+  else if (kind === 'monster') p.set('mon', id);
   else if (kind) p.set('camp', id);
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
@@ -1240,7 +1381,10 @@ function itemBias(key, it) {
    pushSearchEntry(): `cat` used to be the already-translated French display
    string doubling as a lookup key; now it's one of these tokens, and
    searchCatLabel() resolves the displayed chip text at render time. */
-const CAT_GLYPH = { npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦' };
+const CAT_GLYPH = {
+  npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦',
+  monster: '🐾', zone: '🗺', location: '📖', ability: '✨', event: '⚑', chest: '🧰',
+};
 const searchCatLabel = key => tbl('searchCat', key) || key;
 
 /* Normalisation de recherche : minuscules, accents pliés (é→e), tout
@@ -1336,7 +1480,66 @@ function buildSearch() {
       it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub].filter(Boolean).join(' · '),
       itemGlyph(it), itemBias(key, it));
   });
+  // Régions nommées (zonesGeo, chargé au critique — voir loadCritical) et
+  // coffres placés (S.data.chest, idem) : exhaustivité de la recherche
+  // demandée par la mission, ni l'un ni l'autre n'attend camps.json.
+  buildZoneSearchIndex();
+  buildChestSearchIndex();
+  // Monstres/bestiaire-lore/capacités nommées/événements + camps : ajoutés
+  // une fois leurs jeux de données différés arrivés (voir loadDeferred) —
+  // le tableau searchIndex est déjà branché sur la barre de recherche, un
+  // simple push suffit à chacun.
   whenDeferred(buildCampSearchIndex);
+  whenDeferred(buildMonsterSearchIndex);
+  whenDeferred(buildLocationSearchIndex);
+  whenDeferred(buildAbilitySearchIndex);
+  whenDeferred(buildEventSearchIndex);
+}
+
+/* Camps "destructibles"/"coffres cherchables" : plusieurs entrées de
+   camps.json encodent un type de prop précis (tonneau, caisse de légume,
+   sac, tombe, cercueil, corps…) comme une simple SOUS-CHAÎNE de leur clé —
+   jamais un champ dédié — et une bonne partie d'entre elles ont même leur
+   `kind` canonique posé à "poi" plutôt que "destroyable"/"searchable" (ex.
+   `fulfillment-manager-poi-destroyable-coffins-cemetery`), donc la détection
+   se fait sur la clé elle-même, pas sur g.kind. Traduit ça en un libellé
+   lisible et localisé au lieu du slug brut ("destroyable-container-corn-
+   goldenfield-town" -> "Caisse de maïs — Goldenfield town"), pour que
+   "carotte"/"tonneau"/"coffre" trouvent quelque chose. Repli sans sous-type
+   reconnu -> campKindLabel('destroyable'|'searchable') (déjà traduit).
+   5 camps "for-delete-*" (kind=destroyable) sont des restes de dev — exclus
+   de la recherche entièrement. Toute autre nature de camp (monstres,
+   herboristerie, minerai…) garde EXACTEMENT son comportement/libellé
+   d'avant (pretty(g.k) brut), rien n'y change. */
+const CAMP_TYPE_RULES = [
+  [/explosive.?barrels?/, 'barrels'],
+  [/corn.?sack/, 'sackCorn'],
+  [/wheat.?sack/, 'sackWheat'],
+  [/container.?corn\b/, 'crateCorn'],
+  [/container.?cabbage/, 'crateCabbage'],
+  [/container.?carrot/, 'crateCarrot'],
+  [/container.?onion/, 'crateOnion'],
+  [/container.?eggplant/, 'crateEggplant'],
+  [/container.?berries/, 'crateBerries'],
+  [/\bsacks?\b/, 'sacks'],
+  [/\bbags?\b/, 'sacks'],
+  [/tombstones?/, 'tombstones'],
+  [/coffins?/, 'coffins'],
+  [/searchable.?chest|\bchest\b/, 'chests'],
+  [/corpses/, 'corpses'],
+];
+function campSearchLabel(k) {
+  if (k.includes('for-delete')) return null;   // reste de dev — exclu de la recherche
+  if (!k.includes('destroyable') && !k.includes('searchable')) return pretty(k);
+  let type = null, rest = k;
+  for (const [re, key] of CAMP_TYPE_RULES) {
+    const m = re.exec(k);
+    if (m) { type = key; rest = k.slice(0, m.index) + k.slice(m.index + m[0].length); break; }
+  }
+  const typeLabel = type ? tbl('campType', type)
+    : campKindLabel(k.includes('searchable') ? 'searchable' : 'destroyable');
+  rest = rest.replace(/\b(poi|destroyable|searchable)\b/g, '').replace(/[-_]+/g, ' ').trim();
+  return rest ? `${typeLabel} — ${pretty(rest)}` : typeLabel;
 }
 
 /* Entrées « Camp » ajoutées à l'index une fois camps.json arrivé (chargement
@@ -1344,8 +1547,88 @@ function buildSearch() {
    recherche, un simple push suffit. */
 function buildCampSearchIndex() {
   Object.values(S.camps).forEach(st => st.groups.forEach(g => {
-    if (g.pts.length) pushSearchEntry(pretty(g.k), 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1]);
+    if (!g.pts.length) return;
+    const label = campSearchLabel(g.k);
+    if (label == null) return;
+    pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1]);
   }));
+}
+
+/* Coffres placés (tc_*, S.data.chest — ~3830 marqueurs individuels, chargés
+   au critique). Un skin de prop (ex. "Chest barrel elenian 02 grey") se
+   répète souvent des centaines de fois à l'identique — indexer chaque
+   marqueur ferait des centaines de doublons pour une seule recherche ; une
+   seule entrée par NOM DISTINCT (~130) suffit et reste honnête (aucune
+   position n'est cachée, juste dédoublonnée). Le nom brut n'est pas
+   localisé (pas une entrée Localization/, voir data/SCHEMA.md chests) —
+   préfixé par le libellé de catégorie déjà traduit (catLabel('chest')) pour
+   que "coffre" (FR) / "chest" (EN) / etc. matche quand même. */
+function chestSearchLabel(name) {
+  const rest = (name || '').replace(/^(small\s+)?chest\s+/i, '').trim();
+  return rest ? `${catLabel('chest')} — ${pretty(rest)}` : catLabel('chest');
+}
+function buildChestSearchIndex() {
+  const seen = new Map();
+  S.data.chest.forEach(r => { if (!seen.has(r.name)) seen.set(r.name, r); });
+  seen.forEach(r => pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z));
+}
+
+/* Régions nommées (zones_geo.json, chargé au critique — voir loadCritical) :
+   clic -> zoom sur les anneaux réels de la région (pas juste son point
+   d'étiquette) + active la couche "Zones" si elle était masquée, pour que
+   le polygone soit effectivement visible. */
+function buildZoneSearchIndex() {
+  S.zonesGeo.forEach(z => {
+    if (!z.rings?.length) return;
+    pushSearchEntry(z.name, 'zone', ZONE_HEX, null, null, () => {
+      if (!S.zonesOn) { S.zonesOn = true; toggleZones(true); buildFilters(); }
+      map.flyToBounds(L.latLngBounds(z.rings.flat().map(([x, zz]) => toLL(x, zz))).pad(0.15));
+    }, null, null, '🗺');
+  });
+}
+
+/* Monstres : nom (déjà dédupliqué/regroupé au build — voir()), sous-libellé "niv X ·
+   famille", clic -> fiche (pas de position fixe unique : un monstre peut
+   apparaître dans plusieurs camps, listés DANS la fiche). */
+function buildMonsterSearchIndex() {
+  Object.entries(S.monsters).forEach(([key, m]) => {
+    const sub = [m.level != null ? tr('levelAbbrev', m.level) : null, m.family ? pretty(m.family) : null]
+      .filter(Boolean).join(' · ');
+    pushSearchEntry(m.name, 'monster', MONSTER_HEX, null, null, () => openMonsterFiche(key),
+      m.icon ? `icons/${m.icon}` : null, sub, '🐾');
+  });
+}
+
+/* Bestiaire/lore (MapMarkers.xml) : index = clé de fiche (S.locations est un
+   tableau, pas un objet — voir.
+   Sous-libellé = nature (Ville/Bestiaire/Ressource…) ; position quand
+   connue (38/208 depuis un pin _ip, le reste sans coordonnée fiable —
+   fiche seule, comme un PNJ connu seulement par le dialogue). */
+function buildLocationSearchIndex() {
+  S.locations.forEach((l, i) => {
+    pushSearchEntry(l.title, 'location', LOCATION_HEX, l.x ?? null, l.z ?? null,
+      () => openLocationFiche(i), null, locationKindLabel(l.kind), '📖');
+  });
+}
+
+/* Capacités NOMMÉES seulement (202/1765 — sorts de héros Q/W/E/R/MA ; les
+   capacités de monstre n'ont aucune localisation dans le client, voir
+   data/SCHEMA.md abilities.json /::
+   abilities_site()) : indexer les ~1560 restantes n'aurait affiché que des
+   libellés de repli vides de sens, sans bénéfice pour la recherche. */
+function buildAbilitySearchIndex() {
+  Object.entries(S.abilities).forEach(([key, a]) => {
+    pushSearchEntry(a.name, 'ability', ABILITY_HEX, null, null, () => openAbilityFiche(key),
+      null, a.slot || '', '✨');
+  });
+}
+
+/* Événements de monde NOMMÉS seulement (28/454 — voir() pour la liste exclue : points
+   anonymes WE_SmallPoint/WE_Arena générique/Ghost, sans nom propre à taper).
+   Pas de fiche dédiée (comme les points d'intérêt) : clic -> va juste voir
+   sur la carte. */
+function buildEventSearchIndex() {
+  S.events.forEach(e => pushSearchEntry(e.name, 'event', EVENT_HEX, e.x, e.z, null, null, pretty(e.kind), '⚑'));
 }
 
 /* Score d'un jeton de requête contre une entrée (plus bas = meilleur) :
@@ -1524,7 +1807,7 @@ function buildHash() {
   // écrits ci-dessus depuis S.locator et les reporter aussi les dupliquerait.
   const p = new URLSearchParams(location.hash.slice(1));
   const carry = new URLSearchParams();
-  const carryKeys = S.locator ? ['q', 'camp', 'i', 'npc'] : ['q', 'camp', 'i', 'npc', 'at', 'atl'];
+  const carryKeys = S.locator ? ['q', 'camp', 'i', 'npc', 'mon'] : ['q', 'camp', 'i', 'npc', 'mon', 'at', 'atl'];
   for (const k of carryKeys) if (p.has(k)) carry.set(k, p.get(k));
   if ([...carry.keys()].length) h += '&' + carry.toString().replace(/%2C/g, ',');
   return h;
@@ -1555,7 +1838,7 @@ function readHash() {
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {
     view, onSet, ping: p.get('ping'), quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
-    npc: p.get('npc'), at, atl: p.get('atl') || null,
+    npc: p.get('npc'), monster: p.get('mon'), at, atl: p.get('atl') || null,
   };
 }
 
@@ -1729,7 +2012,7 @@ async function setLang(code) {
    appuis Précédent/Suivant rapprochés (mobile notamment). */
 function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, ping, quest, camp, item, npc, at, atl } = readHash();
+  const { view, onSet, ping, quest, camp, item, npc, monster, at, atl } = readHash();
 
   // Caméra EN PREMIER, avant tout rendu de couche dense : Leaflet exige une
   // vue déjà posée (setView/fitBounds) avant que map.getZoom()/map.project()
@@ -1768,12 +2051,16 @@ function applyLocationState() {
 
   // Fiche : ferme celle en cours puis rouvre celle du hash, s'il y en a une.
   // quest/item/npc sont immédiats (données déjà chargées à ce stade) ; camp
-  // attend camp_details.json (chargement différé) comme au chargement initial.
+  // et monster attendent camp_details.json/monsters.json (chargement
+  // différé) comme au chargement initial.
   closeFiche();
   if (quest && S.quests.has(quest)) openQuestFiche(quest);
   else if (item && S.items[item]) openItemFiche(item);
   else if (npc && S.data.npc[+npc]) openNpcFiche(+npc);
-  else whenDeferred(() => { if (camp && S.campDetails[camp]) openCampFiche(camp); });
+  else whenDeferred(() => {
+    if (camp && S.campDetails[camp]) openCampFiche(camp);
+    else if (monster && S.monsters[monster]) openMonsterFiche(monster);
+  });
 
   // Réticule + ping.
   if (at) setLocator(at.x, at.z, atl); else clearLocator();
