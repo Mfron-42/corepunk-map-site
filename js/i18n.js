@@ -89,6 +89,13 @@ const I18N = {
       posDynamic: 'Position dynamique',
       posDynamicZone: 'Position dynamique — zone de spawn',
       posUncatalogued: 'Position non cataloguée — à vérifier en jeu',
+      // Sous-libellé de la ligne de résultat de recherche pour une QUÊTE
+      // entière sans position extraite (giver/acteurs tous sans x/z — ex.
+      // les quêtes de Prison Island, sur une carte/frame de coordonnées à
+      // part). Honnête et distinct de posUnknown (réservé aux lignes hors
+      // quête) : dit juste qu'il n'y a aucun point à montrer, pas de bouton
+      // carte cassé — la fiche s'ouvre normalement au clic.
+      questNoPos: 'Pas de point sur la carte',
       vendorStockTitle: 'Stock du vendeur',
       vendorStockTitleN: n => `Stock du vendeur (${n})`,
       noVendorItems: 'Aucun article connu pour ce marchand.',
@@ -274,6 +281,13 @@ const I18N = {
       posDynamic: 'Dynamic position',
       posDynamicZone: 'Dynamic position — spawn zone',
       posUncatalogued: 'Uncatalogued position — check in-game',
+      // Sub-label for a search result row for an entire QUEST with no
+      // extracted position (giver/actors all lack x/z — e.g. the Prison
+      // Island quests, on a separate map/coordinate frame). Honest and
+      // distinct from posUnknown (reserved for non-quest rows): just says
+      // there's no point to show, no broken map button — the fiche still
+      // opens normally on click.
+      questNoPos: 'No point on the map',
       vendorStockTitle: 'Vendor stock',
       vendorStockTitleN: n => `Vendor stock (${n})`,
       noVendorItems: 'No known items for this merchant.',
@@ -443,6 +457,12 @@ const I18N = {
       posDynamic: 'Динамическая позиция',
       posDynamicZone: 'Динамическая позиция — зона спавна',
       posUncatalogued: 'Позиция не каталогизирована — проверьте в игре',
+      // Подпись строки результата поиска для ЗАДАНИЯ целиком без найденной
+      // позиции (у выдающего/участников нет x/z — напр. задания Prison
+      // Island, на отдельной карте/системе координат). Честно и отдельно от
+      // posUnknown: просто нет точки на карте, кнопка карты не показана —
+      // карточка задания всё равно открывается по клику.
+      questNoPos: 'Нет точки на карте',
       vendorStockTitle: 'Товары торговца',
       vendorStockTitleN: n => `Товары торговца (${n})`,
       noVendorItems: 'Нет известных товаров у этого торговца.',
@@ -612,6 +632,12 @@ const I18N = {
       posDynamic: 'Динамічна позиція',
       posDynamicZone: 'Динамічна позиція — зона спавну',
       posUncatalogued: 'Позиція не каталогізована — перевірте в грі',
+      // Підпис рядка результату пошуку для ЦІЛОГО КВЕСТУ без знайденої
+      // позиції (у видавця/учасників немає x/z — напр. квести Prison
+      // Island, на окремій карті/системі координат). Чесно і окремо від
+      // posUnknown: просто немає точки на карті, кнопка карти не показана —
+      // картка квесту все одно відкривається по кліку.
+      questNoPos: 'Немає точки на карті',
       vendorStockTitle: 'Товари торговця',
       vendorStockTitleN: n => `Товари торговця (${n})`,
       noVendorItems: 'Немає відомих товарів у цього торговця.',
@@ -781,6 +807,13 @@ const I18N = {
       posDynamic: 'Posición dinámica',
       posDynamicZone: 'Posición dinámica — zona de aparición',
       posUncatalogued: 'Posición no catalogada — verificar en el juego',
+      // Subtítulo de la fila de resultado de búsqueda para una MISIÓN
+      // entera sin posición extraída (el dador/actores no tienen x/z — p.
+      // ej. las misiones de Prison Island, en un mapa/sistema de
+      // coordenadas aparte). Honesto y distinto de posUnknown: solo dice
+      // que no hay punto que mostrar, sin botón de mapa roto — la ficha
+      // igual se abre al hacer clic.
+      questNoPos: 'Sin punto en el mapa',
       vendorStockTitle: 'Inventario del vendedor',
       vendorStockTitleN: n => `Inventario del vendedor (${n})`,
       noVendorItems: 'No se conocen artículos para este comerciante.',

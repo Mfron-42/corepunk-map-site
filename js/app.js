@@ -1552,8 +1552,13 @@ function buildSearch() {
   S.data.npc.forEach((r, i) => push(r.name, 'npc', CATS.npc.hex, r.x, r.z, () => openNpcFiche(i),
     null, r.x == null ? tr('posUnknown') : null, initials(r.name)));
   S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z));
-  S.data.quest.forEach(q => q.x != null && push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
-    null, null, null, 0, questSearchBody(q)));
+  // Une quête sans x/z (giver et acteurs tous sans position extraite — ex.
+  // les quêtes de Prison Island, cf. questNoPos) reste indexée : le clic
+  // ouvre sa fiche exactement comme d'habitude (openQuestFiche tolère déjà
+  // q.x null), simplement pas de saut/centrage carte — même traitement que
+  // les PNJ sans position juste au-dessus.
+  S.data.quest.forEach(q => push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
+    null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q)));
   S.data.qao.forEach(r => push(r.name, 'qao', CATS.qao.hex, r.x, r.z));
   S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z));
   // Base de données objets : icône + rareté, pas de position (fiche seule).
