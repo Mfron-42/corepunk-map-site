@@ -1,0 +1,770 @@
+/* Kwalat — i18n dictionary (UI chrome) + language runtime.
+   Loaded BEFORE app.js: exposes globals (LANGS, DEFAULT_LANG, LANG, t, tbl,
+   setLangCode, $$) that app.js reads for every player-facing string.
+
+   Coherence rule (see data/SCHEMA.md "i18n"): a language code only belongs
+   in LANGS once BOTH layers are complete for it — this dictionary (UI) AND
+   the game-data build under site/data/<code>/::
+   SITE_LOCALES +. Never show an interface in one
+   language with game content in another. FR is the default. */
+'use strict';
+
+const LANGS = {
+  fr: { name: 'Français', flag: '🇫🇷', numberLocale: 'fr-FR' },
+  en: { name: 'English', flag: '🇬🇧', numberLocale: 'en-US' },
+  ru: { name: 'Русский', flag: '🇷🇺', numberLocale: 'ru-RU' },
+  uk: { name: 'Українська', flag: '🇺🇦', numberLocale: 'uk-UA' },
+  es: { name: 'Español', flag: '🇪🇸', numberLocale: 'es-ES' },
+};
+const DEFAULT_LANG = 'fr';
+
+/* Slavic plural rule (CLDR one/few/many), shared by ru/uk count-based UI
+   strings that actually bother distinguishing the count (see ficheNpcBtn) —
+   the other n=>`${n} ...` entries mirror fr/en's own simplification of
+   always using one invariant plural form regardless of n. */
+function _pluralSlavic(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
+
+/* ui: flat strings/functions for one-off chrome text (titles, buttons,
+   messages). Table sections (cat/rarity/kind/itemKind/action/searchCat/
+   campKind) mirror the small label dictionaries app.js used to hardcode in
+   French — same keys as the neutral tokens the pipeline now ships, kinds),
+   so a table lookup never needs to know which language is active except
+   here. */
+const I18N = {
+  fr: {
+    ui: {
+      pageTitle: 'Kwalat — Carte communautaire Corepunk',
+      pageDescription: "Carte interactive de Kwalat (Corepunk) : PNJ, quêtes, ateliers, coffres, camps et points d'intérêt.",
+      panelAriaLabel: 'Légende et filtres',
+      title: 'Carte de Kwalat',
+      subtitle: 'Corepunk · carte communautaire',
+      searchPlaceholder: 'Chercher un PNJ, une quête, un objet…',
+      searchAriaLabel: 'Recherche',
+      filtersAriaLabel: 'Filtres',
+      legend: 'Légende',
+      campsTitle: 'Camps & ressources',
+      trackedTitle: 'Suivis',
+      trackedEmptyHint: 'Épinglez un marqueur avec « Suivre » pour le retrouver ici.',
+      footerNote: 'Données extraites du client du jeu · non affilié à Artificial Core.',
+      langSelectorLabel: 'Langue',
+      panelToggleAriaLabel: 'Afficher ou masquer le panneau',
+      mapAriaLabel: 'Carte du monde',
+      loadingText: 'Relevé topographique en cours…',
+      zonesLabel: 'Zones (régions)',
+      campLoading: 'Chargement des camps…',
+      noResults: 'Aucun résultat.',
+      noResultsHint: 'Essayez un mot plus court, ou vérifiez l’orthographe.',
+      searchBodyHintPrefix: '› objectif : ',
+      trackBtn: 'Suivre',
+      trackedBtn: 'Suivi ✓',
+      doneBtn: 'Fait',
+      doneBtnActive: 'Fait ✓',
+      removeBtn: 'Retirer',
+      ficheNpcBtn: n => `Fiche (${n} quête${n > 1 ? 's' : ''})`,
+      questCat: 'Quête',
+      givenBySuffix: name => ` · donnée par ${name}`,
+      givenByPlain: name => `donnée par ${name}`,
+      ficheCompleteBtn: 'Fiche complète',
+      campLabel: 'Camp',
+      pointsHereSuffix: n => ` · ${n} points ici`,
+      spawnsTotal: n => `${n} spawns au total`,
+      campFicheBtn: 'Fiche du camp',
+      levelAbbrev: lvl => `niv ${lvl}`,
+      spawnPointsCount: n => `${n} points de spawn`,
+      viewOnMapBtn: 'Voir sur la carte',
+      likelyMonsters: n => `Monstres probables (${n})`,
+      guaranteedLabel: 'Garanti',
+      chanceLabel: 'Probabilité',
+      lootBestRates: 'Butin (meilleurs taux)',
+      mapLabel: 'Carte',
+      // "position inconnue" bannie du site (voir data/SCHEMA.md "search_zone") :
+      // ce libellé générique reste pour les lignes hors objectif de quête
+      // (PNJ/objet/marchand sans position extraite) — les objectifs de
+      // quête eux-mêmes utilisent posDynamic/posDynamicZone/posUncatalogued
+      // ci-dessous, jamais celui-ci.
+      posUnknown: 'position non précisée',
+      posDynamic: 'Position dynamique',
+      posDynamicZone: 'Position dynamique — zone de spawn',
+      posUncatalogued: 'Position non cataloguée — à vérifier en jeu',
+      vendorStockTitle: 'Stock du vendeur',
+      vendorStockTitleN: n => `Stock du vendeur (${n})`,
+      noVendorItems: 'Aucun article connu pour ce marchand.',
+      npcCat: 'PNJ',
+      vendorSuffix: ' · Marchand',
+      questsGivenN: n => `Quêtes données (${n})`,
+      noQuestsForNpc: 'Aucune quête connue pour ce PNJ.',
+      questItemBadge: 'Objet de quête',
+      gameItemBadge: 'Item du jeu',
+      soldTag: 'vendu',
+      craftableTag: 'craftable',
+      lootTag: 'loot',
+      activableBadge: 'Activable',
+      objectivesN: n => `Objectifs (${n})`,
+      objectivesTitle: 'Objectifs',
+      howToTitle: 'Comment faire',
+      rewardsTitle: 'Récompenses',
+      questItemsN: n => `Items de quête (${n})`,
+      viewGiverBtn: 'Voir le donneur',
+      viewZoneBtn: 'Voir la zone',
+      onMapTitle: 'Sur la carte',
+      dialogsN: n => `Dialogues (${n})`,
+      journalTitle: 'Journal',
+      relatedQuestsTitle: 'Quêtes liées',
+      questFicheKind: region => 'Quête' + (region ? ` · ${region}` : ''),
+      dropRatesTitle: 'Taux de drop',
+      farmSpotsTitle: 'Spots de farm',
+      soldByTitle: 'Vendu par',
+      moreMerchants: n => `+ ${n} autres marchands`,
+      merchantPosUnknown: 'Position du marchand non précisée.',
+      recipeTitle: 'Recette',
+      producesArrow: 'produit → ',
+      usedInTitle: 'Utilisé dans',
+      rewardBadge: 'Récompense',
+      requiredBadge: 'Requis',
+      pingTitle: 'Ping',
+      copyLinkBtn: 'Copier le lien',
+      linkCopied: 'Lien copié ✓',
+      locatorTitle: 'Repère',
+      mapDownload9600: 'Carte 9600px',
+      mapDownload4800: 'Carte 4800px',
+      loadErrorPrefix: msg => `Impossible de charger les données (${msg})`,
+      closeBtnAria: 'Fermer',
+    },
+    cat: {
+      npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
+      qao: 'Objets de quête', workshop: 'Ateliers', chest: 'Coffres',
+    },
+    rarity: { Common: 'Commun', Uncommon: 'Peu commun', Rare: 'Rare', Epic: 'Épique' },
+    kind: { npc: 'PNJ', object: 'Objet', item: 'Item', other: '—' },
+    itemKind: {
+      weapon: 'Arme', resource: 'Ressource', rune: 'Rune', consumable: 'Consommable',
+      artifact: 'Artefact', chip: 'Puce', synthesis: 'Synthèse',
+      quest_item: 'Objet de quête', recipe: 'Recette', item: 'Objet',
+    },
+    // Type d'arme affiché en fiche/recherche ("Pistolet · Deux mains ·
+    // Bombardier") -- weaponType/weaponClass reprennent le terme officiel du
+    // jeu quand il existe (ConstWeaponTypes.xml pour G/Sh/S, Units.xml pour
+    // les classes Bomber/Champion/Warmonger — voir data/SCHEMA.md "i18n" sur
+    // ce principe) ; les valeurs sans fiche officielle (Dagger/Bow/Knuckle/
+    // Spear, useType) sont une traduction sobre maison, comme les autres
+    // libellés bespoke déjà documentés (quest_hints, CAMP_KIND…).
+    weaponType: {
+      Gun: 'Pistolet', Sword: 'Épée', Shield: 'Bouclier', Dagger: 'Dague',
+      Bow: 'Arc', Knuckle: 'Poings américains', Spear: 'Lance',
+    },
+    useType: {
+      OneHanded: 'Une main', TwoHanded: 'Deux mains',
+      OneHandedLeft: 'Une main (gauche)', OneHandedRight: 'Une main (droite)',
+    },
+    weaponClass: { Bomber: 'Bombardier', Champion: 'Champion', Warmonger: 'Fauteur de guerre' },
+    action: {
+      kill: 'Éliminer', collect: 'Collecter', use: 'Utiliser', talk: 'Parler à',
+      goto: 'Se rendre à', deliver: 'Livrer', custom: 'Faire',
+    },
+    searchCat: {
+      npc: 'PNJ', poi: 'Lieu', quest: 'Quête', qao: 'Objet',
+      workshop: 'Atelier', camp: 'Camp', item: 'Item',
+    },
+    campKind: {
+      monsters: 'Monstres', creeps: 'Creeps', herbalism: 'Herboristerie',
+      logging: 'Bois', mining: 'Minerai', searchable: 'Coffres cherchables',
+      destroyable: 'Destructibles', reactive: 'Interactifs', shrines: 'Sanctuaires',
+      soulkeeper: 'Soulkeepers', quest: 'Quête', wildlife: 'Animaux',
+      guards: 'Gardes', other: 'Autres',
+    },
+  },
+  en: {
+    ui: {
+      pageTitle: 'Kwalat — Corepunk Community Map',
+      pageDescription: 'Interactive map of Kwalat (Corepunk): NPCs, quests, workshops, chests, camps and points of interest.',
+      panelAriaLabel: 'Legend and filters',
+      title: 'Map of Kwalat',
+      subtitle: 'Corepunk · community map',
+      searchPlaceholder: 'Search an NPC, a quest, an item…',
+      searchAriaLabel: 'Search',
+      filtersAriaLabel: 'Filters',
+      legend: 'Legend',
+      campsTitle: 'Camps & resources',
+      trackedTitle: 'Tracked',
+      trackedEmptyHint: 'Pin a marker with “Track” to find it here.',
+      footerNote: 'Data extracted from the game client · not affiliated with Artificial Core.',
+      langSelectorLabel: 'Language',
+      panelToggleAriaLabel: 'Show or hide the panel',
+      mapAriaLabel: 'World map',
+      loadingText: 'Surveying the terrain…',
+      zonesLabel: 'Zones (regions)',
+      campLoading: 'Loading camps…',
+      noResults: 'No results.',
+      noResultsHint: 'Try a shorter word, or check the spelling.',
+      searchBodyHintPrefix: '› objective: ',
+      trackBtn: 'Track',
+      trackedBtn: 'Tracked ✓',
+      doneBtn: 'Done',
+      doneBtnActive: 'Done ✓',
+      removeBtn: 'Remove',
+      ficheNpcBtn: n => `Details (${n} quest${n > 1 ? 's' : ''})`,
+      questCat: 'Quest',
+      givenBySuffix: name => ` · given by ${name}`,
+      givenByPlain: name => `given by ${name}`,
+      ficheCompleteBtn: 'Full details',
+      campLabel: 'Camp',
+      pointsHereSuffix: n => ` · ${n} points here`,
+      spawnsTotal: n => `${n} total spawns`,
+      campFicheBtn: 'Camp details',
+      levelAbbrev: lvl => `lvl ${lvl}`,
+      spawnPointsCount: n => `${n} spawn points`,
+      viewOnMapBtn: 'View on map',
+      likelyMonsters: n => `Likely monsters (${n})`,
+      guaranteedLabel: 'Guaranteed',
+      chanceLabel: 'Chance',
+      lootBestRates: 'Loot (best rates)',
+      mapLabel: 'Map',
+      // "position unknown" banned site-wide (see data/SCHEMA.md "search_zone"):
+      // this generic label stays only for non-goal rows (NPC/object/merchant
+      // with no extracted position) — quest goals themselves use
+      // posDynamic/posDynamicZone/posUncatalogued below, never this one.
+      posUnknown: 'position not specified',
+      posDynamic: 'Dynamic position',
+      posDynamicZone: 'Dynamic position — spawn zone',
+      posUncatalogued: 'Uncatalogued position — check in-game',
+      vendorStockTitle: 'Vendor stock',
+      vendorStockTitleN: n => `Vendor stock (${n})`,
+      noVendorItems: 'No known items for this merchant.',
+      npcCat: 'NPC',
+      vendorSuffix: ' · Merchant',
+      questsGivenN: n => `Quests given (${n})`,
+      noQuestsForNpc: 'No known quests for this NPC.',
+      questItemBadge: 'Quest item',
+      gameItemBadge: 'Game item',
+      soldTag: 'sold',
+      craftableTag: 'craftable',
+      lootTag: 'loot',
+      activableBadge: 'Activatable',
+      objectivesN: n => `Objectives (${n})`,
+      objectivesTitle: 'Objectives',
+      howToTitle: 'How to',
+      rewardsTitle: 'Rewards',
+      questItemsN: n => `Quest items (${n})`,
+      viewGiverBtn: 'View giver',
+      viewZoneBtn: 'View zone',
+      onMapTitle: 'On the map',
+      dialogsN: n => `Dialogue (${n})`,
+      journalTitle: 'Journal',
+      relatedQuestsTitle: 'Related quests',
+      questFicheKind: region => 'Quest' + (region ? ` · ${region}` : ''),
+      dropRatesTitle: 'Drop rates',
+      farmSpotsTitle: 'Farm spots',
+      soldByTitle: 'Sold by',
+      moreMerchants: n => `+ ${n} more merchants`,
+      merchantPosUnknown: 'Merchant position not specified.',
+      recipeTitle: 'Recipe',
+      producesArrow: 'produces → ',
+      usedInTitle: 'Used in',
+      rewardBadge: 'Reward',
+      requiredBadge: 'Required',
+      pingTitle: 'Ping',
+      copyLinkBtn: 'Copy link',
+      linkCopied: 'Link copied ✓',
+      locatorTitle: 'Marker',
+      mapDownload9600: 'Map 9600px',
+      mapDownload4800: 'Map 4800px',
+      loadErrorPrefix: msg => `Could not load data (${msg})`,
+      closeBtnAria: 'Close',
+    },
+    cat: {
+      npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
+      qao: 'Quest objects', workshop: 'Workshops', chest: 'Chests',
+    },
+    rarity: { Common: 'Common', Uncommon: 'Uncommon', Rare: 'Rare', Epic: 'Epic' },
+    kind: { npc: 'NPC', object: 'Object', item: 'Item', other: '—' },
+    itemKind: {
+      weapon: 'Weapon', resource: 'Resource', rune: 'Rune', consumable: 'Consumable',
+      artifact: 'Artifact', chip: 'Chip', synthesis: 'Synthesis',
+      quest_item: 'Quest item', recipe: 'Recipe', item: 'Item',
+    },
+    weaponType: {
+      Gun: 'Gun', Sword: 'Sword', Shield: 'Shield', Dagger: 'Dagger',
+      Bow: 'Bow', Knuckle: 'Knuckles', Spear: 'Spear',
+    },
+    useType: {
+      OneHanded: 'One-handed', TwoHanded: 'Two-handed',
+      OneHandedLeft: 'One-handed (left)', OneHandedRight: 'One-handed (right)',
+    },
+    weaponClass: { Bomber: 'Bomber', Champion: 'Champion', Warmonger: 'Warmonger' },
+    action: {
+      kill: 'Kill', collect: 'Collect', use: 'Use', talk: 'Talk to',
+      goto: 'Go to', deliver: 'Deliver', custom: 'Do',
+    },
+    searchCat: {
+      npc: 'NPC', poi: 'Place', quest: 'Quest', qao: 'Object',
+      workshop: 'Workshop', camp: 'Camp', item: 'Item',
+    },
+    campKind: {
+      monsters: 'Monsters', creeps: 'Creeps', herbalism: 'Herbalism',
+      logging: 'Logging', mining: 'Mining', searchable: 'Searchable chests',
+      destroyable: 'Destroyables', reactive: 'Interactives', shrines: 'Shrines',
+      soulkeeper: 'Soulkeepers', quest: 'Quest', wildlife: 'Wildlife',
+      guards: 'Guards', other: 'Other',
+    },
+  },
+  ru: {
+    ui: {
+      pageTitle: 'Kwalat — Карта сообщества Corepunk',
+      pageDescription: 'Интерактивная карта Квалата (Corepunk): НПС, задания, мастерские, сундуки, лагеря и точки интереса.',
+      panelAriaLabel: 'Легенда и фильтры',
+      title: 'Карта Квалата',
+      subtitle: 'Corepunk · карта сообщества',
+      searchPlaceholder: 'Найти НПС, задание, предмет…',
+      searchAriaLabel: 'Поиск',
+      filtersAriaLabel: 'Фильтры',
+      legend: 'Легенда',
+      campsTitle: 'Лагеря и ресурсы',
+      trackedTitle: 'Отслеживаемое',
+      trackedEmptyHint: 'Закрепите маркер кнопкой «Отслеживать», чтобы найти его здесь.',
+      footerNote: 'Данные извлечены из клиента игры · не связано с Artificial Core.',
+      langSelectorLabel: 'Язык',
+      panelToggleAriaLabel: 'Показать или скрыть панель',
+      mapAriaLabel: 'Карта мира',
+      loadingText: 'Съёмка местности…',
+      zonesLabel: 'Зоны (регионы)',
+      campLoading: 'Загрузка лагерей…',
+      noResults: 'Нет результатов.',
+      noResultsHint: 'Попробуйте более короткое слово или проверьте написание.',
+      searchBodyHintPrefix: '› цель: ',
+      trackBtn: 'Отслеживать',
+      trackedBtn: 'Отслеживается ✓',
+      doneBtn: 'Готово',
+      doneBtnActive: 'Готово ✓',
+      removeBtn: 'Убрать',
+      ficheNpcBtn: n => `Карточка (${n} ${_pluralSlavic(n, 'задание', 'задания', 'заданий')})`,
+      questCat: 'Задание',
+      givenBySuffix: name => ` · квестодатель: ${name}`,
+      givenByPlain: name => `квестодатель: ${name}`,
+      ficheCompleteBtn: 'Полная карточка',
+      campLabel: 'Лагерь',
+      pointsHereSuffix: n => ` · ${n} точек здесь`,
+      spawnsTotal: n => `${n} спавнов всего`,
+      campFicheBtn: 'Карточка лагеря',
+      levelAbbrev: lvl => `ур. ${lvl}`,
+      spawnPointsCount: n => `${n} точек спавна`,
+      viewOnMapBtn: 'Смотреть на карте',
+      likelyMonsters: n => `Вероятные монстры (${n})`,
+      guaranteedLabel: 'Гарантировано',
+      chanceLabel: 'Шанс',
+      lootBestRates: 'Добыча (лучшие шансы)',
+      mapLabel: 'Карта',
+      // «позиция неизвестна» под запретом сайта (см. data/SCHEMA.md "search_zone"):
+      // это общее обозначение остаётся только для строк без цели квеста
+      // (ПНЖ/объект/торговец без найденной позиции) — сами цели заданий
+      // используют posDynamic/posDynamicZone/posUncatalogued ниже.
+      posUnknown: 'позиция не указана',
+      posDynamic: 'Динамическая позиция',
+      posDynamicZone: 'Динамическая позиция — зона спавна',
+      posUncatalogued: 'Позиция не каталогизирована — проверьте в игре',
+      vendorStockTitle: 'Товары торговца',
+      vendorStockTitleN: n => `Товары торговца (${n})`,
+      noVendorItems: 'Нет известных товаров у этого торговца.',
+      npcCat: 'НПС',
+      vendorSuffix: ' · Торговец',
+      questsGivenN: n => `Выданные задания (${n})`,
+      noQuestsForNpc: 'Нет известных заданий для этого НПС.',
+      questItemBadge: 'Предмет задания',
+      gameItemBadge: 'Игровой предмет',
+      soldTag: 'продаётся',
+      craftableTag: 'крафтится',
+      lootTag: 'лут',
+      activableBadge: 'Активируется',
+      objectivesN: n => `Цели (${n})`,
+      objectivesTitle: 'Цели',
+      howToTitle: 'Как выполнить',
+      rewardsTitle: 'Награды',
+      questItemsN: n => `Предметы задания (${n})`,
+      viewGiverBtn: 'К квестодателю',
+      viewZoneBtn: 'Смотреть зону',
+      onMapTitle: 'На карте',
+      dialogsN: n => `Диалоги (${n})`,
+      journalTitle: 'Журнал',
+      relatedQuestsTitle: 'Связанные задания',
+      questFicheKind: region => 'Задание' + (region ? ` · ${region}` : ''),
+      dropRatesTitle: 'Шансы выпадения',
+      farmSpotsTitle: 'Места фарма',
+      soldByTitle: 'Продаётся у',
+      moreMerchants: n => `+ ${n} других торговцев`,
+      merchantPosUnknown: 'Позиция торговца не указана.',
+      recipeTitle: 'Рецепт',
+      producesArrow: 'создаёт → ',
+      usedInTitle: 'Используется в',
+      rewardBadge: 'Награда',
+      requiredBadge: 'Требуется',
+      pingTitle: 'Пинг',
+      copyLinkBtn: 'Скопировать ссылку',
+      linkCopied: 'Ссылка скопирована ✓',
+      locatorTitle: 'Метка',
+      mapDownload9600: 'Карта 9600px',
+      mapDownload4800: 'Карта 4800px',
+      loadErrorPrefix: msg => `Не удалось загрузить данные (${msg})`,
+      closeBtnAria: 'Закрыть',
+    },
+    cat: {
+      npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
+      qao: 'Объекты заданий', workshop: 'Мастерские', chest: 'Сундуки',
+    },
+    rarity: { Common: 'Обычное', Uncommon: 'Необычное', Rare: 'Редкое', Epic: 'Эпическое' },
+    kind: { npc: 'НПС', object: 'Объект', item: 'Предмет', other: '—' },
+    itemKind: {
+      weapon: 'Оружие', resource: 'Ресурс', rune: 'Руна', consumable: 'Расходники',
+      artifact: 'Артефакт', chip: 'Чип', synthesis: 'Синтез',
+      quest_item: 'Предмет задания', recipe: 'Рецепт', item: 'Предмет',
+    },
+    weaponType: {
+      Gun: 'Пистолет', Sword: 'Меч', Shield: 'Щит', Dagger: 'Кинжал',
+      Bow: 'Лук', Knuckle: 'Кастеты', Spear: 'Копьё',
+    },
+    useType: {
+      OneHanded: 'Одноручное', TwoHanded: 'Двуручное',
+      OneHandedLeft: 'Одноручное (левое)', OneHandedRight: 'Одноручное (правое)',
+    },
+    weaponClass: { Bomber: 'Bomber', Champion: 'Champion', Warmonger: 'Warmonger' },
+    action: {
+      kill: 'Уничтожить', collect: 'Собрать', use: 'Использовать', talk: 'Поговорить с',
+      goto: 'Отправиться к', deliver: 'Доставить', custom: 'Сделать',
+    },
+    searchCat: {
+      npc: 'НПС', poi: 'Место', quest: 'Задание', qao: 'Объект',
+      workshop: 'Мастерская', camp: 'Лагерь', item: 'Предмет',
+    },
+    campKind: {
+      monsters: 'Монстры', creeps: 'Крипы', herbalism: 'Травничество',
+      logging: 'Лесозаготовка', mining: 'Горное дело', searchable: 'Обыскиваемые сундуки',
+      destroyable: 'Разрушаемые', reactive: 'Интерактивные', shrines: 'Святилища',
+      soulkeeper: 'Хранители душ', quest: 'Задание', wildlife: 'Дикие животные',
+      guards: 'Стражи', other: 'Другое',
+    },
+  },
+  uk: {
+    ui: {
+      pageTitle: 'Kwalat — Карта спільноти Corepunk',
+      pageDescription: 'Інтерактивна карта Квалата (Corepunk): НПС, квести, майстерні, скрині, табори та точки інтересу.',
+      panelAriaLabel: 'Легенда та фільтри',
+      title: 'Карта Квалата',
+      subtitle: 'Corepunk · карта спільноти',
+      searchPlaceholder: 'Знайти НПС, квест, предмет…',
+      searchAriaLabel: 'Пошук',
+      filtersAriaLabel: 'Фільтри',
+      legend: 'Легенда',
+      campsTitle: 'Табори та ресурси',
+      trackedTitle: 'Відстежуване',
+      trackedEmptyHint: 'Закріпіть маркер кнопкою «Відстежувати», щоб знайти його тут.',
+      footerNote: 'Дані видобуто з клієнта гри · не пов’язано з Artificial Core.',
+      langSelectorLabel: 'Мова',
+      panelToggleAriaLabel: 'Показати або сховати панель',
+      mapAriaLabel: 'Карта світу',
+      loadingText: 'Знімання місцевості…',
+      zonesLabel: 'Зони (регіони)',
+      campLoading: 'Завантаження таборів…',
+      noResults: 'Немає результатів.',
+      noResultsHint: 'Спробуйте коротше слово або перевірте написання.',
+      searchBodyHintPrefix: '› мета: ',
+      trackBtn: 'Відстежувати',
+      trackedBtn: 'Відстежується ✓',
+      doneBtn: 'Готово',
+      doneBtnActive: 'Готово ✓',
+      removeBtn: 'Прибрати',
+      ficheNpcBtn: n => `Картка (${n} ${_pluralSlavic(n, 'квест', 'квести', 'квестів')})`,
+      questCat: 'Квест',
+      givenBySuffix: name => ` · квестодавець: ${name}`,
+      givenByPlain: name => `квестодавець: ${name}`,
+      ficheCompleteBtn: 'Повна картка',
+      campLabel: 'Табір',
+      pointsHereSuffix: n => ` · ${n} точок тут`,
+      spawnsTotal: n => `${n} спавнів усього`,
+      campFicheBtn: 'Картка табору',
+      levelAbbrev: lvl => `рів. ${lvl}`,
+      spawnPointsCount: n => `${n} точок спавну`,
+      viewOnMapBtn: 'Дивитися на карті',
+      likelyMonsters: n => `Ймовірні монстри (${n})`,
+      guaranteedLabel: 'Гарантовано',
+      chanceLabel: 'Шанс',
+      lootBestRates: 'Здобич (найкращі шанси)',
+      mapLabel: 'Карта',
+      // «позиція невідома» заборонена на сайті (див. data/SCHEMA.md "search_zone"):
+      // це загальне позначення лишається лише для рядків поза метою квесту
+      // (НПС/об’єкт/торговець без знайденої позиції) — самі цілі квестів
+      // використовують posDynamic/posDynamicZone/posUncatalogued нижче.
+      posUnknown: 'позиція не вказана',
+      posDynamic: 'Динамічна позиція',
+      posDynamicZone: 'Динамічна позиція — зона спавну',
+      posUncatalogued: 'Позиція не каталогізована — перевірте в грі',
+      vendorStockTitle: 'Товари торговця',
+      vendorStockTitleN: n => `Товари торговця (${n})`,
+      noVendorItems: 'Немає відомих товарів у цього торговця.',
+      npcCat: 'НПС',
+      vendorSuffix: ' · Торговець',
+      questsGivenN: n => `Видані квести (${n})`,
+      noQuestsForNpc: 'Немає відомих квестів для цього НПС.',
+      questItemBadge: 'Предмет квесту',
+      gameItemBadge: 'Ігровий предмет',
+      soldTag: 'продається',
+      craftableTag: 'крафтиться',
+      lootTag: 'лут',
+      activableBadge: 'Активується',
+      objectivesN: n => `Цілі (${n})`,
+      objectivesTitle: 'Цілі',
+      howToTitle: 'Як виконати',
+      rewardsTitle: 'Нагороди',
+      questItemsN: n => `Предмети квесту (${n})`,
+      viewGiverBtn: 'До квестодавця',
+      viewZoneBtn: 'Дивитися зону',
+      onMapTitle: 'На карті',
+      dialogsN: n => `Діалоги (${n})`,
+      journalTitle: 'Журнал',
+      relatedQuestsTitle: 'Пов’язані квести',
+      questFicheKind: region => 'Квест' + (region ? ` · ${region}` : ''),
+      dropRatesTitle: 'Шанси випадіння',
+      farmSpotsTitle: 'Місця фарму',
+      soldByTitle: 'Продається у',
+      moreMerchants: n => `+ ${n} інших торговців`,
+      merchantPosUnknown: 'Позиція торговця не вказана.',
+      recipeTitle: 'Рецепт',
+      producesArrow: 'створює → ',
+      usedInTitle: 'Використовується в',
+      rewardBadge: 'Нагорода',
+      requiredBadge: 'Потрібно',
+      pingTitle: 'Пінг',
+      copyLinkBtn: 'Скопіювати посилання',
+      linkCopied: 'Посилання скопійовано ✓',
+      locatorTitle: 'Мітка',
+      mapDownload9600: 'Карта 9600px',
+      mapDownload4800: 'Карта 4800px',
+      loadErrorPrefix: msg => `Не вдалося завантажити дані (${msg})`,
+      closeBtnAria: 'Закрити',
+    },
+    cat: {
+      npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
+      qao: 'Об’єкти квестів', workshop: 'Майстерні', chest: 'Скрині',
+    },
+    rarity: { Common: 'Звичайний', Uncommon: 'Незвичайний', Rare: 'Рідкісний', Epic: 'Епічний' },
+    kind: { npc: 'НПС', object: 'Об’єкт', item: 'Предмет', other: '—' },
+    itemKind: {
+      weapon: 'Зброя', resource: 'Ресурс', rune: 'Руна', consumable: 'Витратні предмети',
+      artifact: 'Артефакт', chip: 'Чип', synthesis: 'Синтез',
+      quest_item: 'Предмет квесту', recipe: 'Рецепт', item: 'Предмет',
+    },
+    weaponType: {
+      Gun: 'Пістолет', Sword: 'Меч', Shield: 'Щит', Dagger: 'Кинджал',
+      Bow: 'Лук', Knuckle: 'Кастети', Spear: 'Спис',
+    },
+    useType: {
+      OneHanded: 'Одноручна', TwoHanded: 'Дворучна',
+      OneHandedLeft: 'Одноручна (ліва)', OneHandedRight: 'Одноручна (права)',
+    },
+    weaponClass: { Bomber: 'Бомбер', Champion: 'Чемпіон', Warmonger: 'Вармонгер' },
+    action: {
+      kill: 'Знищити', collect: 'Зібрати', use: 'Використати', talk: 'Поговорити з',
+      goto: 'Піти до', deliver: 'Доставити', custom: 'Зробити',
+    },
+    searchCat: {
+      npc: 'НПС', poi: 'Місце', quest: 'Квест', qao: 'Об’єкт',
+      workshop: 'Майстерня', camp: 'Табір', item: 'Предмет',
+    },
+    campKind: {
+      monsters: 'Монстри', creeps: 'Кріпи', herbalism: 'Травництво',
+      logging: 'Лісорубство', mining: 'Гірництво', searchable: 'Обшукувані скрині',
+      destroyable: 'Руйнівні', reactive: 'Інтерактивні', shrines: 'Святилища',
+      soulkeeper: 'Охоронці душ', quest: 'Квест', wildlife: 'Дикі тварини',
+      guards: 'Стражі', other: 'Інше',
+    },
+  },
+  es: {
+    ui: {
+      pageTitle: 'Kwalat — Mapa comunitario de Corepunk',
+      pageDescription: 'Mapa interactivo de Kwalat (Corepunk): PNJ, misiones, talleres, cofres, campamentos y puntos de interés.',
+      panelAriaLabel: 'Leyenda y filtros',
+      title: 'Mapa de Kwalat',
+      subtitle: 'Corepunk · mapa comunitario',
+      searchPlaceholder: 'Buscar un PNJ, una misión, un objeto…',
+      searchAriaLabel: 'Búsqueda',
+      filtersAriaLabel: 'Filtros',
+      legend: 'Leyenda',
+      campsTitle: 'Campamentos y recursos',
+      trackedTitle: 'Seguimiento',
+      trackedEmptyHint: 'Fija un marcador con «Seguir» para encontrarlo aquí.',
+      footerNote: 'Datos extraídos del cliente del juego · no afiliado con Artificial Core.',
+      langSelectorLabel: 'Idioma',
+      panelToggleAriaLabel: 'Mostrar u ocultar el panel',
+      mapAriaLabel: 'Mapa del mundo',
+      loadingText: 'Levantamiento del terreno…',
+      zonesLabel: 'Zonas (regiones)',
+      campLoading: 'Cargando campamentos…',
+      noResults: 'Sin resultados.',
+      noResultsHint: 'Prueba con una palabra más corta o revisa la ortografía.',
+      searchBodyHintPrefix: '› objetivo: ',
+      trackBtn: 'Seguir',
+      trackedBtn: 'Siguiendo ✓',
+      doneBtn: 'Hecho',
+      doneBtnActive: 'Hecho ✓',
+      removeBtn: 'Quitar',
+      ficheNpcBtn: n => `Ficha (${n} misión${n > 1 ? 'es' : ''})`,
+      questCat: 'Misión',
+      givenBySuffix: name => ` · dado por ${name}`,
+      givenByPlain: name => `dado por ${name}`,
+      ficheCompleteBtn: 'Ficha completa',
+      campLabel: 'Campamento',
+      pointsHereSuffix: n => ` · ${n} puntos aquí`,
+      spawnsTotal: n => `${n} apariciones en total`,
+      campFicheBtn: 'Ficha del campamento',
+      levelAbbrev: lvl => `niv. ${lvl}`,
+      spawnPointsCount: n => `${n} puntos de aparición`,
+      viewOnMapBtn: 'Ver en el mapa',
+      likelyMonsters: n => `Monstruos probables (${n})`,
+      guaranteedLabel: 'Garantizado',
+      chanceLabel: 'Probabilidad',
+      lootBestRates: 'Botín (mejores probabilidades)',
+      mapLabel: 'Mapa',
+      // «posición desconocida» prohibido en el sitio (ver data/SCHEMA.md "search_zone"):
+      // esta etiqueta genérica solo se usa para filas sin objetivo de misión
+      // (PNJ/objeto/comerciante sin posición extraída) — los propios objetivos
+      // de misión usan posDynamic/posDynamicZone/posUncatalogued más abajo.
+      posUnknown: 'posición no especificada',
+      posDynamic: 'Posición dinámica',
+      posDynamicZone: 'Posición dinámica — zona de aparición',
+      posUncatalogued: 'Posición no catalogada — verificar en el juego',
+      vendorStockTitle: 'Inventario del vendedor',
+      vendorStockTitleN: n => `Inventario del vendedor (${n})`,
+      noVendorItems: 'No se conocen artículos para este comerciante.',
+      npcCat: 'PNJ',
+      vendorSuffix: ' · Comerciante',
+      questsGivenN: n => `Misiones otorgadas (${n})`,
+      noQuestsForNpc: 'No se conocen misiones para este PNJ.',
+      questItemBadge: 'Objeto de misión',
+      gameItemBadge: 'Objeto del juego',
+      soldTag: 'en venta',
+      craftableTag: 'crafteable',
+      lootTag: 'botín',
+      activableBadge: 'Activable',
+      objectivesN: n => `Objetivos (${n})`,
+      objectivesTitle: 'Objetivos',
+      howToTitle: 'Cómo hacerlo',
+      rewardsTitle: 'Recompensas',
+      questItemsN: n => `Objetos de misión (${n})`,
+      viewGiverBtn: 'Ver a quien la da',
+      viewZoneBtn: 'Ver la zona',
+      onMapTitle: 'En el mapa',
+      dialogsN: n => `Diálogos (${n})`,
+      journalTitle: 'Diario',
+      relatedQuestsTitle: 'Misiones relacionadas',
+      questFicheKind: region => 'Misión' + (region ? ` · ${region}` : ''),
+      dropRatesTitle: 'Probabilidades de botín',
+      farmSpotsTitle: 'Zonas de farmeo',
+      soldByTitle: 'Vendido por',
+      moreMerchants: n => `+ ${n} comerciantes más`,
+      merchantPosUnknown: 'Posición del comerciante no especificada.',
+      recipeTitle: 'Receta',
+      producesArrow: 'produce → ',
+      usedInTitle: 'Se usa en',
+      rewardBadge: 'Recompensa',
+      requiredBadge: 'Requerido',
+      pingTitle: 'Ping',
+      copyLinkBtn: 'Copiar enlace',
+      linkCopied: 'Enlace copiado ✓',
+      locatorTitle: 'Marcador',
+      mapDownload9600: 'Mapa 9600px',
+      mapDownload4800: 'Mapa 4800px',
+      loadErrorPrefix: msg => `No se pudieron cargar los datos (${msg})`,
+      closeBtnAria: 'Cerrar',
+    },
+    cat: {
+      npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
+      qao: 'Objetos de misión', workshop: 'Talleres', chest: 'Cofres',
+    },
+    rarity: { Common: 'Común', Uncommon: 'Poco común', Rare: 'Raro', Epic: 'Épico' },
+    kind: { npc: 'PNJ', object: 'Objeto', item: 'Ítem', other: '—' },
+    itemKind: {
+      weapon: 'Arma', resource: 'Recurso', rune: 'Runa', consumable: 'Consumible',
+      artifact: 'Artefacto', chip: 'Chip', synthesis: 'Síntesis',
+      quest_item: 'Objeto de misión', recipe: 'Receta', item: 'Objeto',
+    },
+    weaponType: {
+      Gun: 'Pistola', Sword: 'Espada', Shield: 'Escudo', Dagger: 'Daga',
+      Bow: 'Arco', Knuckle: 'Puño americano', Spear: 'Lanza',
+    },
+    useType: {
+      OneHanded: 'Una mano', TwoHanded: 'Dos manos',
+      OneHandedLeft: 'Una mano (izquierda)', OneHandedRight: 'Una mano (derecha)',
+    },
+    weaponClass: { Bomber: 'Bombardero', Champion: 'Champion', Warmonger: 'Belicista' },
+    action: {
+      kill: 'Eliminar', collect: 'Recolectar', use: 'Usar', talk: 'Hablar con',
+      goto: 'Ir a', deliver: 'Entregar', custom: 'Hacer',
+    },
+    searchCat: {
+      npc: 'PNJ', poi: 'Lugar', quest: 'Misión', qao: 'Objeto',
+      workshop: 'Taller', camp: 'Campamento', item: 'Ítem',
+    },
+    campKind: {
+      monsters: 'Monstruos', creeps: 'Creeps', herbalism: 'Herboristería',
+      logging: 'Tala', mining: 'Minería', searchable: 'Cofres buscables',
+      destroyable: 'Destructibles', reactive: 'Interactivos', shrines: 'Santuarios',
+      soulkeeper: 'Guardianes de almas', quest: 'Misión', wildlife: 'Fauna',
+      guards: 'Guardias', other: 'Otros',
+    },
+  },
+};
+
+const LANG_STORAGE_KEY = 'cpmap_lang';
+
+/* Initial language: URL hash `lang=` param wins (shareable links), else the
+   persisted choice, else DEFAULT_LANG. Read once at script load, BEFORE
+   app.js does anything — app.js's own hash helpers (buildHash/readHash)
+   keep `lang` in the URL alongside x/z/zm/on/q/camp/i/ping. */
+function detectInitialLang() {
+  try {
+    const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+    const fromHash = p.get('lang');
+    if (fromHash && I18N[fromHash]) return fromHash;
+  } catch (e) { /* ignore */ }
+  try {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored && I18N[stored]) return stored;
+  } catch (e) { /* ignore (private browsing etc.) */ }
+  return DEFAULT_LANG;
+}
+
+let LANG = detectInitialLang();
+
+function setLangCode(code) {
+  LANG = I18N[code] ? code : DEFAULT_LANG;
+  try { localStorage.setItem(LANG_STORAGE_KEY, LANG); } catch (e) { /* ignore */ }
+  document.documentElement.lang = LANG;
+  return LANG;
+}
+setLangCode(LANG); // persist + <html lang> for the language resolved above
+
+/* Flat UI string/function lookup, falls back to the default language, then
+   to the raw key (never throws, never shows a blank string). Named `tr`, not
+   the more conventional `t`: app.js already uses bare `t` everywhere as a
+   loop variable (tracked items, etc.) — a global `t()` would be shadowed
+   silently in a dozen call sites and someone would eventually get bitten. */
+function tr(key, ...args) {
+  const v = (I18N[LANG] && I18N[LANG].ui[key]) ?? (I18N[DEFAULT_LANG].ui[key]) ?? key;
+  return typeof v === 'function' ? v(...args) : v;
+}
+
+/* Table lookup (cat/rarity/kind/itemKind/action/searchCat/campKind) — the
+   token keys mirror the game's own neutral identifiers (pipeline output),
+   e.g. tbl('campKind', 'herbalism'). Returns undefined (not the raw key) so
+   call sites can fall back to a prettified raw label when a token is truly
+   unknown, same as before this dictionary existed. */
+function tbl(section, key) {
+  const cur = I18N[LANG] && I18N[LANG][section] && I18N[LANG][section][key];
+  if (cur !== undefined) return cur;
+  const def = I18N[DEFAULT_LANG][section] && I18N[DEFAULT_LANG][section][key];
+  return def;
+}
+
+const $$ = sel => Array.from(document.querySelectorAll(sel));

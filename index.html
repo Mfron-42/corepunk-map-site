@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="pageTitle">Kwalat — Carte communautaire Corepunk</title>
+<meta name="description" content="Carte interactive de Kwalat (Corepunk) : PNJ, quêtes, ateliers, coffres, camps et points d'intérêt." data-i18n-attr="content:pageDescription">
+<link rel="icon" href="icons/interest_points/Mystic.png">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+  <aside id="panel" aria-label="Légende et filtres" data-i18n-attr="aria-label:panelAriaLabel">
+    <header class="plaque">
+      <div class="plaque-top">
+        <h1 data-i18n="title">Carte de Kwalat</h1>
+        <select id="lang-select" aria-label="Langue / Language" class="lang-select"></select>
+      </div>
+      <p class="plaque-sub" data-i18n="subtitle">Corepunk · carte communautaire</p>
+    </header>
+
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="Chercher un PNJ, une quête, un objet…"
+             autocomplete="off" spellcheck="false" aria-label="Recherche"
+             data-i18n-attr="placeholder:searchPlaceholder;aria-label:searchAriaLabel">
+      <ul id="search-results" hidden></ul>
+    </div>
+
+    <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
+      <h2 data-i18n="legend">Légende</h2>
+      <ul id="filter-list"></ul>
+      <h2 id="camps-title" data-i18n="campsTitle">Camps &amp; ressources</h2>
+      <ul id="camp-list"></ul>
+    </nav>
+
+    <section id="tracked-section">
+      <h2 data-i18n="trackedTitle">Suivis</h2>
+      <ul id="tracked-list"></ul>
+      <p id="tracked-empty" class="hint" data-i18n="trackedEmptyHint">Épinglez un marqueur avec « Suivre » pour le retrouver ici.</p>
+    </section>
+
+    <footer class="panel-foot">
+      <p data-i18n="footerNote">Données extraites du client du jeu · non affilié à Artificial Core.</p>
+    </footer>
+  </aside>
+
+  <button id="panel-toggle" aria-label="Afficher ou masquer le panneau" aria-expanded="true"
+          data-i18n-attr="aria-label:panelToggleAriaLabel">
+    <span></span><span></span><span></span>
+  </button>
+
+  <main id="map-wrap">
+    <div id="map" aria-label="Carte du monde" data-i18n-attr="aria-label:mapAriaLabel"></div>
+    <div id="readout" class="readout" aria-hidden="true">
+      <span id="ro-coords">x — · z —</span><span class="ro-sep"></span><span id="ro-zoom">z0</span>
+    </div>
+    <div id="loading" class="loading">
+      <div class="loading-rule"></div>
+      <p data-i18n="loadingText">Relevé topographique en cours…</p>
+    </div>
+  </main>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="js/i18n.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
