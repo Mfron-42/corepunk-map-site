@@ -7,7 +7,7 @@ import {
   CATS, CAMP_COLORS, catLabel, campKindLabel,
   campDisplayName, chestTypeLabel,
 } from './config.js';
-import { esc, fmtCoord, fold, iconTag, initials, pretty } from './utils.js';
+import { esc, fmtCoord, fold, iconTag, initials, pretty, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor } from './data.js';
 
@@ -50,7 +50,7 @@ function popupHtml(cat, r, id) {
     + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
     + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
   return `<div class="pop">
-    <h3>${icon}${esc(r.name)}</h3>
+    <h3>${icon}${esc(cleanLabel(r.name))}</h3>
     <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}</div>
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${extraHtml}

@@ -235,8 +235,14 @@ function campLootTableName(k) {
   return null;
 }
 
+/* Alias de familles de monstres : le client fragmente quelques tokens de
+   famille (« robo » vs « robot »…) — regroupés à l'affichage du bestiaire.
+   Étendre ici si d'autres doublons apparaissent dans les données. */
+const FAMILY_ALIAS = { robo: 'robot' };
+const familyKey = f => FAMILY_ALIAS[f] || f;
+
 export {
-  KWALAT_DEFAULTS, TILE_BASE,
+  KWALAT_DEFAULTS, TILE_BASE, familyKey,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
   monsterAttackLabel, locationKindLabel,

@@ -136,11 +136,37 @@ function renderDense(cat, points, color, popupFor) {
    reconstruit au déplacement) mais en gardant l'icône réelle au lieu d'un
    simple point — évite de garder des centaines de nœuds DOM+image en
    permanence pendant que l'utilisateur navigue loin de la vue initiale. */
+/* Sous ce zoom, les portraits DOM (30 px) s'empilent en tas illisible en
+   ville : la couche passe en petits points canvas (même palette) et ne
+   repasse aux portraits qu'au-delà. */
+const DOM_MIN_ZOOM = 1.5;
+function renderDomDots(cat, g, popupFor, onSelect) {
+  const c = CATS[cat];
+  const t = worldToPxTransform();
+  const pb = map.getPixelBounds();
+  const padX = (pb.max.x - pb.min.x) * 0.25, padY = (pb.max.y - pb.min.y) * 0.25;
+  const arr = S.data[cat];
+  for (let i = 0; i < arr.length; i++) {
+    const r = arr[i];
+    if (r.x == null || r.z == null) continue;
+    const q = fastProject(t, r.x, r.z);
+    if (q.x < pb.min.x - padX || q.x > pb.max.x + padX || q.y < pb.min.y - padY || q.y > pb.max.y + padY) continue;
+    const id = markerId(cat, i);
+    const mk = L.circleMarker(toLL(r.x, r.z), {
+      renderer: canvasR, radius: 4.6, color: '#0a0e14', weight: 1.2,
+      fillColor: c.hex, fillOpacity: .88,
+    });
+    mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });
+    if (onSelect) mk.on('click', () => onSelect(r, i));
+    g.addLayer(mk);
+  }
+}
 function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
   const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
   g.clearLayers();
   const c = CATS[cat];
   if (!c || !c.on) return;
+  if (map.getZoom() < DOM_MIN_ZOOM) { renderDomDots(cat, g, popupFor, onSelect); return; }
 
   const t = worldToPxTransform();
   const pb = map.getPixelBounds();
@@ -226,6 +252,7 @@ let highlightLayer = null;
 function clearHighlight() {
   if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
 }
+function hasHighlight() { return !!highlightLayer; }
 function showHighlight(points, color) {
   clearHighlight();
   if (!points.length) return;
@@ -254,6 +281,6 @@ function applyMapGeometry() {
 export {
   map, toLL, toWorld, worldBounds, applyMapGeometry, canvasR,
   layers, markerId, registerDense, registerDomDense,
-  denseRenderers, denseByCat, scheduleRedraw, refreshIconLayer,
-  buildZoneLayer, toggleZones, showHighlight, clearHighlight,
+  denseRenderers, scheduleRedraw, refreshIconLayer,
+  buildZoneLayer, toggleZones, showHighlight, clearHighlight, hasHighlight,
 };

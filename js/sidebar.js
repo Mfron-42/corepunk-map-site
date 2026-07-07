@@ -1,8 +1,8 @@
 /* Kwalat — panneau latéral : filtres de couches, liste des camps, suivis
    (tracked/fait) et bouton d'affichage du panneau. */
-import { S, save } from './state.js';
-import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel } from './config.js';
-import { $, esc, pretty } from './utils.js';
+import { S, LS, save } from './state.js';
+import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey } from './config.js';
+import { $, $$, esc, pretty } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
@@ -117,13 +117,14 @@ function buildBestiary() {
   }
   const fams = new Map();
   for (const [key, m] of Object.entries(S.monsters)) {
-    const fam = m.family || 'other';
+    const fam = familyKey(m.family || 'other');   // alias (robo→robot…), voir config.js
     let arr = fams.get(fam);
     if (!arr) fams.set(fam, arr = []);
     arr.push({ key, m });
   }
   const hasAny = fams.size > 0;
-  title.hidden = !hasAny;
+  const sec = title.closest('.side-sec');
+  (sec || title).hidden = !hasAny;
   box.innerHTML = '';
   if (!hasAny) return;
   const sorted = [...fams.entries()].sort((a, b) => b[1].length - a[1].length);
@@ -151,6 +152,19 @@ function buildBestiary() {
 }
 
 /* ── Panneau ────────────────────────────────────────────────── */
+/* Sections repliables du panneau (Légende/Camps/Bestiaire) : état ouvert/
+   replié persisté par section (localStorage) — la sidebar fait ~3 écrans,
+   chacun garde ouverte la partie qu'il consulte vraiment. */
+const _secState = JSON.parse(localStorage.getItem(LS.sections) || '{}');
+$$('.side-sec').forEach(sec => {
+  const k = sec.dataset.sec;
+  if (k in _secState) sec.open = !!_secState[k];
+  sec.addEventListener('toggle', () => {
+    _secState[k] = sec.open;
+    localStorage.setItem(LS.sections, JSON.stringify(_secState));
+  });
+});
+
 $('#panel-toggle').addEventListener('click', () => {
   const p = $('#panel');
   const hidden = p.classList.toggle('hidden');

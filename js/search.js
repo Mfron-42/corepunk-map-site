@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
-  catLabel, campKindLabel, campDisplayName, chestTypeLabel,
+  catLabel, campDisplayName, chestTypeLabel,
   rarityLabel, itemKindLabel, weaponTypeLabel,
   locationKindLabel, mapName,
 } from './config.js';

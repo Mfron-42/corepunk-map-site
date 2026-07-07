@@ -13,7 +13,7 @@ import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
   map, toWorld, registerDense, registerDomDense,
-  denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight,
+  denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred } from './data.js';
 import { popupHtml, questPopup, campPopup } from './popups.js';
@@ -28,6 +28,8 @@ import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } f
 import { buildHash, syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearPing, clearLocator } from './pins.js';
 import { applyLocationState } from './router.js';
+
+let highlightedCampKey = null;   // toggle du bouton « Surligner les N points »
 
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
@@ -48,10 +50,20 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
   else if (b.dataset.act === 'camp-highlight') {
-    // « Montre-moi TOUS les points de ce contenant » (caisses de maïs,
-    // cercueils…) — surlignage éphémère, voir mapview.showHighlight.
-    const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === id);
-    if (g) showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
+    // « Montre-moi TOUS les points de ce contenant » — toggle : un second
+    // clic efface le surlignage sans fermer la fiche.
+    if (highlightedCampKey === id && hasHighlight()) {
+      clearHighlight();
+      highlightedCampKey = null;
+      b.textContent = tr('highlightPointsBtn', +b.dataset.n || 0);
+    } else {
+      const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === id);
+      if (g) {
+        showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
+        highlightedCampKey = id;
+        b.textContent = tr('hideHighlightBtn');
+      }
+    }
   }
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
@@ -247,6 +259,15 @@ async function setLang(code) {
   }).catch(() => {});
 
   buildZoneLayer();
+
+  // Boot téléphone : panneau plein écran (voir @media 480px) masqué par
+  // défaut — la carte d'abord, le panneau via le hamburger.
+  if (matchMedia('(max-width: 520px)').matches) {
+    $('#panel').classList.add('hidden');
+    $('#panel-toggle').classList.add('solo');
+    $('#panel-toggle').setAttribute('aria-expanded', 'false');
+    map.invalidateSize();
+  }
 
   // await : un lien profond map=<id> doit avoir basculé la carte avant qu'on
   // masque le voile de chargement (sinon flash de Kwalat puis bascule).

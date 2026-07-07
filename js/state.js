@@ -2,7 +2,7 @@
    S.lang ne fait que refléter LANG (résolu par js/i18n/index.js). */
 import { LANG } from './i18n/index.js';
 
-const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', filters: 'cpmap_filters' };
+const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', sections: 'cpmap_sections' };
 /* ── État ───────────────────────────────────────────────────── */
 const S = {
   lang: LANG,               // code langue actif (fr/en — résolu par site/js/i18n.js)

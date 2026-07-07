@@ -12,7 +12,7 @@ import {
   weaponTypeLine, ACTION_META, actionVerb, actionIconSvg, mapName,
   campDisplayName, campLootTableName,
 } from './config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty } from './utils.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, toLL, canvasR, clearHighlight } from './mapview.js';
 import { unfocus } from './urlstate.js';
@@ -51,7 +51,7 @@ function openCampFiche(key) {
       <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
-      ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
+      ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${g.pts.length}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
     </div></div>
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : ''}
     ${drops}
@@ -73,6 +73,7 @@ function openLootTableFiche(label) {
       <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(tr('lootTableKind'))}</div>
       <h2>${esc(label)}</h2></div></div>
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
+      ${sorted.length > 30 ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : ''}
       <div class="fiche-scroll">${lootRowsHtml(sorted, 'noLootCatalogued')}</div></div>`);
   setFicheHash(null);
 }
@@ -125,7 +126,14 @@ function openMonsterFiche(key) {
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
 
-  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>${lootRowsHtml(m.loot, 'noLootCatalogued')}</div>`;
+  // Séparer le VRAI butin de kill des entrées de tables de récompense
+  // agrégées (recettes « *_unlocked », Champions Tribute…) qui noyaient la
+  // liste — repliées dans un volet dédié, jamais supprimées.
+  const isRewardRow = d => /_unlocked$/i.test(d.key || '') || /tribute/i.test(d.name || '');
+  const mainLoot = (m.loot || []).filter(d => !isRewardRow(d));
+  const rewardLoot = (m.loot || []).filter(isRewardRow);
+  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>${lootRowsHtml(mainLoot, 'noLootCatalogued')}
+    ${rewardLoot.length ? `<details class="fiche-dialogs"><summary>${esc(tr('rewardTablesN', rewardLoot.length))}</summary>${lootRowsHtml(rewardLoot, 'noLootCatalogued')}</details>` : ''}</div>`;
   const harvestHtml = (m.harvestLoot?.length || m.harvestMethod)
     ? `<div class="fiche-section"><h3>${esc(tr('harvestTitle'))}${m.harvestMethod ? ' · ' + esc(harvestMethodLabel(m.harvestMethod)) : ''}</h3>${lootRowsHtml(m.harvestLoot, 'noHarvestCatalogued')}</div>`
     : '';
@@ -222,6 +230,18 @@ detail.id = 'detail';
 detail.innerHTML = `<button id="detail-close" aria-label="${esc(tr('closeBtnAria'))}">✕</button><div id="detail-body"></div>`;
 $('#map-wrap').appendChild(detail);
 detail.querySelector('#detail-close').onclick = () => unfocus(closeFiche);
+/* Filtre local des longues listes (stock vendeur / table de butin) : masque
+   les lignes dont le nom replié (data-n) ne contient pas la saisie. */
+detail.addEventListener('input', e => {
+  const inp = e.target.closest('.stock-filter');
+  if (!inp) return;
+  const q = fold(inp.value);
+  const box = inp.closest('.fiche-section')?.querySelector('.fiche-scroll');
+  if (!box) return;
+  box.querySelectorAll('.frow').forEach(row => {
+    row.style.display = !q || (row.dataset.n || '').includes(q) ? '' : 'none';
+  });
+});
 function closeFiche() {
   detail.classList.remove('open');
   if (S.investLayer) { map.removeLayer(S.investLayer); S.investLayer = null; }
@@ -356,13 +376,15 @@ function vendorStockSection(vendorKey) {
     const label = it
       ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(key)}">${esc(name)}</span>`
       : `<span class="fr-label">${esc(name)}</span>`;
-    return `<div class="frow">
+    return `<div class="frow" data-n="${esc(fold(name))}">
       ${iconTag(icon, 'fr-icon', itemGlyph(it))}
       ${dot}${label}
       ${priceHtml(price)}
     </div>`;
   }).join('');
-  return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitleN', v.sells.length))}</h3><div class="fiche-scroll">${rows}</div></div>`;
+  const filter = v.sells.length > 15
+    ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : '';
+  return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitleN', v.sells.length))}</h3>${filter}<div class="fiche-scroll">${rows}</div></div>`;
 }
 
 function openNpcFiche(idx) {
@@ -434,7 +456,7 @@ function chipList(keys) {
    leur seul point d'affichage possible et il ne montrait rien du tout. */
 function questItemRow(qi, regionHint) {
   const cat = qi.key ? S.items[qi.key] : null;
-  const name = cat?.name || qi.label;
+  const name = cleanLabel(cat?.name || qi.label);
   const icon = cat?.icon ? `icons/${cat.icon}` : null;
   const badgeHex = qi.isQuestItem ? CATS.qao.hex : CATS.workshop.hex;
   const badgeLabel = qi.isQuestItem ? tr('questItemBadge') : tr('gameItemBadge');
@@ -538,8 +560,8 @@ function seriesTargetChips(members, kind, regionHint) {
   return `<span class="goal-target-series">${members.map(a => `
     <span class="goal-target">
       ${icon}${badge}
-      <span class="goal-target-mini-label">${esc(a.label)}</span>
-      ${a.x != null ? gotoBtn(a.x, a.z, a.label) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
+      <span class="goal-target-mini-label">${esc(cleanLabel(a.label))}</span>
+      ${a.x != null ? gotoBtn(a.x, a.z, cleanLabel(a.label)) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
     </span>`).join('')}</span>`;
 }
 
@@ -562,13 +584,13 @@ function goalStepsSection(q) {
     const series = n > 1 ? seriesActorsFor(q, g) : null;
     const targetHtml = series
       ? seriesTargetChips(series, g.target.kind, regionHint)
-      : goalTargetChip(g.target, g.label, regionHint);
+      : goalTargetChip(g.target, cleanLabel(g.label), regionHint);
     // `verb_included` : le libellé du but contient DÉJÀ son verbe ("Bring
     // book to King Head") — ne pas re-préfixer, sinon verbe doublé
     // ("Livrer Bring book to…"). Le pictogramme d'action reste.
     const text = g.verb_included
-      ? `${esc(g.label)}${count}`
-      : `<b>${esc(verb)}</b> ${esc(g.label)}${count}`;
+      ? `${esc(cleanLabel(g.label))}${count}`
+      : `<b>${esc(verb)}</b> ${esc(cleanLabel(g.label))}${count}`;
     return `<li class="goal-step${aggregate}">
       <span class="goal-num">${i + 1}</span>
       <span class="goal-ico" title="${esc(verb)}">${actionIconSvg(meta.ico)}</span>
@@ -589,7 +611,7 @@ function hintBox(q) {
   if (!q.hint) return '';
   return `<div class="hint-box">
     <span class="hint-box-icon" aria-hidden="true">💡</span>
-    <div class="hint-box-body"><div class="hint-box-title">${esc(tr('howToTitle'))}</div><p>${esc(q.hint)}</p></div>
+    <div class="hint-box-body"><div class="hint-box-title">${esc(tr('howToTitle'))}</div><p>${esc(cleanLabel(q.hint))}</p></div>
   </div>`;
 }
 
@@ -611,18 +633,19 @@ function openQuestFiche(slug) {
   const actorRows = (q.actors || []).map(a => {
     const onOtherMap = a.map && a.map !== S.map;
     const posCell = a.x == null ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
-      : onOtherMap ? crossMapBtn(a.map, a.x, a.z, a.label)
-        : gotoBtn(a.x, a.z, a.label);
+      : onOtherMap ? crossMapBtn(a.map, a.x, a.z, cleanLabel(a.label))
+        : gotoBtn(a.x, a.z, cleanLabel(a.label));
     // Acteur PNJ cliquable vers sa fiche (quêtes + boutique) quand il est
     // connu de la carte active ; monstre idem vers sa fiche bestiaire —
     // navigation quête → PNJ/monstre sans repasser par la recherche.
-    let labelHtml = `<span class="fr-label">${esc(a.label)}</span>`;
+    const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
+    let labelHtml = `<span class="fr-label">${esc(aLabel)}</span>`;
     if (a.kind === 'npc' && !onOtherMap) {
       const ni = npcIndexByName(a.label);
-      if (ni >= 0) labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(a.label)}</span>`;
+      if (ni >= 0) labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
     } else if (a.kind === 'monster') {
       const mk = monsterKeyFor(null, a.label);
-      if (mk) labelHtml = `<span class="fr-label link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(a.label)}</span>`;
+      if (mk) labelHtml = `<span class="fr-label link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(aLabel)}</span>`;
     }
     return `
     <div class="frow">
@@ -684,7 +707,36 @@ function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
   const labelHtml = linkAct
     ? `<span class="fr-label link" data-act="${linkAct}" data-id="${esc(linkId)}">${esc(label)}</span>`
     : `<span class="fr-label">${esc(label)}</span>`;
-  return `<div class="frow">${iconTag(icon, 'fr-icon', glyph || '📦')}${labelHtml}${rateHtml || ''}</div>`;
+  // data-n : nom replié pour le filtre local des longues listes (voir le
+  // listener .stock-filter posé sur le drawer plus haut).
+  return `<div class="frow" data-n="${esc(fold(label))}">${iconTag(icon, 'fr-icon', glyph || '📦')}${labelHtml}${rateHtml || ''}</div>`;
+}
+
+/* Fusion d'affichage des tables par TRANCHES DE NIVEAU : « Gathering
+   Butchering Boars L01 04 / L05 09 / L10 14 » au même taux deviennent UNE
+   ligne « … (L01–14) ». Ne fusionne que même base + même taux/quantité/
+   garantie ; le clic ouvre la première tranche (fiche table). */
+function dedupeTierDrops(drops) {
+  const groups = new Map();
+  for (const d of drops) {
+    const m = /^(.*\S)\s+L(\d{2})\s+(\d{2})$/.exec(d.label || '');
+    const base = m ? m[1] : (d.label || '');
+    const gk = `${base}|${d.w}|${d.c}|${d.g}`;
+    let e = groups.get(gk);
+    if (!e) groups.set(gk, e = { ...d, base, first: d.label, lo: null, hi: null, n: 0 });
+    e.n++;
+    if (m) {
+      const lo = +m[2], hi = +m[3];
+      e.lo = e.lo == null ? lo : Math.min(e.lo, lo);
+      e.hi = e.hi == null ? hi : Math.max(e.hi, hi);
+    }
+  }
+  return [...groups.values()].map(e => ({
+    ...e,
+    label: e.n > 1 && e.lo != null
+      ? `${e.base} (L${String(e.lo).padStart(2, '0')}–${String(e.hi).padStart(2, '0')})`
+      : e.first,
+  }));
 }
 
 function openItemFiche(key) {
@@ -701,14 +753,15 @@ function openItemFiche(key) {
 
   let dropsHtml = '';
   if (it.drops?.length) {
+    const drops = dedupeTierDrops(it.drops);
     // d.label = nom lisible de la table de butin (camp/source), pas d'un
     // autre item -- pas d'icône/clé propre, seul le taux (dropRateHtml)
     // est commun avec monsterLootRow ci-dessus.
-    const guaranteed = it.drops.filter(d => d.g);
-    const chance = it.drops.filter(d => !d.g);
+    const guaranteed = drops.filter(d => d.g);
+    const chance = drops.filter(d => !d.g);
     dropsHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>
-      ${guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => dropRow(null, d.label, 'fiche-loot', d.label, dropRateHtml(d))).join('')}` : ''}
-      ${chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => dropRow(null, d.label, 'fiche-loot', d.label, dropRateHtml(d))).join('')}` : ''}
+      ${guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => dropRow(null, d.label, 'fiche-loot', d.first, dropRateHtml(d))).join('')}` : ''}
+      ${chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => dropRow(null, d.label, 'fiche-loot', d.first, dropRateHtml(d))).join('')}` : ''}
     </div>`;
   }
 
@@ -742,7 +795,10 @@ function openItemFiche(key) {
         </div>`;
       }).join('');
       const more = npcs.length > 6 ? `<p class="hint">${esc(tr('moreMerchants', npcs.length - 6))}</p>` : '';
-      return `<div class="vendor-block"><div class="vendor-name">${esc(v.name)}</div>${npcRows || `<p class="hint">${esc(tr('merchantPosUnknown'))}</p>`}${more}</div>`;
+      // En-tête technique du stand (« Tt Trader Drek ») masqué quand des PNJ
+      // nommés existent en dessous — bruit d'asset, pas un nom joueur.
+      const showName = !(npcs.length && /^tt[\s_]/i.test(v.name || ''));
+      return `<div class="vendor-block">${showName ? `<div class="vendor-name">${esc(v.name)}</div>` : ''}${npcRows || `<p class="hint">${esc(tr('merchantPosUnknown'))}</p>`}${more}</div>`;
     }).join('');
     if (blocks) vendorsHtml = `<div class="fiche-section"><h3>${esc(tr('soldByTitle'))}</h3>${blocks}</div>`;
   }

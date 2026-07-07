@@ -84,4 +84,10 @@ function editLe(a, b, maxD) {
   return prev[lb];
 }
 
-export { $, $$, esc, fmtCoord, pretty, initials, itemGlyph, iconTag, reduceMotion, fold, editLe };
+/* Nettoyage d'AFFICHAGE des libellés issus du client : suffixe technique
+   « TEXTURING » et préfixe « QItem » (artefacts d'assets, jamais du contenu
+   joueur — vus sur les acteurs/objets de quête). Les clés et l'index de
+   recherche gardent la donnée brute. */
+const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '');
+
+export { $, $$, esc, fmtCoord, pretty, initials, itemGlyph, iconTag, reduceMotion, fold, editLe, cleanLabel };
