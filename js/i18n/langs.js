@@ -13,7 +13,7 @@ const LANGS = {
 const DEFAULT_LANG = 'fr';
 
 /* Slavic plural rule (CLDR one/few/many), shared by ru/uk count-based UI
-   strings that actually bother distinguishing the count (see ficheNpcBtn) —
+   strings that actually bother distinguishing the count (see questCountSuffix) —
    the other n=>`${n} ...` entries mirror fr/en's own simplification of
    always using one invariant plural form regardless of n. */
 function pluralSlavic(n, one, few, many) {

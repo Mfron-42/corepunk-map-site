@@ -29,11 +29,11 @@ function popupHtml(cat, r, id) {
   let extraBtn = '', extraHtml = '';
   if (cat === 'npc') {
     // Fiche TOUJOURS accessible depuis la carte — pas seulement pour les
-    // donneurs de quêtes : un marchand sans quête (12 PNJ) n'avait aucun
-    // moyen d'ouvrir sa boutique depuis son marqueur. Libellé selon ce que
-    // la fiche a réellement à montrer (quêtes > boutique > fiche simple).
-    const label = r.quests?.length ? tr('ficheNpcBtn', r.quests.length)
-      : r.vendor ? tr('ficheShopBtn') : tr('ficheBtn');
+    // donneurs de quêtes. Le libellé reste sobre (« Fiche » / « Fiche ·
+    // Boutique ») : l'ancien « Fiche (3 quêtes) » se lisait comme une
+    // « fiche de quête » ; le compte de quêtes vit désormais dans la ligne
+    // de catégorie (« PNJ · Marchand · 3 quêtes »), voir catLine.
+    const label = r.vendor ? tr('ficheShopBtn') : tr('ficheBtn');
     extraBtn = `<button class="act primary" data-act="fiche-npc" data-id="${esc(id)}">${esc(label)}</button>`;
   }
   // Activable : la clé technique (qao_*) est le seul « type » que fournissent
@@ -47,7 +47,8 @@ function popupHtml(cat, r, id) {
   const chestType = cat === 'chest' ? chestTypeLabel(r.name) : null;
   const catLine = catLabel(cat)
     + (chestType ? ' · ' + chestType : '')
-    + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '');
+    + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
+    + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
   return `<div class="pop">
     <h3>${icon}${esc(r.name)}</h3>
     <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}</div>

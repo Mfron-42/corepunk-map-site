@@ -51,7 +51,8 @@ async function loadCritical() {
   S.zonesGeo = zonesGeo;
   S.zonesQuest = zonesQuest;
   S.items = items;
-  lootTableIdx = null;   // index paresseux table→items (voir lootTableItems)
+  lootTableIdx = null;    // index paresseux table→items (voir lootTableItems)
+  monsterZonesIdx = null; // les zones (zonesGeo) viennent d'être rechargées (voir monsterZones)
   quests.forEach(q => S.quests.set(q.slug, q));
 }
 
@@ -84,6 +85,7 @@ async function loadDeferred() {
   S.events = events;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)
+  monsterZonesIdx = null;  // index paresseux monstre→zones (voir monsterZones)
   // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
   // maps ship their own in their bundle (loadMapData). This deferred load is
   // Kwalat's — only apply it to S.camps when Kwalat is the ACTIVE map, else it
@@ -168,6 +170,51 @@ function lootTableItems(label) {
   return lootTableIdx.get(label) || null;
 }
 
+/* Zones nommées où un monstre apparaît : croisement de ses camps (points
+   représentatifs x/z) avec les polygones des régions (zonesGeo, Kwalat) par
+   lancer de rayon ; repli sur la clé de camp quand le point ne tombe dans
+   aucun anneau (les clés se terminent par le slug de la région, ex.
+   "monsters-boarmammoth-windreach-woods" → "Windreach Woods"). Index
+   paresseux pour tout le catalogue, invalidé quand monstres OU zones sont
+   rechargés (setLang). Ne fabrique rien : un monstre sans camp catalogué
+   n'a simplement aucune zone. */
+let monsterZonesIdx = null;
+function pointInRing(x, z, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, zi] = ring[i], [xj, zj] = ring[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function monsterZones(key) {
+  if (!monsterZonesIdx) {
+    monsterZonesIdx = new Map();
+    const zones = S.zonesGeo || [];
+    const bySlug = zones.map(zn => ({ zn, slug: fold(zn.name) }));
+    for (const [k, m] of Object.entries(S.monsters || {})) {
+      const names = new Set();
+      for (const c of m.camps || []) {
+        let hit = null;
+        if (c.x != null) {
+          for (const zn of zones) {
+            if (zn.rings?.some(ring => pointInRing(c.x, c.z, ring))) { hit = zn.name; break; }
+          }
+        }
+        if (!hit && c.camp) {
+          const folded = fold(String(c.camp));
+          for (const { zn, slug } of bySlug) {
+            if (slug && folded.endsWith(slug)) { hit = zn.name; break; }
+          }
+        }
+        if (hit) names.add(hit);
+      }
+      monsterZonesIdx.set(k, [...names]);
+    }
+  }
+  return monsterZonesIdx.get(key) || [];
+}
+
 /* Rechargement (setLang) : les jeux différés vont être re-fetchés — repartir
    « non prêts » pour que whenDeferred() re-file bien après le nouveau load. */
 function resetDeferred() { deferredReady = false; }
@@ -175,4 +222,5 @@ function resetDeferred() { deferredReady = false; }
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
   resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems,
+  monsterZones,
 };

@@ -73,7 +73,7 @@ function openLootTableFiche(label) {
       <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(tr('lootTableKind'))}</div>
       <h2>${esc(label)}</h2></div></div>
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
-      ${lootRowsHtml(sorted, 'noLootCatalogued')}</div>`);
+      <div class="fiche-scroll">${lootRowsHtml(sorted, 'noLootCatalogued')}</div></div>`);
   setFicheHash(null);
 }
 
@@ -334,7 +334,7 @@ function dynamicPosBadge(t, regionHint) {
    neutre suffit et reste identique dans toutes les langues. */
 function priceHtml(price) {
   if (price == null) return '';
-  return `<span class="muted fr-price">${esc(price.toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
+  return `<span class="muted fr-price" title="${esc(tr('priceTitle'))}">${esc(price.toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
 }
 function vendorStockSection(vendorKey) {
   const v = S.vendors[vendorKey];
@@ -362,7 +362,7 @@ function vendorStockSection(vendorKey) {
       ${priceHtml(price)}
     </div>`;
   }).join('');
-  return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitleN', v.sells.length))}</h3>${rows}</div>`;
+  return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitleN', v.sells.length))}</h3><div class="fiche-scroll">${rows}</div></div>`;
 }
 
 function openNpcFiche(idx) {

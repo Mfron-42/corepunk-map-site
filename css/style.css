@@ -326,6 +326,53 @@ body {
 .filter-row input:focus-visible ~ .swatch { outline: 2px solid var(--accent); outline-offset: 3px; }
 .camp-loading { padding: 6px; }
 
+/* ── Bestiaire (sidebar) ──────────────────────────────────────
+   Familles repliables (details/summary), même vocabulaire visuel que les
+   lignes de filtre (pastille .swatch-like, compteur mono, hover discret). */
+#bestiary-list { margin: 0 0 6px; }
+#bestiary-list .bst-loading { padding: 6px; }
+.bst-family summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px;
+  border-radius: var(--radius-s);
+  cursor: pointer; user-select: none;
+  list-style: none;
+  transition: background var(--dur) var(--ease);
+}
+.bst-family summary::-webkit-details-marker { display: none; }
+.bst-family summary:hover { background: var(--panel-3); }
+.bst-family summary .swatch {
+  flex: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(8, 12, 18, .7);
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px currentColor;
+}
+.bst-fam-label { font-size: .87rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bst-family[open] .bst-fam-label { color: var(--accent); }
+.bst-family summary .fcount {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  color: var(--muted);
+  min-width: 2.6em;
+  text-align: right;
+}
+.bst-list { list-style: none; margin: 0 0 6px; padding: 0 0 0 24px; }
+.bst-row {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 2.5px 4px 2.5px 0;
+  font-size: .78rem;
+  min-width: 0;
+}
+.bst-name { cursor: pointer; transition: color var(--dur) var(--ease); }
+.bst-name:hover { color: var(--accent); }
+.bst-row .muted {
+  color: var(--muted); font-size: .66rem;
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: right;
+}
+
 /* ── Suivis ── */
 #tracked-list li {
   display: flex; align-items: center; gap: 9px;
@@ -357,6 +404,19 @@ body {
 .panel-foot a:hover { text-decoration: underline; }
 /* Date de génération du jeu de données (site_meta.json). */
 .panel-foot .data-date { margin-top: 4px; opacity: .8; }
+/* Listes longues internes aux fiches (stock vendeur, tables de butin) :
+   hauteur bornée + défilement propre — la fiche reste compacte sans replier
+   la section (la boutique est LA raison d'ouvrir une fiche marchand). */
+.fiche-scroll {
+  max-height: 45vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+  padding-right: 4px;
+}
+.fiche-scroll::-webkit-scrollbar { width: 8px; }
+.fiche-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+.fiche-scroll::-webkit-scrollbar-track { background: transparent; }
 .dl-links { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .dl-links a {
   font-family: var(--font-display);

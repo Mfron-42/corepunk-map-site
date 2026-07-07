@@ -1,13 +1,13 @@
 /* Kwalat — panneau latéral : filtres de couches, liste des camps, suivis
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, save } from './state.js';
-import { CATS, CAMP_COLORS, ZONE_HEX, catLabel, campKindLabel } from './config.js';
-import { $, esc } from './utils.js';
+import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel } from './config.js';
+import { $, esc, pretty } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
-import { whenDeferred, deferredReady } from './data.js';
+import { whenDeferred, deferredReady, monsterZones } from './data.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -99,6 +99,57 @@ function buildCampFilters() {
       st.points.length, st.on, on => { st.on = on; scheduleRedraw(); }));
   }
 }
+/* ── Bestiaire (sidebar) ─────────────────────────────────────
+   Monstres du catalogue GLOBAL groupés par famille (repliables), triés par
+   taille de famille décroissante ; chaque monstre : nom cliquable → fiche
+   (data-act, délégué global de main.js — pas d'import de vues ici), niveau
+   et zones où il apparaît (croisement camps ⨯ régions, voir data.js
+   monsterZones). Catalogue global : indépendant de la carte active, donc
+   jamais reconstruit à la bascule de carte — seulement au boot (données
+   différées) et au changement de langue (voir main.js). */
+function buildBestiary() {
+  const box = $('#bestiary-list');
+  const title = $('#bestiary-title');
+  if (!box || !title) return;
+  if (!deferredReady) {
+    box.innerHTML = `<p class="hint bst-loading">${esc(tr('bestiaryLoading'))}</p>`;
+    return;
+  }
+  const fams = new Map();
+  for (const [key, m] of Object.entries(S.monsters)) {
+    const fam = m.family || 'other';
+    let arr = fams.get(fam);
+    if (!arr) fams.set(fam, arr = []);
+    arr.push({ key, m });
+  }
+  const hasAny = fams.size > 0;
+  title.hidden = !hasAny;
+  box.innerHTML = '';
+  if (!hasAny) return;
+  const sorted = [...fams.entries()].sort((a, b) => b[1].length - a[1].length);
+  for (const [fam, list] of sorted) {
+    list.sort((a, b) => (a.m.level ?? 99) - (b.m.level ?? 99) || a.m.name.localeCompare(b.m.name));
+    const rows = list.map(({ key, m }) => {
+      const zones = monsterZones(key);
+      const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
+      const sub = [m.level != null ? tr('levelAbbrev', m.level) : '', zoneTxt].filter(Boolean).join(' · ');
+      return `<li class="bst-row">
+        <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}</span>
+        ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}
+      </li>`;
+    }).join('');
+    const det = document.createElement('details');
+    det.className = 'bst-family';
+    det.innerHTML = `<summary>
+        <span class="swatch" style="background:${MONSTER_HEX}"></span>
+        <span class="bst-fam-label">${esc(pretty(fam))}</span>
+        <span class="fcount">${list.length.toLocaleString(numberLocale())}</span>
+      </summary>
+      <ul class="bst-list">${rows}</ul>`;
+    box.appendChild(det);
+  }
+}
+
 /* ── Panneau ────────────────────────────────────────────────── */
 $('#panel-toggle').addEventListener('click', () => {
   const p = $('#panel');
@@ -108,4 +159,4 @@ $('#panel-toggle').addEventListener('click', () => {
   setTimeout(() => map.invalidateSize(), 280);
 });
 
-export { buildFilters, renderTracked, toggleTrack, toggleDone };
+export { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary };

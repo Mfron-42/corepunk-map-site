@@ -24,7 +24,7 @@ import {
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import { buildSearch, hideSearchResults } from './search.js';
-import { buildFilters, renderTracked, toggleTrack, toggleDone } from './sidebar.js';
+import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } from './sidebar.js';
 import { buildHash, syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearPing, clearLocator } from './pins.js';
 import { applyLocationState } from './router.js';
@@ -195,6 +195,7 @@ async function setLang(code) {
   loadDeferred().then(() => {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
+    buildBestiary();   // libellés de familles/zones dans la nouvelle langue
   });
 }
 /* ── Démarrage ──────────────────────────────────────────────── */
@@ -232,6 +233,7 @@ async function setLang(code) {
   buildSearch();
   renderTracked();
   renderDataDate();
+  buildBestiary();   // indication de chargement — repeuplé une fois le différé arrivé
 
   // Téléchargements (si les images assemblées existent)
   fetch('download/kwalat_half.jpg', { method: 'HEAD' }).then(r => {
@@ -264,6 +266,7 @@ async function setLang(code) {
   loadDeferred().then(() => {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
+    buildBestiary();
     // Une fiche item/PNJ/quête ouverte avant l'arrivée des recettes/vendeurs/
     // monstres (fenêtre de course rare) est simplement rafraîchie avec les
     // données désormais complètes (liens monstre/marchand inclus).
