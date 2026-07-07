@@ -355,8 +355,6 @@ body {
 }
 .panel-foot a { color: var(--core); text-decoration: none; }
 .panel-foot a:hover { text-decoration: underline; }
-/* Date de génération du jeu de données (site_meta.json). */
-.panel-foot .data-date { margin-top: 4px; opacity: .8; }
 .dl-links { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .dl-links a {
   font-family: var(--font-display);
@@ -956,20 +954,6 @@ body {
 }
 .pop-mobs .chip-icon { width: 18px; height: 18px; }
 .pop-mobs .chip i { color: var(--muted); font-style: normal; }
-/* Mob de camp cliquable vers sa fiche monstre (popup de camp) — même
-   affordance que les chips de récompense (.reward-chips .chip[data-act]). */
-.pop-mobs .chip[data-act] { cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
-.pop-mobs .chip[data-act]:hover { border-color: var(--accent); color: var(--accent); }
-/* Pastille de rareté (stock du vendeur) : couleur RARITY, purement visuelle. */
-.rar-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-/* Prix vendeur : nombre localisé + pièce stylisée (l'unité n'est pas nommée
-   dans les données du jeu — glyphe neutre, identique dans toutes les langues). */
-.fr-price { display: inline-flex; align-items: center; gap: 4px; }
-.fr-price .coin {
-  width: 9px; height: 9px; border-radius: 50%; display: inline-block;
-  background: radial-gradient(circle at 35% 35%, #f0d87c, #c9a83c 70%);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
-}
 .fiche-goals { margin: 0; padding-left: 18px; font-size: .82rem; line-height: 1.5; }
 .fiche-goals li { margin-bottom: 3px; }
 .fiche-dialogs summary {
