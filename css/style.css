@@ -326,6 +326,52 @@ body {
 .filter-row input:focus-visible ~ .swatch { outline: 2px solid var(--accent); outline-offset: 3px; }
 .camp-loading { padding: 6px; }
 
+/* ── Bestiaire (sidebar) ──────────────────────────────────────
+   Familles repliables (details/summary), même vocabulaire visuel que les
+   lignes de filtre (pastille .swatch-like, compteur mono, hover discret). */
+#bestiary-list { margin: 0 0 6px; }
+#bestiary-list .bst-loading { padding: 6px; }
+.bst-family summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px;
+  border-radius: var(--radius-s);
+  cursor: pointer; user-select: none;
+  list-style: none;
+  transition: background var(--dur) var(--ease);
+}
+.bst-family summary::-webkit-details-marker { display: none; }
+.bst-family summary:hover { background: var(--panel-3); }
+.bst-family summary .swatch {
+  flex: none;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(8, 12, 18, .7);
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px currentColor;
+}
+.bst-fam-label { font-size: .87rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bst-family[open] .bst-fam-label { color: var(--accent); }
+.bst-family summary .fcount {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  color: var(--muted);
+  min-width: 2.6em;
+  text-align: right;
+}
+.bst-list { list-style: none; margin: 0 0 6px; padding: 0 0 0 24px; }
+.bst-row {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 2.5px 4px 2.5px 0;
+  font-size: .78rem;
+  min-width: 0;
+}
+.bst-name:hover { color: var(--accent); text-decoration-color: var(--accent); }
+.bst-row .muted {
+  color: var(--muted); font-size: .66rem;
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  text-align: right;
+}
+
 /* ── Suivis ── */
 #tracked-list li {
   display: flex; align-items: center; gap: 9px;
@@ -355,6 +401,74 @@ body {
 }
 .panel-foot a { color: var(--core); text-decoration: none; }
 .panel-foot a:hover { text-decoration: underline; }
+/* Date de génération du jeu de données (site_meta.json). */
+.panel-foot .data-date { margin-top: 4px; opacity: .8; }
+/* Listes longues internes aux fiches (stock vendeur, tables de butin) :
+   hauteur bornée + défilement propre — la fiche reste compacte sans replier
+   la section (la boutique est LA raison d'ouvrir une fiche marchand). */
+.fiche-scroll {
+  max-height: 45vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+  padding-right: 4px;
+}
+.fiche-scroll::-webkit-scrollbar { width: 8px; }
+.fiche-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+.fiche-scroll::-webkit-scrollbar-track { background: transparent; }
+/* Listes longues du PANNEAU (camps & ressources, bestiaire) : hauteur
+   bornée + défilement interne, même scrollbar fine que les fiches — le
+   panneau ne fait plus trois écrans, chaque section défile chez elle. */
+#camp-list, #bestiary-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+}
+#camp-list::-webkit-scrollbar, #bestiary-list::-webkit-scrollbar { width: 8px; }
+#camp-list::-webkit-scrollbar-thumb, #bestiary-list::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+#camp-list::-webkit-scrollbar-track, #bestiary-list::-webkit-scrollbar-track { background: transparent; }
+
+/* Filtre local d'une longue liste de fiche (stock vendeur, table de butin). */
+.stock-filter {
+  width: 100%;
+  margin: 2px 0 8px;
+  padding: 7px 10px;
+  background: var(--panel-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-s);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: .8rem;
+  transition: border-color var(--dur) var(--ease);
+}
+.stock-filter::placeholder { color: var(--muted); }
+.stock-filter:focus-visible { outline: none; border-color: var(--line-strong); }
+/* Sections repliables du panneau (Légende / Camps / Bestiaire) : le sommaire
+   reprend exactement le style des h2 existants + un chevron d'état, l'état
+   ouvert/replié est persisté (localStorage, voir sidebar.js). */
+.side-sec > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.side-sec > summary::-webkit-details-marker { display: none; }
+.side-sec > summary::after {
+  content: '';
+  width: 7px; height: 7px;
+  border-right: 1.6px solid var(--muted);
+  border-bottom: 1.6px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform var(--dur) var(--ease);
+  margin-left: auto;
+  margin-right: 18px;
+  flex: none;
+}
+.side-sec[open] > summary::after { transform: rotate(45deg); }
+.side-sec > summary:hover h2 { color: var(--accent); }
 .dl-links { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .dl-links a {
   font-family: var(--font-display);
@@ -583,9 +697,11 @@ body {
 }
 .act.on:hover, .act.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); }
 .act.ghost {
-  border-color: transparent; background: transparent; color: var(--muted);
+  /* Bordure VISIBLE : en transparent total, le bouton (ex. « Surligner les
+     N points ») était sous le seuil de perception sur fond de fiche. */
+  border-color: var(--line); background: transparent; color: var(--ink-dim);
 }
-.act.ghost:hover { color: var(--ink); background: var(--line-soft); border-color: var(--line-soft); }
+.act.ghost:hover { color: var(--ink); background: var(--line-soft); border-color: var(--line-strong); }
 
 /* ── Fiche (drawer droite) ── */
 #detail {
@@ -798,8 +914,16 @@ body {
   border: 1px solid color-mix(in srgb, var(--chip-c) 42%, transparent);
 }
 .frow .fr-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.frow .fr-label.link { cursor: pointer; transition: color var(--dur) var(--ease); }
-.frow .fr-label.link:hover { color: var(--accent); }
+/* Affordance PERMANENTE des libellés cliquables (fiches) : souligné pointillé
+   ambré discret — au survol seul, le lien était invisible au tactile. */
+.frow .fr-label.link, .bst-name {
+  cursor: pointer;
+  transition: color var(--dur) var(--ease);
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 3px;
+}
+.frow .fr-label.link:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
 /* ── Bouton « carte » ─────────────────────────────────────────────────
    Pastille secondaire/ghost cohérente partout où un objet du monde peut être
@@ -954,6 +1078,20 @@ body {
 }
 .pop-mobs .chip-icon { width: 18px; height: 18px; }
 .pop-mobs .chip i { color: var(--muted); font-style: normal; }
+/* Mob de camp cliquable vers sa fiche monstre (popup de camp) — même
+   affordance que les chips de récompense (.reward-chips .chip[data-act]). */
+.pop-mobs .chip[data-act] { cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
+.pop-mobs .chip[data-act]:hover { border-color: var(--accent); color: var(--accent); }
+/* Pastille de rareté (stock du vendeur) : couleur RARITY, purement visuelle. */
+.rar-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+/* Prix vendeur : nombre localisé + pièce stylisée (l'unité n'est pas nommée
+   dans les données du jeu — glyphe neutre, identique dans toutes les langues). */
+.fr-price { display: inline-flex; align-items: center; gap: 4px; }
+.fr-price .coin {
+  width: 9px; height: 9px; border-radius: 50%; display: inline-block;
+  background: radial-gradient(circle at 35% 35%, #f0d87c, #c9a83c 70%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+}
 .fiche-goals { margin: 0; padding-left: 18px; font-size: .82rem; line-height: 1.5; }
 .fiche-goals li { margin-bottom: 3px; }
 .fiche-dialogs summary {
@@ -983,6 +1121,35 @@ body {
   }
   #panel-toggle { left: 12px; }
   #detail { width: 100vw; max-width: 100vw; }
+}
+
+/* ── Téléphone (≤ 520 px) : le site doit rester utilisable en jeu ──────
+   Avant ce bloc : panneau de 328 px sur 390 px d'écran, fiche plus large
+   que l'écran (prix/boutons coupés, ✕ hors champ), hamburger sur le titre.
+   Ici : panneau plein écran en surcouche (masqué par défaut au boot mobile,
+   voir main.js), fiche plein écran avec ✕ épinglé, hamburger sous la barre
+   de statut, boutons « Carte » et prix qui ne débordent plus. */
+@media (max-width: 520px) {
+  #panel { width: 100vw; flex-basis: 100vw; }
+  #panel.hidden { margin-left: -100vw; }
+  #detail {
+    width: 100vw; max-width: 100vw;
+    border-left: none;
+  }
+  /* ✕ à DROITE en mobile : à gauche (base), il entrait en collision avec le
+     hamburger fixe ; sticky conservé (reste visible au défilement). */
+  #detail-close {
+    float: right;
+    margin: 8px 10px 0 12px;
+    background: var(--glass);
+    border-color: var(--line);
+  }
+  #detail-body { padding: 4px 12px 24px; }
+  .frow { flex-wrap: wrap; row-gap: 3px; }
+  .pop-actions { flex-wrap: wrap; }
+  .fiche-scroll { max-height: 55vh; }
+  #panel-toggle { top: 10px; left: 10px; }
+  .readout { display: none; }          /* lecture de coordonnées : geste souris, inutile au doigt */
 }
 
 @media (prefers-reduced-motion: reduce) {
