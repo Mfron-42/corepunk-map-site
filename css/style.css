@@ -151,6 +151,74 @@ body {
 }
 .lang-select option { background: var(--panel-2); color: var(--ink); }
 
+/* ── Sélecteur de carte (multi-cartes) ── */
+.map-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+}
+.map-switch[hidden] { display: none; }
+.map-switch-label {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: .64rem;
+  font-weight: 680;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.map-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: var(--font-display);
+  font-size: .72rem;
+  font-weight: 640;
+  letter-spacing: .04em;
+  color: var(--accent);
+  background: var(--panel-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  padding: 6px 24px 6px 10px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+                    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position: right 12px top 55%, right 8px top 55%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
+}
+.map-select:hover, .map-select:focus-visible {
+  border-color: var(--line-strong);
+  background-color: var(--panel-4);
+  outline: none;
+}
+.map-select option { background: var(--panel-2); color: var(--ink); }
+.map-select optgroup { background: var(--panel-2); color: var(--muted); font-style: normal; }
+
+/* Badge de carte sur un résultat de recherche d'une AUTRE carte que l'active. */
+.map-badge {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: .6rem;
+  font-weight: 680;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+/* Bouton « aller à » vers une autre carte (fiche de quête). */
+.goto.goto-cross {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
 /* ── Recherche ── */
 .search-wrap { position: relative; padding: 15px 16px 6px; }
 #search {

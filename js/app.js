@@ -6,8 +6,18 @@
 'use strict';
 
 /* ── Constantes ─────────────────────────────────────────────── */
-const WORLD = { w: 9600, h: 7680 };
-const MAP_TOP_Z = 8704; // z monde à la ligne de pixels 0 de la pyramide
+/* Multi-cartes (vague C) : la carte ACTIVE porte toute la géométrie (dims,
+   ligne de pixels 0 = tile_top_z, densité px/unité, zoom natif, chemin de
+   tuiles). `activeMap` vaut les défauts Kwalat jusqu'à ce que maps.json soit
+   chargé (init) — identiques à l'entrée Kwalat du manifeste, donc rien ne
+   change au boot ; seul switchMap() bascule ces valeurs. toLL/toWorld/les
+   tuiles/les bornes en dérivent (mêmes maths qu'avant, paramétrées). */
+const KWALAT_DEFAULTS = {
+  id: 'Kwalat', type: 'world', w: 9600, h: 7680,
+  tile_top_z: 8704, tile_path: '', native_zoom: 2, ppu: 4, tile_max_zoom: 3,
+  frame_status: 'validated', has_entities: true,
+};
+let activeMap = KWALAT_DEFAULTS;
 // Les tuiles (~645 Mo) sont hébergées sur un dépôt GitHub Pages dédié,
 // séparé du dépôt principal du site — republié seulement quand la pyramide
 // de tuiles change (rarement), jamais à chaque mise à jour des données.
@@ -40,7 +50,7 @@ const CAMP_COLORS = {
   herbalism: '#80ed99', logging: '#b08968', mining: '#9ba7c0',
   searchable: '#ffd166', destroyable: '#e07a5f',
   reactive: '#06d6a0', shrines: '#bdb2ff', soulkeeper: '#7b2cbf',
-  quest: '#c77dff', guards: '#778da9', other: '#6c757d',
+  quest: '#c77dff', guards: '#778da9', event: '#f4a259', other: '#6c757d',
 };
 const campKindLabel = key => tbl('campKind', key) || pretty(key);
 const actorKindLabel = key => tbl('kind', key) || key;
@@ -146,6 +156,12 @@ const S = {
                             // données différées arrivent pendant qu'elle est ouverte)
   locator: null,            // miroir plat du réticule ambré {x,z,label}, lu par buildHash()
   restoring: false,         // vrai pendant applyLocationState() — garde anti-boucle (pushFocusState)
+  // ── Multi-cartes (vague C) ──
+  map: 'Kwalat',            // id de la carte active
+  maps: {},                 // manifeste (site/data/<lang>/maps.json) : id -> géométrie légère
+  mapOrder: [],             // ordre d'affichage du sélecteur
+  crossIndex: [],           // index de recherche cross-carte (search_index.bin) : toutes cartes
+  mapCache: {},             // id de carte -> données de marqueurs déjà chargées (lazy + cache)
 };
 
 /* ── Carte ──────────────────────────────────────────────────── */
@@ -162,20 +178,30 @@ map.attributionControl.addAttribution(
   'Corepunk © Artificial Core — carte communautaire non officielle');
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-const toLL = (x, z) => map.unproject([x * 4, (MAP_TOP_Z - z) * 4], 2);
-const toWorld = ll => { const p = map.project(ll, 2); return { x: p.x / 4, z: MAP_TOP_Z - p.y / 4 }; };
-const worldBounds = L.latLngBounds(toLL(0, 0), toLL(WORLD.w, WORLD.h));
+/* Transform monde↔pixel, paramétré par la carte active (Kwalat : ppu 4,
+   native_zoom 2, tile_top_z 8704 — strictement identique à l'ancien code
+   `x*4, (8704-z)*4, zoom 2`). */
+const toLL = (x, z) => map.unproject([x * activeMap.ppu, (activeMap.tile_top_z - z) * activeMap.ppu], activeMap.native_zoom);
+const toWorld = ll => { const p = map.project(ll, activeMap.native_zoom); return { x: p.x / activeMap.ppu, z: activeMap.tile_top_z - p.y / activeMap.ppu }; };
+let worldBounds = L.latLngBounds(toLL(0, 0), toLL(activeMap.w, activeMap.h));
 map.setMaxBounds(worldBounds.pad(0.12));
 
 const Tiles = L.TileLayer.extend({
-  getTileUrl: c => `${TILE_BASE}/${c.z}/${c.x}_${c.y}.webp`,
+  // `tile_path` : '' = tuiles Kwalat à la racine du dépôt ; '<mapId>/' = sous-
+  // dossier par carte. Le dépôt de tuiles est le même pour toutes les cartes.
+  getTileUrl: c => `${TILE_BASE}/${activeMap.tile_path}${c.z}/${c.x}_${c.y}.webp`,
 });
-new Tiles('', {
-  tileSize: 512, minNativeZoom: 0, maxNativeZoom: 3,
-  minZoom: 0, maxZoom: 5, noWrap: true, keepBuffer: 3,
-  bounds: worldBounds, className: 'map-tiles',
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-}).addTo(map);
+let tileLayer = null;
+function makeTileLayer() {
+  return new Tiles('', {
+    tileSize: 512, minNativeZoom: 0, maxNativeZoom: activeMap.tile_max_zoom,
+    minZoom: 0, maxZoom: 5, noWrap: true, keepBuffer: 3,
+    bounds: worldBounds, className: 'map-tiles',
+    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  });
+}
+tileLayer = makeTileLayer();
+tileLayer.addTo(map);
 
 const canvasR = L.canvas({ padding: 0.35 });
 
@@ -352,20 +378,140 @@ async function loadDeferred() {
   S.locations = locations;
   S.abilities = abilities;
   S.events = events;
-  // Re-callable (language switch, see setLang()): capture each kind's on/off
-  // state before rebuilding S.camps from scratch, else re-running this would
-  // append duplicate points/groups onto the previous load's arrays.
+  // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
+  // maps ship their own in their bundle (loadMapData). This deferred load is
+  // Kwalat's — only apply it to S.camps when Kwalat is the ACTIVE map, else it
+  // would clobber the current map's camps (and leave dense renderers pointing
+  // at removed kinds → crash). Always stash into the Kwalat cache so a later
+  // switch back restores them. Re-callable (setLang): preserve each kind's
+  // on/off before rebuilding, else re-running would duplicate points/groups.
+  const prevSrc = S.map === 'Kwalat' ? S.camps : (S.mapCache.Kwalat && S.mapCache.Kwalat.camps) || {};
   const prevOn = {};
-  for (const [k, st] of Object.entries(S.camps)) prevOn[k] = st.on;
-  S.camps = {};
+  for (const [k, st] of Object.entries(prevSrc)) prevOn[k] = st.on;
+  const kwCamps = {};
   camps.forEach(g => {
     const k = g.kind;
-    if (!S.camps[k]) S.camps[k] = { on: prevOn[k] || false, points: [], groups: [] };
-    S.camps[k].groups.push(g);
-    g.pts.forEach(pt => S.camps[k].points.push({ x: pt[0], z: pt[1], g }));
+    if (!kwCamps[k]) kwCamps[k] = { on: prevOn[k] || false, points: [], groups: [] };
+    kwCamps[k].groups.push(g);
+    g.pts.forEach(pt => kwCamps[k].points.push({ x: pt[0], z: pt[1], g }));
   });
+  if (S.mapCache.Kwalat) S.mapCache.Kwalat.camps = kwCamps;
+  if (S.map === 'Kwalat') S.camps = kwCamps;
   deferredReady = true;
   onDeferredReady.splice(0).forEach(fn => fn());
+}
+
+/* ── Multi-cartes (vague C) ─────────────────────────────────────
+   Le manifeste maps.json (chargé au boot) alimente le sélecteur + le
+   transform. Les DONNÉES de marqueurs de chaque carte non-Kwalat vivent dans
+   site/data/<lang>/<mapId>/*.bin, chargées PARESSEUSEMENT à la première
+   bascule et mises en cache. Kwalat garde ses données à la racine (chargées
+   au boot par loadCritical/loadDeferred). Les catalogues GLOBAUX (objets,
+   monstres, capacités, lore, événements) sont indépendants de la carte et
+   restent partagés — jamais rechargés en changeant de carte. Les régions
+   (zones_geo) sont propres à Kwalat : vides ailleurs. */
+/* Nom lisible d'une carte : libellé i18n (mapName) sinon repli propre — les
+   arènes portent des noms de LIEU (Dendrohold, Wagon Yard…) : on strippe juste
+   le préfixe de famille (BG_Arena_/PvE_Arena_/…) et on prettifie, valable dans
+   toutes les langues (noms propres). Seuls Kwalat + les 2 îles d'Extraction
+   ont une traduction dédiée dans i18n.js (mapName). */
+function prettyMapId(id) {
+  const s = (id || '').replace(/^(BG_Arena_|PvE_Arena_|PvP_Arena_|Extraction_Island_)/, '')
+    .replace(/_/g, ' ').trim();
+  return s ? s.replace(/^./, c => c.toUpperCase()) : id;
+}
+const mapName = id => tbl('mapName', id) || prettyMapId(id);
+
+/* Instantané des données PROPRES à la carte courante (marqueurs + quêtes +
+   camps + régions) — les catalogues globaux n'en font pas partie. */
+function captureMapState() {
+  return {
+    data: S.data, quests: S.quests, camps: S.camps,
+    zonesGeo: S.zonesGeo, zonesQuest: S.zonesQuest,
+  };
+}
+function applyMapState(s) {
+  S.data = s.data; S.quests = s.quests; S.camps = s.camps;
+  S.zonesGeo = s.zonesGeo; S.zonesQuest = s.zonesQuest;
+}
+
+/* Charge (ou restaure depuis le cache) les données de marqueurs d'une carte.
+   Kwalat : déjà en mémoire (loadCritical) — capturé tel quel. Autres : fetch
+   du bundle par carte, 404-tolérant (petites cartes n'ont pas tous les
+   fichiers). Les camps arrivent avec le bundle (pas de chargement différé
+   séparé, contrairement à Kwalat). */
+async function loadMapData(mid) {
+  if (S.mapCache[mid]) { applyMapState(S.mapCache[mid]); return; }
+  if (mid === 'Kwalat') {                      // déjà chargé au boot
+    S.mapCache.Kwalat = captureMapState();
+    return;
+  }
+  const base = `data/${S.lang}/${mid}/`;
+  // Ne demande QUE les fichiers réellement présents (manifeste `files`) — pas de
+  // 404 pour une catégorie absente de cette carte (ex. Extraction sans ateliers).
+  const has = new Set((S.maps[mid] && S.maps[mid].files) || []);
+  const get = name => has.has(name) ? fetchJson(base + name + '.bin').catch(() => []) : Promise.resolve([]);
+  const [npcs, quests, qao, workshops, chests, camps] = await Promise.all([
+    get('npcs'), get('quests'), get('quest_objects'),
+    get('workshops'), get('chests'), get('camps'),
+  ]);
+  const qmap = new Map();
+  quests.forEach(q => qmap.set(q.slug, q));
+  const campsState = {};
+  camps.forEach(g => {
+    const k = g.kind;
+    if (!campsState[k]) campsState[k] = { on: false, points: [], groups: [] };
+    campsState[k].groups.push(g);
+    g.pts.forEach(pt => campsState[k].points.push({ x: pt[0], z: pt[1], g }));
+  });
+  const snap = {
+    data: { npc: npcs, poi: [], quest: quests, qao, workshop: workshops, chest: chests },
+    quests: qmap, camps: campsState, zonesGeo: [], zonesQuest: {},
+  };
+  S.mapCache[mid] = snap;
+  applyMapState(snap);
+}
+
+/* Bascule de carte : recadre le transform (via activeMap), recrée la couche
+   de tuiles (nouveau tile_path + maxNativeZoom), recharge paresseusement les
+   marqueurs de la carte, redessine tout. `opts.keepView` = ne pas recadrer la
+   caméra (restauration par lien profond / résultat cross-carte, qui pose sa
+   propre vue ensuite). Pendant S.restoring, on ne réécrit pas le hash. */
+let switching = false;
+async function switchMap(mid, opts = {}) {
+  if (switching || !S.maps[mid] || mid === S.map) return;
+  switching = true;
+  try {
+    if (!S.mapCache[S.map]) S.mapCache[S.map] = captureMapState();
+    S.map = mid;
+    activeMap = S.maps[mid];
+    await loadMapData(mid);
+    // Transform + bornes recalés sur la nouvelle carte.
+    worldBounds = L.latLngBounds(toLL(0, 0), toLL(activeMap.w, activeMap.h));
+    map.setMaxBounds(worldBounds.pad(0.12));
+    if (tileLayer) map.removeLayer(tileLayer);
+    tileLayer = makeTileLayer();
+    tileLayer.addTo(map);
+    closeFiche();
+    resBox.hidden = true;
+    if (S.zoneLayer) { map.removeLayer(S.zoneLayer); S.zoneLayer = null; }
+    buildZoneLayer();
+    if (S.zonesOn && S.zoneLayer) map.addLayer(S.zoneLayer);
+    registerAllDenseRenderers();
+    buildFilters();
+    buildSearch();
+    updateMapSelectorValue();
+    // Recadrer, SAUF si l'appelant restaure sa propre vue (keepView) — MAIS si
+    // la carte n'a encore aucune vue (lien profond map= au démarrage à froid),
+    // en poser une d'office : les couches denses projettent via map.getZoom(),
+    // qui exige une vue établie (sinon « Set map center and zoom first »). La
+    // vue réelle du hash est ensuite reposée par applyLocationState.
+    if (!opts.keepView || !map._loaded) map.fitBounds(worldBounds);
+    denseRenderers.forEach(fn => fn());
+    if (!S.restoring && !opts.silent) syncHash();
+  } finally {
+    switching = false;
+  }
 }
 
 /* ── Marqueurs ──────────────────────────────────────────────── */
@@ -747,6 +893,12 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'goto') {
     goTo(+b.dataset.x, +b.dataset.z, undefined, b.dataset.label);
   }
+  else if (b.dataset.act === 'map-goto') {
+    // Acteur/cible sur une AUTRE carte : basculer d'abord, puis focus (les x/z
+    // sont dans le repère de la carte cible — voir crossMapBtn).
+    const mid = b.dataset.map, x = +b.dataset.x, z = +b.dataset.z, lbl = b.dataset.label;
+    switchMap(mid, { keepView: true }).then(() => goTo(x, z, undefined, lbl));
+  }
 });
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
@@ -846,6 +998,11 @@ const GOTO_ICON = `<svg class="goto-ico" viewBox="0 0 24 24" fill="none" stroke=
 function gotoBtn(x, z, label) {
   if (x == null) return `<span class="pos-unknown">${esc(tr('posUnknown'))}</span>`;
   return `<button class="goto" data-act="goto" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(tr('mapLabel'))}</span></button>`;
+}
+/* Cible sur une AUTRE carte : bouton de bascule cross-carte (libellé = nom de
+   la carte cible) au lieu d'un goTo local. Le clic bascule puis focus. */
+function crossMapBtn(mid, x, z, label) {
+  return `<button class="goto goto-cross" data-act="map-goto" data-map="${esc(mid)}" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(mapName(mid))}</span></button>`;
 }
 
 /* ── Position d'objectif de quête à 3 niveaux ──────────────────────────
@@ -1153,12 +1310,20 @@ function openQuestFiche(slug) {
   // une search_zone propagée depuis le goal dont ce slot est la cible ->
   // dynamicPosBadge (zone dessinée seulement si confiance haute). Ne JAMAIS
   // retomber sur le "position inconnue" de gotoBtn pour un slot de quête.
-  const actorRows = (q.actors || []).map(a => `
+  // Un acteur sur une AUTRE carte (a.map ≠ carte active) : bouton de bascule
+  // cross-carte au lieu d'un goTo qui tomberait dans le mauvais repère.
+  const actorRows = (q.actors || []).map(a => {
+    const onOtherMap = a.map && a.map !== S.map;
+    const posCell = a.x == null ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
+      : onOtherMap ? crossMapBtn(a.map, a.x, a.z, a.label)
+        : gotoBtn(a.x, a.z, a.label);
+    return `
     <div class="frow">
       <span class="k-chip" style="--chip-c:${a.kind === 'npc' ? CATS.npc.hex : a.kind === 'object' ? CATS.qao.hex : '#8d99ae'}">${a.kind === 'object' ? tr('activableBadge') : actorKindLabel(a.kind)}</span>
       <span class="fr-label">${esc(a.label)}</span>
-      ${a.x != null ? gotoBtn(a.x, a.z, a.label) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
-    </div>`).join('');
+      ${posCell}
+    </div>`;
+  }).join('');
   const rewards = q.rewards?.length
     ? `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3><div class="reward-chips">${chipList(q.rewards)}</div></div>` : '';
   const items = q.items?.length
@@ -1356,7 +1521,10 @@ function drawQuestZone(slug) {
    rien à relier sur la carte. */
 function drawInvestigation(q) {
   if (S.investLayer) map.removeLayer(S.investLayer);
-  const positioned = (q.actors || []).filter(a => a.x != null);
+  // Multi-cartes : ne relier QUE les acteurs de la carte courante — un acteur
+  // sur une autre carte (a.map ≠ carte active) est dans un autre repère de
+  // coordonnées ; le dessiner ici le placerait au mauvais endroit.
+  const positioned = (q.actors || []).filter(a => a.x != null && (!a.map || a.map === S.map));
   if (q.x == null || !positioned.length) { S.investLayer = null; return; }
   const g = L.layerGroup();
   const from = toLL(q.x, q.z);
@@ -1522,12 +1690,21 @@ let searchIndex = [];
    automatiquement la langue chargée le jour où le site en proposera d'autres
    que l'anglais du client. Chaque segment garde sa forme repliée pour la
    recherche + son texte d'origine pour l'indice affiché au résultat. */
-function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, body) {
+/* `opts` (optionnel) : { map, ref } pour la recherche cross-carte (vague C).
+   `map` = carte à laquelle appartient l'entrée (défaut : carte active) ; si
+   elle diffère de la carte courante, le résultat porte un badge de carte et le
+   clic bascule d'abord dessus (voir renderSearch). `ref` = clé stable (slug de
+   quête…) pour dédoublonner rich-index vs index cross-carte. Les catalogues
+   globaux (objets/monstres/…) sont réindexés sur CHAQUE carte donc leur `map`
+   = carte active : jamais de badge ni de bascule pour eux, toujours dispo. */
+function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, body, opts) {
   const n = fold(label);
   const entry = {
     label, n, words: n.split(' '), cat, hex, x, z, open,
     icon: icon || null, sub: sub || null,
     glyph: glyph || CAT_GLYPH[cat] || '❖', bias: bias || 0,
+    map: (opts && opts.map) || S.map,
+    ref: (opts && opts.ref) || null,
   };
   if (body && body.length) {
     entry.body = body.filter(Boolean).map(s => { const bn = fold(s); return { text: s, n: bn, words: bn.split(' ') }; });
@@ -1535,6 +1712,10 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
   searchIndex.push(entry);
   return entry;
 }
+/* Clé de dédoublonnage rich-index ⨯ index cross-carte : une quête présente à
+   la fois dans les données chargées (par son slug) et dans search_index.bin ne
+   doit sortir qu'une fois. `ref` (slug) prime, sinon cat+libellé replié. */
+const searchDedupKey = e => `${e.cat}|${e.ref || e.n || fold(e.label)}`;
 /* Corpus de recherche « déroulé » d'une quête : objectifs textuels + phrasé
    par but (goalTexts — texte libre distinct du graphe goals[] machine-exact)
    + résumé de journal. Purement additif au titre, jamais affiché tel quel
@@ -1557,8 +1738,14 @@ function buildSearch() {
   // ouvre sa fiche exactement comme d'habitude (openQuestFiche tolère déjà
   // q.x null), simplement pas de saut/centrage carte — même traitement que
   // les PNJ sans position juste au-dessus.
+  // Chaque quête porte sa vraie carte (q.map) et son slug (ref) : sur Kwalat,
+  // le fichier racine contient TOUTES les quêtes (dont celles de Prison Island
+  // via questNoPos) — une quête d'une autre carte reçoit un badge et son clic
+  // bascule dessus (voir renderSearch). Ses x/z sont toujours dans le repère de
+  // q.map (le giver, ou l'objectif via le bundle par carte), donc un goTo APRÈS
+  // bascule tombe juste.
   S.data.quest.forEach(q => push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
-    null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q)));
+    null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug }));
   S.data.qao.forEach(r => push(r.name, 'qao', CATS.qao.hex, r.x, r.z));
   S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z));
   // Base de données objets : icône + rareté, pas de position (fiche seule).
@@ -1586,6 +1773,47 @@ function buildSearch() {
   whenDeferred(buildLocationSearchIndex);
   whenDeferred(buildAbilitySearchIndex);
   whenDeferred(buildEventSearchIndex);
+  // Recherche CROSS-CARTE : les entités des AUTRES cartes (non chargées
+  // localement) viennent de search_index.bin. Ajoutées ici pour que la
+  // recherche spanne tout dès le boot, quelle que soit la carte active.
+  buildCrossMapSearch();
+}
+
+/* Index cross-carte (search_index.bin) : une entrée légère par entité
+   map-scopée de CHAQUE carte {cat, label, map, x?, z?, ref?, kind?}. On
+   n'ajoute QUE les entités d'une AUTRE carte que la carte courante (celles de
+   la carte active sont déjà dans le rich-index ci-dessus), et on saute tout
+   doublon déjà présent (une quête est dans le fichier racine Kwalat ET dans
+   search_index — dédoublonnée par slug). Le clic bascule sur entry.map puis
+   focus/fiche (voir renderSearch → crossMapOpen). */
+function buildCrossMapSearch() {
+  if (!S.crossIndex.length) return;
+  const seen = new Set(searchIndex.map(searchDedupKey));
+  for (const e of S.crossIndex) {
+    if (e.map === S.map) continue;
+    const key = `${e.cat}|${e.ref || fold(e.label)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const hex = e.cat === 'quest' ? CATS.quest.hex
+      : e.cat === 'npc' ? CATS.npc.hex
+        : e.cat === 'qao' ? CATS.qao.hex
+          : e.cat === 'chest' ? CATS.chest.hex
+            : e.cat === 'workshop' ? CATS.workshop.hex
+              : e.cat === 'camp' ? (CAMP_COLORS[e.kind] || '#888') : '#8d99ae';
+    pushSearchEntry(e.label, e.cat, hex, e.x ?? null, e.z ?? null,
+      () => crossMapOpen(e), null, null, null, 0, null, { map: e.map, ref: e.ref });
+  }
+}
+
+/* Ouverture d'un résultat d'une AUTRE carte : bascule d'abord (charge ses
+   données), puis rouvre la fiche / focus. Appelé après que switchMap a résolu
+   (voir renderSearch) — les données de la carte cible sont donc déjà là. */
+function crossMapOpen(e) {
+  if (e.cat === 'quest' && e.ref && S.quests.has(e.ref)) openQuestFiche(e.ref);
+  else if (e.cat === 'npc') {
+    const i = S.data.npc.findIndex(n => n.name === e.label);
+    if (i >= 0) openNpcFiche(i);
+  }
 }
 
 /* Camps "destructibles"/"coffres cherchables" : plusieurs entrées de
@@ -1794,7 +2022,19 @@ function runSearch(raw) {
     scored.push({ it, score, len: it.n.length, bodyHit });
   }
   scored.sort((a, b) => a.score - b.score || a.len - b.len);
-  return scored.slice(0, 24).map(s => ({ ...s.it, bodyHit: s.bodyHit }));
+  // Dédoublonnage final (rich-index ⨯ cross-carte) : une même entité peut
+  // exister des deux côtés (quête dans le fichier racine ET dans
+  // search_index). On garde la meilleure occurrence (déjà triée).
+  const seen = new Set();
+  const out = [];
+  for (const s of scored) {
+    const k = searchDedupKey(s.it);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ ...s.it, bodyHit: s.bodyHit });
+    if (out.length >= 24) break;
+  }
+  return out;
 }
 
 const resBox = $('#search-results');
@@ -1820,17 +2060,29 @@ function renderSearch(raw) {
     // Indice discret : la quête sort sur un mot de son déroulé, pas de son
     // titre — on montre la phrase qui a matché pour que ce soit lisible.
     const hint = it.bodyHit ? `<div class="sr-hint">${esc(tr('searchBodyHintPrefix'))}${esc(it.bodyHit)}</div>` : '';
+    // Résultat d'une AUTRE carte : badge de carte discret + le clic bascule.
+    const otherMap = it.map && it.map !== S.map;
+    const mapBadge = otherMap
+      ? `<span class="map-badge" title="${esc(tr('mapBadgeTitle', mapName(it.map)))}">${esc(mapName(it.map))}</span>` : '';
     li.innerHTML = `<div class="sr-row">
       <span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>
       ${iconTag(it.icon, 'sr-icon', it.glyph)}
       <span class="sr-label">${esc(it.label)}</span>
+      ${mapBadge}
       <span class="muted">${it.x != null ? fmtCoord(it.x, it.z) : esc(it.sub || '')}</span>
     </div>${hint}`;
     li.onclick = () => {
       pushFocusState();   // avant mutation — voir pushFocusState()'s doc
       resBox.hidden = true; $('#search').value = it.label;
-      if (it.x != null) goTo(it.x, it.z, 3, it.label);
-      if (it.open) it.open();
+      const focus = () => {
+        if (it.x != null) goTo(it.x, it.z, 3, it.label);
+        if (it.open) it.open();
+      };
+      // Cross-carte : basculer d'abord (charge la carte cible), PUIS focus —
+      // les x/z de l'entrée sont dans le repère de it.map, donc le goTo tombe
+      // juste une fois la bascule faite. Même carte : comportement inchangé.
+      if (otherMap) switchMap(it.map, { keepView: true }).then(focus);
+      else focus();
     };
     resBox.appendChild(li);
   });
@@ -1862,7 +2114,7 @@ function clearPing() {
 }
 map.on('contextmenu', e => {
   const w = toWorld(e.latlng);
-  if (w.x < 0 || w.z < 0 || w.x > WORLD.w || w.z > WORLD.h) return;
+  if (w.x < 0 || w.z < 0 || w.x > activeMap.w || w.z > activeMap.h) return;
   pushFocusState();   // avant mutation — voir pushFocusState()'s doc
   setPing(w.x, w.z);
   S.ping.mk.openPopup();
@@ -1886,6 +2138,9 @@ function buildHash() {
     ...(S.zonesOn ? ['zones'] : []),
   ];
   let h = `#x=${Math.round(c.x)}&z=${Math.round(c.z)}&zm=${map.getZoom().toFixed(2)}&on=${on.join(',')}&lang=${S.lang}`;
+  // `map=` n'est ajouté QUE hors Kwalat : les liens Kwalat existants restent
+  // byte-identiques (rétro-compat — absence de map= ⇒ Kwalat, cf. readHash).
+  if (S.map && S.map !== 'Kwalat') h += `&map=${S.map}`;
   if (S.ping) h += `&ping=${Math.round(S.ping.x)},${Math.round(S.ping.z)}`;
   if (S.locator) h += `&at=${Math.round(S.locator.x)},${Math.round(S.locator.z)}`;
   if (S.locator?.label) h += `&atl=${encodeURIComponent(S.locator.label)}`;
@@ -1930,6 +2185,7 @@ function readHash() {
   return {
     view, onSet, ping: p.get('ping'), quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
     npc: p.get('npc'), monster: p.get('mon'), at, atl: p.get('atl') || null,
+    map: p.get('map') || 'Kwalat',   // absent ⇒ Kwalat (rétro-compat des liens existants)
   };
 }
 
@@ -2032,6 +2288,68 @@ function buildLangSelector() {
   }
 }
 
+/* ── Sélecteur de carte (vague C) ────────────────────────────── */
+/* Charge le manifeste léger (maps.json) + l'index cross-carte (search_index)
+   pour la langue courante, puis (re)construit le sélecteur. 404-tolérant :
+   sans manifeste, le site reste mono-carte Kwalat (activeMap garde ses défauts,
+   sélecteur masqué). Ré-appelable au changement de langue (données par langue). */
+async function loadMapManifest() {
+  try {
+    const mf = await fetchJson(dataPath('maps.json'));
+    S.maps = mf.maps || {};
+    S.mapOrder = mf.order && mf.order.length ? mf.order : Object.keys(S.maps);
+    if (S.maps[S.map]) activeMap = S.maps[S.map];
+    else if (S.maps.Kwalat) { S.map = 'Kwalat'; activeMap = S.maps.Kwalat; }
+  } catch (e) {
+    S.maps = {}; S.mapOrder = [];
+  }
+  S.crossIndex = await fetchJson(dataPath('search_index.bin')).catch(() => []);
+  buildMapSelector();
+}
+
+/* Groupes du sélecteur (optgroups), dans l'ordre du manifeste par type. */
+const _MAP_GROUP = { world: 'mapGroupWorld', extraction: 'mapGroupExtraction',
+  battleground: 'mapGroupBattleground', pve_arena: 'mapGroupPve',
+  pvp_arena: 'mapGroupPvp', lobby: 'mapGroupOther' };
+let _mapSelectWired = false;
+function buildMapSelector() {
+  const select = $('#map-select');
+  if (!select) return;
+  const wrap = select.closest('.map-switch');
+  const ids = S.mapOrder.filter(id => S.maps[id]);
+  // Un seul carte connue (Kwalat) ⇒ pas de sélecteur (mono-carte, rien à basculer).
+  if (wrap) wrap.hidden = ids.length <= 1;
+  if (ids.length <= 1) return;
+  select.setAttribute('aria-label', tr('mapSelectorLabel'));
+  select.innerHTML = '';
+  let curGroup = null, groupEl = null;
+  for (const id of ids) {
+    const m = S.maps[id];
+    const g = m.type || 'lobby';
+    if (g !== curGroup) {
+      curGroup = g;
+      groupEl = document.createElement('optgroup');
+      groupEl.label = tr(_MAP_GROUP[g] || 'mapGroupOther');
+      select.appendChild(groupEl);
+    }
+    const opt = document.createElement('option');
+    opt.value = id;
+    // Une carte sans pins fiables (tiles_only) est signalée discrètement.
+    const approx = m.frame_status === 'tiles_only' ? ` ${tr('mapTilesOnlySuffix')}` : '';
+    opt.textContent = mapName(id) + approx;
+    if (id === S.map) opt.selected = true;
+    groupEl.appendChild(opt);
+  }
+  if (!_mapSelectWired) {
+    select.addEventListener('change', e => { pushFocusState(); switchMap(e.target.value); });
+    _mapSelectWired = true;
+  }
+}
+function updateMapSelectorValue() {
+  const select = $('#map-select');
+  if (select && select.value !== S.map) select.value = S.map;
+}
+
 /* (Ré)enregistre tous les rendus de couches denses (repartis à zéro à
    chaque appel — voir setLang() : sans ce reset, un changement de langue
    dupliquerait chaque fonction de rendu dans denseRenderers). Les camps
@@ -2070,6 +2388,21 @@ async function setLang(code) {
     console.error('setLang: reload failed', err);
     return;
   }
+  // Les bundles par carte sont propres à la langue (site/data/<lang>/<mapId>/) :
+  // vider le cache et recharger le manifeste + l'index cross-carte pour la
+  // nouvelle langue, puis, si l'on n'est pas sur Kwalat, recharger les données
+  // de la carte active dans la nouvelle langue (loadCritical n'a rechargé que
+  // Kwalat racine).
+  S.mapCache = {};
+  await loadMapManifest();
+  S.mapCache.Kwalat = captureMapState();
+  if (S.map !== 'Kwalat' && S.maps[S.map]) {
+    activeMap = S.maps[S.map];
+    await loadMapData(S.map);
+  } else {
+    S.map = 'Kwalat';
+    activeMap = S.maps.Kwalat || KWALAT_DEFAULTS;
+  }
   applyStaticI18n();
   buildLangSelector();
   registerAllDenseRenderers();
@@ -2102,9 +2435,19 @@ async function setLang(code) {
    fitBounds(monde). `map.setView` uniquement (jamais `flyTo`) : une
    restauration doit être instantanée et déterministe, y compris sous des
    appuis Précédent/Suivant rapprochés (mobile notamment). */
-function applyLocationState() {
+async function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, ping, quest, camp, item, npc, monster, at, atl } = readHash();
+  const { view, onSet, ping, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
+
+  // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
+  // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
+  // de hash, pas de recadrage caméra : la vue est posée juste après). readHash
+  // vient de basculer CATS[*].on ; switchMap→buildFilters les répercutera.
+  if (mapId && S.maps[mapId] && mapId !== S.map) {
+    await switchMap(mapId, { keepView: true, silent: true });
+  } else if ((!mapId || mapId === 'Kwalat') && S.map !== 'Kwalat' && S.maps.Kwalat) {
+    await switchMap('Kwalat', { keepView: true, silent: true });
+  }
 
   // Caméra EN PREMIER, avant tout rendu de couche dense : Leaflet exige une
   // vue déjà posée (setView/fitBounds) avant que map.getZoom()/map.project()
@@ -2173,6 +2516,10 @@ function applyLocationState() {
     return;
   }
 
+  // Multi-cartes : manifeste léger (sélecteur + transform) + index cross-carte,
+  // chargés au boot. 404-tolérant : sans eux, le site reste mono-carte Kwalat
+  // exactement comme avant (activeMap garde ses défauts Kwalat).
+  await loadMapManifest();
   registerAllDenseRenderers();
 
   buildFilters();
@@ -2192,7 +2539,9 @@ function applyLocationState() {
 
   buildZoneLayer();
 
-  applyLocationState();
+  // await : un lien profond map=<id> doit avoir basculé la carte avant qu'on
+  // masque le voile de chargement (sinon flash de Kwalat puis bascule).
+  await applyLocationState();
   $('#loading').classList.add('gone');
 
   // Entrée baseline : cpmSeq=0 signale "atteinte par lien profond/chargement,

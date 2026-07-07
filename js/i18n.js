@@ -80,6 +80,15 @@ const I18N = {
       chanceLabel: 'Probabilité',
       lootBestRates: 'Butin (meilleurs taux)',
       mapLabel: 'Carte',
+      mapSelectorLabel: 'Carte affichée',
+      mapBadgeTitle: name => `Sur ${name} — cliquer pour y basculer`,
+      mapTilesOnlySuffix: '(approx.)',
+      mapGroupWorld: 'Monde',
+      mapGroupExtraction: 'Extraction',
+      mapGroupBattleground: 'Champs de bataille',
+      mapGroupPve: 'Arènes JcE',
+      mapGroupPvp: 'Arènes JcJ',
+      mapGroupOther: 'Autres',
       // "position inconnue" bannie du site (voir data/SCHEMA.md "search_zone") :
       // ce libellé générique reste pour les lignes hors objectif de quête
       // (PNJ/objet/marchand sans position extraite) — les objectifs de
@@ -195,7 +204,15 @@ const I18N = {
       logging: 'Bois', mining: 'Minerai', searchable: 'Coffres cherchables',
       destroyable: 'Destructibles', reactive: 'Interactifs', shrines: 'Sanctuaires',
       soulkeeper: 'Soulkeepers', quest: 'Quête', wildlife: 'Animaux',
-      guards: 'Gardes', other: 'Autres',
+      guards: 'Gardes', event: 'Événement', other: 'Autres',
+    },
+    // Noms de carte localisés (sélecteur + badge). Seuls Kwalat et les 2 îles
+    // d'Extraction ont un libellé dédié ; les arènes portent des noms de lieu
+    // (Dendrohold, Wagon Yard…) résolus par prettyMapId() côté app.js.
+    mapName: {
+      Kwalat: 'Kwalat',
+      Extraction_Island_large: 'Île-prison',
+      Extraction_Island_small: 'Île-prison (petite)',
     },
     monsterAttack: { Melee: 'Corps à corps', Range: 'Distance', Ranged: 'Distance', Axe: 'Hache' },
     locationKind: {
@@ -273,6 +290,15 @@ const I18N = {
       chanceLabel: 'Chance',
       lootBestRates: 'Loot (best rates)',
       mapLabel: 'Map',
+      mapSelectorLabel: 'Displayed map',
+      mapBadgeTitle: name => `On ${name} — click to switch`,
+      mapTilesOnlySuffix: '(approx.)',
+      mapGroupWorld: 'World',
+      mapGroupExtraction: 'Extraction',
+      mapGroupBattleground: 'Battlegrounds',
+      mapGroupPve: 'PvE arenas',
+      mapGroupPvp: 'PvP arenas',
+      mapGroupOther: 'Other',
       // "position unknown" banned site-wide (see data/SCHEMA.md "search_zone"):
       // this generic label stays only for non-goal rows (NPC/object/merchant
       // with no extracted position) — quest goals themselves use
@@ -380,7 +406,12 @@ const I18N = {
       logging: 'Logging', mining: 'Mining', searchable: 'Searchable chests',
       destroyable: 'Destroyables', reactive: 'Interactives', shrines: 'Shrines',
       soulkeeper: 'Soulkeepers', quest: 'Quest', wildlife: 'Wildlife',
-      guards: 'Guards', other: 'Other',
+      guards: 'Guards', event: 'Event', other: 'Other',
+    },
+    mapName: {
+      Kwalat: 'Kwalat',
+      Extraction_Island_large: 'Prison Island',
+      Extraction_Island_small: 'Prison Island (small)',
     },
     monsterAttack: { Melee: 'Melee', Range: 'Ranged', Ranged: 'Ranged', Axe: 'Axe' },
     locationKind: {
@@ -449,6 +480,15 @@ const I18N = {
       chanceLabel: 'Шанс',
       lootBestRates: 'Добыча (лучшие шансы)',
       mapLabel: 'Карта',
+      mapSelectorLabel: 'Отображаемая карта',
+      mapBadgeTitle: name => `На карте «${name}» — нажмите, чтобы перейти`,
+      mapTilesOnlySuffix: '(прибл.)',
+      mapGroupWorld: 'Мир',
+      mapGroupExtraction: 'Эвакуация',
+      mapGroupBattleground: 'Поля боя',
+      mapGroupPve: 'PvE-арены',
+      mapGroupPvp: 'PvP-арены',
+      mapGroupOther: 'Прочее',
       // «позиция неизвестна» под запретом сайта (см. data/SCHEMA.md "search_zone"):
       // это общее обозначение остаётся только для строк без цели квеста
       // (ПНЖ/объект/торговец без найденной позиции) — сами цели заданий
@@ -555,7 +595,12 @@ const I18N = {
       logging: 'Лесозаготовка', mining: 'Горное дело', searchable: 'Обыскиваемые сундуки',
       destroyable: 'Разрушаемые', reactive: 'Интерактивные', shrines: 'Святилища',
       soulkeeper: 'Хранители душ', quest: 'Задание', wildlife: 'Дикие животные',
-      guards: 'Стражи', other: 'Другое',
+      guards: 'Стражи', event: 'Событие', other: 'Другое',
+    },
+    mapName: {
+      Kwalat: 'Квалат',
+      Extraction_Island_large: 'Тюремный остров',
+      Extraction_Island_small: 'Тюремный остров (малый)',
     },
     monsterAttack: { Melee: 'Ближний бой', Range: 'Дальний бой', Ranged: 'Дальний бой', Axe: 'Топор' },
     locationKind: {
@@ -624,6 +669,15 @@ const I18N = {
       chanceLabel: 'Шанс',
       lootBestRates: 'Здобич (найкращі шанси)',
       mapLabel: 'Карта',
+      mapSelectorLabel: 'Показана карта',
+      mapBadgeTitle: name => `На карті «${name}» — натисніть, щоб перейти`,
+      mapTilesOnlySuffix: '(прибл.)',
+      mapGroupWorld: 'Світ',
+      mapGroupExtraction: 'Евакуація',
+      mapGroupBattleground: 'Поля бою',
+      mapGroupPve: 'PvE-арени',
+      mapGroupPvp: 'PvP-арени',
+      mapGroupOther: 'Інше',
       // «позиція невідома» заборонена на сайті (див. data/SCHEMA.md "search_zone"):
       // це загальне позначення лишається лише для рядків поза метою квесту
       // (НПС/об’єкт/торговець без знайденої позиції) — самі цілі квестів
@@ -730,7 +784,12 @@ const I18N = {
       logging: 'Лісорубство', mining: 'Гірництво', searchable: 'Обшукувані скрині',
       destroyable: 'Руйнівні', reactive: 'Інтерактивні', shrines: 'Святилища',
       soulkeeper: 'Охоронці душ', quest: 'Квест', wildlife: 'Дикі тварини',
-      guards: 'Стражі', other: 'Інше',
+      guards: 'Стражі', event: 'Подія', other: 'Інше',
+    },
+    mapName: {
+      Kwalat: 'Квалат',
+      Extraction_Island_large: 'Тюремний острів',
+      Extraction_Island_small: 'Тюремний острів (малий)',
     },
     monsterAttack: { Melee: 'Ближній бій', Range: 'Дальній бій', Ranged: 'Дальній бій', Axe: 'Сокира' },
     locationKind: {
@@ -799,6 +858,15 @@ const I18N = {
       chanceLabel: 'Probabilidad',
       lootBestRates: 'Botín (mejores probabilidades)',
       mapLabel: 'Mapa',
+      mapSelectorLabel: 'Mapa mostrado',
+      mapBadgeTitle: name => `En ${name} — haz clic para cambiar`,
+      mapTilesOnlySuffix: '(aprox.)',
+      mapGroupWorld: 'Mundo',
+      mapGroupExtraction: 'Extracción',
+      mapGroupBattleground: 'Campos de batalla',
+      mapGroupPve: 'Arenas JcE',
+      mapGroupPvp: 'Arenas JcJ',
+      mapGroupOther: 'Otros',
       // «posición desconocida» prohibido en el sitio (ver data/SCHEMA.md "search_zone"):
       // esta etiqueta genérica solo se usa para filas sin objetivo de misión
       // (PNJ/objeto/comerciante sin posición extraída) — los propios objetivos
@@ -906,7 +974,12 @@ const I18N = {
       logging: 'Tala', mining: 'Minería', searchable: 'Cofres buscables',
       destroyable: 'Destructibles', reactive: 'Interactivos', shrines: 'Santuarios',
       soulkeeper: 'Guardianes de almas', quest: 'Misión', wildlife: 'Fauna',
-      guards: 'Guardias', other: 'Otros',
+      guards: 'Guardias', event: 'Evento', other: 'Otros',
+    },
+    mapName: {
+      Kwalat: 'Kwalat',
+      Extraction_Island_large: 'Isla Prisión',
+      Extraction_Island_small: 'Isla Prisión (pequeña)',
     },
     monsterAttack: { Melee: 'Cuerpo a cuerpo', Range: 'A distancia', Ranged: 'A distancia', Axe: 'Hacha' },
     locationKind: {
