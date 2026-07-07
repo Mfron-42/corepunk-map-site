@@ -1,0 +1,232 @@
+/* Kwalat — vue carte : instance Leaflet, transform monde↔pixel paramétré
+   par la carte active, tuiles, couches denses (canvas + DOM culled) et
+   couche des régions nommées. Ne connaît AUCUNE vue applicative (popups et
+   fiches sont injectés par les appelants — voir registerDense/registerDomDense). */
+import { KWALAT_DEFAULTS, TILE_BASE, CATS } from './config.js';
+import { S } from './state.js';
+import { esc, iconTag, initials } from './utils.js';
+
+export let activeMap = KWALAT_DEFAULTS;
+export function setActiveMap(m) { activeMap = m; }
+/* ── Carte ──────────────────────────────────────────────────── */
+const map = L.map('map', {
+  crs: L.CRS.Simple,
+  minZoom: 0, maxZoom: 5,
+  zoomSnap: 0.25, zoomDelta: 0.5,
+  wheelPxPerZoomLevel: 90,
+  zoomControl: false,
+  attributionControl: true,
+});
+map.attributionControl.setPrefix(false);
+map.attributionControl.addAttribution(
+  'Corepunk © Artificial Core — carte communautaire non officielle');
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+/* Transform monde↔pixel, paramétré par la carte active (Kwalat : ppu 4,
+   native_zoom 2, tile_top_z 8704 — strictement identique à l'ancien code
+   `x*4, (8704-z)*4, zoom 2`). */
+const toLL = (x, z) => map.unproject([x * activeMap.ppu, (activeMap.tile_top_z - z) * activeMap.ppu], activeMap.native_zoom);
+const toWorld = ll => { const p = map.project(ll, activeMap.native_zoom); return { x: p.x / activeMap.ppu, z: activeMap.tile_top_z - p.y / activeMap.ppu }; };
+let worldBounds = L.latLngBounds(toLL(0, 0), toLL(activeMap.w, activeMap.h));
+map.setMaxBounds(worldBounds.pad(0.12));
+
+const Tiles = L.TileLayer.extend({
+  // `tile_path` : '' = tuiles Kwalat à la racine du dépôt ; '<mapId>/' = sous-
+  // dossier par carte. Le dépôt de tuiles est le même pour toutes les cartes.
+  getTileUrl: c => `${TILE_BASE}/${activeMap.tile_path}${c.z}/${c.x}_${c.y}.webp`,
+});
+let tileLayer = null;
+function makeTileLayer() {
+  return new Tiles('', {
+    tileSize: 512, minNativeZoom: 0, maxNativeZoom: activeMap.tile_max_zoom,
+    minZoom: 0, maxZoom: 5, noWrap: true, keepBuffer: 3,
+    bounds: worldBounds, className: 'map-tiles',
+    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  });
+}
+tileLayer = makeTileLayer();
+tileLayer.addTo(map);
+
+const canvasR = L.canvas({ padding: 0.35 });
+/* ── Marqueurs ──────────────────────────────────────────────── */
+const layers = {};   // cat -> L.LayerGroup
+function markerId(cat, i) { return `${cat}:${i}`; }
+
+function domIcon(cat, iconUrl, done, name) {
+  return L.divIcon({
+    className: 'mk' + (done ? ' mk-done' : ''),
+    html: `<div class="mk-pin" style="--pin:${CATS[cat].hex}">${iconTag(iconUrl, 'mk-img', initials(name))}</div>`,
+    iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -14],
+  });
+}
+
+/* Transform monde -> pixel (zoom courant), dérivée à la volée de toLL() +
+   map.project() par échantillonnage (3 projections Leaflet, jamais plus,
+   quel que soit le nombre de points à filtrer ensuite). Volontairement
+   générique : ne suppose aucune échelle ni flip d'axe particulier, donc
+   reste valide quelle que soit la config de la couche de tuiles (gérée
+   ailleurs — voir toLL/toWorld en tête de fichier). */
+function worldToPxTransform() {
+  const Z = map.getZoom();
+  const p0 = map.project(toLL(0, 0), Z);
+  const px = map.project(toLL(1000, 0), Z);
+  const pz = map.project(toLL(0, 1000), Z);
+  return {
+    ox: p0.x, oy: p0.y,
+    axx: (px.x - p0.x) / 1000, axy: (px.y - p0.y) / 1000,
+    azx: (pz.x - p0.x) / 1000, azy: (pz.y - p0.y) / 1000,
+  };
+}
+function fastProject(t, x, z) {
+  return { x: t.ox + t.axx * x + t.azx * z, y: t.oy + t.axy * x + t.azy * z };
+}
+
+/* Rendu « dense » sur canvas, filtré par la vue + agrégé par cellule.
+   Perf : un seul passage en espace pixel — la projection Leaflet coûteuse
+   (allocation LatLng + unproject/project) n'est plus appelée que pour les
+   3 points de calibrage + les points effectivement dessinés (après
+   filtrage/clustering), jamais pour l'ensemble brut (jusqu'à 122k points
+   tous camps + quêtes + objets + coffres confondus). */
+function renderDense(cat, points, color, popupFor) {
+  const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
+  g.clearLayers();
+  const st = cat.startsWith('camp:') ? S.camps[cat.slice(5)] : CATS[cat];
+  if (!st || !st.on) return;
+
+  const t = worldToPxTransform();
+  const pb = map.getPixelBounds();
+  const padX = (pb.max.x - pb.min.x) * 0.25, padY = (pb.max.y - pb.min.y) * 0.25;
+  const minX = pb.min.x - padX, maxX = pb.max.x + padX;
+  const minY = pb.min.y - padY, maxY = pb.max.y + padY;
+
+  const vis = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const q = fastProject(t, p.x, p.z);
+    if (q.x >= minX && q.x <= maxX && q.y >= minY && q.y <= maxY) vis.push({ p, px: q.x, py: q.y });
+  }
+
+  const CAP = 1400, cellPx = 30;
+  let drawList;
+  if (vis.length > CAP) {
+    const cells = new Map();
+    for (const v of vis) {
+      const key = ((v.px / cellPx) | 0) + ':' + ((v.py / cellPx) | 0);
+      const c = cells.get(key);
+      if (c) c.n++; else cells.set(key, { p: v.p, n: 1 });
+    }
+    drawList = [...cells.values()];
+  } else {
+    drawList = vis.map(v => ({ p: v.p, n: 1 }));
+  }
+
+  for (const { p, n } of drawList) {
+    const mk = L.circleMarker(toLL(p.x, p.z), {
+      renderer: canvasR, radius: n > 1 ? Math.min(6 + Math.log2(n) * 1.8, 13) : 4.6,
+      color: '#0a0e14', weight: 1.2, fillColor: color, fillOpacity: n > 1 ? .75 : .88,
+    });
+    if (n > 1) mk.bindTooltip('× ' + n, { direction: 'top', offset: [0, -6] });
+    mk.bindPopup(() => popupFor(p, n), { maxWidth: 300 });
+    g.addLayer(mk);
+  }
+}
+
+/* Marqueurs DOM (portraits PNJ/POI/ateliers) : même discipline que les
+   couches denses ci-dessus (ne matérialise que ce qui est dans la vue,
+   reconstruit au déplacement) mais en gardant l'icône réelle au lieu d'un
+   simple point — évite de garder des centaines de nœuds DOM+image en
+   permanence pendant que l'utilisateur navigue loin de la vue initiale. */
+function renderDomCulled(cat, iconPathFor, popupFor) {
+  const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
+  g.clearLayers();
+  const c = CATS[cat];
+  if (!c || !c.on) return;
+
+  const t = worldToPxTransform();
+  const pb = map.getPixelBounds();
+  const padX = (pb.max.x - pb.min.x) * 0.3, padY = (pb.max.y - pb.min.y) * 0.3;
+  const minX = pb.min.x - padX, maxX = pb.max.x + padX;
+  const minY = pb.min.y - padY, maxY = pb.max.y + padY;
+
+  const arr = S.data[cat];
+  for (let i = 0; i < arr.length; i++) {
+    const r = arr[i];
+    if (r.x == null || r.z == null) continue;   // known only from dialog/quest-slot,
+                                                   // no fixed position -- fiche/search only
+    const q = fastProject(t, r.x, r.z);
+    if (q.x < minX || q.x > maxX || q.y < minY || q.y > maxY) continue;
+    const id = markerId(cat, i);
+    const url = r.icon ? `icons/${iconPathFor}/${encodeURIComponent(r.icon)}.png` : null;
+    const mk = L.marker(toLL(r.x, r.z), { icon: domIcon(cat, url, S.done.has(id), r.name) });
+    mk._meta = { cat, i, id, r };
+    mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });
+    g.addLayer(mk);
+  }
+}
+
+const denseRenderers = [];
+const denseByCat = {};
+function registerDense(cat, getPoints, color, popupFor) {
+  const fn = () => renderDense(cat, getPoints(), color, popupFor);
+  denseRenderers.push(fn);
+  denseByCat[cat] = fn;
+  return fn;
+}
+function registerDomDense(cat, iconPath, popupFor) {
+  const fn = () => renderDomCulled(cat, iconPath, popupFor);
+  denseRenderers.push(fn);
+  denseByCat[cat] = fn;
+  return fn;
+}
+/* Les recalculs de couches denses sont coalescés sur une frame (rAF) : un
+   enchaînement rapide de moveend/zoomend (molette, flyTo) ne déclenche
+   qu'un seul redessin au lieu d'un par événement. */
+let redrawQueued = false;
+function scheduleRedraw() {
+  if (redrawQueued) return;
+  redrawQueued = true;
+  requestAnimationFrame(() => { redrawQueued = false; denseRenderers.forEach(fn => fn()); });
+}
+map.on('moveend zoomend', scheduleRedraw);
+function refreshIconLayer(cat) {
+  denseByCat[cat]?.(); // rejoue le rendu (canvas ou DOM culled) de cette seule couche
+}
+/* ── Couche régions nommées (zones_geo) ─────────────────────── */
+function buildZoneLayer() {
+  const g = L.layerGroup();
+  S.zonesGeo.forEach(z => {
+    z.rings.forEach(ring => L.polygon(ring.map(([x, zz]) => toLL(x, zz)), {
+      color: z.color, weight: 1.4, opacity: .8,
+      fillColor: z.color, fillOpacity: .09, interactive: false,
+    }).addTo(g));
+    const [lx, lz] = z.label;
+    L.marker(toLL(lx, lz), {
+      icon: L.divIcon({ className: 'zone-label', html: esc(z.name), iconSize: null }),
+      interactive: false,
+    }).addTo(g);
+  });
+  S.zoneLayer = g;
+}
+function toggleZones(on) {
+  S.zonesOn = on;
+  if (!S.zoneLayer) return;
+  on ? map.addLayer(S.zoneLayer) : map.removeLayer(S.zoneLayer);
+}
+
+/* (Re)calage complet de la géométrie sur la carte active : bornes monde,
+   bornes max, couche de tuiles (tile_path/maxNativeZoom propres à la carte).
+   Appelé par multimap.switchMap() — strictement le bloc qu'il inlinait. */
+function applyMapGeometry() {
+  worldBounds = L.latLngBounds(toLL(0, 0), toLL(activeMap.w, activeMap.h));
+  map.setMaxBounds(worldBounds.pad(0.12));
+  if (tileLayer) map.removeLayer(tileLayer);
+  tileLayer = makeTileLayer();
+  tileLayer.addTo(map);
+}
+
+export {
+  map, toLL, toWorld, worldBounds, applyMapGeometry, canvasR,
+  layers, markerId, registerDense, registerDomDense,
+  denseRenderers, denseByCat, scheduleRedraw, refreshIconLayer,
+  buildZoneLayer, toggleZones,
+};
