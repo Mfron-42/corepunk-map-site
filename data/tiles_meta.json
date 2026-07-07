@@ -1,0 +1,44 @@
+{
+ "0": {
+  "tiles": 303,
+  "gridX": 19,
+  "gridY": 17,
+  "seconds": 25.3
+ },
+ "1": {
+  "tiles": 1194,
+  "gridX": 38,
+  "gridY": 34,
+  "seconds": 103.5
+ },
+ "world": {
+  "w": 9600,
+  "h": 7680
+ },
+ "pxPerUnit": {
+  "0": 1,
+  "1": 2,
+  "2": 4,
+  "3": 8.0
+ },
+ "2": {
+  "tiles": 4675,
+  "gridX": 75,
+  "gridY": 68,
+  "seconds": 392.9
+ },
+ "minimapRect": {
+  "w": 9600,
+  "h": 8320
+ },
+ "worldTopZ": 8704,
+ "3": {
+  "tiles": 18700,
+  "gridX": 150,
+  "gridY": 136,
+  "seconds": 1570.6,
+  "iaTiles": 1060,
+  "lanczosTiles": 3615,
+  "iaThreshold": 1500.0
+ }
+}
