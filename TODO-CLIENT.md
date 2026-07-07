@@ -15,9 +15,13 @@ déjà écrasé la refonte modulaire une fois (commit `8e6ec434`).
 - **À faire dans la pipeline** : ne committer QUE `data/` (+ rien d'autre),
   ou faire un `git pull --rebase` avant de committer, ou mettre à jour son
   gabarit de site avec l'état actuel du dépôt.
-- Un garde-fou existe côté GitHub Actions (`.github/workflows/deploy-pages.yml`,
-  tag `site-code`) qui auto-répare le déploiement, mais la vraie correction
-  est à la source.
+- Deux garde-fous existent en attendant (testés en conditions réelles) :
+  1. le workflow Pages du site auto-répare un snapshot (tag `site-code`) ;
+  2. le dépôt privé **`corepunk-map-guard`** (watchdog cron 15 min) répare
+     même si le snapshot écrase `.github/workflows/` du site.
+  Mais la vraie correction est à la source. Au passage : remplacer le secret
+  `REPAIR_TOKEN` du watchdog par un fine-grained PAT limité à
+  `corepunk-map-site` (contents read/write).
 
 ## 1. Icônes manquantes (1 212 items sans icône)
 
