@@ -13,7 +13,7 @@ import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
   map, toWorld, registerDense, registerDomDense,
-  denseRenderers, buildZoneLayer, markerId,
+  denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight,
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred } from './data.js';
 import { popupHtml, questPopup, campPopup } from './popups.js';
@@ -47,6 +47,12 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-monster') openMonsterFiche(id);
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
+  else if (b.dataset.act === 'camp-highlight') {
+    // « Montre-moi TOUS les points de ce contenant » (caisses de maïs,
+    // cercueils…) — surlignage éphémère, voir mapview.showHighlight.
+    const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === id);
+    if (g) showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
+  }
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
   else if (b.dataset.act === 'goto') {
@@ -123,7 +129,10 @@ function buildLangSelector() {
    loadDeferred()) : la boucle ne fait alors simplement rien pour eux. */
 function registerAllDenseRenderers() {
   denseRenderers.length = 0;
-  registerDomDense('npc', 'npc_map', (r, id) => popupHtml('npc', r, id));
+  // PNJ : le clic sur le marqueur ouvre DIRECTEMENT la fiche à droite
+  // (quêtes + boutique), en plus du popup (actions rapides Suivre/Fait).
+  registerDomDense('npc', 'npc_map', (r, id) => popupHtml('npc', r, id),
+    (r, i) => { pushFocusState(); openNpcFiche(i); });
   registerDomDense('poi', 'interest_points', (r, id) => popupHtml('poi', r, id));
   registerDomDense('workshop', 'npc_map', (r, id) => popupHtml('workshop', r, id)); // ateliers : pictogramme couleur, pas d'icône dédiée
   registerDense('quest', () => S.data.quest.filter(q => q.x != null), CATS.quest.hex,
@@ -210,6 +219,7 @@ async function setLang(code) {
   onMapSwitch(() => {
     closeFiche();
     hideSearchResults();
+    clearHighlight();
     if (S.zoneLayer) { map.removeLayer(S.zoneLayer); S.zoneLayer = null; }
     buildZoneLayer();
     if (S.zonesOn && S.zoneLayer) map.addLayer(S.zoneLayer);

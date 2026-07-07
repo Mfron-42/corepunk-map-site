@@ -35,6 +35,7 @@ export default {
       ficheShopBtn: 'Картка · Крамниця',
       loreEntryTitle: 'Бестіарій',
       lootTableKind: 'Таблиця здобичі',
+      highlightPointsBtn: n => `Підсвітити точки (${n})`,
       dataGeneratedAt: date => `Дані від ${date}`,
       questMapsLine: names => `Мапи: ${names}`,
       lootTableItemsN: n => `Вміст (${n})`,

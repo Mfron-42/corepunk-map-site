@@ -10,7 +10,7 @@ import {
 } from './config.js';
 import { $, esc, fmtCoord, fold, editLe, iconTag, initials, itemGlyph, pretty } from './utils.js';
 import { tr, tbl } from './i18n/index.js';
-import { map, toLL, toggleZones } from './mapview.js';
+import { map, toLL, toggleZones, showHighlight } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
 import { whenDeferred } from './data.js';
@@ -203,7 +203,10 @@ function buildCampSearchIndex() {
     if (!g.pts.length) return;
     const label = campSearchLabel(g.k);
     if (label == null) return;
-    pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1]);
+    // Clic → surligne TOUS les points du groupe (pas seulement le premier) :
+    // « montre-moi toutes les caisses de maïs », voir showHighlight.
+    pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1],
+      () => showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888'));
   }));
 }
 
@@ -227,7 +230,10 @@ function chestSearchLabel(name) {
 function buildChestSearchIndex() {
   const seen = new Map();
   S.data.chest.forEach(r => { if (!seen.has(r.name)) seen.set(r.name, r); });
-  seen.forEach(r => pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z));
+  // Clic → surligne TOUTES les instances de ce skin de prop (chaque coffre
+  // placé porte son nom exact — 142 « Chest boxes elenian 01 grey »…).
+  seen.forEach(r => pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z,
+    () => showHighlight(S.data.chest.filter(c => c.name === r.name), CATS.chest.hex)));
 }
 
 /* Régions nommées (zones_geo.json, chargé au critique — voir loadCritical) :

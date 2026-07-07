@@ -34,6 +34,7 @@ export default {
       ficheShopBtn: 'Ficha · Tienda',
       loreEntryTitle: 'Bestiario',
       lootTableKind: 'Tabla de botín',
+      highlightPointsBtn: n => `Resaltar los ${n} puntos`,
       dataGeneratedAt: date => `Datos del ${date}`,
       questMapsLine: names => `Mapas: ${names}`,
       lootTableItemsN: n => `Contenido (${n})`,

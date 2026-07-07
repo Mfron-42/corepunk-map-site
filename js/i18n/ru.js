@@ -35,6 +35,7 @@ export default {
       ficheShopBtn: 'Карточка · Магазин',
       loreEntryTitle: 'Бестиарий',
       lootTableKind: 'Таблица добычи',
+      highlightPointsBtn: n => `Подсветить точки (${n})`,
       dataGeneratedAt: date => `Данные от ${date}`,
       questMapsLine: names => `Карты: ${names}`,
       lootTableItemsN: n => `Содержимое (${n})`,

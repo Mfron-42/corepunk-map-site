@@ -34,6 +34,7 @@ export default {
       ficheShopBtn: 'Fiche · Boutique',
       loreEntryTitle: 'Bestiaire',
       lootTableKind: 'Table de butin',
+      highlightPointsBtn: n => `Surligner les ${n} points`,
       dataGeneratedAt: date => `Données du ${date}`,
       questMapsLine: names => `Cartes : ${names}`,
       lootTableItemsN: n => `Contenu (${n})`,

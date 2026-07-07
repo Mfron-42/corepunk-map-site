@@ -136,7 +136,7 @@ function renderDense(cat, points, color, popupFor) {
    reconstruit au déplacement) mais en gardant l'icône réelle au lieu d'un
    simple point — évite de garder des centaines de nœuds DOM+image en
    permanence pendant que l'utilisateur navigue loin de la vue initiale. */
-function renderDomCulled(cat, iconPathFor, popupFor) {
+function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
   const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
   g.clearLayers();
   const c = CATS[cat];
@@ -160,6 +160,10 @@ function renderDomCulled(cat, iconPathFor, popupFor) {
     const mk = L.marker(toLL(r.x, r.z), { icon: domIcon(cat, url, S.done.has(id), r.name) });
     mk._meta = { cat, i, id, r };
     mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });
+    // `onSelect` (facultatif, posé par main.js) : ouverture directe de la
+    // fiche au clic sur le marqueur, EN PLUS du popup (actions rapides) —
+    // demandé pour les PNJ : un clic = boutique/quêtes à droite.
+    if (onSelect) mk.on('click', () => onSelect(r, i));
     g.addLayer(mk);
   }
 }
@@ -172,8 +176,8 @@ function registerDense(cat, getPoints, color, popupFor) {
   denseByCat[cat] = fn;
   return fn;
 }
-function registerDomDense(cat, iconPath, popupFor) {
-  const fn = () => renderDomCulled(cat, iconPath, popupFor);
+function registerDomDense(cat, iconPath, popupFor, onSelect) {
+  const fn = () => renderDomCulled(cat, iconPath, popupFor, onSelect);
   denseRenderers.push(fn);
   denseByCat[cat] = fn;
   return fn;
@@ -213,6 +217,29 @@ function toggleZones(on) {
   on ? map.addLayer(S.zoneLayer) : map.removeLayer(S.zoneLayer);
 }
 
+/* ── Surlignage ponctuel de points (contenants typés, skins de coffre) ──
+   Couche éphémère de LECTURE (« montre-moi TOUTES les caisses de maïs / tous
+   les tonneaux de ce skin ») : remplacée à chaque appel, retirée à la
+   fermeture de fiche (closeFiche) et à la bascule de carte (les points sont
+   dans le repère de la carte active). Canvas non interactif. */
+let highlightLayer = null;
+function clearHighlight() {
+  if (highlightLayer) { map.removeLayer(highlightLayer); highlightLayer = null; }
+}
+function showHighlight(points, color) {
+  clearHighlight();
+  if (!points.length) return;
+  const g = L.layerGroup();
+  for (const p of points) {
+    L.circleMarker(toLL(p.x, p.z), {
+      renderer: canvasR, radius: 5.5, color: '#0a0e14', weight: 1.2,
+      fillColor: color, fillOpacity: .95, interactive: false,
+    }).addTo(g);
+  }
+  highlightLayer = g.addTo(map);
+  map.flyToBounds(L.latLngBounds(points.map(p => toLL(p.x, p.z))).pad(0.15));
+}
+
 /* (Re)calage complet de la géométrie sur la carte active : bornes monde,
    bornes max, couche de tuiles (tile_path/maxNativeZoom propres à la carte).
    Appelé par multimap.switchMap() — strictement le bloc qu'il inlinait. */
@@ -228,5 +255,5 @@ export {
   map, toLL, toWorld, worldBounds, applyMapGeometry, canvasR,
   layers, markerId, registerDense, registerDomDense,
   denseRenderers, denseByCat, scheduleRedraw, refreshIconLayer,
-  buildZoneLayer, toggleZones,
+  buildZoneLayer, toggleZones, showHighlight, clearHighlight,
 };

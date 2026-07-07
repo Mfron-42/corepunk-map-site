@@ -14,7 +14,7 @@ import {
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
-import { map, toLL, canvasR } from './mapview.js';
+import { map, toLL, canvasR, clearHighlight } from './mapview.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
 import { mobLabelHtml } from './popups.js';
@@ -51,6 +51,7 @@ function openCampFiche(key) {
       <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
+      ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
     </div></div>
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : ''}
     ${drops}
@@ -226,6 +227,7 @@ function closeFiche() {
   if (S.investLayer) { map.removeLayer(S.investLayer); S.investLayer = null; }
   if (S.questZoneLayer) { map.removeLayer(S.questZoneLayer); S.questZoneLayer = null; }
   clearGoalZone();
+  clearHighlight();
   S.openFiche = null;
   setFicheHash(null);
 }
