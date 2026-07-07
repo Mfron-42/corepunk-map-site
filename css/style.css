@@ -416,6 +416,19 @@ body {
 .fiche-scroll::-webkit-scrollbar { width: 8px; }
 .fiche-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
 .fiche-scroll::-webkit-scrollbar-track { background: transparent; }
+/* Listes longues du PANNEAU (camps & ressources, bestiaire) : hauteur
+   bornée + défilement interne, même scrollbar fine que les fiches — le
+   panneau ne fait plus trois écrans, chaque section défile chez elle. */
+#camp-list, #bestiary-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+}
+#camp-list::-webkit-scrollbar, #bestiary-list::-webkit-scrollbar { width: 8px; }
+#camp-list::-webkit-scrollbar-thumb, #bestiary-list::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+#camp-list::-webkit-scrollbar-track, #bestiary-list::-webkit-scrollbar-track { background: transparent; }
+
 /* Filtre local d'une longue liste de fiche (stock vendeur, table de butin). */
 .stock-filter {
   width: 100%;
