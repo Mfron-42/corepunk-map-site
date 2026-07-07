@@ -57,3 +57,9 @@ dépôt GitHub Pages dédié (voir `TILE_BASE` dans `js/config.js`).
 
 Les fichiers `data/` sont republiés par le pipeline d'extraction (dépôt
 source du projet) — ne pas les éditer à la main ici.
+
+Le déploiement est **auto-réparant** : si le pipeline pousse un snapshot
+contenant l'ancienne architecture, le workflow Pages restaure le code du
+site depuis le tag `site-code` (voir `.github/workflows/deploy-pages.yml`)
+en conservant les données fraîches. Les reprises nécessitant le client du
+jeu sont listées dans `TODO-CLIENT.md`.

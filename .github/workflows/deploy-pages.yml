@@ -52,7 +52,7 @@ jobs:
           else
             echo "::warning::Snapshot bot détecté (js/main.js absent) — restauration du code depuis le tag site-code"
             git fetch origin tag site-code
-            git checkout site-code -- index.html README.md css js .github .gitignore
+            git checkout site-code -- index.html README.md TODO-CLIENT.md css js .github .gitignore
             git rm -qf --ignore-unmatch js/app.js js/app.min.js js/i18n.js css/style.min.css
             git add -A
             git commit -m "Auto-restauration du code du site après snapshot de la pipeline de données
