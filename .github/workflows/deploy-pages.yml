@@ -1,4 +1,4 @@
-name: Deploy Pages
+﻿name: Deploy Pages
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -23,47 +23,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # ── Garde anti-écrasement ──────────────────────────────────────────
-      # La pipeline de données (corepunk-map-bot) pousse des snapshots
-      # COMPLETS du site depuis un clone externe qui contient encore
-      # l'ancienne architecture (js/app.js monolithique) : elle a déjà
-      # écrasé la refonte une fois. Tant qu'elle n'est pas corrigée pour ne
-      # committer que data/, ce garde-fou rend le déploiement auto-réparant :
-      #  - commit SAIN (js/main.js présent)  → on avance le tag `site-code`
-      #    (dernier état de code connu bon) ;
-      #  - commit BOT (js/main.js absent)    → on restaure le code du site
-      #    depuis `site-code` (en GARDANT les data/ fraîches du bot), on
-      #    recommitte, et on déploie la version réparée.
-      # Le push de réparation utilise GITHUB_TOKEN : il ne redéclenche pas
-      # de workflow (protection native GitHub) — ce run-ci déploie déjà
-      # l'artefact corrigé, pas de boucle possible.
-      - name: Garde du code du site (anti-snapshot bot)
-        run: |
-          set -euo pipefail
-          git config user.name "site-code-guard"
-          git config user.email "site-code-guard@users.noreply.github.com"
-          if [ -f js/main.js ]; then
-            echo "Code du site présent — tag site-code avancé sur ${GITHUB_SHA}"
-            git tag -f site-code
-            git push -f origin site-code
-          else
-            echo "::warning::Snapshot bot détecté (js/main.js absent) — restauration du code depuis le tag site-code"
-            git fetch origin tag site-code
-            git checkout site-code -- index.html README.md TODO-CLIENT.md css js .github .gitignore
-            git rm -qf --ignore-unmatch js/app.js js/app.min.js js/i18n.js css/style.min.css
-            git add -A
-            git commit -m "Auto-restauration du code du site après snapshot de la pipeline de données
-
-          Le commit précédent (pipeline corepunk-map-bot) a republié l'ancienne
-          architecture par-dessus la refonte modulaire. Ce commit restaure le code
-          du site depuis le tag site-code en conservant les données fraîches du bot.
-          Corriger la pipeline pour ne committer que data/ rendra ce garde inutile."
-            git push origin HEAD:main
-          fi
-
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
