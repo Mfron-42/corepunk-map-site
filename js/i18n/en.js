@@ -160,6 +160,10 @@ export default {
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
       statsTitle: 'Stats',
       realStatsBadge: 'real',
+      // "real" badge tooltip (monsters.md finding #1): explicitly distinguish
+      // a REAL client reading (m_abs_*/mbt_*_boss record, e.g. Furious
+      // Woodraptor = 154,440 HP) from the generic per-tier estimate below.
+      realStatsTooltip: 'Real values (client) — read directly from the game data for this specific monster, not a per-tier estimate.',
       // Honest note for mobs WITHOUT a real client stat reading (statsSource
       // !== "record"): reverse engineering showed the old "estimated" grid
       // read the wrong field (~640x too low, e.g. a level-20 boss showing
@@ -169,6 +173,12 @@ export default {
       statsServerNote: 'Precise stats are resolved server-side (not available in the client data).',
       computedStatsBadge: 'computed (game formula)',
       statsPerTierNote: 'Difficulty tier assigned server-side — range shown per tier (easy → boss).',
+      // Honest caveat on the Elite/Boss columns (monsters.md finding #2):
+      // unlike easy/medium/hard, these 2 tiers were NEVER checked against an
+      // external source — the community's "~350,000 HP" level-20 boss figure
+      // doesn't reproduce from any client data, and a real named boss can run
+      // far above this generic range (see the "real" badge when available).
+      statsBossEliteCaveat: '"Elite"/"Boss" columns: generic estimated values, not confirmed in-game — some real named bosses are far tougher (see the "real" badge when a dedicated record exists for that monster).',
       bestiaryMapFilterLabel: map => `On this map (${map})`,
       bestiaryMapEmpty: 'No monsters attributed to this map. Uncheck to show all.',
       alwaysGrantedTitle: 'Always granted',
@@ -198,6 +208,14 @@ export default {
       rollRangeTitle: 'Roll range',
       weaponDpsTitle: 'Weapon DPS',
       weaponDpsDerived: 'DPS (computed)',
+      // Main/secondary grouping (data-accuracy audit, items.md #1): an
+      // artifact rolls 1 guaranteed MAIN stat + a limited number of
+      // SECONDARY stats drawn from a shared pool -- never all at once, unlike
+      // the old flat rendering.
+      rollMainStatTitle: 'Main stat (guaranteed)',
+      rollSecondaryStatsTitle: 'Secondary stats (pool)',
+      rollSecondaryHintN: (n, pool) => `Up to ${n} of these ${pool} stats actually roll on the item (shared pool) — not all at once.`,
+      rollSecondaryHint: 'A limited number of these stats actually roll on the item (shared pool) — not all at once.',
       formulaTitle: 'Formula',
       formulaRankLabel: n => `Rank ${n}`,
       formulaPartialNote: 'Part of this line depends on an undecoded engine reference.',

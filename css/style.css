@@ -1284,6 +1284,15 @@ button.rar-pill:hover {
   border: 1px solid var(--line-soft);
   font-style: italic;
 }
+/* Marqueur "*" sur les en-têtes Élite/Boss du tableau par-palier (monsters.md
+   finding #2) : ces deux colonnes n'ont jamais été vérifiées contre une
+   source externe, contrairement à easy/medium/hard -- info-bulle honnête au
+   survol, cf. statsBossEliteCaveat (i18n). */
+.tier-caveat-mark {
+  color: var(--muted);
+  cursor: help;
+  margin-left: 1px;
+}
 .stat-grid {
   display: grid;
   grid-template-columns: 1fr auto;

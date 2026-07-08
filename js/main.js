@@ -153,13 +153,16 @@ function registerAllDenseRenderers() {
     (r, i) => { pushFocusState(); openNpcFiche(i); });
   registerDomDense('poi', 'interest_points', (r, id) => popupHtml('poi', r, id));
   registerDomDense('workshop', 'npc_map', (r, id) => popupHtml('workshop', r, id)); // ateliers : pictogramme couleur, pas d'icône dédiée
-  // Contenu dev (feature #13) : quêtes/objets de quête isTest masqués de la
-  // carte par défaut (S.devOn faux) -- ces deux couches sont les SEULES du
-  // site où un enregistrement isTest porte un marqueur individuel (monstres/
-  // items n'ont pas de couche carte propre, voir js/devcontent.js). Le point
-  // gardé isTest:true (jamais retiré de l'objet, juste laissé passer le
-  // filtre quand S.devOn est vrai) pilote le liseré tireté de mapview.js
-  // renderDense.
+  // Contenu dev (feature #13) : tout enregistrement isTest masqué de la
+  // carte par défaut (S.devOn faux) -- quest/qao ET (parité, data-accuracy
+  // audit world_objects.md "isTest gating parity") searchable_chest/
+  // camp_chest/decor/npc ci-dessous : monstres/items n'ont pas de couche
+  // carte propre (voir js/devcontent.js), mais tout enregistrement AVEC
+  // position qui porte isTest:true doit rester filtré, jamais juste 2 des
+  // 6 couches concernées. Le point gardé isTest:true (jamais retiré de
+  // l'objet, juste laissé passer le filtre quand S.devOn est vrai) pilote
+  // le liseré tireté de mapview.js renderDense (npc filtré directement dans
+  // mapview.js::renderDomDots/renderDomCulled, seules couches DOM du lot).
   registerDense('quest', () => S.data.quest.filter(q => q.x != null && !isHiddenTest(q)), CATS.quest.hex,
     q => questPopup(q));
   registerDense('qao', () => S.data.qao.filter(p => !isHiddenTest(p)), CATS.qao.hex,
@@ -167,14 +170,14 @@ function registerAllDenseRenderers() {
   // Coffres fouillables RÉELS (searchable_chests.bin, sa propre couche/son
   // propre fichier — voir DATA_CONTRACT.md §2/§4) : couleur/popup dédiés,
   // jamais confondus avec les placements chest ci-dessous.
-  registerDense('searchable_chest', () => S.data.searchable_chest || [], CATS.searchable_chest.hex,
+  registerDense('searchable_chest', () => (S.data.searchable_chest || []).filter(p => !isHiddenTest(p)), CATS.searchable_chest.hex,
     r => searchableChestPopup(r));
   // Coffres de camp RÉELS (S.data.chest `group==="camp_chest"`, skin
   // sci_fi) : sa propre couche de haut niveau, ON par défaut (voir
   // DATA_CONTRACT.md §3.1) — id de marqueur "chest:<i>" conservé (voir
   // config.js chestHex/chestKindLabel) pour que Suivre/Fait/fiche-chest
   // continuent de fonctionner sur ce même S.data.chest partagé.
-  registerDense('camp_chest', () => S.data.chest.filter(p => p.group === 'camp_chest'), CATS.camp_chest.hex,
+  registerDense('camp_chest', () => S.data.chest.filter(p => p.group === 'camp_chest' && !isHiddenTest(p)), CATS.camp_chest.hex,
     p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
   // Décor (S.decor, groupe repliable/décoché par défaut — DATA_CONTRACT.md
   // §1/§3.1) : une couche dense par famille, même convention que camp:<kind>
@@ -184,7 +187,7 @@ function registerAllDenseRenderers() {
   // par family.
   for (const fam of DECOR_FAMILIES) {
     registerDense('decor:' + fam, () => S.data.chest.filter(p =>
-      fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)),
+      (fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)) && !isHiddenTest(p)),
       DECOR_HEX[fam], p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
   }
   for (const kind of Object.keys(S.camps)) {

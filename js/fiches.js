@@ -126,8 +126,13 @@ function openSearchableChestFiche(k) {
   setFicheHash(null);
 }
 
-/* Fiche « table de butin » : contenu exact d'une table nommée du client
-   (reconstruite en inversant items.bin — voir lootTableItems), triée
+/* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
+   (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
+   directement à partir de loot_tables.json côté pipeline, voir data.js
+   lootTableItems ; l'ancienne méthode, qui reconstruisait une table en
+   inversant le cache `dropped_in` tronqué de chaque item, rendait les plus
+   grosses tables partagées — les 13 tables de coffre de recette
+   lt_poi_chest_hidden_*, jusqu'à 582 membres — vides ou incomplètes), triée
    garanti d'abord puis par taux décroissant. Ouverte depuis les libellés de
    table de la fiche item et depuis le butin probable d'un contenant. */
 function openLootTableFiche(label) {
@@ -268,22 +273,37 @@ function computedStatsGridHtml(sc) {
 /* Table fourchette : lignes = stats, colonnes = les 5 paliers (libellés
    courts). Enveloppée dans un conteneur défilable horizontalement pour ne
    jamais faire déborder le tiroir de fiche sur mobile. */
+/* Colonnes dont la fourchette générique est marquée d'un caveat honnête
+   (monsters.md finding #2) : "elit"/"boss" n'ont JAMAIS été vérifiées contre
+   une source externe (contrairement à easy/medium/hard, croisées avec une
+   fourchette 1500-20000 documentée) -- le pipeline concède lui-même que le
+   chiffre communautaire "~350 000 PV" pour un boss niv.20 ne se reproduit
+   avec AUCUNE combinaison de ce client, et un vrai boss nommé (voir Finding 1,
+   statsSource === 'record' ci-dessous) peut afficher jusqu'à ~4.5× cette
+   fourchette générique. Le marqueur "*" + la note ne s'affichent QUE si l'une
+   de ces deux colonnes est présente. */
+const _UNVERIFIED_TIERS = new Set(['elit', 'boss']);
 function perTierStatsSection(level, sf) {
   const tiers = PER_TIER_ORDER.filter(t => sf.tiers[t]);
   if (!tiers.length) return '';
+  const hasUnverified = tiers.some(t => _UNVERIFIED_TIERS.has(t));
   const computed = Object.fromEntries(tiers.map(t => [t, computeTierStats(t, level, sf)]));
-  const head = `<tr><th scope="col"></th>${tiers.map(t => `<th scope="col">${esc(statTierLabel(t))}</th>`).join('')}</tr>`;
+  const head = `<tr><th scope="col"></th>${tiers.map(t => `<th scope="col">${esc(statTierLabel(t))}${_UNVERIFIED_TIERS.has(t) ? `<span class="tier-caveat-mark" title="${esc(tr('statsBossEliteCaveat'))}">*</span>` : ''}</th>`).join('')}</tr>`;
   const body = PER_TIER_STATS.map(s =>
     `<tr><th scope="row">${esc(statLabel(s))}</th>${tiers.map(t => `<td>${esc(fmtStatNum(computed[t][s]))}</td>`).join('')}</tr>`).join('');
   return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('levelAbbrev', level))}</span></h3>
     <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
-    <p class="hint">${esc(tr('statsPerTierNote'))}</p></div>`;
+    <p class="hint">${esc(tr('statsPerTierNote'))}</p>
+    ${hasUnverified ? `<p class="hint">${esc(tr('statsBossEliteCaveat'))}</p>` : ''}</div>`;
 }
 function monsterStatsSection(m) {
-  // 1. Relevé client RÉEL (mbt_10_troll_rusty_boss + quelques mobs à bloc
-  //    complet) : grille numérique + badge « réel » — inchangé.
+  // 1. Relevé client RÉEL (mbt_10_troll_rusty_boss, les 4 bosses d'arène
+  //    nommés récupérés via m_abs_* -- voir Finding 1 -- + quelques mobs à
+  //    bloc complet) : grille numérique + badge « réel » avec info-bulle
+  //    explicite pour bien le distinguer de la fourchette générique estimée
+  //    ci-dessus (même donnée qu'avant ce correctif, badge juste plus explicite).
   if (m.statsSource === 'record' && m.stats && Object.keys(m.stats).length) {
-    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge" title="${esc(tr('realStatsTooltip'))}">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
   }
   // 2. Mob portant DIRECTEMENT des stats calculées par la formule (palier
   //    résolu côté données — dormant aujourd'hui, aucun mob non-template n'en
@@ -421,32 +441,72 @@ function derivedDpsRow(wd, tier, rarity) {
   const txt = lo === hi ? fmtNum(lo) : `${fmtNum(lo)}–${fmtNum(hi)}`;
   return `<div class="stat-row-label">${esc(tr('weaponDpsDerived'))}</div><div class="stat-row-value">${esc(txt)}</div>`;
 }
+/* Groupe de lignes de plage de jet pour un SOUS-ENSEMBLE de stat_ranges
+   (sids) -- sous-titre optionnel + note optionnelle (hint), sinon même rendu
+   `stat-grid` que l'ancien bloc plat. Renvoie '' si aucune des sids ne
+   produit de ligne (bandes toutes absentes pour la rareté active). */
+function rollGroupBlock(titleKey, hintHtml, sids, sr, tier, rarity) {
+  const rows = sids.map(sid => tieredStatRows(statLabel(sid), sr[sid], tier, rarity)).join('');
+  if (!rows) return '';
+  return `${titleKey ? `<h4 class="fiche-sub">${esc(tr(titleKey))}</h4>` : ''}${hintHtml || ''}<div class="stat-grid">${rows}</div>`;
+}
 /* Plages de jet + DPS d'arme (item.stat_ranges/weapon_dps, port_map.md #8) :
    UN sélecteur de rareté partagé (jamais deux, même si l'item a les deux
    champs -- voir rollRarityPickHtml ci-dessus), un h3 dont le libellé
    s'adapte à ce qui existe réellement (stat_ranges seul -> "Plage de jet" ;
    weapon_dps seul -> "DPS d'arme" ; les deux -> "Plage de jet" en-tête +
    "DPS d'arme" en sous-titre) -- jamais un h3 générique qui ne correspond à
-   rien pour ~62 items qui n'ont QUE weapon_dps. */
+   rien pour ~62 items qui n'ont QUE weapon_dps.
+
+   Structure RÉELLE des artefacts (audit data-accuracy, items.md #1) : un
+   artefact ne roule JAMAIS ses ~20-23 stats de stat_ranges toutes à la fois
+   -- 1 stat PRINCIPALE garantie + jusqu'à N stats SECONDAIRES tirées d'un
+   pool partagé (roll_types: main|secondary|weapon, déjà décodé/livré côté
+   données mais jamais lu ici avant ce correctif -- voir roll_sources pour le
+   nombre réel de slots secondaires, comptés dynamiquement plutôt que codés
+   en dur : toujours 3 aujourd'hui sur les 121 artefacts vérifiés, mais rien
+   ne garantit que ça reste vrai pour un futur item). Un item qui n'a que des
+   stats `roll_types:"weapon"` (armes -- toujours un flat_phys_penetration
+   figé) ou pas de roll_types du tout retombe sur l'ancien rendu plat, sans
+   grouper ni supposer un mécanisme qu'on n'a pas vérifié pour lui. */
 function rollRangeSection(it, key) {
   const sr = it.stat_ranges, wd = it.weapon_dps;
   if (!sr && !wd) return '';
   const tier = it.tier || it.weapon?.tier || null;
   const rarity = activeRollRarity(key);
-  const genericRows = sr
-    ? Object.entries(sr).map(([sid, tiersObj]) => tieredStatRows(statLabel(sid), tiersObj, tier, rarity)).join('')
-    : '';
+  let genericBlock = '';
+  if (sr) {
+    const rollTypes = it.roll_types || {};
+    const sids = Object.keys(sr);
+    const mainSids = sids.filter(sid => rollTypes[sid] === 'main');
+    const secSids = sids.filter(sid => rollTypes[sid] === 'secondary');
+    const otherSids = sids.filter(sid => rollTypes[sid] !== 'main' && rollTypes[sid] !== 'secondary');
+    if (mainSids.length && secSids.length) {
+      // Nombre réel de slots secondaires (roll_sources : 1 entrée "main" +
+      // N entrées "SecondaryStats" -- voir docstring ci-dessus) ; à défaut
+      // (donnée absente), on n'affirme aucun compte plutôt que d'en inventer un.
+      const secSlots = (it.roll_sources || []).filter(s => /SecondaryStats/i.test(s.type || '')).length;
+      const secHint = `<p class="hint">${esc(secSlots ? tr('rollSecondaryHintN', secSlots, secSids.length) : tr('rollSecondaryHint'))}</p>`;
+      genericBlock = rollGroupBlock('rollMainStatTitle', '', mainSids, sr, tier, rarity)
+        + rollGroupBlock('rollSecondaryStatsTitle', secHint, secSids, sr, tier, rarity)
+        + rollGroupBlock(null, '', otherSids, sr, tier, rarity);
+    } else {
+      // Repli honnête : pas de distinction main/secondaire connue pour cet
+      // item (armes roll_types:"weapon", ou roll_types absent) -- même rendu
+      // plat qu'avant, jamais de groupe fabriqué sans preuve.
+      genericBlock = rollGroupBlock(null, '', sids, sr, tier, rarity);
+    }
+  }
   let dpsRows = '';
   if (wd) {
     const asRows = wd.attack_speed ? tieredStatRows(statLabel('attack_speed'), wd.attack_speed, tier, rarity) : '';
     const dmgRows = wd.weapon_damage ? tieredStatRows(statLabel('weapon_damage'), wd.weapon_damage, tier, rarity) : '';
     dpsRows = asRows + dmgRows + derivedDpsRow(wd, tier, rarity);
   }
-  if (!genericRows && !dpsRows) return '';
-  const title = genericRows ? tr('rollRangeTitle') : tr('weaponDpsTitle');
-  const genericBlock = genericRows ? `<div class="stat-grid">${genericRows}</div>` : '';
+  if (!genericBlock && !dpsRows) return '';
+  const title = genericBlock ? tr('rollRangeTitle') : tr('weaponDpsTitle');
   const dpsBlock = dpsRows
-    ? (genericRows ? `<h4 class="fiche-sub">${esc(tr('weaponDpsTitle'))}</h4><div class="stat-grid">${dpsRows}</div>` : `<div class="stat-grid">${dpsRows}</div>`)
+    ? (genericBlock ? `<h4 class="fiche-sub">${esc(tr('weaponDpsTitle'))}</h4><div class="stat-grid">${dpsRows}</div>` : `<div class="stat-grid">${dpsRows}</div>`)
     : '';
   return `<div class="fiche-section"><h3>${esc(title)}</h3>${rollRarityPickHtml(key, rarity)}${genericBlock}${dpsBlock}</div>`;
 }

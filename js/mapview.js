@@ -5,6 +5,7 @@
 import { KWALAT_DEFAULTS, TILE_BASE, CATS } from './config.js';
 import { S } from './state.js';
 import { esc, iconTag, initials } from './utils.js';
+import { isHiddenTest } from './devcontent.js';
 
 export let activeMap = KWALAT_DEFAULTS;
 export function setActiveMap(m) { activeMap = m; }
@@ -165,6 +166,7 @@ function renderDomDots(cat, g, popupFor, onSelect) {
   for (let i = 0; i < arr.length; i++) {
     const r = arr[i];
     if (r.x == null || r.z == null) continue;
+    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec quest/qao
     const q = fastProject(t, r.x, r.z);
     if (q.x < pb.min.x - padX || q.x > pb.max.x + padX || q.y < pb.min.y - padY || q.y > pb.max.y + padY) continue;
     const id = markerId(cat, i);
@@ -195,6 +197,7 @@ function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
     const r = arr[i];
     if (r.x == null || r.z == null) continue;   // known only from dialog/quest-slot,
                                                    // no fixed position -- fiche/search only
+    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec quest/qao
     const q = fastProject(t, r.x, r.z);
     if (q.x < minX || q.x > maxX || q.y < minY || q.y > maxY) continue;
     const id = markerId(cat, i);

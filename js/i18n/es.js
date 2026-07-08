@@ -162,6 +162,10 @@ export default {
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
       statsTitle: 'Estadísticas',
       realStatsBadge: 'real',
+      // Info-bulle del badge « real » (monsters.md finding #1): distingue un
+      // registro REAL del cliente (record m_abs_*/mbt_*_boss, p. ej. Furious
+      // Woodraptor = 154.440 HP) del rango genérico estimado por nivel de abajo.
+      realStatsTooltip: 'Valores reales (cliente) — leídos directamente de los datos del juego para este monstruo concreto, no una estimación por nivel.',
       // Nota honesta para mobs SIN un registro real del cliente (statsSource
       // !== "record"): la ingeniería inversa mostró que la antigua tabla
       // "estimada" leía el campo equivocado (~640 veces demasiado bajo, p.
@@ -171,6 +175,13 @@ export default {
       statsServerNote: 'Las estadísticas precisas se resuelven en el servidor (no disponibles en los datos del cliente).',
       computedStatsBadge: 'calculado (fórmula del juego)',
       statsPerTierNote: 'Nivel de dificultad asignado en el servidor — rango según el nivel (fácil → jefe).',
+      // Advertencia honesta sobre las columnas Élite/Jefe (monsters.md finding
+      // #2): a diferencia de fácil/medio/difícil, estos 2 niveles nunca se
+      // verificaron contra una fuente externa — la cifra comunitaria de
+      // "~350.000 HP" para un jefe de nivel 20 no se reproduce con ningún dato
+      // del cliente, y un jefe nombrado real puede superar ampliamente este
+      // rango genérico (ver el badge « real » cuando esté disponible).
+      statsBossEliteCaveat: 'Columnas « Élite »/« Jefe »: valores genéricos estimados, no confirmados en el juego — algunos jefes nombrados reales son mucho más resistentes (ver el badge « real » cuando exista un registro dedicado para ese monstruo).',
       bestiaryMapFilterLabel: map => `En este mapa (${map})`,
       bestiaryMapEmpty: 'Ningún monstruo atribuido a este mapa. Desmarca para mostrar todos.',
       alwaysGrantedTitle: 'Siempre otorgado',
@@ -201,6 +212,13 @@ export default {
       rollRangeTitle: 'Rango de tirada',
       weaponDpsTitle: 'DPS del arma',
       weaponDpsDerived: 'DPS (calculado)',
+      // Agrupación principal/secundaria (auditoría data-accuracy, items.md #1):
+      // un artefacto tira 1 stat PRINCIPAL garantizada + un número limitado de
+      // stats SECUNDARIAS de un pool compartido -- nunca todas a la vez.
+      rollMainStatTitle: 'Stat principal (garantizada)',
+      rollSecondaryStatsTitle: 'Stats secundarias (pool)',
+      rollSecondaryHintN: (n, pool) => `Hasta ${n} de estas ${pool} stats tiran realmente en el objeto (pool compartido) — no todas a la vez.`,
+      rollSecondaryHint: 'Un número limitado de estas stats tira realmente en el objeto (pool compartido) — no todas a la vez.',
       formulaTitle: 'Fórmula',
       formulaRankLabel: n => `Rango ${n}`,
       formulaPartialNote: 'Parte de esta línea depende de una referencia del motor no decodificada.',

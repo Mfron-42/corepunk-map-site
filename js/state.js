@@ -37,6 +37,10 @@ const S = {
   ping: null,
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}
+  lootTableContents: {},    // libellé de table -> [{key,name,icon,w,c,g,ch}], table COMPLÈTE
+                            // (site/data/<lang>/loot_table_contents.bin, voir data.js lootTableItems —
+                            // remplace l'ancienne inversion de items.*.drops, tronquée/incomplète
+                            // pour toute table partagée par plus d'items que le cap dropped_in)
   zonesGeo: [],             // polygones des régions nommées
   zonesQuest: {},           // slug -> anneaux de la zone de quête
   zonesOn: false,

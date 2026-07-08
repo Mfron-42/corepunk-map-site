@@ -99,7 +99,7 @@ async function loadCritical() {
   if (S.mapCache.Kwalat) S.mapCache.Kwalat.decor = kwDecor;
   if (S.map === 'Kwalat') S.decor = kwDecor;
   buildRarityGroups();    // regroupe les variantes de rareté « même nom » (voir rarity.js)
-  lootTableIdx = null;    // index paresseux table→items (voir lootTableItems)
+  lootTableIdxFallback = null;   // index paresseux table→items de repli (voir lootTableItems)
   quests.forEach(q => S.quests.set(q.slug, q));
 }
 
@@ -113,7 +113,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, locations, abilities, events] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, locations, abilities, events, lootTableContents] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -128,6 +128,13 @@ async function loadDeferred() {
     fetchJson(dataPath('locations.bin')).catch(() => []),
     fetchJson(dataPath('abilities.bin')).catch(() => ({})),
     fetchJson(dataPath('events.bin')).catch(() => []),
+    // Table de butin COMPLÈTE par libellé (loot.md finding #2) : bundle dédié
+    // construit directement depuis loot_tables.json côté pipeline (voir
+    // build_site_data.py::loot_table_contents_site()) -- remplace l'ancienne
+    // inversion de items.*.drops (tronquée, voir lootTableItems ci-dessous).
+    // 404-tolérant comme tout fichier optionnel : une carte/build sans ce
+    // bundle retombe juste sur "aucune table" plutôt que de planter.
+    fetchJson(dataPath('loot_table_contents.bin')).catch(() => ({})),
   ]);
   S.campDetails = campDetails;
   S.recipes = recipes;
@@ -137,6 +144,7 @@ async function loadDeferred() {
   S.locations = locations;
   S.abilities = abilities;
   S.events = events;
+  S.lootTableContents = lootTableContents;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)
   // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
@@ -202,28 +210,36 @@ function loreIndexFor(key) {
   return i == null ? null : i;
 }
 
-/* Index inverse des tables de butin : items.bin ne stocke le butin QUE côté
-   item (item → [{label, w, c, g, ch}]) ; on le retourne ici en table → items
-   pour les fiches « table de butin » (coffres fouillables, caisses de la
-   ferme, cercueils…). Chaque ligne reprend TELS QUELS les taux déjà publiés
-   côté item — aucune donnée nouvelle, juste l'autre sens de lecture. `ch`
-   (part approximative dans le pool, voir data/SCHEMA.md "chance") propagée
-   au même titre que w/c/g -- fiches.js::dropRateHtml en a besoin pour ne
-   jamais retomber sur le poids brut `w` comme faux pourcentage.
-   Paresseux, invalidé quand le catalogue d'objets est rechargé (setLang). */
-let lootTableIdx = null;
+/* Table de butin COMPLÈTE par libellé (loot.md finding #2) : lue directement
+   depuis S.lootTableContents (bundle dédié construit côté pipeline depuis
+   loot_tables.json -- voir build_site_data.py::loot_table_contents_site(),
+   chargé en différé dans loadDeferred() ci-dessus), donc toujours 100%
+   complète (max observé : 582 lignes, les 13 tables lt_poi_chest_hidden_* de
+   coffre de recette) -- plus jamais reconstruite en inversant le cache
+   `dropped_in` tronqué de chaque item (l'ancienne méthode, gardée juste en
+   dessous en repli), qui rendait justement CES tables-là vides ou
+   incomplètes (0/582 avant ce correctif). `ch` (part approximative dans le
+   pool, voir data/SCHEMA.md "chance") toujours propagée au même titre que
+   w/c/g -- fiches.js::dropRateHtml en a besoin pour ne jamais retomber sur le
+   poids brut `w` comme faux pourcentage. */
+let lootTableIdxFallback = null;
 function lootTableItems(label) {
-  if (!lootTableIdx) {
-    lootTableIdx = new Map();
+  const rows = S.lootTableContents && S.lootTableContents[label];
+  if (rows) return rows;
+  // Repli (bundle dédié absent -- échec réseau ponctuel, ou build sans ce
+  // fichier) : ancienne inversion de items.*.drops, paresseuse, invalidée
+  // quand le catalogue d'objets est rechargé (setLang, voir loadCritical).
+  if (!lootTableIdxFallback) {
+    lootTableIdxFallback = new Map();
     for (const [key, it] of Object.entries(S.items)) {
       for (const d of it.drops || []) {
-        let arr = lootTableIdx.get(d.label);
-        if (!arr) lootTableIdx.set(d.label, arr = []);
+        let arr = lootTableIdxFallback.get(d.label);
+        if (!arr) lootTableIdxFallback.set(d.label, arr = []);
         arr.push({ key, name: it.name, icon: it.icon || null, w: d.w, c: d.c, g: d.g, ch: d.ch });
       }
     }
   }
-  return lootTableIdx.get(label) || null;
+  return lootTableIdxFallback.get(label) || null;
 }
 
 /* Zones nommées où un monstre apparaît : désormais SERVIES par le pipeline

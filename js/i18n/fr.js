@@ -161,6 +161,11 @@ export default {
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
       statsTitle: 'Statistiques',
       realStatsBadge: 'réel',
+      // Info-bulle du badge « réel » (monsters.md finding #1) : distingue
+      // explicitement un relevé RÉEL du client (record m_abs_*/mbt_*_boss,
+      // ex. Furious Woodraptor = 154 440 PV) de la fourchette générique
+      // estimée par palier ci-dessous.
+      realStatsTooltip: 'Valeurs réelles (client) — relevées directement dans les données du jeu pour ce monstre précis, pas une estimation par palier.',
       // Note honnête pour les mobs SANS relevé client réel (statsSource !==
       // "record") : une RE a montré que l'ancienne grille "estimée" lisait un
       // mauvais champ (~640× trop bas, ex. un boss niv 20 à ~544 PV pour une
@@ -175,6 +180,13 @@ export default {
       // palier de difficulté côté serveur au spawn (aucune référence côté
       // client), d'où une plage selon le palier plutôt qu'un chiffre unique.
       statsPerTierNote: 'Palier de difficulté assigné côté serveur — fourchette selon le palier (facile → boss).',
+      // Caveat honnête sur les colonnes Élite/Boss (monsters.md finding #2) :
+      // contrairement à facile/moyen/difficile, ces 2 paliers n'ont JAMAIS été
+      // vérifiés contre une source externe -- le chiffre communautaire
+      // "~350 000 PV" pour un boss niv.20 ne se reproduit avec aucune donnée
+      // du client, et un vrai boss nommé peut afficher bien plus que cette
+      // fourchette générique (voir le badge « réel » quand disponible).
+      statsBossEliteCaveat: 'Colonnes « Élite »/« Boss » : valeurs génériques estimées, non confirmées en jeu — certains boss nommés réels sont bien plus résistants (voir le badge « réel » quand une fiche dédiée existe pour ce monstre).',
       // Case de filtre par-carte du bestiaire (map = nom de la carte active).
       bestiaryMapFilterLabel: map => `Sur cette carte (${map})`,
       bestiaryMapEmpty: 'Aucun monstre attribué à cette carte. Décochez pour tout afficher.',
@@ -205,6 +217,14 @@ export default {
       rollRangeTitle: 'Plage de jet',
       weaponDpsTitle: "DPS d'arme",
       weaponDpsDerived: 'DPS (calculé)',
+      // Groupement principale/secondaires (data-accuracy audit, items.md #1) :
+      // un artefact roule 1 stat PRINCIPALE garantie + un nombre limité de
+      // stats SECONDAIRES tirées d'un pool partagé -- jamais toutes à la fois,
+      // contrairement à l'ancien rendu plat.
+      rollMainStatTitle: 'Stat principale (garantie)',
+      rollSecondaryStatsTitle: 'Stats secondaires (pool)',
+      rollSecondaryHintN: (n, pool) => `Jusqu’à ${n} de ces ${pool} stats roulent réellement sur l’objet (pool partagé) — pas toutes en même temps.`,
+      rollSecondaryHint: 'Un nombre limité de ces stats roule réellement sur l’objet (pool partagé) — pas toutes en même temps.',
       formulaTitle: 'Formule',
       formulaRankLabel: n => `Rang ${n}`,
       formulaPartialNote: 'Une partie de cette ligne dépend d’une référence moteur non décodée.',
