@@ -143,6 +143,33 @@ export default {
       abilityLabel: 'Capacité',
       harvestTitle: 'Dépeçage',
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
+      statsTitle: 'Statistiques',
+      realStatsBadge: 'réel',
+      estimatedStatsBadge: tier => `≈ Estimé (tier ${tier})`,
+      alwaysGrantedTitle: 'Toujours donné',
+      choiceGroupTitle: n => `Choix ${n}`,
+      orWord: ' ou ',
+      xpAbbrev: n => `${n} XP`,
+      goldAbbrev: n => `${n} or`,
+      // Sélecteur de rareté (variantes même-nom, voir js/rarity.js) + indice
+      // de recherche « N raretés » sur le résultat regroupé.
+      rarityVariantsLabel: 'Rareté',
+      rarityVariantsCount: n => `${n} raretés`,
+      // Plages de jet / DPS d'arme / formules / mise à l'échelle rune-puce
+      // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
+      // tier_scaling) -- net-new, voir 
+      // + , tmp/convergence/port_map.md #8/#9/#10.
+      rollRangeTitle: 'Plage de jet',
+      weaponDpsTitle: "DPS d'arme",
+      weaponDpsDerived: 'DPS (calculé)',
+      formulaTitle: 'Formule',
+      formulaRankLabel: n => `Rang ${n}`,
+      formulaPartialNote: 'Une partie de cette ligne dépend d’une référence moteur non décodée.',
+      rarityScalingTitle: 'Mise à l’échelle par rareté',
+      tierScalingTitle: 'Mise à l’échelle par palier',
+      scalingServerSide: 'Ne varie pas avec la rareté dans les données du client (probablement géré côté serveur).',
+      scalingNotLocated: 'Mise à l’échelle non localisée dans les données du client.',
+      tierNotRarity: 'Évolue par PALIER (tier), pas par rareté.',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
@@ -216,12 +243,46 @@ export default {
       wooden: 'Objets en bois', leafTrash: 'Tas de feuilles',
       vegetables: 'Légumes', urban: 'Objets urbains',
     },
-    // Famille de prop d'un coffre placé (tc_*) — déduite du nom, voir
-    // chestTypeLabel (js/config.js). Grandes familles seulement.
+    // Type physique d'un coffre (world_objects.json chest_type) -- ensemble
+    // exact tiré de data/world_objects.json, voir data/SCHEMA.md "Chest loot + type".
     chestType: {
-      barrel: 'Tonneau', boxes: 'Caisses', sci: 'Matériel scientifique',
-      trash: 'Déchets', furniture: 'Mobilier', appliances: 'Électroménager',
-      papers: 'Papiers', books: 'Livres', corpse: 'Dépouille', fridge: 'Réfrigérateur',
+      Backpack: 'Sac à dos', Barrel: 'Tonneau', Bathroom: 'Salle de bain', Bedroom: 'Chambre',
+      Boiler: 'Chaudière', Books: 'Livres', Boxes: 'Caisses', Cabinet: 'Meuble', Chest: 'Coffre',
+      Closed: 'Fermé', Corpse: 'Corps', Fridge: 'Réfrigérateur', Guest: "Chambre d'amis",
+      Kitchen: 'Cuisine', Papers: 'Papiers', Rest: 'Repos', Shelf: 'Étagère', Truck: 'Camion',
+      Wardrobe: 'Armoire', Warehouse: 'Entrepôt',
+    },
+    // Nature d'un objet de quête activable (world_objects.json activable_type)
+    // -- ensemble exact tiré de data/world_objects.json ; plusieurs jetons sont
+    // des noms propres (personnages/objets uniques) laissés identiques dans
+    // toutes les langues, voir data/SCHEMA.md "Activable type".
+    activableType: {
+      Ancient: 'Ancien', Artifact: 'Artefact', Barrel: 'Tonneau', Bart: 'Bart', Beehive: 'Ruche',
+      Black: 'Noir', Blade: 'Lame', Bloody: 'Sanglant', Blue: 'Bleu', Broken: 'Cassé',
+      Building: 'Bâtiment', Captains: 'Capitaine', Cell: 'Cellule', Chain: 'Chaîne',
+      Chainsaw: 'Tronçonneuse', Charging: 'En charge', Cigarette: 'Cigarette', Container: 'Conteneur',
+      Crush: 'Écrasement', Data: 'Données', Deed: 'Acte de propriété', Diamond: 'Diamant',
+      Document: 'Document', Door: 'Porte', Dream: 'Rêve', Drip: 'Goutte-à-goutte', Dwarf: 'Nain',
+      East: 'Est', Empty: 'Vide', Energydrink: 'Boisson énergisante', Enter: 'Entrée',
+      Evidence: 'Preuve', Explosive: 'Explosif', Felixs: 'Felix', Fire: 'Feu', Fishing: 'Pêche',
+      Free: 'Libre', Gasoline: 'Essence', Gift: 'Cadeau', Glass: 'Verre', Green: 'Vert',
+      Handle: 'Poignée', Hiding: 'Cachette', Ingredient: 'Ingrédient', Iron: 'Fer',
+      Isopropyl: 'Isopropanol', Item: 'Objet', Jahri: 'Jahri', Kegs: 'Fûts', Light: 'Lumière',
+      'Lock/Key': 'Serrure/Clé', Machine: 'Machine', Mask: 'Masque', Maxwell: 'Maxwell',
+      Message: 'Message', Mineral: 'Minerai', Mixing: 'Mélange', Mobius: 'Mobius',
+      Mysterious: 'Mystérieux', Nia: 'Nia', Node: 'Nœud', North: 'Nord', Orange: 'Orange',
+      Package: 'Colis', Phylactery: 'Phylactère', Piece: 'Pièce', Place: 'Lieu', Plant: 'Plante',
+      Processor: 'Processeur', Provisions: 'Provisions', Psychomushroom: 'Psychochampignon',
+      Purple: 'Violet', Put: 'Dépôt', Radio: 'Radio', Recording: 'Enregistrement', Red: 'Rouge',
+      Rehearsed: 'Répété', Remains: 'Restes', Renovated: 'Rénové', Robot: 'Robot', Safe: 'Coffre-fort',
+      Second: 'Deuxième', Secret: 'Secret', Sensor: 'Capteur', Sewing: 'Couture', Shiny: 'Brillant',
+      Shipping: 'Expédition', Shirt: 'Chemise', Sign: 'Panneau', Slippery: 'Glissant',
+      Smoker: 'Fumoir', Soldier: 'Soldat', South: 'Sud', Souvenir: 'Souvenir', Special: 'Spécial',
+      Statue: 'Statue', Stolen: 'Volé', Supplies: 'Fournitures', Suspicious: 'Suspect', Svi: 'Svi',
+      Tool: 'Outil', Training: 'Entraînement', Transformer: 'Transformateur', Triton: 'Triton',
+      Undead: 'Mort-vivant', Valuable: 'Précieux', Various: 'Divers', Vial: 'Fiole', Vodka: 'Vodka',
+      Water: 'Eau', Weast: 'Weast', West: 'Ouest', Wolf: 'Loup', Workstation: 'Poste de travail',
+      Yellow: 'Jaune', Zazz: 'Zazz', Zephyr: 'Zéphyr',
     },
     // Métier (item/recette `prof`) — termes officiels ConstProfession.xml.
     profession: {
@@ -235,5 +296,29 @@ export default {
     // d'activité : "Flayer" -> "Boucherie", "Lumberjack" -> "Bûcheron"…).
     harvestMethod: {
       Flayer: 'Boucherie', Herbalism: 'Herboristerie', Lumberjack: 'Bûcheron', Miner: 'Mineur',
+    },
+    // Statistiques de monstre (stats_decoded / stat_curve) -- voir
+    // data/SCHEMA.md "Monster stats" + js/fiches.js::openMonsterFiche().
+    statLabel: {
+      health: 'Santé', attack_power: "Puissance d'attaque", weapon_damage: "Dégâts d'arme",
+      armor: 'Armure', magic_resist: 'Résistance magique', accuracy: 'Précision',
+      attack_speed: "Vitesse d'attaque", movement_speed: 'Vitesse de déplacement', vision: 'Vision',
+      health_regen: 'Régén. de santé', mana: 'Mana', mana_regen: 'Régén. de mana',
+      xp_reward: 'XP donnée', gold_reward: 'Or donné',
+      phys_crit_chance: 'Chances de critique physique', magic_crit_chance: 'Chances de critique magique',
+      // Ajoutés Phase 4 (stat_ranges/weapon_dps/formules -- voir
+      // tmp/convergence/port_map.md #8/#9) : stats rollables/opérandes de
+      // formule absentes du set "monstre" ci-dessus.
+      spell_power: 'Puissance des sorts', phys_penetration: 'Pénétration physique',
+      magic_penetration: 'Pénétration magique', flat_phys_penetration: 'Pénétration physique (fixe)',
+      flat_magic_penetration: 'Pénétration magique (fixe)', phys_crit_power: 'Puissance de critique physique',
+      magic_crit_power: 'Puissance de critique magique', lifesteal: 'Vol de vie',
+      ability_steal: 'Vol de vie (capacités)', heal_shield_power: 'Puissance de soin et de bouclier',
+      cooldown_reduction: 'Réduction de temps de recharge', cost_reduction: 'Réduction de coût',
+      haste: 'Hâte', tenacity: 'Ténacité', slow_resistance: 'Résistance au ralentissement',
+      bleed_chance: 'Chances de saignement', corruption_chance: 'Chances de corruption',
+    },
+    statTier: {
+      easy: 'facile', medium: 'moyen', hard: 'difficile', elit: 'élite', boss: 'boss', miniboss: 'mini-boss',
     },
 };

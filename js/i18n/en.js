@@ -142,6 +142,33 @@ export default {
       abilityLabel: 'Ability',
       harvestTitle: 'Harvesting',
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
+      statsTitle: 'Stats',
+      realStatsBadge: 'real',
+      estimatedStatsBadge: tier => `≈ Estimated (${tier} tier)`,
+      alwaysGrantedTitle: 'Always granted',
+      choiceGroupTitle: n => `Choice ${n}`,
+      orWord: ' or ',
+      xpAbbrev: n => `${n} XP`,
+      goldAbbrev: n => `${n} gold`,
+      // Rarity selector (same-name variants, see js/rarity.js) + grouped-
+      // result search hint "N rarities".
+      rarityVariantsLabel: 'Rarity',
+      rarityVariantsCount: n => `${n} rarities`,
+      // Roll ranges / weapon DPS / formulas / rune-chip scaling
+      // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
+      // tier_scaling) -- net-new, see 
+      // + , tmp/convergence/port_map.md #8/#9/#10.
+      rollRangeTitle: 'Roll range',
+      weaponDpsTitle: 'Weapon DPS',
+      weaponDpsDerived: 'DPS (computed)',
+      formulaTitle: 'Formula',
+      formulaRankLabel: n => `Rank ${n}`,
+      formulaPartialNote: 'Part of this line depends on an undecoded engine reference.',
+      rarityScalingTitle: 'Rarity scaling',
+      tierScalingTitle: 'Tier scaling',
+      scalingServerSide: "Doesn't vary with rarity in the client data (likely handled server-side).",
+      scalingNotLocated: 'Scaling not located in the client data.',
+      tierNotRarity: 'Scales by TIER, not by rarity.',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
@@ -201,12 +228,46 @@ export default {
       wooden: 'Wooden props', leafTrash: 'Leaf piles',
       vegetables: 'Vegetables', urban: 'Urban props',
     },
-    // Placed-chest prop family (tc_*) — inferred from the prop name, see
-    // chestTypeLabel (js/config.js). Major families only.
+    // Physical chest type (world_objects.json chest_type) -- exact set from
+    // data/world_objects.json, see data/SCHEMA.md "Chest loot + type".
     chestType: {
-      barrel: 'Barrel', boxes: 'Crates', sci: 'Scientific equipment',
-      trash: 'Trash', furniture: 'Furniture', appliances: 'Appliances',
-      papers: 'Papers', books: 'Books', corpse: 'Corpse', fridge: 'Fridge',
+      Backpack: 'Backpack', Barrel: 'Barrel', Bathroom: 'Bathroom', Bedroom: 'Bedroom',
+      Boiler: 'Boiler', Books: 'Books', Boxes: 'Boxes', Cabinet: 'Cabinet', Chest: 'Chest',
+      Closed: 'Closed', Corpse: 'Corpse', Fridge: 'Fridge', Guest: 'Guest room',
+      Kitchen: 'Kitchen', Papers: 'Papers', Rest: 'Rest', Shelf: 'Shelf', Truck: 'Truck',
+      Wardrobe: 'Wardrobe', Warehouse: 'Warehouse',
+    },
+    // Activatable quest-object nature (world_objects.json activable_type) --
+    // exact set from data/world_objects.json; several tokens are proper
+    // nouns (characters/unique objects) left identical in every language,
+    // see data/SCHEMA.md "Activable type".
+    activableType: {
+      Ancient: 'Ancient', Artifact: 'Artifact', Barrel: 'Barrel', Bart: 'Bart', Beehive: 'Beehive',
+      Black: 'Black', Blade: 'Blade', Bloody: 'Bloody', Blue: 'Blue', Broken: 'Broken',
+      Building: 'Building', Captains: "Captain's", Cell: 'Cell', Chain: 'Chain',
+      Chainsaw: 'Chainsaw', Charging: 'Charging', Cigarette: 'Cigarette', Container: 'Container',
+      Crush: 'Crush', Data: 'Data', Deed: 'Deed', Diamond: 'Diamond',
+      Document: 'Document', Door: 'Door', Dream: 'Dream', Drip: 'Drip', Dwarf: 'Dwarf',
+      East: 'East', Empty: 'Empty', Energydrink: 'Energy drink', Enter: 'Enter',
+      Evidence: 'Evidence', Explosive: 'Explosive', Felixs: "Felix's", Fire: 'Fire', Fishing: 'Fishing',
+      Free: 'Free', Gasoline: 'Gasoline', Gift: 'Gift', Glass: 'Glass', Green: 'Green',
+      Handle: 'Handle', Hiding: 'Hiding spot', Ingredient: 'Ingredient', Iron: 'Iron',
+      Isopropyl: 'Isopropyl', Item: 'Item', Jahri: 'Jahri', Kegs: 'Kegs', Light: 'Light',
+      'Lock/Key': 'Lock/Key', Machine: 'Machine', Mask: 'Mask', Maxwell: 'Maxwell',
+      Message: 'Message', Mineral: 'Mineral', Mixing: 'Mixing', Mobius: 'Mobius',
+      Mysterious: 'Mysterious', Nia: 'Nia', Node: 'Node', North: 'North', Orange: 'Orange',
+      Package: 'Package', Phylactery: 'Phylactery', Piece: 'Piece', Place: 'Place', Plant: 'Plant',
+      Processor: 'Processor', Provisions: 'Provisions', Psychomushroom: 'Psychomushroom',
+      Purple: 'Purple', Put: 'Deposit', Radio: 'Radio', Recording: 'Recording', Red: 'Red',
+      Rehearsed: 'Rehearsed', Remains: 'Remains', Renovated: 'Renovated', Robot: 'Robot', Safe: 'Safe',
+      Second: 'Second', Secret: 'Secret', Sensor: 'Sensor', Sewing: 'Sewing', Shiny: 'Shiny',
+      Shipping: 'Shipping', Shirt: 'Shirt', Sign: 'Sign', Slippery: 'Slippery',
+      Smoker: 'Smoker', Soldier: 'Soldier', South: 'South', Souvenir: 'Souvenir', Special: 'Special',
+      Statue: 'Statue', Stolen: 'Stolen', Supplies: 'Supplies', Suspicious: 'Suspicious', Svi: 'Svi',
+      Tool: 'Tool', Training: 'Training', Transformer: 'Transformer', Triton: 'Triton',
+      Undead: 'Undead', Valuable: 'Valuable', Various: 'Various', Vial: 'Vial', Vodka: 'Vodka',
+      Water: 'Water', Weast: 'Weast', West: 'West', Wolf: 'Wolf', Workstation: 'Workstation',
+      Yellow: 'Yellow', Zazz: 'Zazz', Zephyr: 'Zephyr',
     },
     profession: {
       Alchemy: 'Alchemy', Butchery: 'Butchery', Construction: 'Construction',
@@ -215,5 +276,27 @@ export default {
     },
     harvestMethod: {
       Flayer: 'Butchery', Herbalism: 'Herbalism', Lumberjack: 'Logging', Miner: 'Mining',
+    },
+    statLabel: {
+      health: 'Health', attack_power: 'Attack power', weapon_damage: 'Weapon damage',
+      armor: 'Armor', magic_resist: 'Magic resist', accuracy: 'Accuracy',
+      attack_speed: 'Attack speed', movement_speed: 'Movement speed', vision: 'Vision',
+      health_regen: 'Health regen', mana: 'Mana', mana_regen: 'Mana regen',
+      xp_reward: 'XP given', gold_reward: 'Gold given',
+      phys_crit_chance: 'Physical crit chance', magic_crit_chance: 'Magic crit chance',
+      // Added Phase 4 (stat_ranges/weapon_dps/formulas -- see
+      // tmp/convergence/port_map.md #8/#9): rollable stats/formula operands
+      // missing from the "monster" set above.
+      spell_power: 'Spell power', phys_penetration: 'Physical penetration',
+      magic_penetration: 'Magic penetration', flat_phys_penetration: 'Flat physical penetration',
+      flat_magic_penetration: 'Flat magic penetration', phys_crit_power: 'Physical crit power',
+      magic_crit_power: 'Magic crit power', lifesteal: 'Lifesteal',
+      ability_steal: 'Ability lifesteal', heal_shield_power: 'Heal and shield power',
+      cooldown_reduction: 'Cooldown reduction', cost_reduction: 'Cost reduction',
+      haste: 'Haste', tenacity: 'Tenacity', slow_resistance: 'Slow resistance',
+      bleed_chance: 'Bleed chance', corruption_chance: 'Corruption chance',
+    },
+    statTier: {
+      easy: 'easy', medium: 'medium', hard: 'hard', elit: 'elite', boss: 'boss', miniboss: 'mini-boss',
     },
 };

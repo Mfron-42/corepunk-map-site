@@ -20,6 +20,8 @@ const S = {
   zoneLayer: null,          // couche régions (filtre Zones)
   questZoneLayer: null,     // surlignage zone de la fiche quête
   items: {},                // clé d'item -> fiche (base de données objets)
+  rarityGroups: new Map(),  // repKey -> {baseName, variants:{Rareté: clé}} (voir rarity.js)
+  rarityGroupOf: new Map(), // clé d'item (représentant compris) -> repKey
   recipes: {},              // clé de recette -> {name, icon, output, ingredients}
   vendors: {},              // clé de vendeur -> {name, npcs, sells}
   monsters: {},             // clé de monstre (variante représentative) -> fiche

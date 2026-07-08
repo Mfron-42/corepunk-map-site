@@ -10,7 +10,8 @@ import {
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campDisplayName, campLootTableName,
+  campDisplayName, campLootTableName, catLabel, chestTypeLabel,
+  statLabel, statTierLabel, formulaTermLabel,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -18,6 +19,7 @@ import { map, toLL, canvasR, clearHighlight } from './mapview.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
 import { mobLabelHtml } from './popups.js';
+import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -57,6 +59,31 @@ function openCampFiche(key) {
     ${drops}
     ${tableHtml}`);
   setFicheHash('camp', key);
+}
+
+/* Fiche coffre (S.data.chest, placements tc_*) : type physique réel (badge,
+   même principe que openCampFiche — r.type est le vrai classifieur
+   chest_type du pipeline, pas une déduction depuis le nom) + butin (même
+   rendu lootRowsHtml que monstre/camp/item) + bouton carte. Pas de lien
+   profond dédié (setFicheHash(null)) — même traitement que
+   openLocationFiche/openAbilityFiche : ~3830 marqueurs individuels par skin
+   de prop, pas un id stable qu'un lien partagé devrait rouvrir (voir
+   data/SCHEMA.md "Chest loot + type" sur pourquoi ces marqueurs ne sont pas
+   individuellement indexés en recherche non plus). */
+function openChestFiche(i) {
+  const r = S.data.chest[i];
+  if (!r) return;
+  S.openFiche = { kind: 'chest', id: i };
+  const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
+  openFiche(`
+    <div class="fiche-head"><div>
+      <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(catLabel('chest'))}${r.type ? ' · ' + esc(chestTypeLabel(r.type)) : ''}</div>
+      <h2>${esc(r.name)}</h2></div></div>
+    <div class="fiche-section"><div class="pop-actions">
+      ${gotoBtn(r.x, r.z, r.name)}
+    </div></div>
+    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
+  setFicheHash(null);
 }
 
 /* Fiche « table de butin » : contenu exact d'une table nommée du client
@@ -104,6 +131,288 @@ function lootRowsHtml(list, emptyKey) {
     + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(monsterLootRow).join('')}` : '');
 }
 
+/* Statistiques de monstre — voir data/SCHEMA.md "Monster stats". Seuls
+   ~25/755 groupes ont un relevé client réel (m.stats/m.statsSource ==
+   "record", ex. le troll boss mbt_10_troll_rusty_boss) ; les ~730 restants
+   n'ont AUCUNE stat par-monstre côté client (statsSource null) — le client
+   ne nomme jamais quel tier de difficulté un mob donné utilise en jeu. On
+   estime alors avec la courbe d'UN template représentatif par tier
+   (site_meta.json.statTemplates, chargé dans S.meta au boot critique) :
+   value(level) = curve.base + curve.per_level*(level-1). C'est un maximum
+   honnête, jamais un chiffre par-monstre fabriqué — d'où le badge "≈ estimé
+   (tier X)" toujours visible à côté, jamais présenté avec la même
+   assurance qu'un relevé réel (badge "réel" plein). */
+const STAT_TIER_REP = {}; // tier -> clé de template choisie (mémoïsé)
+function statTierRep(tier) {
+  if (STAT_TIER_REP[tier]) return STAT_TIER_REP[tier];
+  const cands = Object.entries(S.meta.statTemplates || {}).filter(([, v]) => v.tier === tier);
+  const plain = cands.find(([k]) => !/island|event|no_gold|no_vision|buffed/.test(k)) || cands[0];
+  return (STAT_TIER_REP[tier] = plain ? plain[0] : null);
+}
+/* Aucun tier par-monstre n'est connu (le client ne le dit jamais) : repli
+   "medium" par défaut, affiné par un mot-clé trouvé dans famille/nom/tags —
+   un jugement de meilleur effort, jamais une donnée certaine (d'où le badge
+   estimé toujours visible, quel que soit le tier deviné ici). */
+function guessStatTier(m) {
+  const hay = [m.family, m.name, ...(m.tags || [])].filter(Boolean).join(' ').toLowerCase();
+  if (/mini.?boss/.test(hay)) return 'miniboss';
+  if (/\bboss\b/.test(hay)) return 'boss';
+  if (/elit/.test(hay)) return 'elit';
+  if (/\bhard\b/.test(hay)) return 'hard';
+  if (/\beasy\b/.test(hay)) return 'easy';
+  return 'medium';
+}
+function statsGridHtml(stats) {
+  const rows = Object.entries(stats).map(([k, v]) =>
+    `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(String(v))}</div>`).join('');
+  return `<div class="stat-grid">${rows}</div>`;
+}
+function monsterStatsSection(m) {
+  if (m.stats && Object.keys(m.stats).length) {
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
+  }
+  if (m.level == null) return '';
+  const tier = guessStatTier(m);
+  const repKey = statTierRep(tier);
+  const tpl = repKey && S.meta.statTemplates ? S.meta.statTemplates[repKey] : null;
+  if (!tpl?.curve) return '';
+  const est = {};
+  for (const [label, c] of Object.entries(tpl.curve)) {
+    est[label] = Math.round((c.base + c.per_level * (m.level - 1)) * 10) / 10;
+  }
+  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('estimatedStatsBadge', statTierLabel(tier)))}</span></h3>${statsGridHtml(est)}</div>`;
+}
+
+/* ── Plages de jet (stat_ranges/weapon_dps), formules de dégâts
+   (artifact_formula/formula) et mise à l'échelle rune/puce (rarity_scaling/
+   tier_scaling) — voir  +
+   , tmp/convergence/port_map.md #8/#9/#10. Net-new :
+   zéro fiche de référence à porter, juste les 3 handoffs + le contrat de
+   champs déjà validé en Phase 0. Toutes les valeurs numériques ci-dessous
+   viennent TELLES QUELLES du client (tables Tears/FloatTable/formule
+   d'ability) ; rien n'est jamais estimé ou deviné ici (contrairement à
+   monsterStatsSection ci-dessus, qui a un mode "estimé" explicite — il n'y a
+   pas d'équivalent pour ces données, un champ absent reste absent). */
+const RARITY_BANDS = ['common', 'uncommon', 'rare', 'epic'];
+const bandRarityCap = r => r.charAt(0).toUpperCase() + r.slice(1);
+const bandRarityLabel = r => rarityLabel(bandRarityCap(r)) || r;
+const bandRarityHex = r => RARITY[bandRarityCap(r)]?.hex || 'var(--muted)';
+
+/* Nombre générique (coefficients de formule, rarity_scaling/tier_scaling) :
+   au plus 4 décimales, jamais de zéro de remplissage inventé -- la précision
+   affichée est celle des données, pas une convention arbitraire. */
+function fmtNum(n) {
+  if (n == null) return '?';
+  return n.toLocaleString(numberLocale(), { maximumFractionDigits: 4 });
+}
+/* Nombre de plage de jet (min/max de stat_ranges/weapon_dps) : le pas
+   d'arrondi serveur (`round`) dicte la précision -- round=1 -> entier,
+   round=0.05 -> 2 décimales -- pour ne jamais afficher de faux zéros de
+   précision (10.000000004) ni sur-arrondir un pas fin. */
+function fmtRollNum(n, round) {
+  if (n == null) return '?';
+  let decimals = 0;
+  if (round > 0 && round < 1) decimals = Math.min(2, Math.max(1, Math.ceil(-Math.log10(round))));
+  return n.toLocaleString(numberLocale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+/* Une bande {min,max,round} -> texte : valeur unique si min===max (arme à
+   pas nul, ex. flat_phys_penetration toujours 20), sinon "min–max". */
+function bandText(band) {
+  if (!band) return null;
+  const lo = fmtRollNum(band.min, band.round), hi = fmtRollNum(band.max, band.round);
+  return band.min === band.max ? lo : `${lo}–${hi}`;
+}
+/* Lignes de grille (stat-grid) pour UNE stat à travers ses tiers : le tier
+   de l'ITEM (déjà affiché en en-tête de fiche) filtre à une seule ligne
+   quand il est connu ; à défaut (~9/158 items sans tier résolu, cf. audit
+   Phase 4), on montre tous les tiers présents, étiquetés "(T1)"/"(T2)"/"(T3)"
+   plutôt que d'en deviner un seul. */
+function tieredStatRows(label, tiersObj, tier, rarity) {
+  const tierKeys = (tier && tiersObj[tier]) ? [tier] : Object.keys(tiersObj).sort();
+  return tierKeys.map(tk => {
+    const band = tiersObj[tk][rarity] || tiersObj[tk].common;
+    const txt = bandText(band);
+    if (txt == null) return '';
+    const rowLabel = tierKeys.length > 1 ? `${label} (${tk})` : label;
+    return `<div class="stat-row-label">${esc(rowLabel)}</div><div class="stat-row-value">${esc(txt)}</div>`;
+  }).join('');
+}
+
+/* Sélecteur de rareté ACTIVE pour la plage de jet -- même composant visuel
+   que le sélecteur de VARIANTE (#6, rar-select/rar-pills/rar-pill), mais un
+   mécanisme différent : ici une seule clé d'item, 4 bandes de jet par
+   rareté ; là-bas, 4 clés d'item séparées. Les deux ne se recoupent jamais
+   dans les données (aucun item avec stat_ranges/weapon_dps ne porte de
+   suffixe de rareté de clé -- vérifié), donc aucun risque d'afficher deux
+   sélecteurs "Rareté" empilés sur la même fiche. État mémorisé par clé
+   d'item (pas dans S -- éphémère comme currentGoalZones/goalZoneLayer plus
+   haut) : ré-ouvrir la MÊME fiche garde la rareté choisie (retour de
+   loadDeferred, changement de langue...), ouvrir une AUTRE fiche repart de
+   "common". */
+let rollRarityState = { key: null, rarity: 'common' };
+function activeRollRarity(key) {
+  if (rollRarityState.key !== key) rollRarityState = { key, rarity: 'common' };
+  return rollRarityState.rarity;
+}
+function setRollRarity(key, rarity) {
+  rollRarityState = { key, rarity };
+  openItemFiche(key);
+}
+function rollRarityPickHtml(key, active) {
+  const pills = RARITY_BANDS.map(r => {
+    const hex = bandRarityHex(r), label = bandRarityLabel(r);
+    return r === active
+      ? `<span class="rar-pill is-active" style="--chip-c:${hex}" aria-current="true"><span class="rar-dot"></span>${esc(label)}</span>`
+      : `<button type="button" class="rar-pill" style="--chip-c:${hex}" data-act="roll-rarity" data-id="${esc(key)}" data-r="${r}"><span class="rar-dot"></span>${esc(label)}</button>`;
+  }).join('');
+  return `<div class="rar-select"><span class="rar-select-label">${esc(tr('rarityVariantsLabel'))}</span>
+    <div class="rar-pills" role="group" aria-label="${esc(tr('rarityVariantsLabel'))}">${pills}</div></div>`;
+}
+/* DPS dérivé (arme uniquement) : produit des BORNES au même tier/rareté
+   (min×min, max×max) -- borne exacte du produit de deux quantités positives
+   indépendantes, pas une estimation approximative. Seulement quand le tier
+   est résolu (pas de mélange de tiers différents dans un même produit,
+   contrairement à tieredStatRows qui accepte d'empiler plusieurs tiers pour
+   UNE stat isolée). */
+function derivedDpsRow(wd, tier, rarity) {
+  if (!tier || !wd.attack_speed?.[tier] || !wd.weapon_damage?.[tier]) return '';
+  const asBand = wd.attack_speed[tier][rarity] || wd.attack_speed[tier].common;
+  const dmgBand = wd.weapon_damage[tier][rarity] || wd.weapon_damage[tier].common;
+  if (!asBand || !dmgBand) return '';
+  const lo = Math.round(asBand.min * dmgBand.min * 100) / 100;
+  const hi = Math.round(asBand.max * dmgBand.max * 100) / 100;
+  const txt = lo === hi ? fmtNum(lo) : `${fmtNum(lo)}–${fmtNum(hi)}`;
+  return `<div class="stat-row-label">${esc(tr('weaponDpsDerived'))}</div><div class="stat-row-value">${esc(txt)}</div>`;
+}
+/* Plages de jet + DPS d'arme (item.stat_ranges/weapon_dps, port_map.md #8) :
+   UN sélecteur de rareté partagé (jamais deux, même si l'item a les deux
+   champs -- voir rollRarityPickHtml ci-dessus), un h3 dont le libellé
+   s'adapte à ce qui existe réellement (stat_ranges seul -> "Plage de jet" ;
+   weapon_dps seul -> "DPS d'arme" ; les deux -> "Plage de jet" en-tête +
+   "DPS d'arme" en sous-titre) -- jamais un h3 générique qui ne correspond à
+   rien pour ~62 items qui n'ont QUE weapon_dps. */
+function rollRangeSection(it, key) {
+  const sr = it.stat_ranges, wd = it.weapon_dps;
+  if (!sr && !wd) return '';
+  const tier = it.tier || it.weapon?.tier || null;
+  const rarity = activeRollRarity(key);
+  const genericRows = sr
+    ? Object.entries(sr).map(([sid, tiersObj]) => tieredStatRows(statLabel(sid), tiersObj, tier, rarity)).join('')
+    : '';
+  let dpsRows = '';
+  if (wd) {
+    const asRows = wd.attack_speed ? tieredStatRows(statLabel('attack_speed'), wd.attack_speed, tier, rarity) : '';
+    const dmgRows = wd.weapon_damage ? tieredStatRows(statLabel('weapon_damage'), wd.weapon_damage, tier, rarity) : '';
+    dpsRows = asRows + dmgRows + derivedDpsRow(wd, tier, rarity);
+  }
+  if (!genericRows && !dpsRows) return '';
+  const title = genericRows ? tr('rollRangeTitle') : tr('weaponDpsTitle');
+  const genericBlock = genericRows ? `<div class="stat-grid">${genericRows}</div>` : '';
+  const dpsBlock = dpsRows
+    ? (genericRows ? `<h4 class="fiche-sub">${esc(tr('weaponDpsTitle'))}</h4><div class="stat-grid">${dpsRows}</div>` : `<div class="stat-grid">${dpsRows}</div>`)
+    : '';
+  return `<div class="fiche-section"><h3>${esc(title)}</h3>${rollRarityPickHtml(key, rarity)}${genericBlock}${dpsBlock}</div>`;
+}
+
+/* Formules de dégâts (item.artifact_formula / ability.formula, port_map.md
+   #9) : base + Σ coeff × libellé-stat RECONSTRUITS et LOCALISÉS côté client
+   -- jamais le "human"/stat_name anglais figé du pipeline affiché tel quel
+   (voir formulaTermLabel, js/config.js). Un "rôle" nommé (ADF/DMG/Scale…)
+   est un résultat numérique DISTINCT du même enregistrement (coup initial
+   vs tic de DoT...), pas un sous-terme d'une même formule -- dédupliqué à
+   l'affichage quand deux rôles rendent EXACTEMENT le même texte (cas réel :
+   art_t3_guardians_wrath, ADF===ADF2). `ranks` (capacité à montée en rang) :
+   une ligne par rang, même logique de dédup à l'intérieur de chaque rang. */
+function exprHuman(expr) {
+  const terms = expr.terms || [];
+  const parts = [];
+  if (expr.base || !terms.length) parts.push(fmtNum(expr.base || 0));
+  for (const t of terms) {
+    const coeff = t.coeff != null ? fmtNum(t.coeff) : '?';
+    parts.push(`${coeff} × ${formulaTermLabel(t)}`);
+  }
+  return parts.join(' + ') || fmtNum(expr.base || 0);
+}
+function formulaRoleEntries(formula) {
+  const roles = formula.roles && Object.keys(formula.roles).length
+    ? Object.entries(formula.roles).map(([name, expr]) => ({ name, expr }))
+    : (formula.terms || formula.human != null) ? [{ name: formula.element_name || null, expr: formula }] : [];
+  const byText = new Map();
+  for (const { name, expr } of roles) {
+    const text = exprHuman(expr);
+    let e = byText.get(text);
+    if (!e) byText.set(text, e = { names: [], text, hasExternal: !!(expr.externals?.length) });
+    if (name) e.names.push(name);
+  }
+  const multi = roles.length > 1;
+  return [...byText.values()].map(e => ({ tag: multi && e.names.length ? e.names.join(' · ') : null, text: e.text, hasExternal: e.hasExternal }));
+}
+/* [{tag, text, hasExternal}] -- ranks aplatis avec un préfixe de rang
+   composé ("Rang 1 · DMG") quand la capacité a ses propres rôles nommés ET
+   des rangs, sans jamais imbriquer une 2e couche de rangs (le format ne le
+   permet pas -- voir  */
+function formulaEntries(formula) {
+  if (formula.ranks?.length) {
+    return formula.ranks.flatMap(r => {
+      const rankTag = tr('formulaRankLabel', r.rank);
+      return formulaRoleEntries(r).map(e => ({
+        tag: e.tag ? `${rankTag} · ${e.tag}` : rankTag, text: e.text, hasExternal: e.hasExternal,
+      }));
+    });
+  }
+  return formulaRoleEntries(formula);
+}
+/* `rarityNote` (item artefact uniquement -- jamais pour une capacité, qui
+   n'a pas de notion de rareté) : les 7 formules d'artefact décodées sont
+   RARITY-FLAT (une seule formule fixe, jamais répétée par rareté -- vérifié
+   byte-exact, voir  "honest gaps"). Un éventuel
+   bonus lié à la rareté existe peut-être en jeu mais n'est tout simplement
+   pas dans ces données -- jamais fabriqué ici, juste signalé une fois. */
+function formulaHtml(formula, { rarityNote = false } = {}) {
+  const entries = formulaEntries(formula);
+  if (!entries.length) return '';
+  const lines = entries.map(e => `<p class="formula-line">${e.tag ? `<span class="formula-role">${esc(e.tag)}</span>` : ''}${esc(e.text)}${
+    e.hasExternal ? ` <span class="formula-partial" title="${esc(tr('formulaPartialNote'))}">†</span>` : ''
+  }</p>`).join('');
+  const note = rarityNote ? `<p class="hint">${esc(tr('scalingServerSide'))}</p>` : '';
+  return `<div class="fiche-section"><h3>${esc(tr('formulaTitle'))}</h3>${lines}${note}</div>`;
+}
+
+/* Mise à l'échelle rune (rarity_scaling, 13/24 runes actives décodées) et
+   puce (tier_scaling, 1/71 seulement -- combo_crusher) : port_map.md #10.
+   EXIGENCE FERME (pas une nuance de style) : un statut "no_template" montre
+   une note honnête, jamais une case vide ni un zéro ; une puce ne montre
+   JAMAIS "aucune mise à l'échelle" par défaut -- soit ses vraies valeurs de
+   tier (toujours accompagnées du rappel "par tier, pas par rareté"), soit
+   rien du tout si ni le champ ni le statut n'existent (70/71 puces, faute
+   de couverture de ce passage de décodage -- pas la même chose qu'une puce
+   confirmée sans mise à l'échelle). */
+function scalingSection(it) {
+  const parts = [];
+  if (it.rarity_scaling) {
+    const cols = Object.entries(it.rarity_scaling);
+    const multiCol = cols.length > 1;
+    const rows = cols.flatMap(([col, byRarity]) => RARITY_BANDS.map(r => {
+      const v = byRarity[r];
+      if (v == null) return '';
+      const label = multiCol ? `${bandRarityLabel(r)} (${col})` : bandRarityLabel(r);
+      return `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
+    })).join('');
+    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
+  } else if (it.rarity_scaling_status === 'no_template') {
+    parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${esc(tr('scalingNotLocated'))}</p></div>`);
+  }
+  if (it.tier_scaling) {
+    const rows = ['t1', 't2', 't3'].map(tk => {
+      const v = it.tier_scaling[tk];
+      if (v == null) return '';
+      return `<div class="stat-row-label">${esc(tk.toUpperCase())}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
+    }).join('');
+    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('tierScalingTitle'))}</h3><div class="stat-grid">${rows}</div><p class="hint">${esc(tr('tierNotRarity'))}</p></div>`);
+  }
+  return parts.join('');
+}
+
 /* Fiche monstre : niveau/famille/type d'attaque, tags lisibles, butin AU KILL
    (taux garanti/×N/%, item cliquable -> fiche item, même rendu que
    openCampFiche/openItemFiche ci-dessus) SÉPARÉ du butin de DÉPEÇAGE
@@ -125,6 +434,7 @@ function openMonsterFiche(key) {
   const kindLine = (kindBits.join(' · ') || tr('monsterLabel')) + (m.variants > 1 ? tr('variantsNote', m.variants) : '');
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
+  const statsHtml = monsterStatsSection(m);
 
   // Séparer le VRAI butin de kill des entrées de tables de récompense
   // agrégées (recettes « *_unlocked », Champions Tribute…) qui noyaient la
@@ -169,6 +479,7 @@ function openMonsterFiche(key) {
       <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}</div>
       <h2>${esc(m.name)}</h2></div></div>
     ${tagsHtml}
+    ${statsHtml}
     ${lootHtml}
     ${harvestHtml}
     ${abilitiesHtml}
@@ -208,19 +519,28 @@ function openLocationFiche(idx) {
 }
 
 /* Fiche capacité (sorts de héros NOMMÉS uniquement) : nom, emplacement
-   (Q/W/E/R/MA), description, tags de nature (Stun/AoE/DoT…) en puces. */
+   (Q/W/E/R/MA), description, tags de nature (Stun/AoE/DoT…) en puces,
+   formule de dégâts reconstruite/localisée quand décodée (a.formula, 14/202
+   capacités du catalogue site -- voir formulaHtml ci-dessus) et mise à
+   l'échelle par rareté quand connue (a.rarity_scaling -- 0 aujourd'hui côté
+   capacités, mais le champ est traité comme sur un item pour rester correct
+   si le pipeline en expose un jour). */
 function openAbilityFiche(key) {
   const a = S.abilities[key];
   if (!a) return;
   S.openFiche = { kind: 'ability', id: key };
   const tagsHtml = a.tags?.length
     ? `<div class="fiche-section reward-chips">${a.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
+  const formulaHtmlBlock = a.formula ? formulaHtml(a.formula) : '';
+  const scalingHtml = scalingSection(a);
   openFiche(`
     <div class="fiche-head"><div>
       <div class="fiche-kind" style="color:${ABILITY_HEX}">${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}</div>
       <h2>${esc(a.name)}</h2></div></div>
     ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(a.desc)}</p></div>` : ''}
-    ${tagsHtml}`);
+    ${tagsHtml}
+    ${formulaHtmlBlock}
+    ${scalingHtml}`);
   setFicheHash(null);
 }
 
@@ -445,6 +765,24 @@ function itemChip(key) {
 function chipList(keys) {
   return (keys || []).map(itemChip).join('');
 }
+/* Chip QUANTIFIÉE ({key, count}) — même rendu que itemChip mais avec un
+   suffixe "×N" (recette : ingrédients ; récompense de quête : items
+   toujours donnés/au choix). Partagée entre les deux au lieu de dupliquer
+   le rendu : la forme {key, count} est identique dans les deux cas (voir
+    pour les ingrédients et
+    pour les récompenses fixes/au choix). */
+function qtyItemChip(entry) {
+  const key = entry.key, count = entry.count;
+  const it = S.items[key];
+  const name = it ? it.name : pretty(key);
+  const icon = it?.icon ? `icons/${it.icon}` : null;
+  const attrs = it ? ` data-act="fiche-item" data-id="${esc(key)}"` : '';
+  const qty = count > 1 ? `<span class="chip-qty">×${count}</span>` : '';
+  return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', itemGlyph(it))}${esc(name)}${qty}</span>`;
+}
+function qtyChipList(list) {
+  return (list || []).map(qtyItemChip).join('');
+}
 
 /* Ligne d'item de quête : distingue objet de quête (synthétique) et item du
    jeu — pour ces derniers, résumé d'obtention (vendu / craftable / loot)
@@ -615,6 +953,40 @@ function hintBox(q) {
   </div>`;
 }
 
+/* Récompenses de quête : distingue TOUJOURS DONNÉ (xp/or + items à
+   choice_group null,  restructure ça en
+   {fixed, choices, xp?, gold?}) des groupes de CHOIX mutuellement
+   exclusifs (un par choice_group réel, index affiché = ordre du tableau,
+   déjà trié par le pipeline). Jamais une liste à plat comme avant : un
+   joueur doit voir sans ambiguïté ce qui est garanti et ce qui s'exclut
+   (ex. allergic_to_duty : 6 items toujours donnés + plusieurs groupes
+   "choisissez 1 parmi N"). qtyItemChip/qtyChipList (section recette
+   ci-dessus) gèrent déjà la forme {key,count} — réutilisées telles quelles
+   ici.
+   BUG FIX (regression, was `q.rewards?.length ? ... : ''`): q.rewards is the
+   structured object {fixed, choices, xp?, gold?}, not an array — `.length`
+   on that object is always undefined, so the old code produced the empty
+   string on EVERY quest fiche, silently dropping the rewards section
+   entirely (no crash, just a permanently-missing section). */
+function questRewardsSection(q) {
+  const r = q.rewards;
+  if (!r) return '';
+  const hasFixed = r.fixed?.length || r.xp != null || r.gold != null;
+  const hasChoices = r.choices?.length;
+  if (!hasFixed && !hasChoices) return '';
+  const xpGold = [r.xp != null ? tr('xpAbbrev', r.xp) : null, r.gold != null ? tr('goldAbbrev', r.gold) : null]
+    .filter(Boolean).join(' · ');
+  const fixedHtml = hasFixed ? `
+    <h4 class="fiche-sub">${esc(tr('alwaysGrantedTitle'))}</h4>
+    ${xpGold ? `<div class="pop-coords">${esc(xpGold)}</div>` : ''}
+    ${r.fixed?.length ? `<div class="reward-chips">${qtyChipList(r.fixed)}</div>` : ''}` : '';
+  const choicesHtml = (r.choices || []).map((group, i) => `
+    <h4 class="fiche-sub">${esc(tr('choiceGroupTitle', i + 1))}</h4>
+    <div class="reward-chips">${group.map((e, gi) =>
+      (gi > 0 ? `<span class="choice-or">${esc(tr('orWord'))}</span>` : '') + qtyItemChip(e)).join('')}</div>`).join('');
+  return `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3>${fixedHtml}${choicesHtml}</div>`;
+}
+
 function openQuestFiche(slug) {
   const q = S.quests.get(slug);
   if (!q) return;
@@ -654,8 +1026,7 @@ function openQuestFiche(slug) {
       ${posCell}
     </div>`;
   }).join('');
-  const rewards = q.rewards?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3><div class="reward-chips">${chipList(q.rewards)}</div></div>` : '';
+  const rewards = questRewardsSection(q);
   const items = q.items?.length
     ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</div>` : '';
   const goalSteps = goalStepsSection(q);
@@ -751,6 +1122,14 @@ function openItemFiche(key) {
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
 
+  // Plages de jet/DPS d'arme (stat_ranges/weapon_dps), formule d'artefact
+  // T3 (artifact_formula) et mise à l'échelle rune/puce (rarity_scaling/
+  // tier_scaling) -- port_map.md #8/#9/#10, voir les fonctions partagées
+  // définies plus haut (rollRangeSection/formulaHtml/scalingSection).
+  const rollRangeHtml = rollRangeSection(it, key);
+  const formulaHtmlBlock = it.artifact_formula ? formulaHtml(it.artifact_formula, { rarityNote: true }) : '';
+  const scalingHtml = scalingSection(it);
+
   let dropsHtml = '';
   if (it.drops?.length) {
     const drops = dedupeTierDrops(it.drops);
@@ -818,7 +1197,16 @@ function openItemFiche(key) {
       const metaLine = [r.prof ? professionLabel(r.prof) : null, rarity ? rarityLabel(rarity) : null]
         .filter(Boolean).join(' · ');
       const meta = metaLine ? `<div class="pop-coords recipe-meta">${esc(metaLine)}</div>` : '';
-      const ing = chipList(r.ingredients);
+      // BUG FIX (regression, was chipList(r.ingredients)): r.ingredients is
+      // [{key,count}] (see  not
+      // an array of string keys -- chipList's itemChip(key) did S.items[key]
+      // with `key` being an OBJECT (always undefined), then pretty(key) threw
+      // a TypeError (.replace on a non-string), aborting openItemFiche()
+      // before openFiche() ever ran. Net effect: opening ANY item fiche with
+      // a recipe that has ingredients silently did nothing in the UI. Use the
+      // quantity-aware chip list instead (same {key,count} shape as quest
+      // rewards, see qtyItemChip/qtyChipList above).
+      const ing = qtyChipList(r.ingredients);
       const out = (r.output && r.output !== key)
         ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(r.output)}</div>` : '';
       return `<div class="recipe-block">${meta}<div class="reward-chips">${ing}</div>${out}</div>`;
@@ -860,13 +1248,39 @@ function openItemFiche(key) {
   // liste des raretés ATTEIGNABLES par le craft (it.rarities, tirage pondéré
   // -- voir data/SCHEMA.md recipes.json) à la place d'une rareté unique.
   const raritiesLine = !rarity && it.rarities?.length ? it.rarities.map(rarityLabel).join(' / ') : '';
+  // Sélecteur de rareté : quand la clé ouverte appartient à un groupe de
+  // variantes « même nom » (voir rarity.js::buildRarityGroups), une pastille
+  // par rareté ; celle de la fiche courante est allumée, les autres rouvrent
+  // leur variante (data-act=fiche-item -> openItemFiche, qui met à jour
+  // prix/butin/hash).
+  let raritySelectHtml = '';
+  const grp = rarityGroupFor(key);
+  if (grp) {
+    const rars = Object.keys(grp.variants).sort((a, b) => RARITY_ORDER[a] - RARITY_ORDER[b]);
+    const pills = rars.map(r => {
+      const vk = grp.variants[r];
+      const hex = RARITY[r]?.hex || 'var(--muted)';
+      const label = rarityLabel(r) || r;
+      return vk === key
+        ? `<span class="rar-pill is-active" style="--chip-c:${hex}" aria-current="true"><span class="rar-dot"></span>${esc(label)}</span>`
+        : `<button type="button" class="rar-pill" style="--chip-c:${hex}" data-act="fiche-item" data-id="${esc(vk)}"><span class="rar-dot"></span>${esc(label)}</button>`;
+    }).join('');
+    raritySelectHtml = `<div class="rar-select">
+      <span class="rar-select-label">${esc(tr('rarityVariantsLabel'))}</span>
+      <div class="rar-pills" role="group" aria-label="${esc(tr('rarityVariantsLabel'))}">${pills}</div>
+    </div>`;
+  }
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
       <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}</div>
       <h2>${esc(it.name)}</h2>
       ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>
+    ${raritySelectHtml}
     ${descHtml}
+    ${rollRangeHtml}
+    ${formulaHtmlBlock}
+    ${scalingHtml}
     ${dropsHtml}
     ${farmHtml}
     ${vendorsHtml}
@@ -927,5 +1341,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  itemColor, viewGoalZone, flyToQuestZone,
+  openChestFiche, itemColor, viewGoalZone, flyToQuestZone, setRollRarity,
 };

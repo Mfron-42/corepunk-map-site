@@ -61,6 +61,25 @@ const ABILITY_HEX = '#5fa8d3';
 const EVENT_HEX = '#d65db1';
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
+/* Statistiques de monstre (stats_decoded / stat_curve) — voir
+   data/SCHEMA.md "Monster stats" + js/fiches.js::openMonsterFiche(). */
+const statLabel = key => tbl('statLabel', key) || pretty(key);
+const statTierLabel = key => tbl('statTier', key) || key;
+/* Formules (item.artifact_formula / ability.formula, voir js/fiches.js) : le
+   code opérande-2 COURT du moteur (Ap/Arm/Sp…, 
+   ) n'est PAS le our_stat_id snake_case utilisé par
+   stat_ranges/statLabel — cette petite table fait le pont pour les quelques
+   codes vus dans les formules décodées à ce jour. formulaTermLabel() reste
+   honnête sur ses replis : table statLabel (via l'alias) d'abord, puis le
+   nom anglais figé du terme (stat_name) SEULEMENT s'il n'existe aucune
+   entrée, puis pretty(code) en dernier recours — jamais un label inventé. */
+const FORMULA_STAT_ALIAS = { Ap: 'attack_power', Arm: 'armor', Sp: 'spell_power' };
+function formulaTermLabel(t) {
+  const code = t.stat_code;
+  const canon = code && (FORMULA_STAT_ALIAS[code] || code);
+  const known = canon && tbl('statLabel', canon);
+  return known || t.stat_name || pretty(code || '');
+}
 const RARITY = {
   Common:   { hex: '#b9c2c8' },
   Uncommon: { hex: '#6fbf73' },
@@ -187,27 +206,16 @@ function campDisplayName(k) {
   return rest ? `${typeLabel} — ${pretty(rest)}` : typeLabel;
 }
 
-/* Type d'un coffre placé (tc_*) : là aussi encodé uniquement dans le nom de
-   prop ("Chest barrel elenian 02 grey", "Cabinets floor kitchen 01"…).
-   Seules les grandes familles sont traduites (chestType) ; null = pas de
-   famille reconnue, l'appelant garde le nom brut seul. */
-const CHEST_TYPE_RULES = [
-  [/\bbarrel/, 'barrel'],
-  [/\bboxes\b/, 'boxes'],
-  [/\bsci\b/, 'sci'],
-  [/\btrash\b/, 'trash'],
-  [/cabinets|wardrobe|bedroom prop|desktop/, 'furniture'],
-  [/appliances|boiler/, 'appliances'],
-  [/\bpapers\b/, 'papers'],
-  [/\bbooks\b/, 'books'],
-  [/\bcorpse|\bcorps\d/, 'corpse'],
-  [/\bfridge\b/, 'fridge'],
-];
-function chestTypeLabel(name) {
-  const n = (name || '').toLowerCase();
-  for (const [re, key] of CHEST_TYPE_RULES) if (re.test(n)) return tbl('chestType', key);
-  return null;
-}
+/* Type d'un coffre placé (tc_*) et nature d'un objet de quête activable
+   (qao) : le pipeline classifie déjà chaque enregistrement sur le vrai champ
+   moteur (world_objects.json chest_type/activable_type — tokens neutres
+   capitalisés, ex. "Barrel"/"Boxes"/"Radio"/"Evidence") — le site compose
+   juste son propre libellé localisé, même principe que campKindLabel/
+   monsterAttackLabel ci-dessus. Pas de déduction depuis le nom de prop ici :
+   ce champ existe déjà sur r.type (voir data/SCHEMA.md "Chest loot + type" /
+   "Activable type"). */
+const chestTypeLabel = key => tbl('chestType', key) || pretty(key);
+const activableTypeLabel = key => tbl('activableType', key) || pretty(key);
 
 /* Table de butin PROBABLE d'un camp cassable/fouillable : le client ne
    fournit PAS le lien prop → table ; on n'associe que les cas où le TYPE
@@ -245,9 +253,9 @@ export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
-  monsterAttackLabel, locationKindLabel,
+  monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName,
-  campDisplayName, chestTypeLabel, campLootTableName,
+  campDisplayName, chestTypeLabel, activableTypeLabel, campLootTableName,
 };

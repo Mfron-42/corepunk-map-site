@@ -19,8 +19,8 @@ import { loadCritical, loadDeferred, resetDeferred } from './data.js';
 import { popupHtml, questPopup, campPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
-  openMonsterFiche, openLocationFiche, openLootTableFiche,
-  viewGoalZone, flyToQuestZone,
+  openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
+  viewGoalZone, flyToQuestZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import { buildSearch, hideSearchResults } from './search.js';
@@ -39,7 +39,7 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
@@ -49,6 +49,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-monster') openMonsterFiche(id);
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
+  else if (b.dataset.act === 'fiche-chest') openChestFiche(+id.split(':')[1]);
   else if (b.dataset.act === 'camp-highlight') {
     // « Montre-moi TOUS les points de ce contenant » — toggle : un second
     // clic efface le surlignage sans fermer la fiche.
@@ -65,6 +66,7 @@ document.addEventListener('click', e => {
       }
     }
   }
+  else if (b.dataset.act === 'roll-rarity') setRollRarity(id, b.dataset.r);
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
   else if (b.dataset.act === 'goto') {

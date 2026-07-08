@@ -999,6 +999,14 @@ body {
 .chip-icon { width: 20px; height: 20px; object-fit: contain; border-radius: 4px; font-size: .56rem; flex: none; }
 .reward-chips .chip[data-act] { cursor: pointer; }
 .reward-chips .chip[data-act]:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+/* Quantité d'une chip (ingrédient de recette / récompense toujours donnée) —
+   suffixe discret, jamais un second badge encadré : juste un peu plus
+   petit et muet que le libellé de la chip elle-même. */
+.chip-qty { margin-left: 4px; font-size: .7rem; color: var(--muted); font-family: var(--font-mono); }
+/* Séparateur "ou"/"or"/etc. entre les chips d'un groupe de récompenses au
+   choix (choice_group) — un simple mot muet en italique entre deux chips,
+   jamais un chip lui-même (ce n'est pas un choix possible). */
+.choice-or { color: var(--muted); font-size: .74rem; font-style: italic; align-self: center; }
 
 /* ── Fiche item (base de données) ────────────────────────────── */
 .fiche-sub {
@@ -1025,6 +1033,145 @@ body {
   margin-top: 5px;
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
   font-size: .78rem; color: var(--muted);
+}
+
+/* ── Sélecteur de rareté (variantes « même nom ») ─────────────────────
+   Un objet qui existe en plusieurs raretés (une clé par rareté, même nom —
+   voir js/rarity.js buildRarityGroups) montre ici une rangée de pastilles. La
+   couleur EST le sens : chaque pastille porte la teinte canonique de sa
+   rareté (RARITY[r].hex, même idiome --chip-c que .k-chip). La rareté ouverte
+   est « allumée » (fond/liseré pleins) ; les autres restent sobres et
+   cliquables (rouvrent la variante). Aligné sous le nom (marge 44px comme
+   .fiche-head), replie proprement sur mobile. */
+.rar-select {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 10px 0 2px 44px;
+}
+.rar-select-label {
+  font-family: var(--font-display);
+  font-size: .6rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rar-pills { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.rar-pill {
+  --chip-c: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: .62rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--chip-c) 60%, var(--muted));
+  background: color-mix(in srgb, var(--chip-c) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--chip-c) 26%, transparent);
+  cursor: pointer;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.rar-pill .rar-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--chip-c);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--chip-c) 20%, transparent);
+}
+button.rar-pill:hover {
+  color: var(--chip-c);
+  background: color-mix(in srgb, var(--chip-c) 16%, transparent);
+  border-color: color-mix(in srgb, var(--chip-c) 48%, transparent);
+}
+.rar-pill:focus-visible { outline: 2px solid var(--chip-c); outline-offset: 2px; }
+.rar-pill.is-active {
+  color: var(--chip-c);
+  background: color-mix(in srgb, var(--chip-c) 22%, transparent);
+  border-color: var(--chip-c);
+  cursor: default;
+  font-weight: 600;
+}
+.rar-pill.is-active .rar-dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--chip-c) 30%, transparent); }
+
+/* ── Fiche monstre : grille de statistiques ──────────────────────────
+   Réel (relevé client, mbt_10_troll_rusty_boss & cie) vs estimé (courbe de
+   template appliquée au niveau du monstre, aucun relevé par-monstre n'existe
+   côté client — voir data/SCHEMA.md "Monster stats"). Même distinction
+   visuelle que .pos-dynamic/.pos-unknown ailleurs dans ce fichier : le réel
+   est affirmatif (badge plein, teinte --core, même famille que .goal-count),
+   l'estimé reste en italique muette, jamais présenté avec la même assurance
+   qu'une valeur relevée. */
+.stats-badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  letter-spacing: .04em;
+  color: var(--core);
+  background: var(--core-soft);
+  border-radius: 4px;
+  padding: 1px 7px;
+  margin-left: 7px;
+  text-transform: none;
+}
+.stats-badge.estimated {
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  font-style: italic;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 16px;
+}
+.stat-row-label { font-size: .8rem; color: var(--ink-dim); }
+.stat-row-value {
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  color: var(--ink);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── Formules (artefacts T3 / capacités nommées) ─────────────────────
+   base + Σ coeff × stat, RECONSTRUITE et LOCALISÉE côté client (jamais le
+   "human"/stat_name anglais figé du pipeline) -- voir js/fiches.js
+   formulaHtml/exprHuman. Un rôle nommé (ADF/DMG/Scale…) = un résultat
+   numérique distinct du même enregistrement (coup initial vs tic de DoT…),
+   affiché en étiquette discrète devant sa ligne seulement quand il y en a
+   plusieurs à distinguer. */
+.formula-line {
+  font-family: var(--font-mono);
+  font-size: .84rem;
+  color: var(--ink);
+  margin: 0 0 5px;
+  line-height: 1.5;
+}
+.formula-line:last-child { margin-bottom: 0; }
+.formula-role {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: .6rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 8px;
+}
+/* Marque discrète "†" : une partie de cette ligne dépend d'une référence
+   moteur non décodée (table/constante externe) -- jamais silencieuse,
+   jamais une seconde note pleine longueur répétée à chaque ligne. */
+.formula-partial {
+  cursor: help;
+  color: var(--muted);
+  font-family: var(--font-body);
+  margin-left: 2px;
 }
 
 /* ── Divers ── */

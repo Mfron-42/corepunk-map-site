@@ -4,6 +4,7 @@
    à chaque rechargement des jeux différés). */
 import { S } from './state.js';
 import { fold } from './utils.js';
+import { buildRarityGroups } from './rarity.js';
 
 /* ── Chargement des données ─────────────────────────────────── */
 /* Chaque *.json de data/ est publié en .bin : un en-tête custom de 4 octets
@@ -51,6 +52,7 @@ async function loadCritical() {
   S.zonesGeo = zonesGeo;
   S.zonesQuest = zonesQuest;
   S.items = items;
+  buildRarityGroups();    // regroupe les variantes de rareté « même nom » (voir rarity.js)
   lootTableIdx = null;    // index paresseux table→items (voir lootTableItems)
   monsterZonesIdx = null; // les zones (zonesGeo) viennent d'être rechargées (voir monsterZones)
   quests.forEach(q => S.quests.set(q.slug, q));

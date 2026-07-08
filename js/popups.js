@@ -5,9 +5,9 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, catLabel, campKindLabel,
-  campDisplayName, chestTypeLabel,
+  campDisplayName, chestTypeLabel, activableTypeLabel,
 } from './config.js';
-import { esc, fmtCoord, fold, iconTag, initials, pretty, cleanLabel } from './utils.js';
+import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor } from './data.js';
 
@@ -26,7 +26,7 @@ function popupHtml(cat, r, id) {
   let icon = '';
   if (cat === 'npc') icon = iconTag(r.icon ? `icons/npc_map/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
   if (cat === 'poi') icon = iconTag(r.icon ? `icons/interest_points/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
-  let extraBtn = '', extraHtml = '';
+  let extraBtn = '', extraHtml = '', typeBadge = '';
   if (cat === 'npc') {
     // Fiche TOUJOURS accessible depuis la carte — pas seulement pour les
     // donneurs de quêtes. Le libellé reste sobre (« Fiche » / « Fiche ·
@@ -36,22 +36,26 @@ function popupHtml(cat, r, id) {
     const label = r.vendor ? tr('ficheShopBtn') : tr('ficheBtn');
     extraBtn = `<button class="act primary" data-act="fiche-npc" data-id="${esc(id)}">${esc(label)}</button>`;
   }
-  // Activable : la clé technique (qao_*) est le seul « type » que fournissent
-  // les données — prettifiée, et seulement quand elle dit plus que le nom.
-  if (cat === 'qao' && r.k) {
-    const t = pretty(r.k.replace(/^qao_/, ''));
-    if (fold(t) !== fold(r.name)) extraHtml = `<p class="pop-extra">${esc(t)}</p>`;
+  // Activable : le vrai classifieur activable_type du pipeline (r.type, ex.
+  // "Radio"/"Evidence") — remplace l'ancienne prettification de la clé
+  // technique brute (qao_*), qui fuitait l'identifiant interne ("qao_radio_
+  // red" -> "Radio red") tel quel dans le popup.
+  if (cat === 'qao' && r.type) extraHtml = `<p class="pop-extra">${esc(activableTypeLabel(r.type))}</p>`;
+  // Coffre placé : type physique réel (r.type, ex. "Barrel"/"Boxes") — badge
+  // coloré (même idiome --chip-c que les autres k-chip du site) ; bouton
+  // fiche complète seulement quand une table de butin exacte est attachée.
+  if (cat === 'chest') {
+    if (r.type) typeBadge = `<span class="k-chip" style="--chip-c:${CATS.chest.hex}">${esc(chestTypeLabel(r.type))}</span>`;
+    if (r.loot?.length) {
+      extraBtn = `<button class="act primary" data-act="fiche-chest" data-id="${esc(id)}">${esc(tr('ficheCompleteBtn'))}</button>`;
+    }
   }
-  // Coffre placé : famille de prop (tonneau/caisses/mobilier…) déduite du nom
-  // — voir chestTypeLabel ; sans famille reconnue, la catégorie seule suffit.
-  const chestType = cat === 'chest' ? chestTypeLabel(r.name) : null;
   const catLine = catLabel(cat)
-    + (chestType ? ' · ' + chestType : '')
     + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
     + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
   return `<div class="pop">
     <h3>${icon}${esc(cleanLabel(r.name))}</h3>
-    <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}</div>
+    <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}${typeBadge ? ' ' + typeBadge : ''}</div>
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${extraHtml}
     ${actionBtns(id, extraBtn)}</div>`;

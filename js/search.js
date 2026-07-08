@@ -18,6 +18,7 @@ import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche,
 } from './fiches.js';
+import { isDeprecatedItem, rarityGroupFor } from './rarity.js';
 import { switchMap } from './multimap.js';
 import { buildFilters } from './sidebar.js';
 
@@ -122,10 +123,21 @@ function buildSearch() {
   // Sous-libellé : rareté/nature + type d'arme court (ex. "Rare · Pistolet")
   // quand connu, pour distinguer d'un coup d'œil plusieurs résultats "Arme".
   Object.entries(S.items).forEach(([key, it]) => {
-    const kindSub = rarityLabel(it.rarity) || itemKindLabel(it.kind) || '';
+    // (a) doublon `_old` déprécié : jamais indexé (voir isDeprecatedItem).
+    if (isDeprecatedItem(key, it)) return;
+    // (b) membre non-représentant d'un groupe de rareté (voir rarity.js) :
+    // une seule entrée par groupe (le représentant), la rareté se choisit
+    // sur la fiche (pill selector, voir openItemFiche).
+    const grp = rarityGroupFor(key);
+    if (grp && S.rarityGroupOf.get(key) !== key) return;
+    // Représentant d'un groupe : sous-libellé = nature de l'objet + indice
+    // « N raretés » (au lieu de la seule rareté du représentant, arbitraire),
+    // pour que le résultat unique se lise « plusieurs raretés dispo ».
+    const kindSub = (grp ? itemKindLabel(it.kind) : rarityLabel(it.rarity)) || itemKindLabel(it.kind) || '';
     const wtSub = it.weapon?.weapon_type ? weaponTypeLabel(it.weapon.weapon_type) : '';
+    const grpSub = grp ? tr('rarityVariantsCount', Object.keys(grp.variants).length) : '';
     push(it.name, 'item', itemColor(it), null, null, () => openItemFiche(key),
-      it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub].filter(Boolean).join(' · '),
+      it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub].filter(Boolean).join(' · '),
       itemGlyph(it), itemBias(key, it));
   });
   // Régions nommées (zonesGeo, chargé au critique — voir loadCritical) et
@@ -185,6 +197,39 @@ function crossMapOpen(e) {
   }
 }
 
+/* Coffres placés (tc_*, S.data.chest — ~3830 marqueurs individuels, chargés
+   au critique). Un skin de prop (ex. "Chest barrel elenian 02 grey") se
+   répète souvent des centaines de fois à l'identique — indexer chaque
+   marqueur ferait des centaines de doublons pour une seule recherche ; une
+   seule entrée par NOM DISTINCT (~130) suffit et reste honnête (aucune
+   position n'est cachée, juste dédoublonnée). Le nom brut n'est pas
+   localisé (pas une entrée Localization/, voir data/SCHEMA.md chests) —
+   préfixé par le libellé de catégorie déjà traduit (catLabel('chest')) pour
+   que "coffre" (FR) / "chest" (EN) / etc. matche quand même. */
+function chestSearchLabel(name) {
+  const rest = (name || '').replace(/^(small\s+)?chest\s+/i, '').trim();
+  return rest ? `${catLabel('chest')} — ${pretty(rest)}` : catLabel('chest');
+}
+function buildChestSearchIndex() {
+  const seen = new Map();
+  S.data.chest.forEach(r => { if (!seen.has(r.name)) seen.set(r.name, r); });
+  // Clic → surligne TOUTES les instances de ce skin de prop (chaque coffre
+  // placé porte son nom exact — 142 « Chest boxes elenian 01 grey »…).
+  seen.forEach(r => {
+    // `body` : le mot de type localisé ET le jeton anglais brut, chacun son
+    // propre segment — une requête "tonneau" (UI fr) ou "barrel" (tapé quelle
+    // que soit la langue active) doit matcher tout coffre de type Barrel,
+    // même si le libellé affiché (chestSearchLabel) ne le cite pas. Le
+    // sous-libellé affiché (sub) vient du vrai type physique (r.type,
+    // classifieur chest_type du pipeline), pas d'une heuristique sur le nom.
+    const typeLabel = r.type ? chestTypeLabel(r.type) : null;
+    const body = r.type ? [typeLabel, r.type] : null;
+    pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z,
+      () => showHighlight(S.data.chest.filter(c => c.name === r.name), CATS.chest.hex),
+      null, typeLabel, null, 0, body);
+  });
+}
+
 /* Libellé de recherche d'un camp : nom d'affichage partagé (campDisplayName,
    js/config.js — type de contenant localisé + reste de clé prettifié, pour
    que "carotte"/"tonneau"/"pot"/"champignon" trouvent quelque chose). Seule
@@ -208,32 +253,6 @@ function buildCampSearchIndex() {
     pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1],
       () => showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888'));
   }));
-}
-
-/* Coffres placés (tc_*, S.data.chest — ~3830 marqueurs individuels, chargés
-   au critique). Un skin de prop (ex. "Chest barrel elenian 02 grey") se
-   répète souvent des centaines de fois à l'identique — indexer chaque
-   marqueur ferait des centaines de doublons pour une seule recherche ; une
-   seule entrée par NOM DISTINCT (~130) suffit et reste honnête (aucune
-   position n'est cachée, juste dédoublonnée). Le nom brut n'est pas
-   localisé (pas une entrée Localization/, voir data/SCHEMA.md chests) —
-   préfixé par le libellé de catégorie déjà traduit (catLabel('chest')) pour
-   que "coffre" (FR) / "chest" (EN) / etc. matche quand même. */
-function chestSearchLabel(name) {
-  // Famille de prop localisée quand reconnue ("Coffre · Tonneau — Elenian 02
-  // grey") — même détection que le popup (chestTypeLabel, js/config.js).
-  const type = chestTypeLabel(name);
-  const head = type ? `${catLabel('chest')} · ${type}` : catLabel('chest');
-  const rest = (name || '').replace(/^(small\s+)?chest\s+/i, '').trim();
-  return rest ? `${head} — ${pretty(rest)}` : head;
-}
-function buildChestSearchIndex() {
-  const seen = new Map();
-  S.data.chest.forEach(r => { if (!seen.has(r.name)) seen.set(r.name, r); });
-  // Clic → surligne TOUTES les instances de ce skin de prop (chaque coffre
-  // placé porte son nom exact — 142 « Chest boxes elenian 01 grey »…).
-  seen.forEach(r => pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z,
-    () => showHighlight(S.data.chest.filter(c => c.name === r.name), CATS.chest.hex)));
 }
 
 /* Régions nommées (zones_geo.json, chargé au critique — voir loadCritical) :
