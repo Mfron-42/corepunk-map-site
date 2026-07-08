@@ -64,6 +64,12 @@ export default {
       likelyMonsters: n => `Monstres probables (${n})`,
       guaranteedLabel: 'Garanti',
       chanceLabel: 'Probabilité',
+      // Part APPROXIMATIVE (d.ch = weight / poids total de la table, voir
+      // data/SCHEMA.md "chance") d'un drop non garanti + caveat honnête posé
+      // en tooltip (title) sur la pastille -- voir js/fiches.js dropRateHtml.
+      dropChanceApprox: pct => `≈ ${pct} %`,
+      dropChanceBelowOne: '< 1 %',
+      dropChanceCaveat: 'Part de cet objet dans le pool de butin de la table — pas une probabilité par kill (le nombre réel de tirages dépend du serveur).',
       lootBestRates: 'Butin (meilleurs taux)',
       mapLabel: 'Carte',
       mapSelectorLabel: 'Carte affichée',
@@ -147,7 +153,23 @@ export default {
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
       statsTitle: 'Statistiques',
       realStatsBadge: 'réel',
-      estimatedStatsBadge: tier => `≈ Estimé (tier ${tier})`,
+      // Note honnête pour les mobs SANS relevé client réel (statsSource !==
+      // "record") : une RE a montré que l'ancienne grille "estimée" lisait un
+      // mauvais champ (~640× trop bas, ex. un boss niv 20 à ~544 PV pour une
+      // vraie valeur serveur ~350 000) -- ce chiffre fabriqué est retiré,
+      // remplacé par ce simple aveu. Voir js/fiches.js monsterStatsSection.
+      statsServerNote: 'Statistiques précises résolues côté serveur (indisponibles dans les données du client).',
+      // Badge « calculé » : stats issues de la formule de mise à l'échelle du
+      // jeu (décodée byte-exact, voir 
+      // pas une estimation.
+      computedStatsBadge: 'calculé (formule du jeu)',
+      // Note honnête sous la table fourchette-par-palier : le jeu assigne le
+      // palier de difficulté côté serveur au spawn (aucune référence côté
+      // client), d'où une plage selon le palier plutôt qu'un chiffre unique.
+      statsPerTierNote: 'Palier de difficulté assigné côté serveur — fourchette selon le palier (facile → boss).',
+      // Case de filtre par-carte du bestiaire (map = nom de la carte active).
+      bestiaryMapFilterLabel: map => `Sur cette carte (${map})`,
+      bestiaryMapEmpty: 'Aucun monstre attribué à cette carte. Décochez pour tout afficher.',
       alwaysGrantedTitle: 'Toujours donné',
       choiceGroupTitle: n => `Choix ${n}`,
       orWord: ' ou ',
@@ -222,11 +244,16 @@ export default {
       monster: 'Monstre', zone: 'Région', location: 'Lieu',
       ability: 'Capacité', event: 'Événement', chest: 'Coffre',
     },
+    // "searchable" et "quest" reformulés pour ne plus lire comme les couches
+    // statiques de haut niveau (cat.chest "Coffres" / cat.quest "Quêtes") :
+    // ce sont des lignes de FILTRE de camp (spawns dynamiques / contenants
+    // fouillables), pas les mêmes couches -- voir campType.chests plus bas
+    // pour le même souci sur le libellé du sous-type "Coffres — <région>".
     campKind: {
       monsters: 'Monstres', creeps: 'Creeps', herbalism: 'Herboristerie',
-      logging: 'Bois', mining: 'Minerai', searchable: 'Coffres cherchables',
+      logging: 'Bois', mining: 'Minerai', searchable: 'Fouillables',
       destroyable: 'Destructibles', reactive: 'Interactifs', shrines: 'Sanctuaires',
-      soulkeeper: 'Soulkeepers', quest: 'Quête', wildlife: 'Animaux',
+      soulkeeper: 'Soulkeepers', quest: 'Spawns de quête', wildlife: 'Animaux',
       guards: 'Gardes', event: 'Événement', other: 'Autres',
     },
     // Noms de carte localisés (sélecteur + badge). Seuls Kwalat et les 2 îles
@@ -248,7 +275,7 @@ export default {
     // campKind.destroyable/searchable ci-dessus (déjà générique et traduit).
     campType: {
       barrels: 'Tonneaux explosifs', tombstones: 'Pierres tombales', coffins: 'Cercueils',
-      chests: 'Coffres', corpses: 'Corps fouillables', sacks: 'Sacs',
+      chests: 'Coffres fouillables', corpses: 'Corps fouillables', sacks: 'Sacs',
       crateCorn: 'Caisse de maïs', crateCabbage: 'Caisse de choux', crateCarrot: 'Caisse de carottes',
       crateOnion: "Caisse d'oignons", crateEggplant: "Caisse d'aubergines", crateBerries: 'Caisse de baies',
       sackCorn: 'Sac de maïs', sackWheat: 'Sac de blé',

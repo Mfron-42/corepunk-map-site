@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
-  catLabel, campDisplayName, chestTypeLabel,
+  catLabel, campDisplayName, chestTypeLabel, chestDisplayName,
   rarityLabel, itemKindLabel, weaponTypeLabel,
   locationKindLabel, mapName,
 } from './config.js';
@@ -216,13 +216,23 @@ function crossMapOpen(e) {
    répète souvent des centaines de fois à l'identique — indexer chaque
    marqueur ferait des centaines de doublons pour une seule recherche ; une
    seule entrée par NOM DISTINCT (~130) suffit et reste honnête (aucune
-   position n'est cachée, juste dédoublonnée). Le nom brut n'est pas
-   localisé (pas une entrée Localization/, voir data/SCHEMA.md chests) —
-   préfixé par le libellé de catégorie déjà traduit (catLabel('chest')) pour
-   que "coffre" (FR) / "chest" (EN) / etc. matche quand même. */
-function chestSearchLabel(name) {
-  const rest = (name || '').replace(/^(small\s+)?chest\s+/i, '').trim();
-  return rest ? `${catLabel('chest')} — ${pretty(rest)}` : catLabel('chest');
+   position n'est cachée, juste dédoublonnée). Le libellé affiché utilise le
+   nom d'affichage partagé (chestDisplayName, js/config.js — type physique
+   localisé, jamais le jeton d'asset d'art brut), préfixé par le libellé de
+   catégorie déjà traduit (catLabel('chest')) pour que "coffre" (FR) /
+   "chest" (EN) / etc. matche quand même. Plusieurs skins DISTINCTS partagent
+   souvent le même type (ex. 7 noms distincts de Barrel sur Kwalat) — donc,
+   depuis que le libellé affiché est le type seul, plusieurs entrées peuvent
+   désormais se lire pareil (différenciées seulement par leurs coordonnées,
+   affichées à droite de chaque ligne). `opts.ref` (clé stable = nom brut,
+   jamais affichée) est donc OBLIGATOIRE ici : searchDedupKey retombe sinon
+   sur le libellé replié (fold(label)) quand `ref` est absent, et aurait fait
+   disparaître silencieusement 6 des 7 skins de Barrel (un seul survit à la
+   dédup) — régression détectée en vérifiant ce correctif (voir
+   dupe_check.json de la passe de vérif). */
+function chestSearchLabel(r) {
+  const rest = chestDisplayName(r);
+  return rest ? `${catLabel('chest')} — ${rest}` : catLabel('chest');
 }
 function buildChestSearchIndex() {
   const seen = new Map();
@@ -233,14 +243,16 @@ function buildChestSearchIndex() {
     // `body` : le mot de type localisé ET le jeton anglais brut, chacun son
     // propre segment — une requête "tonneau" (UI fr) ou "barrel" (tapé quelle
     // que soit la langue active) doit matcher tout coffre de type Barrel,
-    // même si le libellé affiché (chestSearchLabel) ne le cite pas. Le
-    // sous-libellé affiché (sub) vient du vrai type physique (r.type,
-    // classifieur chest_type du pipeline), pas d'une heuristique sur le nom.
+    // même si le libellé affiché (chestSearchLabel, maintenant lui-même le
+    // type localisé) ne matche pas déjà tout seul dans une AUTRE langue que
+    // celle active. Le sous-libellé affiché (sub) vient du vrai type
+    // physique (r.type, classifieur chest_type du pipeline), pas d'une
+    // heuristique sur le nom.
     const typeLabel = r.type ? chestTypeLabel(r.type) : null;
     const body = r.type ? [typeLabel, r.type] : null;
-    pushSearchEntry(chestSearchLabel(r.name), 'chest', CATS.chest.hex, r.x, r.z,
+    pushSearchEntry(chestSearchLabel(r), 'chest', CATS.chest.hex, r.x, r.z,
       () => showHighlight(S.data.chest.filter(c => c.name === r.name), CATS.chest.hex),
-      null, typeLabel, null, 0, body);
+      null, typeLabel, null, 0, body, { ref: 'chest:' + r.name });
   });
 }
 

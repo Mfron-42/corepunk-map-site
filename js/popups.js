@@ -5,7 +5,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, catLabel, campKindLabel,
-  campDisplayName, chestTypeLabel, activableTypeLabel,
+  campDisplayName, chestDisplayName, activableTypeLabel,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
@@ -26,7 +26,7 @@ function popupHtml(cat, r, id) {
   let icon = '';
   if (cat === 'npc') icon = iconTag(r.icon ? `icons/npc_map/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
   if (cat === 'poi') icon = iconTag(r.icon ? `icons/interest_points/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
-  let extraBtn = '', extraHtml = '', typeBadge = '';
+  let extraBtn = '', extraHtml = '';
   if (cat === 'npc') {
     // Fiche TOUJOURS accessible depuis la carte — pas seulement pour les
     // donneurs de quêtes. Le libellé reste sobre (« Fiche » / « Fiche ·
@@ -41,21 +41,23 @@ function popupHtml(cat, r, id) {
   // technique brute (qao_*), qui fuitait l'identifiant interne ("qao_radio_
   // red" -> "Radio red") tel quel dans le popup.
   if (cat === 'qao' && r.type) extraHtml = `<p class="pop-extra">${esc(activableTypeLabel(r.type))}</p>`;
-  // Coffre placé : type physique réel (r.type, ex. "Barrel"/"Boxes") — badge
-  // coloré (même idiome --chip-c que les autres k-chip du site) ; bouton
-  // fiche complète seulement quand une table de butin exacte est attachée.
-  if (cat === 'chest') {
-    if (r.type) typeBadge = `<span class="k-chip" style="--chip-c:${CATS.chest.hex}">${esc(chestTypeLabel(r.type))}</span>`;
-    if (r.loot?.length) {
-      extraBtn = `<button class="act primary" data-act="fiche-chest" data-id="${esc(id)}">${esc(tr('ficheCompleteBtn'))}</button>`;
-    }
+  // Coffre placé : bouton fiche complète seulement quand une table de butin
+  // exacte est attachée. Pas de badge de type ici : le titre (h3, ci-dessous)
+  // EST déjà le type physique localisé (chestDisplayName) — un badge
+  // répéterait la même info deux fois dans la même popup.
+  if (cat === 'chest' && r.loot?.length) {
+    extraBtn = `<button class="act primary" data-act="fiche-chest" data-id="${esc(id)}">${esc(tr('ficheCompleteBtn'))}</button>`;
   }
   const catLine = catLabel(cat)
     + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
     + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
+  // Titre : nom d'affichage localisé pour un coffre (chestDisplayName — le
+  // nom brut est un jeton d'asset d'art jamais localisé, voir config.js) ;
+  // nettoyage TEXTURING/QItem générique (cleanLabel) pour tout le reste.
+  const title = cat === 'chest' ? chestDisplayName(r) : cleanLabel(r.name);
   return `<div class="pop">
-    <h3>${icon}${esc(cleanLabel(r.name))}</h3>
-    <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}${typeBadge ? ' ' + typeBadge : ''}</div>
+    <h3>${icon}${esc(title)}</h3>
+    <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}</div>
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${extraHtml}
     ${actionBtns(id, extraBtn)}</div>`;

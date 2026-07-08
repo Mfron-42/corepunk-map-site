@@ -65,6 +65,12 @@ export default {
       likelyMonsters: n => `Ймовірні монстри (${n})`,
       guaranteedLabel: 'Гарантовано',
       chanceLabel: 'Шанс',
+      // ПРИБЛИЗНА частка (d.ch = вага / сумарна вага таблиці, див.
+      // data/SCHEMA.md "chance") негарантованого дропу + чесна примітка у
+      // спливаючій підказці (title) — див. js/fiches.js dropRateHtml.
+      dropChanceApprox: pct => `≈ ${pct} %`,
+      dropChanceBelowOne: '< 1 %',
+      dropChanceCaveat: 'Частка цього предмета в пулі здобичі таблиці — не ймовірність за одне вбивство (реальна кількість кидків визначається сервером).',
       lootBestRates: 'Здобич (найкращі шанси)',
       mapLabel: 'Карта',
       mapSelectorLabel: 'Показана карта',
@@ -146,7 +152,17 @@ export default {
       noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальні',
-      estimatedStatsBadge: tier => `≈ Оцінка (тир: ${tier})`,
+      // Чесна примітка для мобів БЕЗ реального клієнтського заміру
+      // (statsSource !== "record"): реверс-інжиніринг показав, що стара
+      // "оцінна" таблиця читала не те поле (приблизно у 640 разів занижене
+      // значення, напр. бос 20 рів. показував ~544 HP при реальному
+      // серверному значенні ~350 000) — цей вигаданий номер прибрано,
+      // замість нього — чесне визнання. Див. js/fiches.js monsterStatsSection.
+      statsServerNote: 'Точні характеристики визначаються на сервері (недоступні в даних клієнта).',
+      computedStatsBadge: 'розрахунок (формула гри)',
+      statsPerTierNote: 'Рівень складності призначається на сервері — діапазон за рівнями (легкий → бос).',
+      bestiaryMapFilterLabel: map => `На цій карті (${map})`,
+      bestiaryMapEmpty: 'На цій карті немає монстрів. Зніміть галочку, щоб показати всіх.',
       alwaysGrantedTitle: 'Видається завжди',
       choiceGroupTitle: n => `Вибір ${n}`,
       orWord: ' або ',
@@ -215,11 +231,16 @@ export default {
       monster: 'Монстр', zone: 'Регіон', location: 'Місце',
       ability: 'Здібність', event: 'Подія', chest: 'Скриня',
     },
+    // "searchable" і "quest" переформульовано, щоб не читатися як
+    // верхньорівневі статичні шари (cat.chest "Скрині" / cat.quest
+    // "Квести"): це рядки ФІЛЬТРА табору (динамічні спавни / обшукувані
+    // контейнери), а не ті самі шари — див. campType.chests нижче про таку
+    // саму правку підпису підтипу "Скрині — <регіон>".
     campKind: {
       monsters: 'Монстри', creeps: 'Кріпи', herbalism: 'Травництво',
-      logging: 'Лісорубство', mining: 'Гірництво', searchable: 'Обшукувані скрині',
+      logging: 'Лісорубство', mining: 'Гірництво', searchable: 'Обшукувані',
       destroyable: 'Руйнівні', reactive: 'Інтерактивні', shrines: 'Святилища',
-      soulkeeper: 'Охоронці душ', quest: 'Квест', wildlife: 'Дикі тварини',
+      soulkeeper: 'Охоронці душ', quest: 'Спавни завдань', wildlife: 'Дикі тварини',
       guards: 'Стражі', event: 'Подія', other: 'Інше',
     },
     mapName: {
@@ -234,7 +255,7 @@ export default {
     },
     campType: {
       barrels: 'Вибухові бочки', tombstones: 'Надгробки', coffins: 'Труни',
-      chests: 'Скрині', corpses: 'Обшукувані трупи', sacks: 'Мішки',
+      chests: 'Обшукувані скрині', corpses: 'Обшукувані трупи', sacks: 'Мішки',
       crateCorn: 'Ящик кукурудзи', crateCabbage: 'Ящик капусти', crateCarrot: 'Ящик моркви',
       crateOnion: 'Ящик цибулі', crateEggplant: 'Ящик баклажанів', crateBerries: 'Ящик ягід',
       sackCorn: 'Мішок кукурудзи', sackWheat: 'Мішок пшениці',

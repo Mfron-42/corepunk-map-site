@@ -64,6 +64,13 @@ export default {
       likelyMonsters: n => `Monstruos probables (${n})`,
       guaranteedLabel: 'Garantizado',
       chanceLabel: 'Probabilidad',
+      // Proporción APROXIMADA (d.ch = weight / peso total de la tabla, ver
+      // data/SCHEMA.md "chance") de un botín no garantizado + advertencia
+      // honesta en un tooltip (title) sobre la píldora — ver js/fiches.js
+      // dropRateHtml.
+      dropChanceApprox: pct => `≈ ${pct} %`,
+      dropChanceBelowOne: '< 1 %',
+      dropChanceCaveat: 'Proporción de este objeto en el grupo de botín de la tabla — no una probabilidad por muerte (el número real de tiradas depende del servidor).',
       lootBestRates: 'Botín (mejores probabilidades)',
       mapLabel: 'Mapa',
       mapSelectorLabel: 'Mapa mostrado',
@@ -146,7 +153,17 @@ export default {
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
       statsTitle: 'Estadísticas',
       realStatsBadge: 'real',
-      estimatedStatsBadge: tier => `≈ Estimado (nivel ${tier})`,
+      // Nota honesta para mobs SIN un registro real del cliente (statsSource
+      // !== "record"): la ingeniería inversa mostró que la antigua tabla
+      // "estimada" leía el campo equivocado (~640 veces demasiado bajo, p.
+      // ej. un jefe de nivel 20 mostraba ~544 HP para un valor real de
+      // servidor de ~350.000) — esa cifra inventada se elimina, reemplazada
+      // por esta simple advertencia. Ver js/fiches.js monsterStatsSection.
+      statsServerNote: 'Las estadísticas precisas se resuelven en el servidor (no disponibles en los datos del cliente).',
+      computedStatsBadge: 'calculado (fórmula del juego)',
+      statsPerTierNote: 'Nivel de dificultad asignado en el servidor — rango según el nivel (fácil → jefe).',
+      bestiaryMapFilterLabel: map => `En este mapa (${map})`,
+      bestiaryMapEmpty: 'Ningún monstruo atribuido a este mapa. Desmarca para mostrar todos.',
       alwaysGrantedTitle: 'Siempre otorgado',
       choiceGroupTitle: n => `Elección ${n}`,
       orWord: ' o ',
@@ -215,11 +232,17 @@ export default {
       monster: 'Monstruo', zone: 'Región', location: 'Lugar',
       ability: 'Habilidad', event: 'Evento', chest: 'Cofre',
     },
+    // "searchable" y "quest" reformulados para que no se lean como las capas
+    // estáticas de nivel superior (cat.chest "Cofres" / cat.quest
+    // "Misiones"): son filas de FILTRO de campamento (apariciones dinámicas /
+    // contenedores registrables), no esas mismas capas — ver campType.chests
+    // más abajo para el mismo ajuste en la etiqueta del subtipo
+    // "Cofres — <región>".
     campKind: {
       monsters: 'Monstruos', creeps: 'Creeps', herbalism: 'Herboristería',
-      logging: 'Tala', mining: 'Minería', searchable: 'Cofres buscables',
+      logging: 'Tala', mining: 'Minería', searchable: 'Registrables',
       destroyable: 'Destructibles', reactive: 'Interactivos', shrines: 'Santuarios',
-      soulkeeper: 'Guardianes de almas', quest: 'Misión', wildlife: 'Fauna',
+      soulkeeper: 'Guardianes de almas', quest: 'Apariciones de misión', wildlife: 'Fauna',
       guards: 'Guardias', event: 'Evento', other: 'Otros',
     },
     mapName: {
@@ -234,7 +257,7 @@ export default {
     },
     campType: {
       barrels: 'Barriles explosivos', tombstones: 'Lápidas', coffins: 'Ataúdes',
-      chests: 'Cofres', corpses: 'Cadáveres registrables', sacks: 'Sacos',
+      chests: 'Cofres registrables', corpses: 'Cadáveres registrables', sacks: 'Sacos',
       crateCorn: 'Cajón de maíz', crateCabbage: 'Cajón de repollo', crateCarrot: 'Cajón de zanahorias',
       crateOnion: 'Cajón de cebollas', crateEggplant: 'Cajón de berenjenas', crateBerries: 'Cajón de bayas',
       sackCorn: 'Saco de maíz', sackWheat: 'Saco de trigo',

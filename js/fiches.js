@@ -10,7 +10,7 @@ import {
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campDisplayName, campLootTableName, catLabel, chestTypeLabel,
+  campDisplayName, campLootTableName, catLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
@@ -62,26 +62,30 @@ function openCampFiche(key) {
   setFicheHash('camp', key);
 }
 
-/* Fiche coffre (S.data.chest, placements tc_*) : type physique réel (badge,
-   même principe que openCampFiche — r.type est le vrai classifieur
-   chest_type du pipeline, pas une déduction depuis le nom) + butin (même
-   rendu lootRowsHtml que monstre/camp/item) + bouton carte. Pas de lien
-   profond dédié (setFicheHash(null)) — même traitement que
-   openLocationFiche/openAbilityFiche : ~3830 marqueurs individuels par skin
-   de prop, pas un id stable qu'un lien partagé devrait rouvrir (voir
-   data/SCHEMA.md "Chest loot + type" sur pourquoi ces marqueurs ne sont pas
-   individuellement indexés en recherche non plus). */
+/* Fiche coffre (S.data.chest, placements tc_*) : nom d'affichage = type
+   physique réel localisé (chestDisplayName, js/config.js — r.type est le vrai
+   classifieur chest_type du pipeline, jamais le nom brut d'asset d'art, non
+   localisé et bruité) + butin (même rendu lootRowsHtml que monstre/camp/item)
+   + bouton carte. La ligne de catégorie reste sobre (catLabel('chest') seul,
+   ex. "Coffres"/"Chests") : le type occupe déjà le h2, le répéter dans la
+   ligne du dessus serait une pure redite ("Coffres · Tonneau" au-dessus de
+   "Tonneau"). Pas de lien profond dédié (setFicheHash(null)) — même
+   traitement que openLocationFiche/openAbilityFiche : ~3830 marqueurs
+   individuels par skin de prop, pas un id stable qu'un lien partagé devrait
+   rouvrir (voir data/SCHEMA.md "Chest loot + type" sur pourquoi ces
+   marqueurs ne sont pas individuellement indexés en recherche non plus). */
 function openChestFiche(i) {
   const r = S.data.chest[i];
   if (!r) return;
   S.openFiche = { kind: 'chest', id: i };
+  const name = chestDisplayName(r);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
   openFiche(`
     <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(catLabel('chest'))}${r.type ? ' · ' + esc(chestTypeLabel(r.type)) : ''}</div>
-      <h2>${esc(r.name)}</h2></div></div>
+      <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(catLabel('chest'))}</div>
+      <h2>${esc(name)}</h2></div></div>
     <div class="fiche-section"><div class="pop-actions">
-      ${gotoBtn(r.x, r.z, r.name)}
+      ${gotoBtn(r.x, r.z, name)}
     </div></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash(null);
@@ -107,15 +111,32 @@ function openLootTableFiche(label) {
 }
 
 /* Rendu commun d'un taux de drop : quantité ("×N", dès que count>1) suivi de
-   « Garanti » ou d'un pourcentage de chance — jamais les deux pour un même
-   drop garanti (un « 100 % » redondant n'apporte rien face à un « ×3
-   garanti » explicite, voir data/SCHEMA.md "Drop rows"). */
+   soit « Garanti » (uniquement quand `g` est vrai -- un item qui occupe la
+   quasi-totalité de la masse pondérée de sa table ; la règle a été durcie,
+   un simple poids `w`>=1 NE PROUVE PLUS rien seul -- ~93,6 % des lignes du
+   dataset étaient marquées « garanti » à tort avant ce correctif, voir
+   data/SCHEMA.md "guaranteed") soit la part APPROXIMATIVE `d.ch` (weight /
+   poids total de la table, 0..1, voir data/SCHEMA.md "chance") dans le pool
+   -- jamais une probabilité par KILL : le nombre réel de tirages par kill
+   vit côté serveur, absent des données client. Un titre (tooltip) explicite
+   ce caveat au survol de la pastille. `d.ch` absent (part non calculable) :
+   on n'affiche PLUS le poids brut `w` comme un faux pourcentage (c'était le
+   bug -- un poids de 1.0 pouvait se lire « 100 % » pour une part réelle de
+   l'ordre de 1 %) -- juste la quantité connue, honnêtement. */
+function dropChancePctText(ch) {
+  const pct = ch * 100;
+  if (pct < 1) return tr('dropChanceBelowOne');
+  const rounded = pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct < 10 ? 1 : 0 });
+  return tr('dropChanceApprox', rounded);
+}
 function dropRateHtml(d) {
   const countBit = d.c > 1 ? `×${d.c}` : '';
   if (d.g) return `<span class="muted">${esc([countBit, tr('guaranteedLabel')].filter(Boolean).join(' '))}</span>`;
-  if (d.w == null) return countBit ? `<span class="muted">${esc(countBit)}</span>` : '';
-  const pct = `${(d.w * 100).toFixed(d.w < 0.1 ? 1 : 0)} %`;
-  return `<span class="muted">${esc([countBit, pct].filter(Boolean).join(' · '))}</span>`;
+  if (d.ch != null) {
+    const pctText = dropChancePctText(d.ch);
+    return `<span class="muted" title="${esc(tr('dropChanceCaveat'))}">${esc([countBit, pctText].filter(Boolean).join(' · '))}</span>`;
+  }
+  return countBit ? `<span class="muted">${esc(countBit)}</span>` : '';
 }
 
 /* Ligne de butin commune (fiche monstre/camp) : icône + nom cliquable vers
@@ -132,28 +153,24 @@ function lootRowsHtml(list, emptyKey) {
     + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(monsterLootRow).join('')}` : '');
 }
 
-/* Statistiques de monstre — voir data/SCHEMA.md "Monster stats". Seuls
-   ~25/755 groupes ont un relevé client réel (m.stats/m.statsSource ==
-   "record", ex. le troll boss mbt_10_troll_rusty_boss) ; les ~730 restants
-   n'ont AUCUNE stat par-monstre côté client (statsSource null) — le client
-   ne nomme jamais quel tier de difficulté un mob donné utilise en jeu. On
-   estime alors avec la courbe d'UN template représentatif par tier
-   (site_meta.json.statTemplates, chargé dans S.meta au boot critique) :
-   value(level) = curve.base + curve.per_level*(level-1). C'est un maximum
-   honnête, jamais un chiffre par-monstre fabriqué — d'où le badge "≈ estimé
-   (tier X)" toujours visible à côté, jamais présenté avec la même
-   assurance qu'un relevé réel (badge "réel" plein). */
-const STAT_TIER_REP = {}; // tier -> clé de template choisie (mémoïsé)
-function statTierRep(tier) {
-  if (STAT_TIER_REP[tier]) return STAT_TIER_REP[tier];
-  const cands = Object.entries(S.meta.statTemplates || {}).filter(([, v]) => v.tier === tier);
-  const plain = cands.find(([k]) => !/island|event|no_gold|no_vision|buffed/.test(k)) || cands[0];
-  return (STAT_TIER_REP[tier] = plain ? plain[0] : null);
-}
-/* Aucun tier par-monstre n'est connu (le client ne le dit jamais) : repli
-   "medium" par défaut, affiné par un mot-clé trouvé dans famille/nom/tags —
-   un jugement de meilleur effort, jamais une donnée certaine (d'où le badge
-   estimé toujours visible, quel que soit le tier deviné ici). */
+/* Statistiques de monstre — voir data/SCHEMA.md "Monster stats". Seule une
+   poignée de groupes (m.stats/m.statsSource === "record", ex. le troll boss
+   mbt_10_troll_rusty_boss) a un relevé client réel ; la quasi-totalité des
+   autres n'ont AUCUNE stat par-monstre fiable côté client (statsSource null
+   OU "partial" — un ou deux codes épars, jamais un bloc complet, voir
+   data/SCHEMA.md) : le client ne nomme jamais quel tier de difficulté un mob
+   donné utilise en jeu.
+   Un ancien rendu affichait ici une grille de nombres "estimés" en
+   appliquant la courbe d'UN template de tier représentatif
+   (site_meta.json.statTemplates) au niveau du monstre. Une RE a prouvé que
+   le champ lu pour construire cette courbe n'est PAS celui qui alimente les
+   vraies stats serveur : un boss niv 20 y ressortait à ~544 PV pour une
+   vraie valeur serveur ~350 000 (~640× trop bas). Ce chiffre fabriqué est
+   donc retiré PURE ET SIMPLEMENT de l'affichage (jamais réutilisé, même si
+   le pipeline continue de le publier) : un mob sans relevé "record" montre
+   juste son PALIER deviné (guessStatTier — un jugement de meilleur effort,
+   jamais une donnée certaine) + son niveau + une note honnête indiquant que
+   ses vraies stats sont résolues côté serveur. */
 function guessStatTier(m) {
   const hay = [m.family, m.name, ...(m.tags || [])].filter(Boolean).join(' ').toLowerCase();
   if (/mini.?boss/.test(hay)) return 'miniboss';
@@ -168,20 +185,90 @@ function statsGridHtml(stats) {
     `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(String(v))}</div>`).join('');
   return `<div class="stat-grid">${rows}</div>`;
 }
+
+/* Fourchette de stats PAR PALIER (fiches.js) — voir data/SCHEMA.md "Monster
+   stats" +  Le client ne nomme
+   jamais quel palier de difficulté (easy/medium/hard/elit/boss) un mob donné
+   utilise en jeu (choix serveur au spawn, sans référence persistée côté
+   client). Plutôt que de deviner UN palier (ancien guessStatTier) ou de ne
+   rien montrer, on calcule les VRAIS nombres du jeu pour CHAQUE palier au
+   niveau du mob — une fourchette honnête — via la formule décodée, dont les
+   constantes par palier + de croissance sont publiées dans
+   site_meta.json.statFormula (identiques dans les 5 langues, aucun texte
+   traduisible). La formule et ses constantes viennent TELLES QUELLES du
+   client () ; rien n'est estimé ni ajusté ici — validée
+   byte-exact contre les stats_computed des 5 templates de base. */
+const PER_TIER_ORDER = ['easy', 'medium', 'hard', 'elit', 'boss'];
+const PER_TIER_STATS = ['health', 'armor', 'magic_resist', 'attack_power', 'spell_power'];
+function _tierU(g, L) { return g.a * Math.pow(g.r, L + 1) - 1; }
+/* Un palier, un niveau -> {health,armor,magic_resist,attack_power,spell_power}.
+   Réplique exacte de  (même
+   formule fermée que le pipeline utilise pour publier stats_computed) :
+   U(L)=a·r^(L+1)-1 ; hp=(Hpb·(1+MHM)·U_hp - sub)·Hpb ;
+   armorResist=Base·(1+Mmsm) - U_ar ; apSp=(Base·(1+Mmsm)·U_ap - sub)·Base. */
+function computeTierStats(tier, level, sf) {
+  const t = sf.tiers[tier], g = sf.growth, L = level - 1;
+  const Uhp = _tierU(g.hp, L), Uar = _tierU(g.armorResist, L), Uap = _tierU(g.apSp, L);
+  const Mmsm = t.Mmsm ?? 0, MHM = t.MHM ?? 0;
+  return {
+    health: (t.Hpb * (1 + MHM) * Uhp - g.hp.sub) * t.Hpb,
+    armor: t.Armb * (1 + Mmsm) - Uar,
+    magic_resist: t.Rsb * (1 + Mmsm) - Uar,
+    attack_power: (t.Apb * (1 + Mmsm) * Uap - g.apSp.sub) * t.Apb,
+    spell_power: (t.Spb * (1 + Mmsm) * Uap - g.apSp.sub) * t.Spb,
+  };
+}
+/* Nombre de stat calculée : entier (séparateur de milliers localisé) pour les
+   grandes valeurs (PV), 1 décimale sinon (armure/résistance/puissances). */
+function fmtStatNum(v) {
+  return v.toLocaleString(numberLocale(), { maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 1 });
+}
+/* Grille {stat -> valeur} calculée, arrondie/localisée (stats_computed d'un
+   record ou d'un template le cas échéant). */
+function computedStatsGridHtml(sc) {
+  const rows = PER_TIER_STATS.filter(s => sc[s] != null).map(s =>
+    `<div class="stat-row-label">${esc(statLabel(s))}</div><div class="stat-row-value">${esc(fmtStatNum(sc[s]))}</div>`).join('');
+  return `<div class="stat-grid">${rows}</div>`;
+}
+/* Table fourchette : lignes = stats, colonnes = les 5 paliers (libellés
+   courts). Enveloppée dans un conteneur défilable horizontalement pour ne
+   jamais faire déborder le tiroir de fiche sur mobile. */
+function perTierStatsSection(level, sf) {
+  const tiers = PER_TIER_ORDER.filter(t => sf.tiers[t]);
+  if (!tiers.length) return '';
+  const computed = Object.fromEntries(tiers.map(t => [t, computeTierStats(t, level, sf)]));
+  const head = `<tr><th scope="col"></th>${tiers.map(t => `<th scope="col">${esc(statTierLabel(t))}</th>`).join('')}</tr>`;
+  const body = PER_TIER_STATS.map(s =>
+    `<tr><th scope="row">${esc(statLabel(s))}</th>${tiers.map(t => `<td>${esc(fmtStatNum(computed[t][s]))}</td>`).join('')}</tr>`).join('');
+  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('levelAbbrev', level))}</span></h3>
+    <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <p class="hint">${esc(tr('statsPerTierNote'))}</p></div>`;
+}
 function monsterStatsSection(m) {
-  if (m.stats && Object.keys(m.stats).length) {
+  // 1. Relevé client RÉEL (mbt_10_troll_rusty_boss + quelques mobs à bloc
+  //    complet) : grille numérique + badge « réel » — inchangé.
+  if (m.statsSource === 'record' && m.stats && Object.keys(m.stats).length) {
     return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
   }
+  // 2. Mob portant DIRECTEMENT des stats calculées par la formule (palier
+  //    résolu côté données — dormant aujourd'hui, aucun mob non-template n'en
+  //    a, mais honoré si un décodage futur en publie) : grille + badge
+  //    « calculé (formule du jeu) ».
+  if (m.statsComputed) {
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('computedStatsBadge'))}</span></h3>${computedStatsGridHtml(m.statsComputed)}</div>`;
+  }
+  // 3. Mob régulier AVEC niveau + statFormula chargée -> fourchette par palier
+  //    (les vrais nombres du jeu pour chaque palier à ce niveau).
+  const sf = S.meta?.statFormula;
+  if (m.level != null && sf?.tiers && sf?.growth) {
+    return perTierStatsSection(m.level, sf);
+  }
+  // 4. Sans niveau NI statFormula : repli honnête palier deviné + note serveur.
   if (m.level == null) return '';
   const tier = guessStatTier(m);
-  const repKey = statTierRep(tier);
-  const tpl = repKey && S.meta.statTemplates ? S.meta.statTemplates[repKey] : null;
-  if (!tpl?.curve) return '';
-  const est = {};
-  for (const [label, c] of Object.entries(tpl.curve)) {
-    est[label] = Math.round((c.base + c.per_level * (m.level - 1)) * 10) / 10;
-  }
-  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('estimatedStatsBadge', statTierLabel(tier)))}</span></h3>${statsGridHtml(est)}</div>`;
+  const tierLine = [tr('levelAbbrev', m.level), statTierLabel(tier)].filter(Boolean).join(' · ');
+  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tierLine)}</span></h3>
+    <p class="hint">${esc(tr('statsServerNote'))}</p></div>`;
 }
 
 /* ── Plages de jet (stat_ranges/weapon_dps), formules de dégâts
@@ -507,8 +594,25 @@ function openMonsterFiche(key) {
   const model = S.monsterModels[modelKey] || null;
   const variantSelectHtml = monsterVariantPickHtml(key, monsterModelVariants(modelKey, key), model);
   const icon = m.icon ? `icons/${m.icon}` : null;
+  // Zone(s) où ce monstre apparaît : champ `m.zones` cuit dans les données
+  // (build_site_data.py::_monster_zone_names — croisement camps ⨯ régions,
+  // hors zone attrape-tout « Restricted Area » qui couvrait 82% de la carte).
+  // Remplace l'ancien monsterZones() côté client (buggé : Restricted Area
+  // partout). Préfixée d'un 📍 : un nom de ZONE du jeu se lisait avant comme
+  // un statut du monstre plutôt qu'un lieu (le nom est déjà localisé côté
+  // données, aucune traduction supplémentaire requise).
+  const zones = m.zones || [];
+  const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
   const kindBits = [m.family ? pretty(m.family) : null, m.level != null ? tr('levelAbbrev', m.level) : null,
-    m.attack ? monsterAttackLabel(m.attack) : null].filter(Boolean);
+    m.attack ? monsterAttackLabel(m.attack) : null, zoneTxt ? `📍 ${zoneTxt}` : null].filter(Boolean);
+  // Affordance « Voir la zone » : dessine le(s) polygone(s) de région sur la
+  // carte (zones_geo, propre à Kwalat) — n'apparaît que quand au moins une des
+  // zones du mob correspond à un polygone chargé (sinon rien à dessiner, ex.
+  // sur une autre carte où S.zonesGeo est vide).
+  const zoneDrawable = zones.length && (S.zonesGeo || []).some(z => zones.some(n => fold(n) === fold(z.name)));
+  const zoneBtnHtml = zoneDrawable
+    ? `<div class="fiche-section"><div class="pop-actions"><button class="goto" data-act="monster-zone" data-id="${esc(key)}">${GOTO_ICON}<span>${esc(tr('viewZoneBtn'))}</span></button></div></div>`
+    : '';
   // Contenu dev (feature #13) : marqueur explicite quand la variante
   // ACTIVEMENT affichée est isTest (toujours ouvrable par lien profond direct,
   // voir monsterModelVariants -- jamais un 404 silencieux, juste marqué).
@@ -563,6 +667,7 @@ function openMonsterFiche(key) {
     ${variantSelectHtml}
     ${tagsHtml}
     ${statsHtml}
+    ${zoneBtnHtml}
     ${lootHtml}
     ${harvestHtml}
     ${abilitiesHtml}
@@ -735,6 +840,34 @@ function drawGoalZone(sz) {
 }
 function zoneViewBtn(zi) {
   return `<button class="goto" data-act="goal-zone-view" data-zi="${zi}">${GOTO_ICON}<span>${esc(tr('viewZoneBtn'))}</span></button>`;
+}
+/* Zone(s) de monstre sur la carte (bestiaire / fiche « Voir la zone ») :
+   dessine les VRAIS polygones de région (S.zonesGeo, propre à Kwalat) résolus
+   par NOM depuis m.zones. Réutilise l'infra de zone d'objectif de quête
+   (goalZoneLayer, effacée pareillement par clearGoalZone/closeFiche) — mais
+   trace le polygone réel plutôt qu'un simple cercle centroïde/bbox, puisqu'on
+   a la géométrie exacte. Un nom sans polygone chargé (autre carte) ne dessine
+   rien, jamais de contour inventé. */
+function drawMonsterZone(zoneNames) {
+  clearGoalZone();
+  if (!zoneNames?.length) return;
+  const zones = (S.zonesGeo || []).filter(z => zoneNames.some(n => fold(n) === fold(z.name)));
+  if (!zones.length) return;
+  const g = L.layerGroup();
+  const pts = [];
+  zones.forEach(z => (z.rings || []).forEach(ring => {
+    L.polygon(ring.map(([x, zz]) => { pts.push(toLL(x, zz)); return toLL(x, zz); }), {
+      color: CATS.quest.hex, weight: 2, dashArray: '5 6',
+      fillColor: CATS.quest.hex, fillOpacity: .12, interactive: false,
+    }).addTo(g);
+  }));
+  goalZoneLayer = g.addTo(map);
+  if (pts.length) map.flyToBounds(L.latLngBounds(pts).pad(0.25));
+}
+/* Accès délégué (main.js) : dessine la/les zone(s) du monstre `key`. */
+function viewMonsterZone(key) {
+  const m = S.monsters[key];
+  if (m?.zones) drawMonsterZone(m.zones);
 }
 /* Libellé + éventuel bouton pour une cible sans position fixe. `regionHint`
    (facultatif) = région du journal de la quête, affichée en cas (c) quand
@@ -1412,5 +1545,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  openChestFiche, itemColor, viewGoalZone, flyToQuestZone, setRollRarity,
+  openChestFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 };

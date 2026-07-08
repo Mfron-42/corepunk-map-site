@@ -1,13 +1,13 @@
 /* Kwalat — panneau latéral : filtres de couches, liste des camps, suivis
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, LS, save } from './state.js';
-import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, chestTypeLabel } from './config.js';
-import { $, $$, esc, pretty } from './utils.js';
+import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, chestTypeLabel, chestDisplayName, mapName } from './config.js';
+import { $, $$, esc, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
-import { whenDeferred, deferredReady, monsterZones } from './data.js';
+import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest } from './devcontent.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
@@ -15,7 +15,12 @@ function trackedTargetById(id) {
   const [cat, key] = id.split(':');
   if (cat === 'quest') { const q = S.quests.get(key); return q && { name: q.name, x: q.x, z: q.z, hex: CATS.quest.hex }; }
   const r = S.data[cat]?.[+key];
-  return r && { name: r.name, x: r.x, z: r.z, hex: CATS[cat]?.hex || '#999' };
+  if (!r) return null;
+  // Coffre suivi ("Suivi"/tracked depuis son popup) : même nom d'affichage
+  // que partout ailleurs (chestDisplayName) -- sinon la liste de suivi
+  // aurait été le dernier endroit à encore montrer le nom brut d'asset d'art.
+  const name = cat === 'chest' ? chestDisplayName(r) : r.name;
+  return { name, x: r.x, z: r.z, hex: CATS[cat]?.hex || '#999' };
 }
 function toggleTrack(id, btn) {
   const i = S.tracked.findIndex(t => t.id === id);
@@ -155,11 +160,15 @@ function buildCampFilters() {
 /* ── Bestiaire (sidebar) ─────────────────────────────────────
    Monstres du catalogue GLOBAL groupés par famille (repliables), triés par
    taille de famille décroissante ; chaque monstre : nom cliquable → fiche
-   (data-act, délégué global de main.js — pas d'import de vues ici), niveau
-   et zones où il apparaît (croisement camps ⨯ régions, voir data.js
-   monsterZones). Catalogue global : indépendant de la carte active, donc
-   jamais reconstruit à la bascule de carte — seulement au boot (données
-   différées) et au changement de langue (voir main.js). */
+   (data-act, délégué global de main.js — pas d'import de vues ici), niveau,
+   zones où il apparaît (champ cuit `m.zones`, hors zone attrape-tout — voir
+   build_site_data.py::_monster_zone_names) et, quand une région est dessinable,
+   une affordance « voir la zone » qui trace son/ses polygone(s) sur la carte.
+   Filtre PAR CARTE : les mobs dont `m.maps` ne contient pas la carte active
+   sont masqués (un mob SANS donnée de carte reste toujours affiché — couverture
+   maps partielle, 332/917 groupes) ; le filtre se met à jour à la bascule de
+   carte (main.js onMapSwitch) et se bascule via la case en tête de liste. */
+let bestiaryMapOnly = true;   // filtrer le bestiaire à la carte active (défaut : oui)
 function buildBestiary() {
   const box = $('#bestiary-list');
   const title = $('#bestiary-title');
@@ -169,11 +178,19 @@ function buildBestiary() {
     return;
   }
   const fams = new Map();
+  let hiddenByMap = 0;
   for (const [key, m] of Object.entries(S.monsters)) {
     // Contenu dev (feature #13) : monstres isTest masqués du bestiaire par
     // défaut, même garde que la recherche (voir js/devcontent.js /
     // search.js buildMonsterSearchIndex) — 162/917 groupes concernés.
     if (isHiddenTest(m)) continue;
+    // Filtre par-carte : masque un mob CONFIRMÉ sur d'autres cartes seulement
+    // (m.maps présent sans la carte active). Un mob SANS m.maps (couverture
+    // partielle) n'est jamais masqué — on ne cache pas sur une donnée absente.
+    if (bestiaryMapOnly && Array.isArray(m.maps) && m.maps.length && !m.maps.includes(S.map)) {
+      hiddenByMap++;
+      continue;
+    }
     const fam = familyKey(m.family || 'other');   // alias (robo→robot…), voir config.js
     let arr = fams.get(fam);
     if (!arr) fams.set(fam, arr = []);
@@ -181,16 +198,48 @@ function buildBestiary() {
   }
   const hasAny = fams.size > 0;
   const sec = title.closest('.side-sec');
-  (sec || title).hidden = !hasAny;
+  (sec || title).hidden = !hasAny && !hiddenByMap;
   box.innerHTML = '';
-  if (!hasAny) return;
+  // Bascule du filtre par-carte (libellé + case) — toujours visible tant que le
+  // bestiaire l'est, pour que l'utilisateur sache qu'il est filtré et puisse
+  // tout réafficher (utile quand le filtre masque tout sur une petite carte).
+  const mapFilterRow = document.createElement('label');
+  mapFilterRow.className = 'bst-mapfilter';
+  mapFilterRow.innerHTML = `<input type="checkbox" ${bestiaryMapOnly ? 'checked' : ''}>
+    <span>${esc(tr('bestiaryMapFilterLabel', mapName(S.map)))}</span>`;
+  mapFilterRow.querySelector('input').addEventListener('change', e => {
+    bestiaryMapOnly = e.target.checked;
+    buildBestiary();
+  });
+  box.appendChild(mapFilterRow);
+  if (!hasAny) {
+    const empty = document.createElement('p');
+    empty.className = 'hint';
+    empty.textContent = tr('bestiaryMapEmpty');
+    box.appendChild(empty);
+    return;
+  }
   const sorted = [...fams.entries()].sort((a, b) => b[1].length - a[1].length);
   for (const [fam, list] of sorted) {
     list.sort((a, b) => (a.m.level ?? 99) - (b.m.level ?? 99) || a.m.name.localeCompare(b.m.name));
     const rows = list.map(({ key, m }) => {
-      const zones = monsterZones(key);
+      const zones = m.zones || [];
       const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
-      const sub = [m.level != null ? tr('levelAbbrev', m.level) : '', zoneTxt].filter(Boolean).join(' · ');
+      // 📍 devant le nom de zone : un nom de ZONE du jeu (ex. "Restricted
+      // Area") se lisait avant comme un statut du monstre plutôt qu'un lieu
+      // ("niv 14 · Zone restreinte" ressemblait à un état) — même correctif
+      // que openMonsterFiche (js/fiches.js), aucune traduction requise (le
+      // nom de zone est déjà localisé côté données).
+      const zoneBit = zoneTxt ? `📍 ${zoneTxt}` : '';
+      const sub = [m.level != null ? tr('levelAbbrev', m.level) : '', zoneBit].filter(Boolean).join(' · ');
+      // « Voir la zone » : n'apparaît que si au moins une des régions du mob a
+      // un polygone chargé (S.zonesGeo, propre à Kwalat) — sinon rien à
+      // dessiner. Trace le(s) polygone(s) sur la carte (viewMonsterZone,
+      // délégué main.js) sans ouvrir la fiche.
+      const zoneDrawable = zones.length && (S.zonesGeo || []).some(z => zones.some(n => fold(n) === fold(z.name)));
+      const zoneBtn = zoneDrawable
+        ? `<button type="button" class="bst-zone" data-act="monster-zone" data-id="${esc(key)}" title="${esc(tr('viewZoneBtn'))}" aria-label="${esc(tr('viewZoneBtn'))}">📍</button>`
+        : '';
       // N'apparaît que si S.devOn est vrai (sinon isHiddenTest l'aurait déjà
       // exclu de `list` plus haut) : marque explicitement un monstre isTest
       // révélé, jamais confondu avec une vraie créature du jeu.
@@ -198,6 +247,7 @@ function buildBestiary() {
       return `<li class="bst-row">
         <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
         ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}
+        ${zoneBtn}
       </li>`;
     }).join('');
     const det = document.createElement('details');

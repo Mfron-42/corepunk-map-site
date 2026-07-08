@@ -219,6 +219,22 @@ function campDisplayName(k) {
 const chestTypeLabel = key => tbl('chestType', key) || pretty(key);
 const activableTypeLabel = key => tbl('activableType', key) || pretty(key);
 
+/* Nom d'affichage d'un coffre placé (popup, fiche, recherche) : le NOM brut
+   (r.name, ex. "Chest barrel elenian 02 blood") est un identifiant d'ASSET
+   D'ART — jamais localisé (pas une entrée Localization/, voir data/SCHEMA.md
+   "Chest loot + type") et truffé de bruit interne (set d'art "elenian"/
+   "greenville", couleur, variante…) qui ne dit RIEN au joueur. Le vrai
+   classifieur joueur, c'est r.type (Barrel/Boxes/Corpse/Cabinet/…, même champ
+   que chestTypeLabel ci-dessus) : on l'affiche SEUL, localisé, comme nom — la
+   position sur la carte dit déjà où, la fiche dit quoi + butin, inutile de
+   répéter le jeton d'art. Repli sur le nom nettoyé (préfixe "Chest "/"Small
+   chest " retiré, reste prettifié) seulement pour les ~44 placements sans
+   type lié (voir data/SCHEMA.md coverage). */
+function chestDisplayName(r) {
+  if (r.type) return chestTypeLabel(r.type);
+  return pretty((r.name || '').replace(/^(small\s+)?chest\s+/i, ''));
+}
+
 /* Table de butin PROBABLE d'un camp cassable/fouillable : le client ne
    fournit PAS le lien prop → table ; on n'associe que les cas où le TYPE
    encodé dans la clé correspond exactement au nom d'une table de butin du
@@ -259,5 +275,5 @@ export {
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName,
-  campDisplayName, chestTypeLabel, activableTypeLabel, campLootTableName,
+  campDisplayName, chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
 };

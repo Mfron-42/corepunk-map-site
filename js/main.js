@@ -20,7 +20,7 @@ import { popupHtml, questPopup, campPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
-  viewGoalZone, flyToQuestZone, setRollRarity,
+  viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import { buildSearch, hideSearchResults } from './search.js';
@@ -70,6 +70,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'roll-rarity') setRollRarity(id, b.dataset.r);
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
+  else if (b.dataset.act === 'monster-zone') viewMonsterZone(id);
   else if (b.dataset.act === 'goto') {
     goTo(+b.dataset.x, +b.dataset.z, undefined, b.dataset.label);
   }
@@ -296,6 +297,7 @@ async function setLang(code) {
     registerAllDenseRenderers();
     buildFilters();
     buildSearch();
+    buildBestiary();    // filtre par-carte du bestiaire (m.maps ⨯ carte active) — voir sidebar.js
     buildDevToggle();   // compte qao/quête isTest propre à la carte qui vient d'être chargée
   });
 

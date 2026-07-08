@@ -64,6 +64,12 @@ export default {
       likelyMonsters: n => `Likely monsters (${n})`,
       guaranteedLabel: 'Guaranteed',
       chanceLabel: 'Chance',
+      // Approximate SHARE (d.ch = weight / the table's total weight, see
+      // data/SCHEMA.md "chance") of a non-guaranteed drop + honest caveat set
+      // as a tooltip (title) on the pill -- see js/fiches.js dropRateHtml.
+      dropChanceApprox: pct => `≈ ${pct} %`,
+      dropChanceBelowOne: '< 1 %',
+      dropChanceCaveat: "This item's share of the table's loot pool — not a per-kill probability (the real roll count is handled server-side).",
       lootBestRates: 'Loot (best rates)',
       mapLabel: 'Map',
       mapSelectorLabel: 'Displayed map',
@@ -146,7 +152,17 @@ export default {
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
       statsTitle: 'Stats',
       realStatsBadge: 'real',
-      estimatedStatsBadge: tier => `≈ Estimated (${tier} tier)`,
+      // Honest note for mobs WITHOUT a real client stat reading (statsSource
+      // !== "record"): reverse engineering showed the old "estimated" grid
+      // read the wrong field (~640x too low, e.g. a level-20 boss showing
+      // ~544 HP for a real server value of ~350,000) -- that fabricated
+      // number is removed, replaced by this plain admission. See
+      // js/fiches.js monsterStatsSection.
+      statsServerNote: 'Precise stats are resolved server-side (not available in the client data).',
+      computedStatsBadge: 'computed (game formula)',
+      statsPerTierNote: 'Difficulty tier assigned server-side — range shown per tier (easy → boss).',
+      bestiaryMapFilterLabel: map => `On this map (${map})`,
+      bestiaryMapEmpty: 'No monsters attributed to this map. Uncheck to show all.',
       alwaysGrantedTitle: 'Always granted',
       choiceGroupTitle: n => `Choice ${n}`,
       orWord: ' or ',
@@ -214,11 +230,16 @@ export default {
       monster: 'Monster', zone: 'Region', location: 'Place',
       ability: 'Ability', event: 'Event', chest: 'Chest',
     },
+    // "searchable" and "quest" reworded so they no longer read as the
+    // top-level static layers (cat.chest "Chests" / cat.quest "Quests"):
+    // these are camp FILTER rows (dynamic spawns / searchable containers),
+    // not the same layers -- see campType.chests below for the matching fix
+    // on the "Chests — <region>" sub-type label.
     campKind: {
       monsters: 'Monsters', creeps: 'Creeps', herbalism: 'Herbalism',
-      logging: 'Logging', mining: 'Mining', searchable: 'Searchable chests',
+      logging: 'Logging', mining: 'Mining', searchable: 'Searchable',
       destroyable: 'Destroyables', reactive: 'Interactives', shrines: 'Shrines',
-      soulkeeper: 'Soulkeepers', quest: 'Quest', wildlife: 'Wildlife',
+      soulkeeper: 'Soulkeepers', quest: 'Quest spawns', wildlife: 'Wildlife',
       guards: 'Guards', event: 'Event', other: 'Other',
     },
     mapName: {
@@ -233,7 +254,7 @@ export default {
     },
     campType: {
       barrels: 'Explosive barrels', tombstones: 'Tombstones', coffins: 'Coffins',
-      chests: 'Chests', corpses: 'Searchable corpses', sacks: 'Sacks',
+      chests: 'Searchable chests', corpses: 'Searchable corpses', sacks: 'Sacks',
       crateCorn: 'Corn crate', crateCabbage: 'Cabbage crate', crateCarrot: 'Carrot crate',
       crateOnion: 'Onion crate', crateEggplant: 'Eggplant crate', crateBerries: 'Berry crate',
       sackCorn: 'Corn sack', sackWheat: 'Wheat sack',

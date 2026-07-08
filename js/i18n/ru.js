@@ -65,6 +65,12 @@ export default {
       likelyMonsters: n => `Вероятные монстры (${n})`,
       guaranteedLabel: 'Гарантировано',
       chanceLabel: 'Шанс',
+      // ПРИБЛИЗИТЕЛЬНАЯ доля (d.ch = вес / суммарный вес таблицы, см.
+      // data/SCHEMA.md "chance") негарантированного дропа + честная оговорка
+      // во всплывающей подсказке (title) — см. js/fiches.js dropRateHtml.
+      dropChanceApprox: pct => `≈ ${pct} %`,
+      dropChanceBelowOne: '< 1 %',
+      dropChanceCaveat: 'Доля этого предмета в пуле добычи таблицы — не вероятность за один килл (реальное число бросков определяется сервером).',
       lootBestRates: 'Добыча (лучшие шансы)',
       mapLabel: 'Карта',
       mapSelectorLabel: 'Отображаемая карта',
@@ -146,7 +152,17 @@ export default {
       noHarvestCatalogued: 'Добыча при разделке этого монстра не каталогизирована.',
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальные',
-      estimatedStatsBadge: tier => `≈ Оценка (тир: ${tier})`,
+      // Честная пометка для мобов БЕЗ реального клиентского замера
+      // (statsSource !== "record"): реверс-инжиниринг показал, что старая
+      // "оценочная" таблица читала не то поле (~в 640 раз заниженное значение,
+      // напр. босс 20 ур. показывал ~544 HP при реальном серверном значении
+      // ~350 000) — этот выдуманный номер убран, вместо него — честное
+      // признание. См. js/fiches.js monsterStatsSection.
+      statsServerNote: 'Точные характеристики определяются на сервере (недоступны в данных клиента).',
+      computedStatsBadge: 'расчёт (формула игры)',
+      statsPerTierNote: 'Уровень сложности назначается на сервере — диапазон по уровням (лёгкий → босс).',
+      bestiaryMapFilterLabel: map => `На этой карте (${map})`,
+      bestiaryMapEmpty: 'На этой карте нет монстров. Снимите галочку, чтобы показать всех.',
       alwaysGrantedTitle: 'Выдаётся всегда',
       choiceGroupTitle: n => `Выбор ${n}`,
       orWord: ' или ',
@@ -215,11 +231,16 @@ export default {
       monster: 'Монстр', zone: 'Регион', location: 'Место',
       ability: 'Способность', event: 'Событие', chest: 'Сундук',
     },
+    // "searchable" и "quest" переформулированы, чтобы не читаться как
+    // верхнеуровневые статичные слои (cat.chest "Сундуки" / cat.quest
+    // "Задания"): это строки ФИЛЬТРА лагерей (динамические спавны /
+    // обыскиваемые контейнеры), а не те же слои — см. campType.chests ниже
+    // про такую же правку подписи подтипа "Сундуки — <регион>".
     campKind: {
       monsters: 'Монстры', creeps: 'Крипы', herbalism: 'Травничество',
-      logging: 'Лесозаготовка', mining: 'Горное дело', searchable: 'Обыскиваемые сундуки',
+      logging: 'Лесозаготовка', mining: 'Горное дело', searchable: 'Обыскиваемые',
       destroyable: 'Разрушаемые', reactive: 'Интерактивные', shrines: 'Святилища',
-      soulkeeper: 'Хранители душ', quest: 'Задание', wildlife: 'Дикие животные',
+      soulkeeper: 'Хранители душ', quest: 'Спавны заданий', wildlife: 'Дикие животные',
       guards: 'Стражи', event: 'Событие', other: 'Другое',
     },
     mapName: {
@@ -234,7 +255,7 @@ export default {
     },
     campType: {
       barrels: 'Взрывающиеся бочки', tombstones: 'Надгробия', coffins: 'Гробы',
-      chests: 'Сундуки', corpses: 'Обыскиваемые трупы', sacks: 'Мешки',
+      chests: 'Обыскиваемые сундуки', corpses: 'Обыскиваемые трупы', sacks: 'Мешки',
       crateCorn: 'Ящик кукурузы', crateCabbage: 'Ящик капусты', crateCarrot: 'Ящик моркови',
       crateOnion: 'Ящик лука', crateEggplant: 'Ящик баклажанов', crateBerries: 'Ящик ягод',
       sackCorn: 'Мешок кукурузы', sackWheat: 'Мешок пшеницы',

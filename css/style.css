@@ -417,6 +417,23 @@ body {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   text-align: right;
 }
+/* Bouton « voir la zone » d'une ligne de bestiaire : trace le polygone de
+   région sur la carte (n'apparaît que si la zone est dessinable). */
+.bst-zone {
+  flex: none; background: none; border: none; cursor: pointer;
+  color: var(--muted); font-size: .74rem; line-height: 1;
+  padding: 1px 3px; border-radius: var(--radius-s);
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.bst-zone:hover { color: var(--accent); background: var(--accent-soft); }
+/* Case de filtre par-carte en tête du bestiaire. */
+.bst-mapfilter {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 4px 8px;
+  font-size: .7rem; color: var(--muted); cursor: pointer;
+}
+.bst-mapfilter input { flex: none; accent-color: var(--accent); cursor: pointer; }
+.bst-mapfilter span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Suivis ── */
 #tracked-list li {
@@ -1237,6 +1254,39 @@ button.rar-pill:hover {
   text-align: right;
   white-space: nowrap;
 }
+/* Table fourchette-par-palier (monstre sans palier serveur connu) : lignes =
+   stats, colonnes = les 5 paliers. Défilable horizontalement pour ne jamais
+   déborder le tiroir de fiche sur écran étroit. */
+.ptr-wrap { overflow-x: auto; margin: 2px 0 2px; }
+.ptr-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: .74rem;
+}
+.ptr-table th, .ptr-table td {
+  padding: 3px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+.ptr-table thead th {
+  font-family: var(--font-display);
+  font-size: .6rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line-soft);
+}
+.ptr-table tbody th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+.ptr-table tbody td {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+.ptr-table tbody tr:not(:last-child) th,
+.ptr-table tbody tr:not(:last-child) td { border-bottom: 1px solid var(--line-soft); }
 
 /* ── Formules (artefacts T3 / capacités nommées) ─────────────────────
    base + Σ coeff × stat, RECONSTRUITE et LOCALISÉE côté client (jamais le
