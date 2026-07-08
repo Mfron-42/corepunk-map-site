@@ -21,9 +21,18 @@ export default {
       loadingText: 'Levantamiento del terreno…',
       zonesLabel: 'Zonas (regiones)',
       campLoading: 'Cargando campamentos…',
-      chestTypesTitle: 'Tipos de contenedores',
+      decorFamiliesTitle: 'Familias de decoración',
       chestTypesAllBtn: 'Todos',
       chestTypesNoneBtn: 'Ninguno',
+      // Recategorización de contenedores (DATA_CONTRACT.md): las 2 capas
+      // reales de cofres + el grupo "Decoración" (legacy_chest/decor por
+      // familia).
+      decorGroupLabel: 'Decoración',
+      campChestLabel: 'Cofre de campamento',
+      legacyChestLabel: 'Cofre del tesoro heredado',
+      lootGenericNote: 'Botín genérico: el único vínculo de botín conocido de este contenedor es un grupo registrable amplio, no una tabla de botín dedicada — no es un cofre farmeable específico.',
+      searchableChestTitle: 'Cofre registrable',
+      searchableChestRarityNote: 'Rareza aleatoria: el nivel (común/raro/épico…) lo decide el servidor al aparecer — no se puede deducir de los datos del cliente.',
       noResults: 'Sin resultados.',
       noResultsHint: 'Prueba con una palabra más corta o revisa la ortografía.',
       searchBodyHintPrefix: '› objetivo: ',
@@ -203,7 +212,11 @@ export default {
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
-      qao: 'Objetos de misión', workshop: 'Talleres', chest: 'Cofres',
+      qao: 'Objetos de misión', workshop: 'Talleres',
+      // Recategorización de contenedores: la antigua capa única "Cofres"
+      // (chest) se elimina, reemplazada por estas 2 capas reales — ver
+      // DATA_CONTRACT.md §1/§3.1 y js/config.js CATS.
+      searchable_chest: 'Cofres registrables', camp_chest: 'Cofres de campamento',
     },
     rarity: { Common: 'Común', Uncommon: 'Poco común', Rare: 'Raro', Epic: 'Épico' },
     kind: { npc: 'PNJ', object: 'Objeto', item: 'Ítem', other: '—' },
@@ -231,6 +244,14 @@ export default {
       workshop: 'Taller', camp: 'Campamento', item: 'Ítem',
       monster: 'Monstruo', zone: 'Región', location: 'Lugar',
       ability: 'Habilidad', event: 'Evento', chest: 'Cofre',
+      searchable_chest: 'Cofre registrable',
+    },
+    // Familias de decoración (chests.bin group="decor" por family, +
+    // "legacy" para group="legacy_chest") — sub-filas del grupo plegable
+    // "Decoración" (js/sidebar.js buildDecorGroup), ver DATA_CONTRACT.md §3.1.
+    decorFamily: {
+      barrel: 'Barriles', boxes: 'Cajas', furniture: 'Muebles',
+      corpse: 'Cadáveres', books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
     },
     // "searchable" y "quest" reformulados para que no se lean como las capas
     // estáticas de nivel superior (cat.chest "Cofres" / cat.quest

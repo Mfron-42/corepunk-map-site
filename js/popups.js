@@ -6,6 +6,7 @@ import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, catLabel, campKindLabel,
   campDisplayName, chestDisplayName, activableTypeLabel,
+  chestHex, chestKindLabel, prettyRegion,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
@@ -48,18 +49,44 @@ function popupHtml(cat, r, id) {
   if (cat === 'chest' && r.loot?.length) {
     extraBtn = `<button class="act primary" data-act="fiche-chest" data-id="${esc(id)}">${esc(tr('ficheCompleteBtn'))}</button>`;
   }
-  const catLine = catLabel(cat)
-    + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
-    + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
+  // Ligne de catégorie d'un coffre placé : la VRAIE catégorie (camp_chest/
+  // décor par famille/legacy — chestKindLabel, js/config.js) remplace
+  // l'ancien catLabel('chest') générique ("Coffres") qui conflait les 3
+  // vraies catégories (voir DATA_CONTRACT.md §3.1/§6) — CATS.chest n'existe
+  // plus du tout, `c` (CATS[cat]) est donc undefined pour cat === 'chest'.
+  const catLine = cat === 'chest' ? chestKindLabel(r)
+    : catLabel(cat)
+      + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
+      + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
   // Titre : nom d'affichage localisé pour un coffre (chestDisplayName — le
   // nom brut est un jeton d'asset d'art jamais localisé, voir config.js) ;
   // nettoyage TEXTURING/QItem générique (cleanLabel) pour tout le reste.
   const title = cat === 'chest' ? chestDisplayName(r) : cleanLabel(r.name);
+  const chipColor = cat === 'chest' ? chestHex(r) : c.hex;
   return `<div class="pop">
     <h3>${icon}${esc(title)}</h3>
-    <div class="pop-cat" style="color:${c.hex}">${esc(catLine)}</div>
+    <div class="pop-cat" style="color:${chipColor}">${esc(catLine)}</div>
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${extraHtml}
+    ${actionBtns(id, extraBtn)}</div>`;
+}
+
+/* Popup « coffre fouillable » (searchable_chests.bin, poi_searchable_chest_*
+   — LE vrai coffre farmable de recette, voir DATA_CONTRACT.md §4) : distinct
+   des placements chest (S.data.chest) ci-dessus, sa propre popup (forme de
+   données différente : region/rarity au lieu de name/type). Bouton fiche
+   complète seulement quand une table de recette est attachée (même garde
+   que popupHtml ci-dessus). */
+function searchableChestPopup(r) {
+  const id = 'searchable_chest:' + r.k;
+  const region = prettyRegion(r.region);
+  const extraBtn = r.loot?.length
+    ? `<button class="act primary" data-act="fiche-searchable-chest" data-id="${esc(r.k)}">${esc(tr('ficheCompleteBtn'))}</button>`
+    : '';
+  return `<div class="pop">
+    <h3>${esc(tr('searchableChestTitle'))}</h3>
+    <div class="pop-cat" style="color:${CATS.searchable_chest.hex}">${esc(region)}</div>
+    <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${actionBtns(id, extraBtn)}</div>`;
 }
 
@@ -103,4 +130,4 @@ function campPopup(p, n) {
     ${extra}${ficheBtn}</div>`;
 }
 
-export { popupHtml, questPopup, campPopup, mobLabelHtml };
+export { popupHtml, questPopup, campPopup, mobLabelHtml, searchableChestPopup };

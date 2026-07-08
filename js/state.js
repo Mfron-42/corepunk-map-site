@@ -30,9 +30,10 @@ const S = {
   tracked: JSON.parse(localStorage.getItem(LS.tracked) || '[]'),
   done: new Set(JSON.parse(localStorage.getItem(LS.done) || '[]')),
   camps: {},                // kind -> {on, points, group}
-  chestTypes: {},           // type de contenant placé (Chest/Barrel/Boxes…) -> {on, count}
-                            // — sous-filtre de la catégorie "chest", voir data.js buildChestTypes()
-                            // et js/sidebar.js buildChestTypeSubfilter()
+  decor: {},                // famille décor (barrel/boxes/furniture/corpse/books/misc/legacy)
+                            // -> {on, count} — sous-couches "Décor" (chests.bin group="decor"|
+                            // "legacy_chest", toutes OFF par défaut), voir data.js
+                            // buildDecorGroups() et js/sidebar.js buildDecorGroup()
   ping: null,
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}

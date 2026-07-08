@@ -21,9 +21,17 @@ export default {
       loadingText: 'Surveying the terrain…',
       zonesLabel: 'Zones (regions)',
       campLoading: 'Loading camps…',
-      chestTypesTitle: 'Container types',
+      decorFamiliesTitle: 'Decor families',
       chestTypesAllBtn: 'All',
       chestTypesNoneBtn: 'None',
+      // Container re-categorization (DATA_CONTRACT.md): the 2 real chest
+      // layers + the "Decor" group (legacy_chest/decor by family).
+      decorGroupLabel: 'Decor',
+      campChestLabel: 'Camp chest',
+      legacyChestLabel: 'Legacy treasure chest',
+      lootGenericNote: 'Generic loot: the only known loot link for this container is a broad searchable pool, not a dedicated loot table — this is not a targeted farmable chest.',
+      searchableChestTitle: 'Searchable chest',
+      searchableChestRarityNote: 'Random rarity: the tier (common/rare/epic…) is decided by the server at spawn time — not derivable from the client data.',
       noResults: 'No results.',
       noResultsHint: 'Try a shorter word, or check the spelling.',
       searchBodyHintPrefix: '› objective: ',
@@ -201,7 +209,11 @@ export default {
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
-      qao: 'Quest objects', workshop: 'Workshops', chest: 'Chests',
+      qao: 'Quest objects', workshop: 'Workshops',
+      // Container re-categorization: the old single "Chests" layer (chest)
+      // is removed, replaced by these 2 real layers — see
+      // DATA_CONTRACT.md §1/§3.1 and js/config.js CATS.
+      searchable_chest: 'Searchable chests', camp_chest: 'Camp chests',
     },
     rarity: { Common: 'Common', Uncommon: 'Uncommon', Rare: 'Rare', Epic: 'Epic' },
     kind: { npc: 'NPC', object: 'Object', item: 'Item', other: '—' },
@@ -229,6 +241,14 @@ export default {
       workshop: 'Workshop', camp: 'Camp', item: 'Item',
       monster: 'Monster', zone: 'Region', location: 'Place',
       ability: 'Ability', event: 'Event', chest: 'Chest',
+      searchable_chest: 'Searchable chest',
+    },
+    // Decor families (chests.bin group="decor" by family, + "legacy" for
+    // group="legacy_chest") — sub-rows of the collapsible "Decor" group
+    // (js/sidebar.js buildDecorGroup), see DATA_CONTRACT.md §3.1.
+    decorFamily: {
+      barrel: 'Barrels', boxes: 'Boxes', furniture: 'Furniture',
+      corpse: 'Corpses', books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
     },
     // "searchable" and "quest" reworded so they no longer read as the
     // top-level static layers (cat.chest "Chests" / cat.quest "Quests"):

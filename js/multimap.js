@@ -4,7 +4,7 @@
    rejoue les hooks posés par main.js (fiches/recherche/filtres/couches). */
 import { S } from './state.js';
 import { KWALAT_DEFAULTS, mapName } from './config.js';
-import { fetchJson, dataPath, buildChestTypes } from './data.js';
+import { fetchJson, dataPath, buildDecorGroups } from './data.js';
 import {
   map, worldBounds, setActiveMap, applyMapGeometry, denseRenderers,
 } from './mapview.js';
@@ -29,12 +29,12 @@ function onMapSwitch(fn) { mapSwitchHooks.push(fn); }
    camps + régions) — les catalogues globaux n'en font pas partie. */
 function captureMapState() {
   return {
-    data: S.data, quests: S.quests, camps: S.camps, chestTypes: S.chestTypes,
+    data: S.data, quests: S.quests, camps: S.camps, decor: S.decor,
     zonesGeo: S.zonesGeo, zonesQuest: S.zonesQuest,
   };
 }
 function applyMapState(s) {
-  S.data = s.data; S.quests = s.quests; S.camps = s.camps; S.chestTypes = s.chestTypes || {};
+  S.data = s.data; S.quests = s.quests; S.camps = s.camps; S.decor = s.decor || {};
   S.zonesGeo = s.zonesGeo; S.zonesQuest = s.zonesQuest;
 }
 
@@ -54,9 +54,12 @@ async function loadMapData(mid) {
   // 404 pour une catégorie absente de cette carte (ex. Extraction sans ateliers).
   const has = new Set((S.maps[mid] && S.maps[mid].files) || []);
   const get = name => has.has(name) ? fetchJson(base + name + '.bin').catch(() => []) : Promise.resolve([]);
-  const [npcs, quests, qao, workshops, chests, camps] = await Promise.all([
+  // searchable_chests : Kwalat-only aujourd'hui (voir DATA_CONTRACT.md §2),
+  // mais lu ici comme n'importe quel autre fichier optionnel par carte —
+  // rien de spécial à faire le jour où une autre carte en publie un.
+  const [npcs, quests, qao, workshops, chests, searchableChests, camps] = await Promise.all([
     get('npcs'), get('quests'), get('quest_objects'),
-    get('workshops'), get('chests'), get('camps'),
+    get('workshops'), get('chests'), get('searchable_chests'), get('camps'),
   ]);
   const qmap = new Map();
   quests.forEach(q => qmap.set(q.slug, q));
@@ -68,8 +71,8 @@ async function loadMapData(mid) {
     g.pts.forEach(pt => campsState[k].points.push({ x: pt[0], z: pt[1], g }));
   });
   const snap = {
-    data: { npc: npcs, poi: [], quest: quests, qao, workshop: workshops, chest: chests },
-    quests: qmap, camps: campsState, chestTypes: buildChestTypes(chests), zonesGeo: [], zonesQuest: {},
+    data: { npc: npcs, poi: [], quest: quests, qao, workshop: workshops, chest: chests, searchable_chest: searchableChests },
+    quests: qmap, camps: campsState, decor: buildDecorGroups(chests), zonesGeo: [], zonesQuest: {},
   };
   S.mapCache[mid] = snap;
   applyMapState(snap);

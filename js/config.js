@@ -1,7 +1,7 @@
 /* Kwalat — constantes structurelles : géométrie par défaut, palettes,
    catégories de couches et résolveurs de libellés (tokens neutres du jeu →
    libellé localisé via tbl()). Aucun état mutable ici. */
-import { tbl } from './i18n/index.js';
+import { tbl, tr } from './i18n/index.js';
 import { pretty } from './utils.js';
 
 /* ── Constantes ─────────────────────────────────────────────── */
@@ -31,13 +31,31 @@ const TILE_BASE = 'https://mfron-42.github.io/corepunk-map-tiles';
    identifiers, shipped as-is regardless of language. Which categories render
    DOM portraits vs canvas dots is decided by main.js's registerDomDense/
    registerDense call sites, not by a flag here. */
+/* Coffres (container re-categorization, DATA_CONTRACT.md) : l'ancienne
+   couche unique "chest" (`type` brut, 3 vraies catégories conflées sous un
+   seul "Coffres") est remplacée par DEUX couches de haut niveau réelles —
+   `searchable_chest` (searchable_chests.bin, poi_searchable_chest_* — LE
+   vrai coffre fouillable farmable, sa propre table de recette) et
+   `camp_chest` (chests.bin `group==="camp_chest"`, skin sci_fi — le coffre
+   de camp) — plus le groupe "Décor" (S.decor, js/state.js/sidebar.js), qui
+   n'est PAS une entrée CATS classique : décor rassemble chests.bin
+   `group==="decor"` (6 familles) + `group==="legacy_chest"`, rendu en
+   couches denses `decor:<famille>` (voir mapview.js renderDense / main.js
+   registerAllDenseRenderers), par analogie avec les couches `camp:<kind>`
+   existantes. `chest` (l'ancienne clé CATS) disparaît : plus aucune couche
+   ne s'appelle ainsi, mais l'id de marqueur "chest:<i>" (S.data.chest, voir
+   chestHex/chestKindLabel plus bas) reste l'espace de nommage stable partagé
+   par camp_chest/décor/legacy pour le suivi ("Suivre"/"Fait") et la fiche
+   (fiche-chest) — seule la couleur/le libellé affichés varient désormais
+   selon le VRAI group/family du point, jamais un CATS.chest générique. */
 const CATS = {
   npc:      { hex: '#e0a23f', on: true,  dense: true },
   poi:      { hex: '#8fb4c9', on: true,  dense: true },
   quest:    { hex: '#c77dff', on: true,  dense: true },
   qao:      { hex: '#ff8fa3', on: false, dense: true },
   workshop: { hex: '#4cc9f0', on: true,  dense: true },
-  chest:    { hex: '#ffd166', on: false, dense: true },
+  searchable_chest: { hex: '#ffd166', on: true, dense: true },
+  camp_chest:       { hex: '#f2a65a', on: true, dense: true },
 };
 const catLabel = key => tbl('cat', key) || key;
 const CAMP_COLORS = {
@@ -235,6 +253,53 @@ function chestDisplayName(r) {
   return pretty((r.name || '').replace(/^(small\s+)?chest\s+/i, ''));
 }
 
+/* ── Décor (chests.bin `group==="decor"`|`"legacy_chest"`) ──────────────
+   6 familles de décor + le coffre-trésor hérité (legacy) — voir
+   DATA_CONTRACT.md §3.1. Ordre d'affichage = ordre de la liste ci-dessous
+   (grosso modo décroissant par volume, legacy en dernier — c'est un `group`
+   à part, pas une vraie "famille" décor, mais rangé au même endroit dans le
+   panneau à la demande du propriétaire). Couleurs volontairement sourdes/
+   terreuses (décor = masqué par défaut, jamais le point d'attention visuel
+   des 2 vraies couches de coffres ci-dessus). */
+const DECOR_FAMILIES = ['barrel', 'boxes', 'furniture', 'misc', 'corpse', 'books', 'legacy'];
+const DECOR_HEX = {
+  barrel: '#a9744c', boxes: '#c2a25c', furniture: '#8f97a8',
+  corpse: '#8a7080', books: '#8d7ab0', misc: '#6c757d', legacy: '#c9a66b',
+};
+const decorFamilyLabel = key => tbl('decorFamily', key) || pretty(key);
+
+/* Couleur RÉELLE d'un coffre placé (S.data.chest) — camp_chest/legacy_chest/
+   décor par famille, jamais un unique hex "coffre" générique (l'ancien
+   CATS.chest, retiré — voir DATA_CONTRACT.md §3.1). Utilisée partout où un
+   point/tracké/popup/fiche de S.data.chest a besoin d'une couleur honnête. */
+function chestHex(r) {
+  if (!r) return DECOR_HEX.misc;
+  if (r.group === 'camp_chest') return CATS.camp_chest.hex;
+  if (r.group === 'legacy_chest') return DECOR_HEX.legacy;
+  return DECOR_HEX[r.family] || DECOR_HEX.misc;
+}
+/* Libellé de catégorie RÉELLE d'un coffre placé (pop-cat/fiche-kind) —
+   remplace l'ancien catLabel('chest') générique qui conflait les 3 vraies
+   catégories sous un seul "Coffres" (voir DATA_CONTRACT.md §3.1 et §6). */
+function chestKindLabel(r) {
+  if (!r) return '';
+  if (r.group === 'camp_chest') return tr('campChestLabel');
+  if (r.group === 'legacy_chest') return tr('legacyChestLabel');
+  return `${tr('decorGroupLabel')} — ${decorFamilyLabel(r.family)}`;
+}
+
+/* Prettification du `region` d'un coffre fouillable (searchable_chests.bin —
+   aucun libellé fourni par les données, voir DATA_CONTRACT.md §4) :
+   "ripplecrop-fields" -> "Ripplecrop Fields". Même esprit neutre que
+   prettyMapId ci-dessus (noms propres, valable dans toutes les langues). */
+function prettyRegion(region) {
+  return (region || '').split('-').map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
+}
+/* Couleur neutre pour la fiche « table de butin » générique (openLootTableFiche,
+   js/fiches.js) — pas liée à un coffre placé précis (peut être ouverte depuis
+   n'importe quel lien de table nommée), donc pas de chestHex() ici. */
+const LOOT_TABLE_HEX = '#c9a66b';
+
 /* Table de butin PROBABLE d'un camp cassable/fouillable : le client ne
    fournit PAS le lien prop → table ; on n'associe que les cas où le TYPE
    encodé dans la clé correspond exactement au nom d'une table de butin du
@@ -276,4 +341,6 @@ export {
   weaponTypeLabel, weaponTypeLine, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName,
   campDisplayName, chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
+  DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,
+  prettyRegion, LOOT_TABLE_HEX,
 };

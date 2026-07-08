@@ -372,6 +372,49 @@ body {
 .filter-row-sub.subfilter-featured .flabel { font-weight: 600; color: var(--ink); }
 .filter-row-sub.subfilter-featured:not(.off) .flabel { color: var(--accent-hi); }
 
+/* ── Groupe repliable "Décor" (container re-categorization) ──────────────
+   Même vocabulaire visuel que .filter-row (pastille + libellé + compteur) +
+   chevron d'état (comme .side-sec) — mais PAS de case à cocher sur cette
+   ligne : c'est un simple groupe d'affichage repliable, jamais un master
+   switch qui masquerait ce que chaque sous-famille dit vraiment (le on/off
+   réel vit sur chaque ligne de .subfilter-list en dessous, voir
+   js/sidebar.js buildDecorGroup). Fermé par défaut (pas de [open] posé). */
+.decor-group { margin: 1px 0; }
+.decor-group > summary {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 6px;
+  border-radius: var(--radius-s);
+  cursor: pointer; user-select: none;
+  list-style: none;
+}
+.decor-group > summary::-webkit-details-marker { display: none; }
+.decor-group > summary:hover { background: var(--panel-3); }
+.decor-group > summary .swatch {
+  flex: none; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid rgba(8, 12, 18, .7);
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px currentColor;
+}
+.decor-group > summary .flabel { font-size: .87rem; flex: 1; }
+.decor-group[open] > summary .flabel { color: var(--accent); }
+.decor-group > summary .fcount {
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  color: var(--muted);
+  min-width: 2.6em;
+  text-align: right;
+}
+.decor-group > summary::after {
+  content: '';
+  width: 7px; height: 7px;
+  border-right: 1.6px solid var(--muted);
+  border-bottom: 1.6px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform var(--dur) var(--ease);
+  flex: none;
+}
+.decor-group[open] > summary::after { transform: rotate(45deg); }
+.decor-group .subfilter-list { margin-top: 2px; }
+
 /* ── Bestiaire (sidebar) ──────────────────────────────────────
    Familles repliables (details/summary), même vocabulaire visuel que les
    lignes de filtre (pastille .swatch-like, compteur mono, hover discret). */

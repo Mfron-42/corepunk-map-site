@@ -22,9 +22,17 @@ export default {
       loadingText: 'Знімання місцевості…',
       zonesLabel: 'Зони (регіони)',
       campLoading: 'Завантаження таборів…',
-      chestTypesTitle: 'Типи контейнерів',
+      decorFamiliesTitle: 'Категорії декору',
       chestTypesAllBtn: 'Усі',
       chestTypesNoneBtn: 'Жодного',
+      // Реорганізація контейнерів (DATA_CONTRACT.md): 2 реальних шари скринь
+      // + група "Декор" (legacy_chest/decor за категорією).
+      decorGroupLabel: 'Декор',
+      campChestLabel: 'Табірна скриня',
+      legacyChestLabel: 'Застаріла скриня зі скарбом',
+      lootGenericNote: 'Загальна здобич: єдиний відомий зв’язок здобичі цього контейнера — широкий обшукуваний пул, а не виділена таблиця здобичі — це не цільова фармована скриня.',
+      searchableChestTitle: 'Обшукувана скриня',
+      searchableChestRarityNote: 'Випадкова рідкість: рівень (звичайний/рідкісний/епічний…) визначається сервером у момент появи — не виводиться з даних клієнта.',
       noResults: 'Немає результатів.',
       noResultsHint: 'Спробуйте коротше слово або перевірте написання.',
       searchBodyHintPrefix: '› мета: ',
@@ -202,7 +210,11 @@ export default {
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
-      qao: 'Об’єкти квестів', workshop: 'Майстерні', chest: 'Скрині',
+      qao: 'Об’єкти квестів', workshop: 'Майстерні',
+      // Реорганізація контейнерів: старий єдиний шар "Скрині" (chest)
+      // прибрано, замінено цими 2 реальними шарами — див. DATA_CONTRACT.md
+      // §1/§3.1 та js/config.js CATS.
+      searchable_chest: 'Обшукувані скрині', camp_chest: 'Табірні скрині',
     },
     rarity: { Common: 'Звичайний', Uncommon: 'Незвичайний', Rare: 'Рідкісний', Epic: 'Епічний' },
     kind: { npc: 'НПС', object: 'Об’єкт', item: 'Предмет', other: '—' },
@@ -230,6 +242,14 @@ export default {
       workshop: 'Майстерня', camp: 'Табір', item: 'Предмет',
       monster: 'Монстр', zone: 'Регіон', location: 'Місце',
       ability: 'Здібність', event: 'Подія', chest: 'Скриня',
+      searchable_chest: 'Обшукувана скриня',
+    },
+    // Категорії декору (chests.bin group="decor" за family, + "legacy" для
+    // group="legacy_chest") — підрядки згортної групи "Декор"
+    // (js/sidebar.js buildDecorGroup), див. DATA_CONTRACT.md §3.1.
+    decorFamily: {
+      barrel: 'Бочки', boxes: 'Ящики', furniture: 'Меблі',
+      corpse: 'Трупи', books: 'Книги', misc: 'Різне', legacy: 'Застаріла скриня',
     },
     // "searchable" і "quest" переформульовано, щоб не читатися як
     // верхньорівневі статичні шари (cat.chest "Скрині" / cat.quest

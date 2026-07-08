@@ -5,6 +5,7 @@
 import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
+import { DECOR_FAMILIES } from './config.js';
 
 /* ── Chargement des données ─────────────────────────────────── */
 /* Chaque *.json de data/ est publié en .bin : un en-tête custom de 4 octets
@@ -33,21 +34,30 @@ async function fetchJson(path) {
    stay unprefixed (language-independent, shared, never duplicated). */
 const dataPath = name => `data/${S.lang}/${name}`;
 
-/* Sous-types de contenant placé (chests.bin `type` : Chest/Barrel/Boxes/
-   Cabinet/Kitchen/Corpse… — champ moteur réel, voir config.js chestTypeLabel
-   et data/SCHEMA.md "Chest loot + type") : compte chaque type présent et
-   reconstruit S.chestTypes en préservant l'état on/off précédent (même
-   principe que le prevOn de loadDeferred ci-dessous pour S.camps) — un type
-   déjà connu garde son cochage, un type nouvellement vu démarre coché (le
-   sous-filtre affiche tout par défaut). */
-function buildChestTypes(chests, prevOn = {}) {
+/* Groupe « Décor » (chests.bin `group==="decor"` par `family`, +
+   `group==="legacy_chest"` regroupé sous la clé fixe 'legacy') : compte
+   chaque famille présente et reconstruit S.decor en préservant l'état
+   on/off précédent (même principe que le prevOn de loadDeferred ci-dessous
+   pour S.camps) — une famille déjà connue garde son cochage, une famille
+   nouvellement vue démarre DÉCOCHÉE (Décor est masqué par défaut, voir
+   DATA_CONTRACT.md §3.1 — contrairement à l'ancien buildChestTypes qui
+   démarrait tout coché). camp_chest/searchable_chest n'entrent jamais ici :
+   ce sont désormais leurs propres couches de haut niveau (config.js CATS),
+   pas des sous-filtres. */
+function buildDecorGroups(chests, prevOn = {}) {
   const counts = {};
   for (const c of chests) {
-    const t = c.type || 'Chest';
-    counts[t] = (counts[t] || 0) + 1;
+    let fam = null;
+    if (c.group === 'decor') fam = c.family || 'misc';
+    else if (c.group === 'legacy_chest') fam = 'legacy';
+    else continue;
+    counts[fam] = (counts[fam] || 0) + 1;
   }
   const next = {};
-  for (const [t, count] of Object.entries(counts)) next[t] = { on: t in prevOn ? prevOn[t] : true, count };
+  for (const fam of DECOR_FAMILIES) {
+    if (!(fam in counts)) continue;
+    next[fam] = { on: fam in prevOn ? prevOn[fam] : false, count: counts[fam] };
+  }
   return next;
 }
 
@@ -56,16 +66,23 @@ function buildChestTypes(chests, prevOn = {}) {
    items). Coupe ~5,7 Mo (camps + recettes + vendeurs + fiches camp) du
    JSON chargé avant que le voile de chargement ne disparaisse. */
 async function loadCritical() {
-  const [npcs, pois, quests, qao, workshops, chests, meta, zonesGeo, zonesQuest, items] = await Promise.all([
+  const [npcs, pois, quests, qao, workshops, chests, searchableChests, meta, zonesGeo, zonesQuest, items] = await Promise.all([
     fetchJson(dataPath('npcs.bin')), fetchJson(dataPath('interest_points.bin')),
     fetchJson(dataPath('quests.bin')), fetchJson(dataPath('quest_objects.bin')),
     fetchJson(dataPath('workshops.bin')), fetchJson(dataPath('chests.bin')),
+    // Coffres fouillables réels (searchable_chests.bin, Kwalat racine
+    // seulement aujourd'hui — voir DATA_CONTRACT.md §2) : 404-tolérant, comme
+    // tout fichier optionnel par carte (autre carte sans ce fichier -> []).
+    fetchJson(dataPath('searchable_chests.bin')).catch(() => []),
     fetchJson(dataPath('site_meta.json')).catch(() => ({})),
     fetchJson(dataPath('zones_geo.bin')).catch(() => []),
     fetchJson(dataPath('zones_quest_geo.bin')).catch(() => ({})),
     fetchJson(dataPath('items.bin')).catch(() => ({})),
   ]);
-  S.data = { npc: npcs, poi: pois, quest: quests, qao, workshop: workshops, chest: chests };
+  S.data = {
+    npc: npcs, poi: pois, quest: quests, qao, workshop: workshops, chest: chests,
+    searchable_chest: searchableChests,
+  };
   S.meta = meta;
   S.zonesGeo = zonesGeo;
   S.zonesQuest = zonesQuest;
@@ -76,11 +93,11 @@ async function loadCritical() {
   // même garde Kwalat-only que S.camps dans loadDeferred ci-dessous, pour ne
   // pas perdre/écraser le sous-filtre de la carte réellement affichée.
   const kwPrevOn = {};
-  const kwPrevSrc = S.map === 'Kwalat' ? S.chestTypes : (S.mapCache.Kwalat && S.mapCache.Kwalat.chestTypes) || {};
-  for (const [t, st] of Object.entries(kwPrevSrc)) kwPrevOn[t] = st.on;
-  const kwChestTypes = buildChestTypes(chests, kwPrevOn);
-  if (S.mapCache.Kwalat) S.mapCache.Kwalat.chestTypes = kwChestTypes;
-  if (S.map === 'Kwalat') S.chestTypes = kwChestTypes;
+  const kwPrevSrc = S.map === 'Kwalat' ? S.decor : (S.mapCache.Kwalat && S.mapCache.Kwalat.decor) || {};
+  for (const [f, st] of Object.entries(kwPrevSrc)) kwPrevOn[f] = st.on;
+  const kwDecor = buildDecorGroups(chests, kwPrevOn);
+  if (S.mapCache.Kwalat) S.mapCache.Kwalat.decor = kwDecor;
+  if (S.map === 'Kwalat') S.decor = kwDecor;
   buildRarityGroups();    // regroupe les variantes de rareté « même nom » (voir rarity.js)
   lootTableIdx = null;    // index paresseux table→items (voir lootTableItems)
   quests.forEach(q => S.quests.set(q.slug, q));
@@ -223,5 +240,5 @@ function resetDeferred() { deferredReady = false; }
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
   resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems,
-  buildChestTypes,
+  buildDecorGroups,
 };

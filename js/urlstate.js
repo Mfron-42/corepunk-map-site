@@ -11,11 +11,10 @@ function buildHash() {
   const on = [
     ...Object.entries(CATS).filter(([, v]) => v.on).map(([k]) => k),
     ...Object.entries(S.camps).filter(([, v]) => v.on).map(([k]) => 'camp.' + k),
-    // Sous-filtre "types de contenant" (S.chestTypes, coché par défaut) —
-    // même principe camp.* ci-dessus : chaque type actuellement coché est
-    // listé tel quel, voir sidebar.js buildChestTypeSubfilter/data.js
-    // buildChestTypes.
-    ...Object.entries(S.chestTypes).filter(([, v]) => v.on).map(([k]) => 'ctype.' + k),
+    // Sous-filtre "Décor" (S.decor, décoché par défaut) — même principe
+    // camp.* ci-dessus : chaque famille actuellement cochée est listée
+    // telle quelle, voir sidebar.js buildDecorGroup/data.js buildDecorGroups.
+    ...Object.entries(S.decor).filter(([, v]) => v.on).map(([k]) => 'decor.' + k),
     ...(S.zonesOn ? ['zones'] : []),
     // Contenu dev révélé (feature #13, tag en bas du panneau — voir
     // main.js buildDevToggle) : même idiome que `zones` ci-dessus, un
@@ -69,11 +68,11 @@ function readHash() {
     // ligne ne fait que reprendre la même clé pour les navigations
     // ultérieures (popstate, hash édité à la main).
     S.devOn = onSet.has('devcontent');
-    // les clés camp.*/ctype.* de onSet sont réappliquées une fois les
+    // les clés camp.*/decor.* de onSet sont réappliquées une fois les
     // données correspondantes prêtes (camps : chargement différé, voir
-    // loadDeferred/whenDeferred ; types de contenant : voir router.js
-    // applyLocationState, appliqués juste après une éventuelle bascule de
-    // carte puisque S.chestTypes en dépend, voir data.js buildChestTypes).
+    // loadDeferred/whenDeferred ; Décor : voir router.js
+    // applyLocationState, appliqué juste après une éventuelle bascule de
+    // carte puisque S.decor en dépend, voir data.js buildDecorGroups).
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {

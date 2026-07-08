@@ -21,9 +21,17 @@ export default {
       loadingText: 'Relevé topographique en cours…',
       zonesLabel: 'Zones (régions)',
       campLoading: 'Chargement des camps…',
-      chestTypesTitle: 'Types de conteneurs',
+      decorFamiliesTitle: 'Familles de décor',
       chestTypesAllBtn: 'Tous',
       chestTypesNoneBtn: 'Aucun',
+      // Container re-categorization (DATA_CONTRACT.md) : les 2 vraies couches
+      // de coffres + le groupe "Décor" (legacy_chest/décor par famille).
+      decorGroupLabel: 'Décor',
+      campChestLabel: 'Coffre de camp',
+      legacyChestLabel: 'Coffre hérité (legacy)',
+      lootGenericNote: 'Butin générique : le seul lien de butin connu de ce contenant est un pool fouillable large, pas une table de butin dédiée — ce n’est pas un coffre farmable ciblé.',
+      searchableChestTitle: 'Coffre fouillable',
+      searchableChestRarityNote: 'Rareté aléatoire : le palier (commun/rare/épique…) est déterminé par le serveur à l’apparition — non déductible des données du client.',
       noResults: 'Aucun résultat.',
       noResultsHint: 'Essayez un mot plus court, ou vérifiez l’orthographe.',
       searchBodyHintPrefix: '› objectif : ',
@@ -208,7 +216,11 @@ export default {
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
-      qao: 'Objets de quête', workshop: 'Ateliers', chest: 'Coffres',
+      qao: 'Objets de quête', workshop: 'Ateliers',
+      // Container re-categorization : l'ancienne couche unique "Coffres"
+      // (chest) est retirée, remplacée par ces 2 vraies couches — voir
+      // DATA_CONTRACT.md §1/§3.1 et js/config.js CATS.
+      searchable_chest: 'Coffres fouillables', camp_chest: 'Coffres de camp',
     },
     rarity: { Common: 'Commun', Uncommon: 'Peu commun', Rare: 'Rare', Epic: 'Épique' },
     kind: { npc: 'PNJ', object: 'Objet', item: 'Item', other: '—' },
@@ -243,6 +255,14 @@ export default {
       workshop: 'Atelier', camp: 'Camp', item: 'Item',
       monster: 'Monstre', zone: 'Région', location: 'Lieu',
       ability: 'Capacité', event: 'Événement', chest: 'Coffre',
+      searchable_chest: 'Coffre fouillable',
+    },
+    // Familles de décor (chests.bin group="decor" par family, + "legacy"
+    // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"
+    // (js/sidebar.js buildDecorGroup) — voir DATA_CONTRACT.md §3.1.
+    decorFamily: {
+      barrel: 'Tonneaux', boxes: 'Caisses', furniture: 'Meubles',
+      corpse: 'Cadavres', books: 'Livres', misc: 'Divers', legacy: 'Coffre hérité',
     },
     // "searchable" et "quest" reformulés pour ne plus lire comme les couches
     // statiques de haut niveau (cat.chest "Coffres" / cat.quest "Quêtes") :

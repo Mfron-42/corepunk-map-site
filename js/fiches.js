@@ -10,8 +10,9 @@ import {
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campDisplayName, campLootTableName, catLabel, chestDisplayName,
+  campDisplayName, campLootTableName, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
+  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -62,31 +63,65 @@ function openCampFiche(key) {
   setFicheHash('camp', key);
 }
 
-/* Fiche coffre (S.data.chest, placements tc_*) : nom d'affichage = type
-   physique réel localisé (chestDisplayName, js/config.js — r.type est le vrai
-   classifieur chest_type du pipeline, jamais le nom brut d'asset d'art, non
-   localisé et bruité) + butin (même rendu lootRowsHtml que monstre/camp/item)
-   + bouton carte. La ligne de catégorie reste sobre (catLabel('chest') seul,
-   ex. "Coffres"/"Chests") : le type occupe déjà le h2, le répéter dans la
-   ligne du dessus serait une pure redite ("Coffres · Tonneau" au-dessus de
-   "Tonneau"). Pas de lien profond dédié (setFicheHash(null)) — même
-   traitement que openLocationFiche/openAbilityFiche : ~3830 marqueurs
-   individuels par skin de prop, pas un id stable qu'un lien partagé devrait
-   rouvrir (voir data/SCHEMA.md "Chest loot + type" sur pourquoi ces
-   marqueurs ne sont pas individuellement indexés en recherche non plus). */
+/* Fiche coffre (S.data.chest, placements tc_* : camp_chest/legacy_chest/
+   décor — voir DATA_CONTRACT.md §3) : nom d'affichage = type physique réel
+   localisé (chestDisplayName, js/config.js — r.type est le vrai classifieur
+   chest_type du pipeline, jamais le nom brut d'asset d'art, non localisé et
+   bruité) ; ligne de catégorie = la VRAIE catégorie du point (chestKindLabel
+   — "Coffre de camp" / "Décor — <famille>" / "Coffre hérité (legacy)",
+   jamais l'ancien catLabel('chest') générique qui conflait les 3) + butin
+   (même rendu lootRowsHtml que monstre/camp/item, avec une note honnête
+   quand r.lootGeneric — pool générique, pas une table curée) + bouton carte.
+   Pas de lien profond dédié (setFicheHash(null)) — même traitement que
+   openLocationFiche/openAbilityFiche : ~3830 marqueurs individuels par skin
+   de prop, pas un id stable qu'un lien partagé devrait rouvrir (voir
+   data/SCHEMA.md "Chest loot + type" sur pourquoi ces marqueurs ne sont pas
+   individuellement indexés en recherche non plus). */
 function openChestFiche(i) {
   const r = S.data.chest[i];
   if (!r) return;
   S.openFiche = { kind: 'chest', id: i };
   const name = chestDisplayName(r);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
+  // Note honnête (r.lootGeneric) : ce placement n'a AUCUNE table de butin
+  // dédiée — le seul lien de butin connu est un pool générique fouillable
+  // (lt_searchable*), pas une vraie table de coffre curée. Jamais présenté
+  // comme un coffre farmable ciblé (voir DATA_CONTRACT.md §1/§3).
+  const genericNote = r.lootGeneric ? `<p class="hint">${esc(tr('lootGenericNote'))}</p>` : '';
   openFiche(`
     <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(catLabel('chest'))}</div>
+      <div class="fiche-kind" style="color:${chestHex(r)}">${esc(chestKindLabel(r))}</div>
       <h2>${esc(name)}</h2></div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, name)}
     </div></div>
+    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${genericNote}${drops}</div>`);
+  setFicheHash(null);
+}
+
+/* Fiche « coffre fouillable » (searchable_chests.bin, poi_searchable_chest_*
+   — LE vrai coffre farmable de recette, distinct des placements chest
+   ci-dessus, voir DATA_CONTRACT.md §4) : région (jeton neutre prettifié,
+   aucun libellé fourni par les données) + note honnête sur la rareté
+   (`rarity` vaut TOUJOURS "random" côté données — le vrai palier est choisi
+   côté serveur au spawn, non décodable depuis le client) + la vraie table de
+   recette (loot, agrégée depuis les 13 lt_poi_chest_hidden_* du point). Pas
+   de lien profond dédié (setFicheHash(null)) — même traitement que
+   openChestFiche/openLocationFiche/openAbilityFiche ci-dessus/dessous. */
+function openSearchableChestFiche(k) {
+  const r = (S.data.searchable_chest || []).find(x => x.k === k);
+  if (!r) return;
+  S.openFiche = { kind: 'searchable_chest', id: k };
+  const region = prettyRegion(r.region);
+  const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
+  openFiche(`
+    <div class="fiche-head"><div>
+      <div class="fiche-kind" style="color:${CATS.searchable_chest.hex}">${esc(region)}</div>
+      <h2>${esc(tr('searchableChestTitle'))}</h2></div></div>
+    <div class="fiche-section"><div class="pop-actions">
+      ${gotoBtn(r.x, r.z, tr('searchableChestTitle'))}
+    </div></div>
+    <div class="fiche-section"><p class="hint">${esc(tr('searchableChestRarityNote'))}</p></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash(null);
 }
@@ -102,7 +137,7 @@ function openLootTableFiche(label) {
   const sorted = [...rows].sort((a, b) => (b.g - a.g) || ((b.w ?? 0) - (a.w ?? 0)));
   openFiche(`
     <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${CATS.chest.hex}">${esc(tr('lootTableKind'))}</div>
+      <div class="fiche-kind" style="color:${LOOT_TABLE_HEX}">${esc(tr('lootTableKind'))}</div>
       <h2>${esc(label)}</h2></div></div>
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
       ${sorted.length > 30 ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : ''}
@@ -1545,5 +1580,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  openChestFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
+  openChestFiche, openSearchableChestFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 };

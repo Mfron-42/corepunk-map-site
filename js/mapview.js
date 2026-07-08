@@ -90,7 +90,13 @@ function fastProject(t, x, z) {
 function renderDense(cat, points, color, popupFor) {
   const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
   g.clearLayers();
-  const st = cat.startsWith('camp:') ? S.camps[cat.slice(5)] : CATS[cat];
+  // Couches "camp:<kind>" (S.camps) et "decor:<famille>" (S.decor, groupe
+  // "Décor" — voir config.js DECOR_FAMILIES/js/sidebar.js buildDecorGroup) :
+  // même convention de préfixe, l'état on/off vit dans un dict à part plutôt
+  // que dans CATS (nombre de sous-couches variable, connu seulement une fois
+  // les données arrivées).
+  const st = cat.startsWith('camp:') ? S.camps[cat.slice(5)]
+    : cat.startsWith('decor:') ? S.decor[cat.slice(6)] : CATS[cat];
   if (!st || !st.on) return;
 
   const t = worldToPxTransform();

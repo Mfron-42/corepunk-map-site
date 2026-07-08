@@ -8,7 +8,7 @@
    coordonnées, hooks de bascule de carte, init. Seul module qui importe
    tout le monde ; aucune logique métier propre. */
 import { S } from './state.js';
-import { CATS, CAMP_COLORS } from './config.js';
+import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX } from './config.js';
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
@@ -16,10 +16,11 @@ import {
   denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred } from './data.js';
-import { popupHtml, questPopup, campPopup } from './popups.js';
+import { popupHtml, questPopup, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
+  openSearchableChestFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -40,7 +41,7 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
@@ -51,6 +52,7 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
   else if (b.dataset.act === 'fiche-chest') openChestFiche(+id.split(':')[1]);
+  else if (b.dataset.act === 'fiche-searchable-chest') openSearchableChestFiche(id);
   else if (b.dataset.act === 'camp-highlight') {
     // « Montre-moi TOUS les points de ce contenant » — toggle : un second
     // clic efface le surlignage sans fermer la fiche.
@@ -162,12 +164,29 @@ function registerAllDenseRenderers() {
     q => questPopup(q));
   registerDense('qao', () => S.data.qao.filter(p => !isHiddenTest(p)), CATS.qao.hex,
     p => popupHtml('qao', p, markerId('qao', S.data.qao.indexOf(p))));
-  // Sous-filtre par type de contenant (S.chestTypes, voir data.js
-  // buildChestTypes / sidebar.js buildChestTypeSubfilter) : un type absent de
-  // la table (ne devrait pas arriver, voir buildChestTypes) reste visible par
-  // défaut plutôt que de disparaître silencieusement.
-  registerDense('chest', () => S.data.chest.filter(p => S.chestTypes[p.type]?.on !== false), CATS.chest.hex,
+  // Coffres fouillables RÉELS (searchable_chests.bin, sa propre couche/son
+  // propre fichier — voir DATA_CONTRACT.md §2/§4) : couleur/popup dédiés,
+  // jamais confondus avec les placements chest ci-dessous.
+  registerDense('searchable_chest', () => S.data.searchable_chest || [], CATS.searchable_chest.hex,
+    r => searchableChestPopup(r));
+  // Coffres de camp RÉELS (S.data.chest `group==="camp_chest"`, skin
+  // sci_fi) : sa propre couche de haut niveau, ON par défaut (voir
+  // DATA_CONTRACT.md §3.1) — id de marqueur "chest:<i>" conservé (voir
+  // config.js chestHex/chestKindLabel) pour que Suivre/Fait/fiche-chest
+  // continuent de fonctionner sur ce même S.data.chest partagé.
+  registerDense('camp_chest', () => S.data.chest.filter(p => p.group === 'camp_chest'), CATS.camp_chest.hex,
     p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
+  // Décor (S.decor, groupe repliable/décoché par défaut — DATA_CONTRACT.md
+  // §1/§3.1) : une couche dense par famille, même convention que camp:<kind>
+  // ci-dessous (préfixe "decor:", voir mapview.js renderDense). 'legacy'
+  // regroupe group==="legacy_chest" (family réelle "greenville" ignorée ici,
+  // voir data.js buildDecorGroups) ; les 6 autres clés sont group==="decor"
+  // par family.
+  for (const fam of DECOR_FAMILIES) {
+    registerDense('decor:' + fam, () => S.data.chest.filter(p =>
+      fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)),
+      DECOR_HEX[fam], p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
+  }
   for (const kind of Object.keys(S.camps)) {
     registerDense('camp:' + kind, () => S.camps[kind].points,
       CAMP_COLORS[kind] || '#888', (p, n) => campPopup(p, n));

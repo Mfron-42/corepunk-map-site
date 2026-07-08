@@ -74,10 +74,10 @@ async function applyLocationState() {
     denseRenderers.forEach(fn => fn());
   };
   if (deferredReady) applyCampFilters(); else whenDeferred(applyCampFilters);
-  // Types de contenant (S.chestTypes) : contrairement aux camps, toujours
-  // prêts ici (chests fait partie du chemin critique / de la bascule de
-  // carte ci-dessus, jamais du chargement différé) — pas de garde whenDeferred.
-  if (onSet) for (const t of Object.keys(S.chestTypes)) S.chestTypes[t].on = onSet.has('ctype.' + t);
+  // Décor (S.decor) : contrairement aux camps, toujours prêt ici (chests
+  // fait partie du chemin critique / de la bascule de carte ci-dessus,
+  // jamais du chargement différé) — pas de garde whenDeferred.
+  if (onSet) for (const f of Object.keys(S.decor)) S.decor[f].on = onSet.has('decor.' + f);
   denseRenderers.forEach(fn => fn());
   buildFilters();
 

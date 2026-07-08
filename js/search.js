@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
-  catLabel, campDisplayName, chestTypeLabel, chestDisplayName,
+  catLabel, campDisplayName, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel,
   locationKindLabel, mapName,
 } from './config.js';
@@ -16,7 +16,7 @@ import { goTo } from './pins.js';
 import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
-  openMonsterFiche, openLocationFiche, openAbilityFiche,
+  openMonsterFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
 } from './fiches.js';
 import { isDeprecatedItem, rarityGroupFor } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
@@ -50,6 +50,7 @@ function itemBias(key, it) {
 const CAT_GLYPH = {
   npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦',
   monster: '🐾', zone: '🗺', location: '📖', ability: '✨', event: '⚑', chest: '🧰',
+  searchable_chest: '🗝',
 };
 const searchCatLabel = key => tbl('searchCat', key) || key;
 let searchIndex = [];
@@ -154,11 +155,13 @@ function buildSearch() {
       it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub, devSub].filter(Boolean).join(' · '),
       itemGlyph(it), itemBias(key, it));
   });
-  // Régions nommées (zonesGeo, chargé au critique — voir loadCritical) et
-  // coffres placés (S.data.chest, idem) : exhaustivité de la recherche
-  // demandée par la mission, ni l'un ni l'autre n'attend camps.json.
+  // Régions nommées (zonesGeo, chargé au critique — voir loadCritical),
+  // coffres placés (S.data.chest, idem) et coffres fouillables réels
+  // (S.data.searchable_chest, idem) : exhaustivité de la recherche demandée
+  // par la mission, aucun des trois n'attend camps.json.
   buildZoneSearchIndex();
   buildChestSearchIndex();
+  buildSearchableChestSearchIndex();
   // Monstres/bestiaire-lore/capacités nommées/événements + camps : ajoutés
   // une fois leurs jeux de données différés arrivés (voir loadDeferred) —
   // le tableau searchIndex est déjà branché sur la barre de recherche, un
@@ -192,9 +195,14 @@ function buildCrossMapSearch() {
     const hex = e.cat === 'quest' ? CATS.quest.hex
       : e.cat === 'npc' ? CATS.npc.hex
         : e.cat === 'qao' ? CATS.qao.hex
-          : e.cat === 'chest' ? CATS.chest.hex
-            : e.cat === 'workshop' ? CATS.workshop.hex
-              : e.cat === 'camp' ? (CAMP_COLORS[e.kind] || '#888') : '#8d99ae';
+          // Coffre placé cross-carte : pas de r complet ici (juste l'entrée
+          // légère search_index.bin, sans group/family) — repli neutre
+          // décor plutôt qu'un CATS.chest qui n'existe plus (voir
+          // DATA_CONTRACT.md §5 : group/family ne sont PAS dans l'index).
+          : e.cat === 'chest' ? '#6c757d'
+            : e.cat === 'searchable_chest' ? CATS.searchable_chest.hex
+              : e.cat === 'workshop' ? CATS.workshop.hex
+                : e.cat === 'camp' ? (CAMP_COLORS[e.kind] || '#888') : '#8d99ae';
     pushSearchEntry(e.label, e.cat, hex, e.x ?? null, e.z ?? null,
       () => crossMapOpen(e), null, null, null, 0, null, { map: e.map, ref: e.ref });
   }
@@ -250,9 +258,26 @@ function buildChestSearchIndex() {
     // heuristique sur le nom.
     const typeLabel = r.type ? chestTypeLabel(r.type) : null;
     const body = r.type ? [typeLabel, r.type] : null;
-    pushSearchEntry(chestSearchLabel(r), 'chest', CATS.chest.hex, r.x, r.z,
-      () => showHighlight(S.data.chest.filter(c => c.name === r.name), CATS.chest.hex),
+    // Couleur RÉELLE (chestHex — camp_chest/décor par famille/legacy, voir
+    // config.js) : un skin d'asset donné (r.name) est TOUJOURS de la même
+    // group/family, donc homogène pour tout le lot dédupliqué ci-dessus.
+    pushSearchEntry(chestSearchLabel(r), 'chest', chestHex(r), r.x, r.z,
+      () => showHighlight(S.data.chest.filter(c => c.name === r.name), chestHex(r)),
       null, typeLabel, null, 0, body, { ref: 'chest:' + r.name });
+  });
+}
+
+/* Coffres fouillables RÉELS (searchable_chests.bin, poi_searchable_chest_* —
+   voir DATA_CONTRACT.md §4) : chaque point de spawn a son propre id stable
+   (r.k) et sa propre région — contrairement aux placements chest ci-dessus
+   (aucun skin répété à dédoublonner), une entrée par point (487) reste
+   parfaitement lisible. Clic -> fiche complète (region + note de rareté +
+   recette), même que le clic sur le marqueur carte. */
+function buildSearchableChestSearchIndex() {
+  (S.data.searchable_chest || []).forEach(r => {
+    const region = prettyRegion(r.region);
+    pushSearchEntry(tr('searchableChestTitle'), 'searchable_chest', CATS.searchable_chest.hex, r.x, r.z,
+      () => openSearchableChestFiche(r.k), null, region, null, 0, null, { ref: 'searchable_chest:' + r.k });
   });
 }
 

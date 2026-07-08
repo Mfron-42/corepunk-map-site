@@ -1,7 +1,10 @@
 /* Kwalat — panneau latéral : filtres de couches, liste des camps, suivis
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, LS, save } from './state.js';
-import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, chestTypeLabel, chestDisplayName, mapName } from './config.js';
+import {
+  CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey,
+  chestDisplayName, chestHex, mapName, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion,
+} from './config.js';
 import { $, $$, esc, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
@@ -14,13 +17,22 @@ import { isHiddenTest } from './devcontent.js';
 function trackedTargetById(id) {
   const [cat, key] = id.split(':');
   if (cat === 'quest') { const q = S.quests.get(key); return q && { name: q.name, x: q.x, z: q.z, hex: CATS.quest.hex }; }
+  // Coffre fouillable réel (searchable_chests.bin) : id stable = sa clé de
+  // point (r.k, pas un index positionnel — tableau à part, voir data.js).
+  if (cat === 'searchable_chest') {
+    const r = (S.data.searchable_chest || []).find(x => x.k === key);
+    return r && { name: `${tr('searchableChestTitle')} — ${prettyRegion(r.region)}`, x: r.x, z: r.z, hex: CATS.searchable_chest.hex };
+  }
   const r = S.data[cat]?.[+key];
   if (!r) return null;
   // Coffre suivi ("Suivi"/tracked depuis son popup) : même nom d'affichage
   // que partout ailleurs (chestDisplayName) -- sinon la liste de suivi
   // aurait été le dernier endroit à encore montrer le nom brut d'asset d'art.
+  // Couleur RÉELLE (chestHex — camp_chest/décor par famille/legacy) plutôt
+  // que l'ancien CATS.chest générique (retiré, voir config.js).
   const name = cat === 'chest' ? chestDisplayName(r) : r.name;
-  return { name, x: r.x, z: r.z, hex: CATS[cat]?.hex || '#999' };
+  const hex = cat === 'chest' ? chestHex(r) : (CATS[cat]?.hex || '#999');
+  return { name, x: r.x, z: r.z, hex };
 }
 function toggleTrack(id, btn) {
   const i = S.tracked.findIndex(t => t.id === id);
@@ -72,73 +84,104 @@ function filterRow(key, label, hex, count, on, toggle, extraClass = '') {
   return li;
 }
 
-/* Sous-filtre « types de contenant » (S.chestTypes : type moteur réel ->
-   {on, count}, voir data.js buildChestTypes) — nichée sous la ligne de
-   catégorie "chest", visible seulement quand celle-ci est active. Les vrais
-   coffres (type "Chest") sont épinglés en tête et mis en avant (voir
-   .subfilter-featured, css/style.css) : c'est le type que la demande
-   utilisateur veut pouvoir isoler du reste des contenants (tonneaux,
-   caisses, meubles…). Rejouée (au lieu de reconstruite par buildFilters())
-   à chaque bascule chest on/off et à chaque clic Tous/Aucun — jamais de
-   perte de l'état on/off déjà coché ailleurs (S.chestTypes en est la seule
-   source de vérité, voir main.js registerDense('chest', …)). */
-function buildChestTypeSubfilter(parentLi) {
-  let sub = parentLi.querySelector('.subfilter-list');
-  if (!sub) {
-    sub = document.createElement('ul');
-    sub.className = 'subfilter-list';
-    parentLi.appendChild(sub);
-  }
-  sub.innerHTML = '';
-  const entries = Object.entries(S.chestTypes);
-  sub.hidden = !CATS.chest.on || !entries.length;
-  if (sub.hidden) return;
-  entries.sort(([ta, a], [tb, b]) => (tb === 'Chest') - (ta === 'Chest') || b.count - a.count);
+/* Effectif d'une catégorie de haut niveau (CATS) pour la ligne de filtre —
+   `camp_chest` n'a pas son propre tableau S.data (les points viennent du
+   même S.data.chest que la décor/legacy, filtrés par `group`, voir
+   config.js/main.js registerAllDenseRenderers) : seule exception à la règle
+   générale "un tableau S.data par clé CATS". */
+function catCount(key) {
+  if (key === 'quest') return S.data.quest.length;
+  if (key === 'camp_chest') return S.data.chest.filter(r => r.group === 'camp_chest').length;
+  return S.data[key].length;
+}
 
+/* Groupe « Décor » (S.decor : famille -> {on, count}, voir data.js
+   buildDecorGroups) — l'ancien "Coffres" catch-all conflait camp_chest/
+   legacy_chest/décor sous un seul filtre ; ce sont désormais les seuls
+   contenants qui restent ici, TOUS décochés par défaut (voir
+   DATA_CONTRACT.md §1/§3.1 — recommandation explicite du propriétaire :
+   l'ancienne couche unique "Coffres" était "le bordel"), mais toujours
+   pleinement recherchables (search.js buildChestSearchIndex ne filtre
+   jamais sur l'état on/off). <details> repliable (fermée par défaut, même
+   discipline que .bst-family) : pas un "master switch" — le on/off réel vit
+   sur CHAQUE sous-famille, jamais un simple bouton qui masquerait ce que les
+   sous-lignes disent vraiment. Rejouée à chaque bascule Tous/Aucun/famille
+   (jamais reconstruite par buildFilters() en entier), même discipline que
+   l'ancien buildChestTypeSubfilter. Retourne null si la carte active n'a
+   aucun contenant décor (S.decor vide). */
+function buildDecorGroup() {
+  const entries = DECOR_FAMILIES.map(f => [f, S.decor[f]]).filter(([, st]) => st);
+  if (!entries.length) return null;
+  const totalCount = entries.reduce((n, [, st]) => n + st.count, 0);
+
+  const li = document.createElement('li');
+  const det = document.createElement('details');
+  det.className = 'decor-group';
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<span class="swatch" style="background:${DECOR_HEX.misc}"></span>
+    <span class="flabel">${esc(tr('decorGroupLabel'))}</span>
+    <span class="fcount">${totalCount.toLocaleString(numberLocale())}</span>`;
+  det.appendChild(summary);
+
+  const sub = document.createElement('ul');
+  sub.className = 'subfilter-list';
   const head = document.createElement('li');
   head.className = 'subfilter-head';
-  head.innerHTML = `<span class="subf-title">${esc(tr('chestTypesTitle'))}</span>
+  head.innerHTML = `<span class="subf-title">${esc(tr('decorFamiliesTitle'))}</span>
     <span class="subf-actions">
       <button type="button" class="subf-btn" data-mode="all">${esc(tr('chestTypesAllBtn'))}</button>
       <button type="button" class="subf-btn" data-mode="none">${esc(tr('chestTypesNoneBtn'))}</button>
     </span>`;
   head.querySelector('[data-mode="all"]').addEventListener('click', () => {
-    for (const st of Object.values(S.chestTypes)) st.on = true;
-    scheduleRedraw(); syncHash(); buildChestTypeSubfilter(parentLi);
+    for (const [, st] of entries) st.on = true;
+    scheduleRedraw(); syncHash(); refreshDecorRows(sub, entries);
   });
   head.querySelector('[data-mode="none"]').addEventListener('click', () => {
-    for (const st of Object.values(S.chestTypes)) st.on = false;
-    scheduleRedraw(); syncHash(); buildChestTypeSubfilter(parentLi);
+    for (const [, st] of entries) st.on = false;
+    scheduleRedraw(); syncHash(); refreshDecorRows(sub, entries);
   });
   sub.appendChild(head);
-
-  for (const [type, st] of entries) {
-    const extra = 'filter-row-sub' + (type === 'Chest' ? ' subfilter-featured' : '');
-    sub.appendChild(filterRow('ctype:' + type, chestTypeLabel(type), CATS.chest.hex, st.count, st.on, on => {
+  for (const [fam, st] of entries) {
+    sub.appendChild(filterRow('decor:' + fam, decorFamilyLabel(fam), DECOR_HEX[fam], st.count, st.on, on => {
       st.on = on;
       scheduleRedraw();
-    }, extra));
+    }, 'filter-row-sub'));
   }
+  det.appendChild(sub);
+  li.appendChild(det);
+  return li;
+}
+/* Rafraîchit juste les cases à cocher des lignes famille après un
+   Tous/Aucun (évite de reconstruire tout le groupe, perdant l'état
+   open/fermé du <details>). */
+function refreshDecorRows(sub, entries) {
+  const rows = sub.querySelectorAll('.filter-row-sub');
+  entries.forEach(([, st], i) => {
+    const row = rows[i];
+    if (!row) return;
+    row.classList.toggle('off', !st.on);
+    const input = row.querySelector('input');
+    if (input) input.checked = st.on;
+  });
 }
 
 function buildFilters() {
   const ul = $('#filter-list');
   ul.innerHTML = '';
   for (const [key, c] of Object.entries(CATS)) {
-    const count = key === 'quest' ? S.data.quest.length : S.data[key].length;
-    const li = filterRow(key, catLabel(key), c.hex, count, c.on, on => {
+    const li = filterRow(key, catLabel(key), c.hex, catCount(key), c.on, on => {
       c.on = on;
       if (c.dense) scheduleRedraw();
       else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
-      if (key === 'chest') buildChestTypeSubfilter(li);
     });
     ul.appendChild(li);
-    if (key === 'chest') buildChestTypeSubfilter(li);
   }
   if (S.zonesGeo.length) {
     ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX,
       S.zonesGeo.length, S.zonesOn, toggleZones));
   }
+  const decorLi = buildDecorGroup();
+  if (decorLi) ul.appendChild(decorLi);
   const cl = $('#camp-list');
   if (!deferredReady) {
     cl.innerHTML = `<li class="hint camp-loading">${esc(tr('campLoading'))}</li>`;

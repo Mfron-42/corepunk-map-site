@@ -22,9 +22,17 @@ export default {
       loadingText: 'Съёмка местности…',
       zonesLabel: 'Зоны (регионы)',
       campLoading: 'Загрузка лагерей…',
-      chestTypesTitle: 'Типы контейнеров',
+      decorFamiliesTitle: 'Категории декора',
       chestTypesAllBtn: 'Все',
       chestTypesNoneBtn: 'Нет',
+      // Реорганизация контейнеров (DATA_CONTRACT.md): 2 реальных слоя
+      // сундуков + группа "Декор" (legacy_chest/decor по категории).
+      decorGroupLabel: 'Декор',
+      campChestLabel: 'Лагерный сундук',
+      legacyChestLabel: 'Устаревший сундук с сокровищами',
+      lootGenericNote: 'Общая добыча: единственная известная связь добычи этого контейнера — широкий обыскиваемый пул, а не выделенная таблица добычи — это не целевой фармящийся сундук.',
+      searchableChestTitle: 'Обыскиваемый сундук',
+      searchableChestRarityNote: 'Случайная редкость: уровень (обычный/редкий/эпический…) определяется сервером в момент появления — не выводится из данных клиента.',
       noResults: 'Нет результатов.',
       noResultsHint: 'Попробуйте более короткое слово или проверьте написание.',
       searchBodyHintPrefix: '› цель: ',
@@ -202,7 +210,11 @@ export default {
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
-      qao: 'Объекты заданий', workshop: 'Мастерские', chest: 'Сундуки',
+      qao: 'Объекты заданий', workshop: 'Мастерские',
+      // Реорганизация контейнеров: старый единый слой "Сундуки" (chest)
+      // убран, заменён этими 2 реальными слоями — см. DATA_CONTRACT.md
+      // §1/§3.1 и js/config.js CATS.
+      searchable_chest: 'Обыскиваемые сундуки', camp_chest: 'Лагерные сундуки',
     },
     rarity: { Common: 'Обычное', Uncommon: 'Необычное', Rare: 'Редкое', Epic: 'Эпическое' },
     kind: { npc: 'НПС', object: 'Объект', item: 'Предмет', other: '—' },
@@ -230,6 +242,14 @@ export default {
       workshop: 'Мастерская', camp: 'Лагерь', item: 'Предмет',
       monster: 'Монстр', zone: 'Регион', location: 'Место',
       ability: 'Способность', event: 'Событие', chest: 'Сундук',
+      searchable_chest: 'Обыскиваемый сундук',
+    },
+    // Категории декора (chests.bin group="decor" по family, + "legacy" для
+    // group="legacy_chest") — подстроки сворачиваемой группы "Декор"
+    // (js/sidebar.js buildDecorGroup), см. DATA_CONTRACT.md §3.1.
+    decorFamily: {
+      barrel: 'Бочки', boxes: 'Ящики', furniture: 'Мебель',
+      corpse: 'Трупы', books: 'Книги', misc: 'Разное', legacy: 'Устаревший сундук',
     },
     // "searchable" и "quest" переформулированы, чтобы не читаться как
     // верхнеуровневые статичные слои (cat.chest "Сундуки" / cat.quest
