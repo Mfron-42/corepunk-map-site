@@ -11,7 +11,16 @@ function buildHash() {
   const on = [
     ...Object.entries(CATS).filter(([, v]) => v.on).map(([k]) => k),
     ...Object.entries(S.camps).filter(([, v]) => v.on).map(([k]) => 'camp.' + k),
+    // Sous-filtre "types de contenant" (S.chestTypes, coché par défaut) —
+    // même principe camp.* ci-dessus : chaque type actuellement coché est
+    // listé tel quel, voir sidebar.js buildChestTypeSubfilter/data.js
+    // buildChestTypes.
+    ...Object.entries(S.chestTypes).filter(([, v]) => v.on).map(([k]) => 'ctype.' + k),
     ...(S.zonesOn ? ['zones'] : []),
+    // Contenu dev révélé (feature #13, tag en bas du panneau — voir
+    // main.js buildDevToggle) : même idiome que `zones` ci-dessus, un
+    // simple jeton dans `on=` plutôt qu'un paramètre dédié.
+    ...(S.devOn ? ['devcontent'] : []),
   ];
   let h = `#x=${Math.round(c.x)}&z=${Math.round(c.z)}&zm=${map.getZoom().toFixed(2)}&on=${on.join(',')}&lang=${S.lang}`;
   // `map=` n'est ajouté QUE hors Kwalat : les liens Kwalat existants restent
@@ -54,8 +63,17 @@ function readHash() {
     onSet = new Set(p.get('on').split(',').filter(Boolean));
     for (const k of Object.keys(CATS)) CATS[k].on = onSet.has(k);
     S.zonesOn = onSet.has('zones');
-    // les clés camp.* de onSet sont réappliquées une fois camps.json chargé
-    // (chargement différé — voir loadDeferred/whenDeferred dans init()).
+    // Contenu dev (feature #13) : état initial déjà résolu au chargement du
+    // module (voir state.js initialDevOn(), qui lit ce même jeton pour
+    // éviter une course avec buildSearch()/buildBestiary() au boot) — cette
+    // ligne ne fait que reprendre la même clé pour les navigations
+    // ultérieures (popstate, hash édité à la main).
+    S.devOn = onSet.has('devcontent');
+    // les clés camp.*/ctype.* de onSet sont réappliquées une fois les
+    // données correspondantes prêtes (camps : chargement différé, voir
+    // loadDeferred/whenDeferred ; types de contenant : voir router.js
+    // applyLocationState, appliqués juste après une éventuelle bascule de
+    // carte puisque S.chestTypes en dépend, voir data.js buildChestTypes).
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {

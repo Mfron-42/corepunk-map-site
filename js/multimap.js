@@ -4,7 +4,7 @@
    rejoue les hooks posés par main.js (fiches/recherche/filtres/couches). */
 import { S } from './state.js';
 import { KWALAT_DEFAULTS, mapName } from './config.js';
-import { fetchJson, dataPath } from './data.js';
+import { fetchJson, dataPath, buildChestTypes } from './data.js';
 import {
   map, worldBounds, setActiveMap, applyMapGeometry, denseRenderers,
 } from './mapview.js';
@@ -29,12 +29,12 @@ function onMapSwitch(fn) { mapSwitchHooks.push(fn); }
    camps + régions) — les catalogues globaux n'en font pas partie. */
 function captureMapState() {
   return {
-    data: S.data, quests: S.quests, camps: S.camps,
+    data: S.data, quests: S.quests, camps: S.camps, chestTypes: S.chestTypes,
     zonesGeo: S.zonesGeo, zonesQuest: S.zonesQuest,
   };
 }
 function applyMapState(s) {
-  S.data = s.data; S.quests = s.quests; S.camps = s.camps;
+  S.data = s.data; S.quests = s.quests; S.camps = s.camps; S.chestTypes = s.chestTypes || {};
   S.zonesGeo = s.zonesGeo; S.zonesQuest = s.zonesQuest;
 }
 
@@ -69,7 +69,7 @@ async function loadMapData(mid) {
   });
   const snap = {
     data: { npc: npcs, poi: [], quest: quests, qao, workshop: workshops, chest: chests },
-    quests: qmap, camps: campsState, zonesGeo: [], zonesQuest: {},
+    quests: qmap, camps: campsState, chestTypes: buildChestTypes(chests), zonesGeo: [], zonesQuest: {},
   };
   S.mapCache[mid] = snap;
   applyMapState(snap);

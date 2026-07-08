@@ -10,6 +10,11 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmtCoord = (x, z) => `x ${Math.round(x).toLocaleString(numberLocale())} · z ${Math.round(z).toLocaleString(numberLocale())}`;
 const pretty = k => (k || '').replace(/[_-]+/g, ' ').trim().replace(/^./, c => c.toUpperCase());
+/* Première lettre en majuscule, reste en minuscules (ex. "epic" -> "Epic",
+   "EPIC" -> "Epic") — capitalisation d'un token de rareté (rarity.js
+   buildRarityGroups, fiches.js bandRarityLabel/bandRarityHex), même règle
+   dans les deux cas. */
+const capitalize = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ── Repli d'image systématique ───────────────────────────────
@@ -90,4 +95,4 @@ function editLe(a, b, maxD) {
    recherche gardent la donnée brute. */
 const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '');
 
-export { $, $$, esc, fmtCoord, pretty, initials, itemGlyph, iconTag, reduceMotion, fold, editLe, cleanLabel };
+export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, reduceMotion, fold, editLe, cleanLabel };

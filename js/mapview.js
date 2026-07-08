@@ -121,9 +121,19 @@ function renderDense(cat, points, color, popupFor) {
   }
 
   for (const { p, n } of drawList) {
+    // Contenu dev révélé (feature #13 — p.isTest n'est jamais présent du
+    // tout tant que S.devOn est faux : le point n'a alors même pas atteint
+    // ce rendu, filtré en amont par le getPoints() du registerDense appelant,
+    // voir main.js registerAllDenseRenderers). Liseré rouge tireté au lieu du
+    // liseré neutre habituel -- même couleur que --danger (css/style.css),
+    // reprise en dur ici (marqueurs canvas Leaflet, pas de CSS applicable) --
+    // subtil mais suffisant pour distinguer un point de test sans lui
+    // inventer une toute nouvelle couche/catégorie de filtre.
+    const isDev = !!p.isTest;
     const mk = L.circleMarker(toLL(p.x, p.z), {
       renderer: canvasR, radius: n > 1 ? Math.min(6 + Math.log2(n) * 1.8, 13) : 4.6,
-      color: '#0a0e14', weight: 1.2, fillColor: color, fillOpacity: n > 1 ? .75 : .88,
+      color: isDev ? '#e0645c' : '#0a0e14', weight: isDev ? 1.8 : 1.2, dashArray: isDev ? '2,2' : null,
+      fillColor: color, fillOpacity: n > 1 ? .75 : .88,
     });
     if (n > 1) mk.bindTooltip('× ' + n, { direction: 'top', offset: [0, -6] });
     mk.bindPopup(() => popupFor(p, n), { maxWidth: 300 });

@@ -26,16 +26,18 @@ const TILE_BASE = 'https://mfron-42.github.io/corepunk-map-tiles';
    fort volume (voir renderDense). */
 /* Labels are resolved live via i18n.js (tbl()/catLabel() etc.) rather than
    stored here, so switching language never needs to rebuild these — only
-   the STRUCTURAL fields (color/hex/on/dense/domIcon) live in this file; the
-   token keys themselves (npc/poi/.../camp kind tokens) are the game's own
-   neutral identifiers, shipped as-is regardless of language. */
+   the STRUCTURAL fields (hex/on/dense) live in this file; the token keys
+   themselves (npc/poi/.../camp kind tokens) are the game's own neutral
+   identifiers, shipped as-is regardless of language. Which categories render
+   DOM portraits vs canvas dots is decided by main.js's registerDomDense/
+   registerDense call sites, not by a flag here. */
 const CATS = {
-  npc:      { color: 'var(--c-npc)',      hex: '#e0a23f', on: true,  dense: true, domIcon: true },
-  poi:      { color: 'var(--c-poi)',      hex: '#8fb4c9', on: true,  dense: true, domIcon: true },
-  quest:    { color: 'var(--c-quest)',    hex: '#c77dff', on: true,  dense: true  },
-  qao:      { color: 'var(--c-qao)',      hex: '#ff8fa3', on: false, dense: true  },
-  workshop: { color: 'var(--c-workshop)', hex: '#4cc9f0', on: true,  dense: true, domIcon: true },
-  chest:    { color: 'var(--c-chest)',    hex: '#ffd166', on: false, dense: true  },
+  npc:      { hex: '#e0a23f', on: true,  dense: true },
+  poi:      { hex: '#8fb4c9', on: true,  dense: true },
+  quest:    { hex: '#c77dff', on: true,  dense: true },
+  qao:      { hex: '#ff8fa3', on: false, dense: true },
+  workshop: { hex: '#4cc9f0', on: true,  dense: true },
+  chest:    { hex: '#ffd166', on: false, dense: true },
 };
 const catLabel = key => tbl('cat', key) || key;
 const CAMP_COLORS = {

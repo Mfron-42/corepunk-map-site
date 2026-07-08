@@ -21,6 +21,9 @@ export default {
       loadingText: 'Surveying the terrain…',
       zonesLabel: 'Zones (regions)',
       campLoading: 'Loading camps…',
+      chestTypesTitle: 'Container types',
+      chestTypesAllBtn: 'All',
+      chestTypesNoneBtn: 'None',
       noResults: 'No results.',
       noResultsHint: 'Try a shorter word, or check the spelling.',
       searchBodyHintPrefix: '› objective: ',
@@ -138,7 +141,6 @@ export default {
       noAbilitiesKnown: 'No known abilities for this monster.',
       noCampsKnown: 'No known camp for this monster.',
       familyMonstersTitle: n => `Monsters of this family (${n})`,
-      locationLabel: 'Place',
       abilityLabel: 'Ability',
       harvestTitle: 'Harvesting',
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
@@ -154,6 +156,17 @@ export default {
       // result search hint "N rarities".
       rarityVariantsLabel: 'Rarity',
       rarityVariantsCount: n => `${n} rarities`,
+      // Monster level/variant selector (feature #12 — a model groups all its
+      // levels/reskins together, see js/fiches.js monsterModelVariants) +
+      // grouped-result search hint "N variants", same idiom as
+      // rarityVariantsCount above.
+      monsterVariantsLabel: 'Level',
+      monsterVariantsCount: n => `${n} variants`,
+      // Dev/test content (feature #13, isTest:true hidden by default): reveal
+      // tag at the bottom of the panel + badge shown wherever revealed
+      // content is displayed (fiche, variant pill, bestiary, search).
+      devContentTag: n => `Dev content (${n})`,
+      devBadge: 'Test',
       // Roll ranges / weapon DPS / formulas / rune-chip scaling
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, see 

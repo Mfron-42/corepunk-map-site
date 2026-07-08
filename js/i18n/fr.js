@@ -21,6 +21,9 @@ export default {
       loadingText: 'Relevé topographique en cours…',
       zonesLabel: 'Zones (régions)',
       campLoading: 'Chargement des camps…',
+      chestTypesTitle: 'Types de conteneurs',
+      chestTypesAllBtn: 'Tous',
+      chestTypesNoneBtn: 'Aucun',
       noResults: 'Aucun résultat.',
       noResultsHint: 'Essayez un mot plus court, ou vérifiez l’orthographe.',
       searchBodyHintPrefix: '› objectif : ',
@@ -139,7 +142,6 @@ export default {
       noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
       noCampsKnown: 'Aucun camp connu pour ce monstre.',
       familyMonstersTitle: n => `Monstres de cette famille (${n})`,
-      locationLabel: 'Lieu',
       abilityLabel: 'Capacité',
       harvestTitle: 'Dépeçage',
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
@@ -155,6 +157,17 @@ export default {
       // de recherche « N raretés » sur le résultat regroupé.
       rarityVariantsLabel: 'Rareté',
       rarityVariantsCount: n => `${n} raretés`,
+      // Sélecteur de niveau/variante de monstre (feature #12, un modèle
+      // regroupe tous ses niveaux/reskins — voir js/fiches.js
+      // monsterModelVariants) + indice de recherche « N variantes » sur le
+      // résultat regroupé, même idiome que rarityVariantsCount ci-dessus.
+      monsterVariantsLabel: 'Niveau',
+      monsterVariantsCount: n => `${n} variantes`,
+      // Contenu dev/test (feature #13, isTest:true masqué par défaut) : tag
+      // de révélation en bas du panneau + badge apposé partout où du contenu
+      // révélé s'affiche (fiche, pastille de variante, bestiaire, recherche).
+      devContentTag: n => `Contenu dev (${n})`,
+      devBadge: 'Test',
       // Plages de jet / DPS d'arme / formules / mise à l'échelle rune-puce
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, voir 

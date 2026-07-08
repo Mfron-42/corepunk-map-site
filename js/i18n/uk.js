@@ -22,6 +22,9 @@ export default {
       loadingText: 'Знімання місцевості…',
       zonesLabel: 'Зони (регіони)',
       campLoading: 'Завантаження таборів…',
+      chestTypesTitle: 'Типи контейнерів',
+      chestTypesAllBtn: 'Усі',
+      chestTypesNoneBtn: 'Жодного',
       noResults: 'Немає результатів.',
       noResultsHint: 'Спробуйте коротше слово або перевірте написання.',
       searchBodyHintPrefix: '› мета: ',
@@ -138,7 +141,6 @@ export default {
       noAbilitiesKnown: 'Немає відомих здібностей у цього монстра.',
       noCampsKnown: 'Немає відомих таборів для цього монстра.',
       familyMonstersTitle: n => `Монстри цього виду (${n})`,
-      locationLabel: 'Місце',
       abilityLabel: 'Здібність',
       harvestTitle: 'Здобич',
       noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',
@@ -154,6 +156,17 @@ export default {
       // підказка пошуку «N рідкостей» на згрупованому результаті.
       rarityVariantsLabel: 'Рідкість',
       rarityVariantsCount: n => { const m = n % 100, u = n % 10; const w = (u === 1 && m !== 11) ? 'рідкість' : (u >= 2 && u <= 4 && (m < 12 || m > 14)) ? 'рідкості' : 'рідкостей'; return `${n} ${w}`; },
+      // Селектор рівня/варіанта монстра (feature #12 — модель об'єднує всі
+      // рівні/скіни однієї істоти, див. js/fiches.js monsterModelVariants) +
+      // підказка пошуку «N варіантів» на згрупованому результаті, той самий
+      // принцип, що й rarityVariantsCount вище.
+      monsterVariantsLabel: 'Рівень',
+      monsterVariantsCount: n => `${n} ${pluralSlavic(n, 'варіант', 'варіанти', 'варіантів')}`,
+      // Тестовий контент (feature #13, isTest:true прихований за
+      // замовчуванням): тег розкриття внизу панелі + позначка на будь-якому
+      // розкритому контенті (картка, пігулка варіанта, бестіарій, пошук).
+      devContentTag: n => `Тестовий контент (${n})`,
+      devBadge: 'Тест',
       // Діапазони характеристик / DPS зброї / формули / масштабування рун і
       // чипів (stat_ranges, weapon_dps, artifact_formula/formula,
       // rarity_scaling, tier_scaling) -- нове, див.

@@ -13,13 +13,14 @@ import {
   campDisplayName, campLootTableName, catLabel, chestTypeLabel,
   statLabel, statTierLabel, formulaTermLabel,
 } from './config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, cleanLabel } from './utils.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, toLL, canvasR, clearHighlight } from './mapview.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
+import { isHiddenTest } from './devcontent.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -194,9 +195,8 @@ function monsterStatsSection(m) {
    monsterStatsSection ci-dessus, qui a un mode "estimé" explicite — il n'y a
    pas d'équivalent pour ces données, un champ absent reste absent). */
 const RARITY_BANDS = ['common', 'uncommon', 'rare', 'epic'];
-const bandRarityCap = r => r.charAt(0).toUpperCase() + r.slice(1);
-const bandRarityLabel = r => rarityLabel(bandRarityCap(r)) || r;
-const bandRarityHex = r => RARITY[bandRarityCap(r)]?.hex || 'var(--muted)';
+const bandRarityLabel = r => rarityLabel(capitalize(r)) || r;
+const bandRarityHex = r => RARITY[capitalize(r)]?.hex || 'var(--muted)';
 
 /* Nombre générique (coefficients de formule, rarity_scaling/tier_scaling) :
    au plus 4 décimales, jamais de zéro de remplissage inventé -- la précision
@@ -258,15 +258,30 @@ function setRollRarity(key, rarity) {
   rollRarityState = { key, rarity };
   openItemFiche(key);
 }
+/* Une pastille "rar-pill" (allumée = span figé / éteinte = bouton cliquable)
+   -- helper partagé par les 3 sélecteurs qui utilisent ce composant visuel
+   (rareté de plage de jet ci-dessous, variantes de rareté d'objet et
+   variantes de monstre dans openItemFiche/monsterVariantPickHtml plus bas) :
+   même HTML span/button, seuls le libellé/la couleur/la cible data-act/id
+   changent d'un appelant à l'autre. */
+function pillHtml({ active, hex, label, act, id, extra = '', mark = '' }) {
+  return active
+    ? `<span class="rar-pill is-active" style="--chip-c:${hex}" aria-current="true"><span class="rar-dot"></span>${esc(label)}${mark}</span>`
+    : `<button type="button" class="rar-pill" style="--chip-c:${hex}" data-act="${act}" data-id="${esc(id)}"${extra}><span class="rar-dot"></span>${esc(label)}${mark}</button>`;
+}
+/* Enveloppe ".rar-select" partagée (libellé + groupe de pastilles) -- même
+   libellé utilisé pour le texte visible ET l'aria-label du groupe. */
+function pillSelectHtml(labelKey, pillsHtml) {
+  const label = esc(tr(labelKey));
+  return `<div class="rar-select"><span class="rar-select-label">${label}</span>
+    <div class="rar-pills" role="group" aria-label="${label}">${pillsHtml}</div></div>`;
+}
 function rollRarityPickHtml(key, active) {
-  const pills = RARITY_BANDS.map(r => {
-    const hex = bandRarityHex(r), label = bandRarityLabel(r);
-    return r === active
-      ? `<span class="rar-pill is-active" style="--chip-c:${hex}" aria-current="true"><span class="rar-dot"></span>${esc(label)}</span>`
-      : `<button type="button" class="rar-pill" style="--chip-c:${hex}" data-act="roll-rarity" data-id="${esc(key)}" data-r="${r}"><span class="rar-dot"></span>${esc(label)}</button>`;
-  }).join('');
-  return `<div class="rar-select"><span class="rar-select-label">${esc(tr('rarityVariantsLabel'))}</span>
-    <div class="rar-pills" role="group" aria-label="${esc(tr('rarityVariantsLabel'))}">${pills}</div></div>`;
+  const pills = RARITY_BANDS.map(r => pillHtml({
+    active: r === active, hex: bandRarityHex(r), label: bandRarityLabel(r),
+    act: 'roll-rarity', id: key, extra: ` data-r="${r}"`,
+  })).join('');
+  return pillSelectHtml('rarityVariantsLabel', pills);
 }
 /* DPS dérivé (arme uniquement) : produit des BORNES au même tier/rareté
    (min×min, max×max) -- borne exacte du produit de deux quantités positives
@@ -413,6 +428,61 @@ function scalingSection(it) {
   return parts.join('');
 }
 
+/* ── Modèle de monstre + sélecteur de niveau/variante (feature #12) ─────
+   Une créature (« modèle », site/data/<lang>/monster_models.bin) se décline
+   souvent en plusieurs niveaux/variantes — jusqu'à 917 groupes bruts au
+   total dans monsters.bin pour ~335 modèles — qui affichaient jusqu'ici UNE
+   FICHE PAR GROUPE, sans lien entre elles. openMonsterFiche(key) prend
+   toujours une clé de groupe précise (compat totale avec tous les appelants
+   existants : recherche, bestiaire, camps, quêtes, lien profond `mon=`) mais
+   affiche désormais la fiche du MODÈLE entier avec un sélecteur pour
+   changer de niveau/variante sans revenir à la recherche.
+
+   monsterModelVariants ne fait PAS confiance à monster_models.levels seul :
+   vérifié sur les données réelles, ce tableau exclut parfois de vraies
+   variantes non-test (reskins de même niveau — ex. trollfat_yellow_arena
+   partage model="trollfat" avec le canonique trollfat_green mais n'apparaît
+   pas dans model.levels ; à l'inverse, le seul niveau listé pour
+   oldman_soldier_blade est lui-même isTest). La source de vérité est donc
+   TOUJOURS S.monsters filtré par `m.model` — monster_models ne sert qu'à
+   trouver canonicalSiteKey (repli d'affichage, voir search.js
+   buildMonsterSearchIndex), jamais à décider quelles variantes existent. */
+function monsterModelVariants(modelKey, activeKey) {
+  const out = [];
+  for (const [key, m] of Object.entries(S.monsters)) {
+    if (m.model !== modelKey) continue;
+    // Contenu dev (feature #13) : une variante isTest reste masquée DE LA
+    // LISTE des pastilles sauf si S.devOn est vrai OU qu'elle est la
+    // variante ACTIVEMENT affichée (jamais masquer ce qu'on montre déjà,
+    // même via un lien profond partagé avant tout clic sur le tag « Contenu
+    // dev » — voir js/devcontent.js isHiddenTest).
+    if (key !== activeKey && isHiddenTest(m)) continue;
+    out.push({ key, m });
+  }
+  out.sort((a, b) => (a.m.level ?? 99) - (b.m.level ?? 99) || a.key.localeCompare(b.key));
+  return out;
+}
+/* Sélecteur -- même composant visuel que le sélecteur de rareté (#6,
+   rar-select/rar-pills/rar-pill, voir rollRarityPickHtml/rarity.js), mais
+   l'axe n'est pas la rareté : neutre (MONSTER_HEX partout, pas de code
+   couleur par pastille — il n'y a pas d'équivalent rareté ici). Une seule
+   variante -> aucun sélecteur (rien à choisir). Deux variantes qui partagent
+   EXACTEMENT le même niveau (reskins, ex. trollfat vert/jaune) affichent
+   chacune leur propre nom en plus du niveau pour rester distinguables (sinon
+   deux pastilles identiques "niv 20" côte à côte, illisible) ; marqueur
+   "dev" (feature #13) sur les variantes isTest visibles. */
+function monsterVariantPickHtml(activeKey, variants, model) {
+  if (variants.length < 2) return '';
+  const pills = variants.map(({ key, m }) => {
+    const lvl = m.level != null ? tr('levelAbbrev', m.level) : null;
+    const distinctName = model?.name && fold(m.name) !== fold(model.name) ? m.name : null;
+    const label = [lvl, distinctName].filter(Boolean).join(' · ') || pretty(key);
+    const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
+    return pillHtml({ active: key === activeKey, hex: MONSTER_HEX, label, act: 'fiche-monster', id: key, mark: devMark });
+  }).join('');
+  return pillSelectHtml('monsterVariantsLabel', pills);
+}
+
 /* Fiche monstre : niveau/famille/type d'attaque, tags lisibles, butin AU KILL
    (taux garanti/×N/%, item cliquable -> fiche item, même rendu que
    openCampFiche/openItemFiche ci-dessus) SÉPARÉ du butin de DÉPEÇAGE
@@ -428,9 +498,21 @@ function openMonsterFiche(key) {
   const m = S.monsters[key];
   if (!m) return;
   S.openFiche = { kind: 'monster', id: key };
+  // Modèle + sélecteur de niveau/variante (feature #12, voir
+  // monsterModelVariants/monsterVariantPickHtml ci-dessus) : `key` reste la
+  // variante ACTIVEMENT affichée (tout le corps de la fiche ci-dessous décrit
+  // TOUJOURS `m`, jamais le modèle abstrait), le sélecteur ne fait que
+  // proposer les autres niveaux/variantes du même modèle.
+  const modelKey = m.model || key;
+  const model = S.monsterModels[modelKey] || null;
+  const variantSelectHtml = monsterVariantPickHtml(key, monsterModelVariants(modelKey, key), model);
   const icon = m.icon ? `icons/${m.icon}` : null;
   const kindBits = [m.family ? pretty(m.family) : null, m.level != null ? tr('levelAbbrev', m.level) : null,
     m.attack ? monsterAttackLabel(m.attack) : null].filter(Boolean);
+  // Contenu dev (feature #13) : marqueur explicite quand la variante
+  // ACTIVEMENT affichée est isTest (toujours ouvrable par lien profond direct,
+  // voir monsterModelVariants -- jamais un 404 silencieux, juste marqué).
+  const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
   const kindLine = (kindBits.join(' · ') || tr('monsterLabel')) + (m.variants > 1 ? tr('variantsNote', m.variants) : '');
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
@@ -476,8 +558,9 @@ function openMonsterFiche(key) {
 
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', initials(m.name))}
-      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}</div>
+      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}${devMark}</div>
       <h2>${esc(m.name)}</h2></div></div>
+    ${variantSelectHtml}
     ${tagsHtml}
     ${statsHtml}
     ${lootHtml}
@@ -755,22 +838,12 @@ function openNpcFiche(idx) {
    clé est connue du catalogue (site/data/items.json) ; sinon repli fidèle au
    rendu historique (nom prettifié, non cliquable). */
 function itemColor(it) { return (it && RARITY[it.rarity]?.hex) || 'var(--muted)'; }
-function itemChip(key) {
-  const it = S.items[key];
-  const name = it ? it.name : pretty(key);
-  const icon = it?.icon ? `icons/${it.icon}` : null;
-  const attrs = it ? ` data-act="fiche-item" data-id="${esc(key)}"` : '';
-  return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', itemGlyph(it))}${esc(name)}</span>`;
-}
-function chipList(keys) {
-  return (keys || []).map(itemChip).join('');
-}
-/* Chip QUANTIFIÉE ({key, count}) — même rendu que itemChip mais avec un
-   suffixe "×N" (recette : ingrédients ; récompense de quête : items
-   toujours donnés/au choix). Partagée entre les deux au lieu de dupliquer
-   le rendu : la forme {key, count} est identique dans les deux cas (voir
+/* Chip QUANTIFIÉE ({key, count}) — rendu commun ingrédient de recette /
+   récompense de quête, avec un suffixe "×N" au-delà de count 1 (voir
     pour les ingrédients et
-    pour les récompenses fixes/au choix). */
+    pour les récompenses fixes/au choix). itemChip
+   (une simple clé, jamais de suffixe de quantité) n'en est qu'un appel avec
+   count omis -- même rendu, pas de duplication. */
 function qtyItemChip(entry) {
   const key = entry.key, count = entry.count;
   const it = S.items[key];
@@ -780,6 +853,7 @@ function qtyItemChip(entry) {
   const qty = count > 1 ? `<span class="chip-qty">×${count}</span>` : '';
   return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', itemGlyph(it))}${esc(name)}${qty}</span>`;
 }
+function itemChip(key) { return qtyItemChip({ key }); }
 function qtyChipList(list) {
   return (list || []).map(qtyItemChip).join('');
 }
@@ -1118,6 +1192,10 @@ function openItemFiche(key) {
   const rarity = RARITY[it.rarity];
   const itemKindText = itemKindLabel(it.kind) || pretty(it.kind || 'item');
   const kindHex = rarity ? rarity.hex : 'var(--muted)';
+  // Contenu dev (feature #13) : marqueur explicite sur un item isTest ouvert
+  // (toujours ouvrable par lien profond direct, jamais un 404 silencieux —
+  // seule sa présence dans la RECHERCHE dépend de S.devOn, voir search.js).
+  const devMark = it.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
 
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
@@ -1259,20 +1337,13 @@ function openItemFiche(key) {
     const rars = Object.keys(grp.variants).sort((a, b) => RARITY_ORDER[a] - RARITY_ORDER[b]);
     const pills = rars.map(r => {
       const vk = grp.variants[r];
-      const hex = RARITY[r]?.hex || 'var(--muted)';
-      const label = rarityLabel(r) || r;
-      return vk === key
-        ? `<span class="rar-pill is-active" style="--chip-c:${hex}" aria-current="true"><span class="rar-dot"></span>${esc(label)}</span>`
-        : `<button type="button" class="rar-pill" style="--chip-c:${hex}" data-act="fiche-item" data-id="${esc(vk)}"><span class="rar-dot"></span>${esc(label)}</button>`;
+      return pillHtml({ active: vk === key, hex: RARITY[r]?.hex || 'var(--muted)', label: rarityLabel(r) || r, act: 'fiche-item', id: vk });
     }).join('');
-    raritySelectHtml = `<div class="rar-select">
-      <span class="rar-select-label">${esc(tr('rarityVariantsLabel'))}</span>
-      <div class="rar-pills" role="group" aria-label="${esc(tr('rarityVariantsLabel'))}">${pills}</div>
-    </div>`;
+    raritySelectHtml = pillSelectHtml('rarityVariantsLabel', pills);
   }
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
-      <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}</div>
+      <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}</div>
       <h2>${esc(it.name)}</h2>
       ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>

@@ -21,6 +21,9 @@ export default {
       loadingText: 'Levantamiento del terreno…',
       zonesLabel: 'Zonas (regiones)',
       campLoading: 'Cargando campamentos…',
+      chestTypesTitle: 'Tipos de contenedores',
+      chestTypesAllBtn: 'Todos',
+      chestTypesNoneBtn: 'Ninguno',
       noResults: 'Sin resultados.',
       noResultsHint: 'Prueba con una palabra más corta o revisa la ortografía.',
       searchBodyHintPrefix: '› objetivo: ',
@@ -138,7 +141,6 @@ export default {
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
       noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
       familyMonstersTitle: n => `Monstruos de esta familia (${n})`,
-      locationLabel: 'Lugar',
       abilityLabel: 'Habilidad',
       harvestTitle: 'Recolección',
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
@@ -154,6 +156,18 @@ export default {
       // + pista de búsqueda «N rarezas» en el resultado agrupado.
       rarityVariantsLabel: 'Rareza',
       rarityVariantsCount: n => `${n} rarezas`,
+      // Selector de nivel/variante de monstruo (feature #12 — un modelo
+      // agrupa todos sus niveles/reskins, ver js/fiches.js
+      // monsterModelVariants) + pista de búsqueda «N variantes» en el
+      // resultado agrupado, mismo idioma que rarityVariantsCount arriba.
+      monsterVariantsLabel: 'Nivel',
+      monsterVariantsCount: n => `${n} variantes`,
+      // Contenido de prueba (feature #13, isTest:true oculto por defecto):
+      // etiqueta de revelación al fondo del panel + insignia mostrada donde
+      // sea que aparezca contenido revelado (ficha, píldora de variante,
+      // bestiario, búsqueda).
+      devContentTag: n => `Contenido de prueba (${n})`,
+      devBadge: 'Prueba',
       // Rangos de tirada / DPS de arma / fórmulas / escalado de runas y chips
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- nuevo, ver  +

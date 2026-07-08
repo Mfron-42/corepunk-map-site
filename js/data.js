@@ -33,6 +33,24 @@ async function fetchJson(path) {
    stay unprefixed (language-independent, shared, never duplicated). */
 const dataPath = name => `data/${S.lang}/${name}`;
 
+/* Sous-types de contenant placé (chests.bin `type` : Chest/Barrel/Boxes/
+   Cabinet/Kitchen/Corpse… — champ moteur réel, voir config.js chestTypeLabel
+   et data/SCHEMA.md "Chest loot + type") : compte chaque type présent et
+   reconstruit S.chestTypes en préservant l'état on/off précédent (même
+   principe que le prevOn de loadDeferred ci-dessous pour S.camps) — un type
+   déjà connu garde son cochage, un type nouvellement vu démarre coché (le
+   sous-filtre affiche tout par défaut). */
+function buildChestTypes(chests, prevOn = {}) {
+  const counts = {};
+  for (const c of chests) {
+    const t = c.type || 'Chest';
+    counts[t] = (counts[t] || 0) + 1;
+  }
+  const next = {};
+  for (const [t, count] of Object.entries(counts)) next[t] = { on: t in prevOn ? prevOn[t] : true, count };
+  return next;
+}
+
 /* Chemin critique : tout ce qu'il faut pour la première peinture (carte,
    panneau, recherche PNJ/POI/quêtes/objets, fiche quête complète avec ses
    items). Coupe ~5,7 Mo (camps + recettes + vendeurs + fiches camp) du
@@ -52,6 +70,17 @@ async function loadCritical() {
   S.zonesGeo = zonesGeo;
   S.zonesQuest = zonesQuest;
   S.items = items;
+  // Ces coffres sont TOUJOURS ceux de Kwalat (racine, voir dataPath) même si
+  // une autre carte est active (setLang() écrase S.data juste après avec le
+  // bundle de la carte active via reloadActiveMapForLang → loadMapData) —
+  // même garde Kwalat-only que S.camps dans loadDeferred ci-dessous, pour ne
+  // pas perdre/écraser le sous-filtre de la carte réellement affichée.
+  const kwPrevOn = {};
+  const kwPrevSrc = S.map === 'Kwalat' ? S.chestTypes : (S.mapCache.Kwalat && S.mapCache.Kwalat.chestTypes) || {};
+  for (const [t, st] of Object.entries(kwPrevSrc)) kwPrevOn[t] = st.on;
+  const kwChestTypes = buildChestTypes(chests, kwPrevOn);
+  if (S.mapCache.Kwalat) S.mapCache.Kwalat.chestTypes = kwChestTypes;
+  if (S.map === 'Kwalat') S.chestTypes = kwChestTypes;
   buildRarityGroups();    // regroupe les variantes de rareté « même nom » (voir rarity.js)
   lootTableIdx = null;    // index paresseux table→items (voir lootTableItems)
   monsterZonesIdx = null; // les zones (zonesGeo) viennent d'être rechargées (voir monsterZones)
@@ -68,12 +97,18 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, locations, abilities, events] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, locations, abilities, events] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
     fetchJson(dataPath('vendors.bin')).catch(() => ({})),
     fetchJson(dataPath('monsters.bin')).catch(() => ({})),
+    // Modèles de monstre (feature #12 — un modèle regroupe tous les niveaux/
+    // variantes d'une même créature ; voir data/SCHEMA.md, js/fiches.js
+    // openMonsterFiche « fiche modèle + sélecteur de variante »). Chargé ici
+    // (déferré) plutôt qu'au critique : jamais consulté avant la première
+    // fiche/recherche monstre, comme monsters.bin lui-même.
+    fetchJson(dataPath('monster_models.bin')).catch(() => ({})),
     fetchJson(dataPath('locations.bin')).catch(() => []),
     fetchJson(dataPath('abilities.bin')).catch(() => ({})),
     fetchJson(dataPath('events.bin')).catch(() => []),
@@ -82,6 +117,7 @@ async function loadDeferred() {
   S.recipes = recipes;
   S.vendors = vendors;
   S.monsters = monsters;
+  S.monsterModels = monsterModels;
   S.locations = locations;
   S.abilities = abilities;
   S.events = events;
@@ -224,5 +260,5 @@ function resetDeferred() { deferredReady = false; }
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
   resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems,
-  monsterZones,
+  monsterZones, buildChestTypes,
 };

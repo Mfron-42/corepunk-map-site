@@ -3,6 +3,25 @@
 import { LANG } from './i18n/index.js';
 
 const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', sections: 'cpmap_sections' };
+
+/* Lecture synchrone du hash pour `devcontent` (feature #13 — contenu isTest
+   masqué par défaut) : même principe que LANG ci-dessus (i18n/index.js
+   detectInitialLang), résolu une fois AVANT que buildSearch()/buildBestiary()
+   ne tournent au boot (main.js init()). Sans ça, un lien partagé avec le tag
+   déjà révélé perdrait la course avec urlstate.js readHash() (qui ne
+   s'exécute qu'à la toute fin de applyLocationState()) : la recherche/le
+   bestiaire se construiraient une première fois avec S.devOn encore à son
+   défaut `false`, et resteraient figés ainsi (voir js/devcontent.js pour le
+   reste du filtre, main.js buildDevToggle() pour le bouton). readHash()
+   reprend la même clé à chaque navigation ultérieure (popstate) — ce
+   lecteur-ci ne sert qu'à l'état initial. */
+function initialDevOn() {
+  try {
+    const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+    return (p.get('on') || '').split(',').includes('devcontent');
+  } catch (e) { return false; }
+}
+
 /* ── État ───────────────────────────────────────────────────── */
 const S = {
   lang: LANG,               // code langue actif (fr/en — résolu par site/js/i18n.js)
@@ -11,6 +30,9 @@ const S = {
   tracked: JSON.parse(localStorage.getItem(LS.tracked) || '[]'),
   done: new Set(JSON.parse(localStorage.getItem(LS.done) || '[]')),
   camps: {},                // kind -> {on, points, group}
+  chestTypes: {},           // type de contenant placé (Chest/Barrel/Boxes…) -> {on, count}
+                            // — sous-filtre de la catégorie "chest", voir data.js buildChestTypes()
+                            // et js/sidebar.js buildChestTypeSubfilter()
   ping: null,
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}
@@ -25,6 +47,11 @@ const S = {
   recipes: {},              // clé de recette -> {name, icon, output, ingredients}
   vendors: {},              // clé de vendeur -> {name, npcs, sells}
   monsters: {},             // clé de monstre (variante représentative) -> fiche
+  monsterModels: {},        // clé de modèle -> {name, family?, canonicalSiteKey?, levels:[{level,tier?,siteKey}]}
+                            // (site/data/<lang>/monster_models.bin, feature #12 — voir data.js loadDeferred
+                            // et js/fiches.js openMonsterFiche « fiche modèle + sélecteur de variante »)
+  devOn: initialDevOn(),    // révèle le contenu isTest (monstres/items/objets de quête/quêtes, feature #13)
+                            // — masqué par défaut, voir js/devcontent.js + main.js buildDevToggle()
   locations: [],            // bestiaire/lore (MapMarkers.xml), index = id de recherche/fiche
   abilities: {},            // clé de capacité (nommées seulement) -> fiche
   events: [],               // événements de monde nommés

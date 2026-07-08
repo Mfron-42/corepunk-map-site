@@ -28,6 +28,7 @@ import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } f
 import { buildHash, syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearPing, clearLocator } from './pins.js';
 import { applyLocationState } from './router.js';
+import { isHiddenTest, devContentCounts } from './devcontent.js';
 
 let highlightedCampKey = null;   // toggle du bouton « Surligner les N points »
 
@@ -149,11 +150,22 @@ function registerAllDenseRenderers() {
     (r, i) => { pushFocusState(); openNpcFiche(i); });
   registerDomDense('poi', 'interest_points', (r, id) => popupHtml('poi', r, id));
   registerDomDense('workshop', 'npc_map', (r, id) => popupHtml('workshop', r, id)); // ateliers : pictogramme couleur, pas d'icône dédiée
-  registerDense('quest', () => S.data.quest.filter(q => q.x != null), CATS.quest.hex,
+  // Contenu dev (feature #13) : quêtes/objets de quête isTest masqués de la
+  // carte par défaut (S.devOn faux) -- ces deux couches sont les SEULES du
+  // site où un enregistrement isTest porte un marqueur individuel (monstres/
+  // items n'ont pas de couche carte propre, voir js/devcontent.js). Le point
+  // gardé isTest:true (jamais retiré de l'objet, juste laissé passer le
+  // filtre quand S.devOn est vrai) pilote le liseré tireté de mapview.js
+  // renderDense.
+  registerDense('quest', () => S.data.quest.filter(q => q.x != null && !isHiddenTest(q)), CATS.quest.hex,
     q => questPopup(q));
-  registerDense('qao', () => S.data.qao, CATS.qao.hex,
+  registerDense('qao', () => S.data.qao.filter(p => !isHiddenTest(p)), CATS.qao.hex,
     p => popupHtml('qao', p, markerId('qao', S.data.qao.indexOf(p))));
-  registerDense('chest', () => S.data.chest, CATS.chest.hex,
+  // Sous-filtre par type de contenant (S.chestTypes, voir data.js
+  // buildChestTypes / sidebar.js buildChestTypeSubfilter) : un type absent de
+  // la table (ne devrait pas arriver, voir buildChestTypes) reste visible par
+  // défaut plutôt que de disparaître silencieusement.
+  registerDense('chest', () => S.data.chest.filter(p => S.chestTypes[p.type]?.on !== false), CATS.chest.hex,
     p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
   for (const kind of Object.keys(S.camps)) {
     registerDense('camp:' + kind, () => S.camps[kind].points,
@@ -170,6 +182,47 @@ function renderDataDate() {
   let p = foot.querySelector('.data-date');
   if (!p) { p = document.createElement('p'); p.className = 'data-date'; foot.appendChild(p); }
   p.textContent = tr('dataGeneratedAt', S.meta.generated.split(' ')[0]);
+}
+
+/* Étiquette « Contenu dev » (feature #13) — tout en bas du panneau, dans le
+   pied (.panel-foot, dernier bloc du drawer gauche) : bascule S.devOn ET
+   republie TOUT ce qui en dépend en un seul geste, même discipline que
+   setLang() plus haut (jamais une mutation isolée qui laisserait une partie
+   de l'UI dans l'ancien état) -- couches carte qao/quête (isTest masqué/
+   révélé), recherche (monstres/items/objets de quête/quêtes), bestiaire, et
+   la fiche ouverte si elle affichait des variantes de monstre. N'existe pas
+   du tout tant qu'aucun contenu isTest n'est connu (compte à 0 avant que
+   items/qao/quête ne soient chargés au tout premier appel du boot -- voir
+   points d'appel dans init()/setLang()/loadDeferred().then ci-dessous) :
+   rien à révéler, rien à afficher, pas de bouton fantôme. */
+function buildDevToggle() {
+  const foot = document.querySelector('.panel-foot');
+  if (!foot) return;
+  const counts = devContentCounts();
+  let btn = foot.querySelector('.dev-toggle');
+  if (!counts.total) { btn?.remove(); return; }
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'dev-toggle';
+    btn.addEventListener('click', () => {
+      S.devOn = !S.devOn;
+      registerAllDenseRenderers();
+      denseRenderers.forEach(fn => fn());
+      buildSearch();
+      buildBestiary();
+      buildDevToggle();
+      syncHash();
+      // La fiche ouverte peut afficher un sélecteur de variantes de monstre
+      // (feature #12) dont la liste dépend elle aussi de S.devOn -- la
+      // rafraîchir republie les pastilles avec le contenu qui vient d'être
+      // montré/masqué, sans perdre la variante actuellement affichée.
+      if (S.openFiche?.kind === 'monster') openMonsterFiche(S.openFiche.id);
+    });
+    foot.appendChild(btn);
+  }
+  btn.classList.toggle('is-on', S.devOn);
+  btn.textContent = tr('devContentTag', counts.total);
 }
 
 /* Bascule complète de langue : recharge le jeu de données (site/data/<lang>/)
@@ -201,6 +254,7 @@ async function setLang(code) {
   buildSearch();
   renderTracked();
   renderDataDate();
+  buildDevToggle();
   if (S.zoneLayer) map.removeLayer(S.zoneLayer);
   buildZoneLayer();
   if (S.zonesOn) map.addLayer(S.zoneLayer);
@@ -210,6 +264,7 @@ async function setLang(code) {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
     buildBestiary();   // libellés de familles/zones dans la nouvelle langue
+    buildDevToggle();  // le compte de monstres isTest n'est connu qu'ici
   });
 }
 /* ── Démarrage ──────────────────────────────────────────────── */
@@ -241,6 +296,7 @@ async function setLang(code) {
     registerAllDenseRenderers();
     buildFilters();
     buildSearch();
+    buildDevToggle();   // compte qao/quête isTest propre à la carte qui vient d'être chargée
   });
 
   buildFilters();
@@ -248,6 +304,7 @@ async function setLang(code) {
   renderTracked();
   renderDataDate();
   buildBestiary();   // indication de chargement — repeuplé une fois le différé arrivé
+  buildDevToggle();  // compte items/objets de quête/quêtes dispo dès le critique ; monstres ajoutés plus bas
 
   // Téléchargements (si les images assemblées existent)
   fetch('download/kwalat_half.jpg', { method: 'HEAD' }).then(r => {
@@ -290,6 +347,7 @@ async function setLang(code) {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
     buildBestiary();
+    buildDevToggle();   // le compte de monstres isTest (162) n'est connu qu'ici
     // Une fiche item/PNJ/quête ouverte avant l'arrivée des recettes/vendeurs/
     // monstres (fenêtre de course rare) est simplement rafraîchie avec les
     // données désormais complètes (liens monstre/marchand inclus).

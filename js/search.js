@@ -19,6 +19,7 @@ import {
   openMonsterFiche, openLocationFiche, openAbilityFiche,
 } from './fiches.js';
 import { isDeprecatedItem, rarityGroupFor } from './rarity.js';
+import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
 import { buildFilters } from './sidebar.js';
 
@@ -114,9 +115,16 @@ function buildSearch() {
   // bascule dessus (voir renderSearch). Ses x/z sont toujours dans le repère de
   // q.map (le giver, ou l'objectif via le bundle par carte), donc un goTo APRÈS
   // bascule tombe juste.
-  S.data.quest.forEach(q => push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
-    null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug }));
-  S.data.qao.forEach(r => push(r.name, 'qao', CATS.qao.hex, r.x, r.z));
+  // Quêtes/objets de quête isTest (feature #13) : masqués de la recherche
+  // par défaut (S.devOn faux) — voir js/devcontent.js. Jamais retirés des
+  // données elles-mêmes, juste pas poussés dans l'index tant que le tag
+  // « Contenu dev » (main.js buildDevToggle) n'a pas été cliqué.
+  S.data.quest.forEach(q => {
+    if (isHiddenTest(q)) return;
+    push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
+      null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug });
+  });
+  S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', CATS.qao.hex, r.x, r.z); });
   S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z));
   // Base de données objets : icône + rareté, pas de position (fiche seule).
   // Bruit technique (ab_/ef_/… , is_test) déprioritisé au profit des objets joueur.
@@ -125,6 +133,9 @@ function buildSearch() {
   Object.entries(S.items).forEach(([key, it]) => {
     // (a) doublon `_old` déprécié : jamais indexé (voir isDeprecatedItem).
     if (isDeprecatedItem(key, it)) return;
+    // (a-bis) isTest (feature #13) : masqué par défaut, même garde que
+    // quêtes/objets de quête ci-dessus — 128 items concernés.
+    if (isHiddenTest(it)) return;
     // (b) membre non-représentant d'un groupe de rareté (voir rarity.js) :
     // une seule entrée par groupe (le représentant), la rareté se choisit
     // sur la fiche (pill selector, voir openItemFiche).
@@ -136,8 +147,11 @@ function buildSearch() {
     const kindSub = (grp ? itemKindLabel(it.kind) : rarityLabel(it.rarity)) || itemKindLabel(it.kind) || '';
     const wtSub = it.weapon?.weapon_type ? weaponTypeLabel(it.weapon.weapon_type) : '';
     const grpSub = grp ? tr('rarityVariantsCount', Object.keys(grp.variants).length) : '';
+    // Item isTest révélé (S.devOn) : marqué explicitement dans le
+    // sous-libellé, jamais confondu avec un vrai objet joueur.
+    const devSub = it.isTest ? tr('devBadge') : '';
     push(it.name, 'item', itemColor(it), null, null, () => openItemFiche(key),
-      it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub].filter(Boolean).join(' · '),
+      it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub, devSub].filter(Boolean).join(' · '),
       itemGlyph(it), itemBias(key, it));
   });
   // Régions nommées (zonesGeo, chargé au critique — voir loadCritical) et
@@ -269,16 +283,51 @@ function buildZoneSearchIndex() {
   });
 }
 
-/* Monstres : nom (déjà dédupliqué/regroupé au build), sous-libellé "niv X ·
-   famille", clic -> fiche (pas de position fixe unique : un monstre peut
-   apparaître dans plusieurs camps, listés DANS la fiche). */
+/* Monstres : DÉDUPLIQUÉS PAR MODÈLE (feature #12 — site/data/<lang>/
+   monster_models.bin) au lieu d'une entrée par groupe brut (917 groupes,
+   ex. jusqu'à 14 lignes identiques "Sanglier mammouth maigre" pour une seule
+   créature déclinée niveau 3 à 20). Regroupement fait ici sur `m.model`
+   (garanti présent sur chaque groupe, jamais sur monster_models[x].levels
+   seul : ce dernier exclut parfois de vraies variantes non-test — reskins
+   de même niveau, ex. trollfat_yellow_arena — qui doivent quand même
+   apparaître/être ouvrables ; voir js/fiches.js monsterModelVariants pour
+   la même discipline côté fiche). Une seule entrée par modèle, avec un
+   indice "N variantes" quand il y en a plus d'une (même idiome que "N
+   raretés" pour les objets ci-dessus) ; clic -> fiche modèle (openMonsterFiche)
+   ouverte sur son niveau REPRÉSENTATIF (canonicalSiteKey du modèle s'il est
+   visible, sinon le niveau le plus bas visible).
+   Monstres isTest (162/917, feature #13) exclus du regroupement par défaut
+   -- un modèle 100 % test (toutes ses variantes isTest, ex. oldman_soldier_*)
+   disparaît alors entièrement de la recherche tant que S.devOn est faux. */
 function buildMonsterSearchIndex() {
-  Object.entries(S.monsters).forEach(([key, m]) => {
-    const sub = [m.level != null ? tr('levelAbbrev', m.level) : null, m.family ? pretty(m.family) : null]
+  const byModel = new Map();   // model_key -> [[key, m], …] (membres VISIBLES seulement)
+  for (const [key, m] of Object.entries(S.monsters)) {
+    if (isHiddenTest(m)) continue;
+    const modelKey = m.model || key;   // repli défensif -- `model` est garanti sur chaque groupe (voir data/SCHEMA.md)
+    let arr = byModel.get(modelKey);
+    if (!arr) byModel.set(modelKey, arr = []);
+    arr.push([key, m]);
+  }
+  for (const [modelKey, members] of byModel) {
+    members.sort((a, b) => (a[1].level ?? 99) - (b[1].level ?? 99) || a[0].localeCompare(b[0]));
+    const canon = S.monsterModels[modelKey]?.canonicalSiteKey;
+    const rep = (canon && members.find(([k]) => k === canon)) || members[0];
+    const [repKey, repM] = rep;
+    const sub = [repM.level != null ? tr('levelAbbrev', repM.level) : null, repM.family ? pretty(repM.family) : null]
       .filter(Boolean).join(' · ');
-    pushSearchEntry(m.name, 'monster', MONSTER_HEX, null, null, () => openMonsterFiche(key),
-      m.icon ? `icons/${m.icon}` : null, sub, '🐾');
-  });
+    const variantsSub = members.length > 1 ? tr('monsterVariantsCount', members.length) : '';
+    // Dev marker (feature #13) : seulement quand la variante REPRÉSENTATIVE
+    // elle-même est isTest (ex. oldman_soldier_blade, 100 % test — son seul
+    // niveau catalogué dans monster_models.levels est justement isTest).
+    // Un modèle MIXTE (ex. boarmammoth_albion : niveaux réels + quelques
+    // skins SkinTest annexes) garde un représentant non-test et n'affiche
+    // donc PAS ce badge ici — les variantes de test restent marquées
+    // individuellement dans la fiche (voir fiches.js monsterVariantPickHtml),
+    // jamais étiqueter toute une créature "Test" à cause d'un seul reskin.
+    const devSub = repM.isTest ? tr('devBadge') : '';
+    pushSearchEntry(repM.name, 'monster', MONSTER_HEX, null, null, () => openMonsterFiche(repKey),
+      repM.icon ? `icons/${repM.icon}` : null, [sub, variantsSub, devSub].filter(Boolean).join(' · '), '🐾');
+  }
 }
 
 /* Bestiaire/lore (MapMarkers.xml) : index = clé de fiche (S.locations est un

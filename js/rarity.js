@@ -14,7 +14,7 @@
    npcIndexByName…), un cycle interdit par l'architecture du site (voir
    tmp/convergence/architecture_map.md, "Strictly downward, no cycles"). */
 import { S } from './state.js';
-import { fold } from './utils.js';
+import { fold, capitalize } from './utils.js';
 
 const RARITY_TOKEN_RE = /_(common|uncommon|rare|epic|legendary)$/i;
 const RARITY_ORDER = { Common: 0, Uncommon: 1, Rare: 2, Epic: 3, Legendary: 4 };
@@ -32,7 +32,7 @@ function buildRarityGroups() {
     if (isDeprecatedItem(key, it)) continue;
     const m = RARITY_TOKEN_RE.exec(key);
     if (!m) continue;   // pas de rareté en dernier token -> pas une variante
-    const rarity = m[1][0].toUpperCase() + m[1].slice(1).toLowerCase();
+    const rarity = capitalize(m[1]);
     // stem ET nom replié doivent coïncider : deux items sans rapport qui
     // partagent juste un stem (ou un nom) ne fusionnent jamais.
     const bk = key.slice(0, m.index) + ' ' + fold(it.name);

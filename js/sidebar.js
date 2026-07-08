@@ -1,13 +1,14 @@
 /* Kwalat — panneau latéral : filtres de couches, liste des camps, suivis
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, LS, save } from './state.js';
-import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey } from './config.js';
+import { CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, chestTypeLabel } from './config.js';
 import { $, $$, esc, pretty } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
 import { whenDeferred, deferredReady, monsterZones } from './data.js';
+import { isHiddenTest } from './devcontent.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -51,9 +52,9 @@ function renderTracked() {
   });
 }
 /* ── Filtres (sidebar) ──────────────────────────────────────── */
-function filterRow(key, label, hex, count, on, toggle) {
+function filterRow(key, label, hex, count, on, toggle, extraClass = '') {
   const li = document.createElement('li');
-  li.innerHTML = `<label class="filter-row ${on ? '' : 'off'}">
+  li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
     <input type="checkbox" ${on ? 'checked' : ''}>
     <span class="swatch" style="background:${hex}"></span>
     <span class="flabel">${esc(label)}</span>
@@ -66,16 +67,68 @@ function filterRow(key, label, hex, count, on, toggle) {
   return li;
 }
 
+/* Sous-filtre « types de contenant » (S.chestTypes : type moteur réel ->
+   {on, count}, voir data.js buildChestTypes) — nichée sous la ligne de
+   catégorie "chest", visible seulement quand celle-ci est active. Les vrais
+   coffres (type "Chest") sont épinglés en tête et mis en avant (voir
+   .subfilter-featured, css/style.css) : c'est le type que la demande
+   utilisateur veut pouvoir isoler du reste des contenants (tonneaux,
+   caisses, meubles…). Rejouée (au lieu de reconstruite par buildFilters())
+   à chaque bascule chest on/off et à chaque clic Tous/Aucun — jamais de
+   perte de l'état on/off déjà coché ailleurs (S.chestTypes en est la seule
+   source de vérité, voir main.js registerDense('chest', …)). */
+function buildChestTypeSubfilter(parentLi) {
+  let sub = parentLi.querySelector('.subfilter-list');
+  if (!sub) {
+    sub = document.createElement('ul');
+    sub.className = 'subfilter-list';
+    parentLi.appendChild(sub);
+  }
+  sub.innerHTML = '';
+  const entries = Object.entries(S.chestTypes);
+  sub.hidden = !CATS.chest.on || !entries.length;
+  if (sub.hidden) return;
+  entries.sort(([ta, a], [tb, b]) => (tb === 'Chest') - (ta === 'Chest') || b.count - a.count);
+
+  const head = document.createElement('li');
+  head.className = 'subfilter-head';
+  head.innerHTML = `<span class="subf-title">${esc(tr('chestTypesTitle'))}</span>
+    <span class="subf-actions">
+      <button type="button" class="subf-btn" data-mode="all">${esc(tr('chestTypesAllBtn'))}</button>
+      <button type="button" class="subf-btn" data-mode="none">${esc(tr('chestTypesNoneBtn'))}</button>
+    </span>`;
+  head.querySelector('[data-mode="all"]').addEventListener('click', () => {
+    for (const st of Object.values(S.chestTypes)) st.on = true;
+    scheduleRedraw(); syncHash(); buildChestTypeSubfilter(parentLi);
+  });
+  head.querySelector('[data-mode="none"]').addEventListener('click', () => {
+    for (const st of Object.values(S.chestTypes)) st.on = false;
+    scheduleRedraw(); syncHash(); buildChestTypeSubfilter(parentLi);
+  });
+  sub.appendChild(head);
+
+  for (const [type, st] of entries) {
+    const extra = 'filter-row-sub' + (type === 'Chest' ? ' subfilter-featured' : '');
+    sub.appendChild(filterRow('ctype:' + type, chestTypeLabel(type), CATS.chest.hex, st.count, st.on, on => {
+      st.on = on;
+      scheduleRedraw();
+    }, extra));
+  }
+}
+
 function buildFilters() {
   const ul = $('#filter-list');
   ul.innerHTML = '';
   for (const [key, c] of Object.entries(CATS)) {
     const count = key === 'quest' ? S.data.quest.length : S.data[key].length;
-    ul.appendChild(filterRow(key, catLabel(key), c.hex, count, c.on, on => {
+    const li = filterRow(key, catLabel(key), c.hex, count, c.on, on => {
       c.on = on;
       if (c.dense) scheduleRedraw();
       else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
-    }));
+      if (key === 'chest') buildChestTypeSubfilter(li);
+    });
+    ul.appendChild(li);
+    if (key === 'chest') buildChestTypeSubfilter(li);
   }
   if (S.zonesGeo.length) {
     ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX,
@@ -117,6 +170,10 @@ function buildBestiary() {
   }
   const fams = new Map();
   for (const [key, m] of Object.entries(S.monsters)) {
+    // Contenu dev (feature #13) : monstres isTest masqués du bestiaire par
+    // défaut, même garde que la recherche (voir js/devcontent.js /
+    // search.js buildMonsterSearchIndex) — 162/917 groupes concernés.
+    if (isHiddenTest(m)) continue;
     const fam = familyKey(m.family || 'other');   // alias (robo→robot…), voir config.js
     let arr = fams.get(fam);
     if (!arr) fams.set(fam, arr = []);
@@ -134,8 +191,12 @@ function buildBestiary() {
       const zones = monsterZones(key);
       const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
       const sub = [m.level != null ? tr('levelAbbrev', m.level) : '', zoneTxt].filter(Boolean).join(' · ');
+      // N'apparaît que si S.devOn est vrai (sinon isHiddenTest l'aurait déjà
+      // exclu de `list` plus haut) : marque explicitement un monstre isTest
+      // révélé, jamais confondu avec une vraie créature du jeu.
+      const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
       return `<li class="bst-row">
-        <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}</span>
+        <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
         ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}
       </li>`;
     }).join('');
