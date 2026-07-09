@@ -153,6 +153,12 @@ export default {
       mapDownload4800: 'Карта 4800px',
       loadErrorPrefix: msg => `Не вдалося завантажити дані (${msg})`,
       closeBtnAria: 'Закрити',
+      // Банер «дані оновлено» (js/updatecheck.js) — токен version.json
+      // змінився з моменту завантаження цієї вкладки (відбувся новий
+      // деплой, поки вкладка залишалася відкритою). Без автоматичного
+      // перезавантаження — лише пропозиція.
+      dataUpdatedBanner: 'Дані оновлено — перезавантажте карту',
+      dataUpdatedReloadBtn: 'Перезавантажити',
       monsterLabel: 'Монстр',
       variantsNote: n => ` · ще ${n} ${pluralSlavic(n, 'варіант', 'варіанти', 'варіантів')}`,
       monsterAbilitiesN: n => `Здібності (${n})`,

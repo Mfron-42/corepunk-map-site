@@ -7,6 +7,48 @@ import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
 import { DECOR_FAMILIES } from './config.js';
 
+/* ── Version stamp (cache-busting) ──────────────────────────────────────
+   Incident réel motivant ce bloc : un onglet resté ouvert des heures a
+   continué de montrer des données de quête d'avant déploiement (les bundles
+   .bin ne sont chargés qu'une fois par onglet + GitHub Pages cache
+   agressivement) — au point que le joueur a conclu qu'une fonctionnalité
+   pourtant livrée n'existait pas. version.json n'est écrit QUE par le script
+   de déploiement ( directement dans le clone de
+   staging, jamais commité dans site/ source) avec un jeton frais à CHAQUE
+   déploiement — {"v": "<horodatage>"}. Il n'existe donc PAS du tout en local
+   (serveur de dev, harnais Playwright _verify_*.mjs) ni avant le tout premier
+   déploiement qui embarque cette fonctionnalité : 404/erreur réseau/JSON
+   invalide tolérés en silence (jamais de console.error, jamais de carte
+   cassée), auquel cas aucun `?v=` n'est ajouté nulle part ci-dessous — le
+   comportement de cache du navigateur reste alors exactement celui d'avant
+   cette fonctionnalité. Chargé une seule fois au boot (main.js::init, AVANT
+   loadCritical) et figé pour toute la durée de vie de l'onglet : c'est très
+   exactement le jeton qu'un onglet resté longtemps ouvert doit détecter comme
+   PÉRIMÉ — voir js/updatecheck.js, qui revérifie périodiquement/au focus si
+   un jeton plus récent existe côté serveur et propose un rechargement (jamais
+   automatique) sans jamais toucher à ce jeton figé ici. */
+let versionStamp = null;
+async function fetchVersionStamp() {
+  try {
+    const r = await fetch('version.json', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return (j && typeof j.v === 'string' && j.v) ? j.v : null;
+  } catch (e) { return null; }
+}
+async function initVersion() {
+  versionStamp = await fetchVersionStamp();
+  return versionStamp;
+}
+const bootVersionStamp = () => versionStamp;
+/* Ajoute `?v=<jeton>` à une URL de données si un jeton a pu être chargé au
+   boot — sinon l'URL est rendue TELLE QUELLE (repli local/dev/pré-1er-déploi
+   silencieux, voir ci-dessus). */
+function withVersion(path) {
+  if (!versionStamp) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(versionStamp);
+}
+
 /* ── Chargement des données ─────────────────────────────────── */
 /* Chaque *.json de data/ est publié en .bin : un en-tête custom de 4 octets
    (friction anti-scraping — ce n'est PAS du chiffrement, juste de quoi faire
@@ -16,7 +58,7 @@ import { DECOR_FAMILIES } from './config.js';
    (fetch + DecompressionStream natif, même API que tout navigateur récent). */
 const BIN_HEADER_LEN = 4; // doit rester synchro avec le générateur des .bin
 async function fetchBin(path) {
-  const r = await fetch(path);
+  const r = await fetch(withVersion(path));
   if (!r.ok) throw new Error(path + ' → ' + r.status);
   const gz = (await r.arrayBuffer()).slice(BIN_HEADER_LEN);
   const stream = new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'));
@@ -24,7 +66,7 @@ async function fetchBin(path) {
 }
 async function fetchJson(path) {
   if (path.endsWith('.bin')) return fetchBin(path);
-  const r = await fetch(path);
+  const r = await fetch(withVersion(path));
   if (!r.ok) throw new Error(path + ' → ' + r.status);
   return r.json();
 }
@@ -256,5 +298,5 @@ function resetDeferred() { deferredReady = false; }
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
   resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems,
-  buildDecorGroups,
+  buildDecorGroups, initVersion, bootVersionStamp, fetchVersionStamp,
 };

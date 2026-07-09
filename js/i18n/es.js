@@ -155,6 +155,12 @@ export default {
       mapDownload4800: 'Mapa 4800px',
       loadErrorPrefix: msg => `No se pudieron cargar los datos (${msg})`,
       closeBtnAria: 'Cerrar',
+      // Aviso "datos actualizados" (js/updatecheck.js) -- el token de
+      // version.json cambió desde que se cargó esta pestaña (hubo un nuevo
+      // despliegue mientras seguía abierta). Nunca se recarga solo: solo se
+      // ofrece la opción.
+      dataUpdatedBanner: 'Datos actualizados — recarga el mapa',
+      dataUpdatedReloadBtn: 'Recargar',
       monsterLabel: 'Monstruo',
       variantsNote: n => ` · +${n} variantes`,
       monsterAbilitiesN: n => `Habilidades (${n})`,

@@ -164,6 +164,11 @@ export default {
       mapDownload4800: 'Map 4800px',
       loadErrorPrefix: msg => `Could not load data (${msg})`,
       closeBtnAria: 'Close',
+      // Live "data updated" banner (js/updatecheck.js) -- version.json
+      // token changed since this tab loaded (a new deploy happened while
+      // the tab was open). Never auto-reload: this just offers one.
+      dataUpdatedBanner: 'New data available — reload the map',
+      dataUpdatedReloadBtn: 'Reload',
       monsterLabel: 'Monster',
       variantsNote: n => ` · +${n} variants`,
       monsterAbilitiesN: n => `Abilities (${n})`,

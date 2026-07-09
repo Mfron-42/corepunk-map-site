@@ -154,6 +154,12 @@ export default {
       mapDownload4800: 'Carte 4800px',
       loadErrorPrefix: msg => `Impossible de charger les données (${msg})`,
       closeBtnAria: 'Fermer',
+      // Bandeau "données mises à jour" (js/updatecheck.js) -- le jeton
+      // version.json a changé depuis le chargement de cet onglet (un
+      // déploiement a eu lieu pendant qu'il restait ouvert). Jamais de
+      // rechargement automatique : seulement proposé.
+      dataUpdatedBanner: 'Données mises à jour — recharger la carte',
+      dataUpdatedReloadBtn: 'Recharger',
       monsterLabel: 'Monstre',
       variantsNote: n => ` · +${n} variantes`,
       monsterAbilitiesN: n => `Capacités (${n})`,

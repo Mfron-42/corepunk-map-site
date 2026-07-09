@@ -15,7 +15,8 @@ import {
   map, toWorld, registerDense, registerDomDense,
   denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
 } from './mapview.js';
-import { loadCritical, loadDeferred, resetDeferred } from './data.js';
+import { loadCritical, loadDeferred, resetDeferred, initVersion } from './data.js';
+import { startUpdateWatcher, refreshUpdateBannerI18n } from './updatecheck.js';
 import { popupHtml, questPopup, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
@@ -120,6 +121,9 @@ function applyStaticI18n() {
       el.setAttribute(attr, tr(key));
     });
   });
+  // Retraduit le bandeau "données mises à jour" (js/updatecheck.js) s'il est
+  // déjà affiché quand la langue change — no-op sinon.
+  refreshUpdateBannerI18n();
 }
 
 let _langSelectWired = false;
@@ -294,6 +298,11 @@ async function setLang(code) {
 (async function init() {
   applyStaticI18n();
   buildLangSelector();
+  // Jeton de version (cache-busting, voir js/data.js) : DOIT être chargé
+  // avant le tout premier fetch de données ci-dessous, sinon les bundles
+  // critiques partiraient sans `?v=` alors que les suivants l'auraient
+  // (incohérent). 404/erreur réseau tolérés en silence (repli local/dev).
+  await initVersion();
   try {
     await loadCritical();
   } catch (err) {
@@ -356,6 +365,11 @@ async function setLang(code) {
   // masque le voile de chargement (sinon flash de Kwalat puis bascule).
   await applyLocationState();
   $('#loading').classList.add('gone');
+
+  // Surveillance "données mises à jour" (js/updatecheck.js) : démarrée une
+  // fois le premier rendu affiché — no-op silencieux si aucun jeton de
+  // version n'a pu être chargé au boot (local/dev/avant 1er déploiement).
+  startUpdateWatcher();
 
   // Entrée baseline : cpmSeq=0 signale "atteinte par lien profond/chargement,
   // pas par une navigation en app" — canGoBackLocally()/unfocus() s'en servent

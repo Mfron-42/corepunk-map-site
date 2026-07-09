@@ -665,6 +665,66 @@ body {
 .ro-sep { width: 1px; height: 12px; background: var(--line); }
 #ro-zoom { color: var(--muted); }
 
+/* ── Bandeau « données mises à jour » (js/updatecheck.js) ──────────────
+   Toast discret, centré en bas de l'écran (jamais au-dessus du panneau/de la
+   fiche latérale ni des contrôles du haut) : un nouveau déploiement a eu
+   lieu pendant que cet onglet restait ouvert. Ajouté/retiré du flux via
+   .is-shown (JS attend un requestAnimationFrame avant de l'ajouter, pour que
+   la transition d'entrée joue) — jamais de disparition automatique, seul un
+   clic sur ✕ ou Recharger le fait partir. z-index au-dessus de tout le
+   chrome (le voile de chargement, seul plus haut, est déjà retiré à ce
+   stade). */
+.update-banner {
+  position: fixed;
+  left: 50%; bottom: 20px;
+  z-index: 2050;
+  display: flex; align-items: center; gap: 10px;
+  max-width: calc(100vw - 24px);
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m);
+  padding: 10px 12px 10px 16px;
+  box-shadow: var(--shadow-lg);
+  color: var(--ink);
+  font-size: .82rem;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 14px);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.update-banner.is-shown { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.update-banner-msg { line-height: 1.35; }
+.update-banner-reload {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: .74rem;
+  letter-spacing: .04em;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-s);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+.update-banner-reload:hover { background: var(--accent-hi); }
+.update-banner-reload:focus-visible { outline: 2px solid var(--accent-hi); outline-offset: 2px; }
+.update-banner-close {
+  flex: none;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-s);
+}
+.update-banner-close:hover { color: var(--ink); background: var(--panel-3); }
+.update-banner-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .loading {
   position: absolute; inset: 0;
   z-index: 2000;
@@ -1547,6 +1607,8 @@ button.rar-pill:hover {
   .fiche-scroll { max-height: 55vh; }
   #panel-toggle { top: 10px; left: 10px; }
   .readout { display: none; }          /* lecture de coordonnées : geste souris, inutile au doigt */
+  .update-banner { left: 12px; right: 12px; max-width: none; transform: translateY(14px); }
+  .update-banner.is-shown { transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
