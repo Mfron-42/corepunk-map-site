@@ -1124,8 +1124,16 @@ function qtyChipList(list) {
    l'archetype manque ou si 2 frères partagent le même archetype (pas observé
    dans l'échantillon, mais pas prouvé impossible — voir le plan sec 7), repli
    sur un numéro d'ordre "#N" clairement POSITIONNEL, jamais présenté comme
-   sémantique (§7 : jamais fabriquer une distinction qui n'existe pas). Renvoie
-   une Map qi -> {tag, positional}. */
+   sémantique (§7 : jamais fabriquer une distinction qui n'existe pas).
+
+   LA source unique de cette distinction pour TOUTES les surfaces (fix UX :
+   le suffixe n'apparaissait QUE dans la section « Quest Items » — ni sur
+   les chips d'étape ni dans le titre de la fiche item, là où le joueur
+   regarde vraiment). Renvoie une Map à DOUBLE clé : l'objet qi lui-même
+   (entrées sans clé catalogue — leur seule identité stable, deux homonymes
+   sans clé ne peuvent pas partager une clé-string sans s'écraser) ET
+   qi.key (string) quand elle existe (les chips d'étape/le titre de fiche
+   item n'ont que la clé, jamais l'objet) -> {tag, positional}. */
 function disambiguateQuestItems(list) {
   const byName = new Map();
   for (const qi of list || []) {
@@ -1135,6 +1143,10 @@ function disambiguateQuestItems(list) {
     byName.get(name).push(qi);
   }
   const tagFor = new Map();
+  const setTag = (qi, info) => {
+    tagFor.set(qi, info);
+    if (qi.key) tagFor.set(qi.key, info);
+  };
   for (const [name, group] of byName) {
     if (group.length < 2) continue;
     const nameToks = new Set(fold(name).split(' ').filter(Boolean));
@@ -1148,12 +1160,29 @@ function disambiguateQuestItems(list) {
         if (toks.length) tag = toks.map(t => t[0].toUpperCase() + t.slice(1)).join(' ');
       }
       if (tag && seenTags.has(tag)) tag = null;   // duplicate archetype tag -> not a unique key, fall back
-      if (tag) { seenTags.add(tag); tagFor.set(qi, { tag, positional: false }); }
-      else tagFor.set(qi, { tag: `#${i + 1}`, positional: true });
+      if (tag) { seenTags.add(tag); setTag(qi, { tag, positional: false }); }
+      else setTag(qi, { tag: `#${i + 1}`, positional: true });
     });
   }
   return tagFor;
 }
+
+/* L'unique FORMATEUR du nom affiché d'un item de quête — utilisé par les 3
+   surfaces (section « Quest Items », chips d'étape, titre de fiche item),
+   aucune logique dupliquée : base + " (tag)" quand `ref` (clé catalogue
+   string OU objet qi) appartient à un groupe d'homonymes de `disambig`,
+   sinon le nom nu (jamais de suffixe inventé pour un item sans homonyme). */
+function disambiguatedItemName(base, ref, disambig) {
+  const info = ref != null ? disambig?.get(ref) : null;
+  return info ? `${base} (${info.tag})` : base;
+}
+
+/* Map de désambiguïsation de la fiche QUÊTE ouverte (même cycle de vie que
+   currentGoalZones : recalculée à chaque openQuestFiche). Portée module pour
+   que goalItemMiniChip — appelé au fond de goalStepsSection/goalTargetChip,
+   qui ne reçoivent pas q.items — lise la MÊME Map que questItemRow, sans
+   passer un paramètre à travers toute la chaîne d'appels. */
+let currentQuestItemDisambig = null;
 
 /* Ligne d'item de quête : distingue objet de quête (synthétique) et item du
    jeu — pour ces derniers, résumé d'obtention (vendu / craftable / loot)
@@ -1163,13 +1192,13 @@ function disambiguateQuestItems(list) {
    zone — plusieurs items de quête (ex. digging_deeper's "Stash Alexander")
    n'existent QUE dans ce catalogue, sans slots[] correspondant, donc c'était
    leur seul point d'affichage possible et il ne montrait rien du tout.
-   `disambig` (Map, voir disambiguateQuestItems) ajoute un suffixe distinctif
-   quand 2+ items partagent le même nom affiché. */
-function questItemRow(qi, regionHint, disambig) {
+   Le nom passe par disambiguatedItemName + currentQuestItemDisambig (la Map
+   de la fiche quête ouverte) : suffixe distinctif quand 2+ items partagent
+   le même nom affiché — même rendu que les chips d'étape. */
+function questItemRow(qi, regionHint) {
   const cat = qi.key ? S.items[qi.key] : null;
   const baseName = cleanLabel(cat?.name || qi.label);
-  const tagInfo = disambig?.get(qi);
-  const name = tagInfo ? `${baseName} (${tagInfo.tag})` : baseName;
+  const name = disambiguatedItemName(baseName, qi.key || qi, currentQuestItemDisambig);
   const icon = cat?.icon ? `icons/${cat.icon}` : null;
   const badgeHex = qi.isQuestItem ? CATS.qao.hex : CATS.workshop.hex;
   const badgeLabel = qi.isQuestItem ? tr('questItemBadge') : tr('gameItemBadge');
@@ -1210,12 +1239,17 @@ const ACTIVABLE_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
    connue, sinon juste le libellé (jamais un lien devine). Utilisée par les
    branches monstre/objet de goalTargetChip ci-dessous quand le goal a été
    joint à un item_key spécifique (geo.py::_resolve_goal_item) -- affiche
-   "drops X" en plus de la cible principale, sur la même ligne d'étape. */
+   "drops X" en plus de la cible principale, sur la même ligne d'étape.
+   Nom désambiguïsé via la MÊME Map que la section « Quest Items »
+   (currentQuestItemDisambig — fix UX : les 3 chips d'imp_brain_hunt
+   affichaient toutes « Imp Brain » identique, la distinction n'existait
+   que dans une section que le joueur ne regarde pas en suivant les étapes). */
 function goalItemMiniChip(t) {
   if (!t.item_key && !t.item_label) return '';
   const it = t.item_key ? S.items[t.item_key] : null;
-  const name = it?.name || t.item_label;
-  if (!name) return '';
+  const base = it?.name || t.item_label;
+  if (!base) return '';
+  const name = disambiguatedItemName(base, t.item_key, currentQuestItemDisambig);
   const icon = it?.icon ? `icons/${it.icon}` : null;
   const attrs = it ? ` data-act="fiche-item" data-id="${esc(t.item_key)}"` : '';
   const approx = t.item_approx ? '<sup>≈</sup>' : '';
@@ -1450,6 +1484,9 @@ function openQuestFiche(slug) {
   // "Hello Blitz Hyperstorm" + zéro objectif/récompense/item), mais une fiche
   // clairement étiquetée « Dialogue PNJ (pas une quête) » avec ses répliques.
   if (q.isDialogue) { openDialogueFiche(q, slug); return; }
+  // Recalculée AVANT la construction des sections (items + étapes) : la même
+  // Map sert questItemRow ET goalItemMiniChip — voir currentQuestItemDisambig.
+  currentQuestItemDisambig = q.items?.length ? disambiguateQuestItems(q.items) : null;
   const regionHint = q.regions?.length ? q.regions[0] : null;
   const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
   // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :
@@ -1492,9 +1529,8 @@ function openQuestFiche(slug) {
     </div>`;
   }).join('');
   const rewards = questRewardsSection(q);
-  const itemsDisambig = q.items?.length ? disambiguateQuestItems(q.items) : null;
   const items = q.items?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint, itemsDisambig)).join('')}</div>` : '';
+    ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</div>` : '';
   const goalSteps = goalStepsSection(q);
   // Repli texte historique — seulement pour les quêtes sans graphe de goals décodé.
   const objectives = (!goalSteps && q.objectives?.length)
@@ -1740,6 +1776,24 @@ function openItemFiche(key) {
       }).join('')}</div>` : '';
 
   const weaponLine = weaponTypeLine(it.weapon);
+  // Titre désambiguïsé (fix UX) : un item de quête lié à une quête par le
+  // résolveur (it.questSource — jamais inventé côté front, voir
+  // build_site_data.py) et qui y a des HOMONYMES (les 3 « Imp Brain »
+  // d'imp_brain_hunt) affichait 3 fois le même <h2> — la distinction
+  // n'existait que dans le corps (« By killing Imp executioner »). Le
+  // suffixe vient de LA même source que partout ailleurs
+  // (disambiguateQuestItems sur les items de SA quête + le formateur
+  // disambiguatedItemName) : archetype discriminant d'abord, repli
+  // positionnel #N sinon, et nom nu quand l'item n'a pas d'homonyme
+  // (aucun suffixe fabriqué). Map LOCALE — ne touche pas
+  // currentQuestItemDisambig, qui appartient à la fiche quête ouverte.
+  let titleName = it.name;
+  if (it.questSource) {
+    const srcQ = S.quests.get(it.questSource.quest);
+    if (srcQ?.items?.length) {
+      titleName = disambiguatedItemName(it.name, key, disambiguateQuestItems(srcQ.items));
+    }
+  }
   // Bien craftable sans rareté fixe (recette pure, pas d'item.rarity propre) :
   // liste des raretés ATTEIGNABLES par le craft (it.rarities, tirage pondéré
   // -- voir data/SCHEMA.md recipes.json) à la place d'une rareté unique.
@@ -1762,7 +1816,7 @@ function openItemFiche(key) {
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
       <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}</div>
-      <h2>${esc(it.name)}</h2>
+      <h2>${esc(titleName)}</h2>
       ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>
     ${raritySelectHtml}
