@@ -1032,6 +1032,34 @@ body {
 .goal-target-series { display: flex; flex-wrap: wrap; gap: 6px 8px; }
 .goal-target-mini-label { font-size: .72rem; color: var(--ink); white-space: nowrap; }
 
+/* Nom de monstre cliquable dans une vignette de cible d'objectif (quest-guide
+   -feature plan sec 5.3/6.4) -- même traitement que .fr-label.link, mais
+   scopé ici plutôt qu'à l'intérieur d'un .frow (goalTargetChip n'en a pas). */
+.goal-target-name { font-size: .74rem; color: var(--ink); white-space: nowrap; }
+.goal-target-name.link {
+  cursor: pointer; color: var(--accent); text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--dur) var(--ease);
+}
+.goal-target-name.link:hover { text-decoration-color: var(--accent); }
+
+/* Mini-chip "cet objectif fait aussi obtenir tel item" (drops X), accolée à
+   la cible monstre/objet principale sur la même ligne d'étape (sec 5.2). */
+.goal-target-item {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .72rem; color: var(--muted);
+  padding: 1px 6px 1px 2px; border-radius: 12px;
+  background: var(--panel-4);
+}
+.goal-target-item.link { cursor: pointer; }
+.goal-target-item.link:hover { color: var(--accent); background: var(--accent-soft); }
+.goal-target-item-icon {
+  width: 16px; height: 16px; border-radius: 3px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.goal-target-item-icon img { width: 100%; height: 100%; object-fit: contain; }
+.goal-target-item-label { white-space: nowrap; }
+
 /* ── Corps de fiche : lignes, chips ── */
 .frow {
   display: flex; align-items: center; gap: 9px;

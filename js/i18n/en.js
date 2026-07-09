@@ -142,6 +142,13 @@ export default {
       dropRatesTitle: 'Drop rates',
       farmSpotsTitle: 'Farm spots',
       soldByTitle: 'Sold by',
+      // Quest-scripted-only obtain fallback (quest-guide-feature plan sec
+      // 5.2/6.3): shown ONLY when an item has no generic recipe/drop/vendor
+      // path at all (the dominant case for a genuine quest item) -- the
+      // quest goal that actually resolved this item is the only true source.
+      obtainDuringQuestTitle: 'How to obtain',
+      obtainViaKill: name => `By killing ${name}`,
+      obtainViaInteract: label => `By interacting with ${label}`,
       moreMerchants: n => `+ ${n} more merchants`,
       merchantPosUnknown: 'Merchant position not specified.',
       recipeTitle: 'Recipe',

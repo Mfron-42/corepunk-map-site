@@ -1117,6 +1117,44 @@ function qtyChipList(list) {
   return (list || []).map(qtyItemChip).join('');
 }
 
+/* Désambiguïsation des items de quête « même nom » (quest-guide-feature plan
+   sec 5.2/6.4 : imp_brain_hunt liste 3× "Imp Brain", visuellement identiques
+   sans ça). Best-effort : items.json::archetype (ex. "Brain Imp Executioner")
+   moins les mots déjà présents dans le nom de base -> "Executioner" ; si
+   l'archetype manque ou si 2 frères partagent le même archetype (pas observé
+   dans l'échantillon, mais pas prouvé impossible — voir le plan sec 7), repli
+   sur un numéro d'ordre "#N" clairement POSITIONNEL, jamais présenté comme
+   sémantique (§7 : jamais fabriquer une distinction qui n'existe pas). Renvoie
+   une Map qi -> {tag, positional}. */
+function disambiguateQuestItems(list) {
+  const byName = new Map();
+  for (const qi of list || []) {
+    const cat = qi.key ? S.items[qi.key] : null;
+    const name = cleanLabel(cat?.name || qi.label);
+    if (!byName.has(name)) byName.set(name, []);
+    byName.get(name).push(qi);
+  }
+  const tagFor = new Map();
+  for (const [name, group] of byName) {
+    if (group.length < 2) continue;
+    const nameToks = new Set(fold(name).split(' ').filter(Boolean));
+    const seenTags = new Set();
+    group.forEach((qi, i) => {
+      const cat = qi.key ? S.items[qi.key] : null;
+      const arch = cat?.archetype;
+      let tag = null;
+      if (arch) {
+        const toks = fold(arch).split(' ').filter(t => t && !nameToks.has(t));
+        if (toks.length) tag = toks.map(t => t[0].toUpperCase() + t.slice(1)).join(' ');
+      }
+      if (tag && seenTags.has(tag)) tag = null;   // duplicate archetype tag -> not a unique key, fall back
+      if (tag) { seenTags.add(tag); tagFor.set(qi, { tag, positional: false }); }
+      else tagFor.set(qi, { tag: `#${i + 1}`, positional: true });
+    });
+  }
+  return tagFor;
+}
+
 /* Ligne d'item de quête : distingue objet de quête (synthétique) et item du
    jeu — pour ces derniers, résumé d'obtention (vendu / craftable / loot)
    tiré du catalogue, et clic -> fiche complète quand la clé est connue.
@@ -1124,10 +1162,14 @@ function qtyChipList(list) {
    2.3) : cette section n'affichait jusqu'ici AUCUNE position, avec ou sans
    zone — plusieurs items de quête (ex. digging_deeper's "Stash Alexander")
    n'existent QUE dans ce catalogue, sans slots[] correspondant, donc c'était
-   leur seul point d'affichage possible et il ne montrait rien du tout. */
-function questItemRow(qi, regionHint) {
+   leur seul point d'affichage possible et il ne montrait rien du tout.
+   `disambig` (Map, voir disambiguateQuestItems) ajoute un suffixe distinctif
+   quand 2+ items partagent le même nom affiché. */
+function questItemRow(qi, regionHint, disambig) {
   const cat = qi.key ? S.items[qi.key] : null;
-  const name = cleanLabel(cat?.name || qi.label);
+  const baseName = cleanLabel(cat?.name || qi.label);
+  const tagInfo = disambig?.get(qi);
+  const name = tagInfo ? `${baseName} (${tagInfo.tag})` : baseName;
   const icon = cat?.icon ? `icons/${cat.icon}` : null;
   const badgeHex = qi.isQuestItem ? CATS.qao.hex : CATS.workshop.hex;
   const badgeLabel = qi.isQuestItem ? tr('questItemBadge') : tr('gameItemBadge');
@@ -1163,6 +1205,24 @@ function questItemRow(qi, regionHint) {
 const ACTIVABLE_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 2.8 20 7v10l-8 4.2L4 17V7l8-4.2Z"/><circle cx="12" cy="12" r="3"/></svg>`;
+/* Mini-vignette « cet objectif fait aussi obtenir tel item » (quest-guide-
+   feature plan sec 5.2/6.4) : cliquable vers la fiche objet quand la clé est
+   connue, sinon juste le libellé (jamais un lien devine). Utilisée par les
+   branches monstre/objet de goalTargetChip ci-dessous quand le goal a été
+   joint à un item_key spécifique (geo.py::_resolve_goal_item) -- affiche
+   "drops X" en plus de la cible principale, sur la même ligne d'étape. */
+function goalItemMiniChip(t) {
+  if (!t.item_key && !t.item_label) return '';
+  const it = t.item_key ? S.items[t.item_key] : null;
+  const name = it?.name || t.item_label;
+  if (!name) return '';
+  const icon = it?.icon ? `icons/${it.icon}` : null;
+  const attrs = it ? ` data-act="fiche-item" data-id="${esc(t.item_key)}"` : '';
+  const approx = t.item_approx ? '<sup>≈</sup>' : '';
+  return `<span class="goal-target-item${it ? ' link' : ''}"${attrs}>
+    ${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approx}</span>
+  </span>`;
+}
 function goalTargetChip(t, label, regionHint) {
   if (!t || t.kind === 'multiple') return '';
   const lbl = esc(label || '');
@@ -1181,13 +1241,37 @@ function goalTargetChip(t, label, regionHint) {
   if (t.kind === 'object') {
     const it = t.key ? S.items[t.key] : null;
     const icon = it?.icon ? `icons/${it.icon}` : null;
+    // t.item_key (quest-guide-feature plan sec 5.2) is a DIFFERENT thing
+    // from t.key above: t.key is this OBJECT's own catalog key (rare), while
+    // t.item_key is the specific quest_item this interaction was joined to
+    // (e.g. an activable machine that hands out a scripted quest item) --
+    // both can render on the same line when they differ.
+    const itemChipHtml = (t.item_key && t.item_key !== t.key) ? goalItemMiniChip(t) : '';
     return `<span class="goal-target">
       <span class="goal-target-icon">${icon ? iconTag(icon, '', '⚙') : ACTIVABLE_GLYPH}</span>
       <span class="k-chip" style="--chip-c:${CATS.qao.hex}">${tr('activableBadge')}</span>
+      ${itemChipHtml}
       ${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}
     </span>`;
   }
-  if (t.kind === 'npc' || t.kind === 'monster') {
+  if (t.kind === 'monster') {
+    // Clickable monster-name link (mirrors the `item` branch above --
+    // quest-guide-feature plan sec 5.3/6.4: this used to only ever render a
+    // position button, with zero name/link, even once a monster target
+    // existed at all) + an inline "drops X" item chip when the goal was
+    // joined to a specific quest item (sec 5.2).
+    const mk = t.key || null;
+    const nameLbl = t.label || label || '';
+    const nameHtml = mk
+      ? `<span class="goal-target-name link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
+      : (nameLbl ? `<span class="goal-target-name">${esc(nameLbl)}</span>` : '');
+    return `<span class="goal-target">
+      ${nameHtml}
+      ${goalItemMiniChip(t)}
+      ${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}
+    </span>`;
+  }
+  if (t.kind === 'npc') {
     return `<span class="goal-target">${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}</span>`;
   }
   if (t.kind === 'dynamic') {
@@ -1388,7 +1472,15 @@ function openQuestFiche(slug) {
     if (a.kind === 'npc' && !onOtherMap) {
       const ni = npcIndexByName(a.label);
       if (ni >= 0) labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
-    } else if (a.kind === 'monster') {
+    } else if (a.kind === 'mob') {
+      // BUG FIX (quest-guide-feature plan sec 5.3): q.actors[].kind is built
+      // straight from slots[].kind (import_quests.py), which only ever uses
+      // the ACTOR vocabulary value "mob" for a creature -- "monster" is
+      // exclusively the RESOLVED goal-target kind (geo.py). This branch
+      // checked the wrong string and was dead code for every quest, 100% of
+      // the time: every mob actor rendered as plain, non-clickable text even
+      // though monsterKeyFor() (already imported, already correct) resolves
+      // most of them immediately.
       const mk = monsterKeyFor(null, a.label);
       if (mk) labelHtml = `<span class="fr-label link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(aLabel)}</span>`;
     }
@@ -1400,8 +1492,9 @@ function openQuestFiche(slug) {
     </div>`;
   }).join('');
   const rewards = questRewardsSection(q);
+  const itemsDisambig = q.items?.length ? disambiguateQuestItems(q.items) : null;
   const items = q.items?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</div>` : '';
+    ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint, itemsDisambig)).join('')}</div>` : '';
   const goalSteps = goalStepsSection(q);
   // Repli texte historique — seulement pour les quêtes sans graphe de goals décodé.
   const objectives = (!goalSteps && q.objectives?.length)
@@ -1610,6 +1703,32 @@ function openItemFiche(key) {
     if (chips.length) usedHtml = `<div class="fiche-section"><h3>${esc(tr('usedInTitle'))}</h3><div class="reward-chips">${chips.join('')}</div></div>`;
   }
 
+  // Quest-scripted-only sourcing fallback (quest-guide-feature plan sec
+  // 5.2/6.3) : dropsHtml/vendorsHtml/recipeHtml all empty is the DOMINANT
+  // case for a genuine quest item (dropped_in/sold_by/produced_by_recipes
+  // are all empty by design, e.g. every quest_item_imp_brain_*) — instead of
+  // silently showing an empty "how to obtain" section, render the one true
+  // source: the quest goal that actually resolved this item (geo.py's
+  // resolver, NEVER inferred here — it.questSource only exists when that
+  // resolver produced a real monster/object target for it).
+  let questSourceHtml = '';
+  if (!dropsHtml && !vendorsHtml && !recipeHtml && it.questSource) {
+    const qs = it.questSource;
+    const srcQuest = S.quests.get(qs.quest);
+    if (srcQuest) {
+      const viaName = qs.via === 'kill' ? (S.monsters[qs.monster_key]?.name || null) : (qs.object_label || null);
+      const viaLine = viaName
+        ? `<p class="hint">${esc(qs.via === 'kill' ? tr('obtainViaKill', viaName) : tr('obtainViaInteract', viaName))}</p>` : '';
+      questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
+        <div class="frow">
+          <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
+          <span class="fr-label link" data-act="fiche-quest" data-id="${esc(qs.quest)}">${esc(srcQuest.name)}</span>
+        </div>
+        ${viaLine}
+      </div>`;
+    }
+  }
+
   const questsHtml = it.quests?.length
     ? `<div class="fiche-section"><h3>${esc(tr('relatedQuestsTitle'))}</h3>${it.quests.map(({ slug, role }) => {
         const q = S.quests.get(slug);
@@ -1656,6 +1775,7 @@ function openItemFiche(key) {
     ${vendorsHtml}
     ${recipeHtml}
     ${usedHtml}
+    ${questSourceHtml}
     ${questsHtml}`);
   setFicheHash('item', key);
 }
