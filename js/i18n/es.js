@@ -162,6 +162,12 @@ export default {
       noLootCatalogued: 'Botín no catalogado para este monstruo.',
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
       noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
+      // Sección "Objetos de misión" de la ficha de monstruo (seguimiento del
+      // vínculo monstruo<->objeto de misión, tarea 1/4): lista questDrops[]
+      // horneado en la compilación -- solo enlaces producidos por el
+      // resolutor, sección ausente si está vacía (nunca un bloque vacío
+      // fabricado).
+      monsterQuestItemsTitle: 'Objetos de misión',
       familyMonstersTitle: n => `Monstruos de esta familia (${n})`,
       abilityLabel: 'Habilidad',
       harvestTitle: 'Recolección',

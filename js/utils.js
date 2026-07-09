@@ -35,10 +35,21 @@ const KIND_GLYPH = {
 function itemGlyph(it) { return (it && KIND_GLYPH[it.kind]) || '📦'; }
 /* <img> avec repli intégré (le glyphe est posé en data-fb, consommé soit
    par le handler `error` global si l'image casse, soit immédiatement s'il
-   n'y a pas d'URL du tout). */
+   n'y a pas d'URL du tout).
+   Encodage # / ? : 3 icônes du catalogue (reskins d'objets destructibles,
+   ex. quest_item_imp_eggs -> "hero_avatars/reactive_small_garbage_leaf_
+   monster_19#_green.png") portent un « # » DANS le nom de fichier même —
+   posé brut dans src=, le navigateur tronque l'URL au fragment et
+   requête un chemin inexistant (404 + icône cassée sur TOUTES les
+   surfaces : fiche item, lignes de quête, section « Quest items » de la
+   fiche monstre, résultats de recherche). iconTag est l'unique point de
+   construction d'<img> de l'app (vérifié : aucune autre construction
+   d'<img>/iconUrl dans site/js), donc l'encodage ici corrige toute la
+   classe d'un coup — « ? » est traité pareil (même troncature, en query
+   string), par défense. */
 function iconTag(url, cls, glyph) {
   return url
-    ? `<img class="${cls}" src="${url}" alt="" data-fb="${esc(glyph)}" loading="lazy">`
+    ? `<img class="${cls}" src="${url.replace(/#/g, '%23').replace(/\?/g, '%3F')}" alt="" data-fb="${esc(glyph)}" loading="lazy">`
     : `<span class="${cls} icon-broken" data-fb="${esc(glyph)}"></span>`;
 }
 document.addEventListener('error', e => {

@@ -729,6 +729,33 @@ function openMonsterFiche(key) {
     ? `<div class="fiche-section"><h3>${esc(tr('harvestTitle'))}${m.harvestMethod ? ' · ' + esc(harvestMethodLabel(m.harvestMethod)) : ''}</h3>${lootRowsHtml(m.harvestLoot, 'noHarvestCatalogued')}</div>`
     : '';
 
+  // Quest items this monster drops (monster<->quest-item link follow-up,
+  // task 1/4): baked at build time (build_site_data.py::monsters_site(),
+  // inverting build_catalog()'s own item->quest quest_source_of index) --
+  // ONLY resolver-produced "kill" links, never name-inferred, so this
+  // section simply doesn't exist for a monster with no such link (never an
+  // empty fabricated block). Both the item name (already disambiguated,
+  // e.g. "Imp Brain (Executioner)") and the quest name are pre-localized,
+  // no client-side lookup/race involved -- S.items is only consulted here
+  // for the icon/clickability of the item chip (eager/critical bundle, safe).
+  const questDropsHtml = m.questDrops?.length
+    ? `<div class="fiche-section"><h3>${esc(tr('monsterQuestItemsTitle'))}</h3>${m.questDrops.map(d => {
+        const dit = S.items[d.item_key];
+        const dicon = dit?.icon ? `icons/${dit.icon}` : null;
+        const itemLabel = dit
+          ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(d.item_key)}">${esc(d.item_name)}</span>`
+          : `<span class="fr-label">${esc(d.item_name)}</span>`;
+        const questLabel = S.quests.has(d.quest_slug)
+          ? `<span class="fr-label link" data-act="fiche-quest" data-id="${esc(d.quest_slug)}">${esc(d.quest_name)}</span>`
+          : `<span class="fr-label">${esc(d.quest_name)}</span>`;
+        return `<div class="frow">
+          ${iconTag(dicon, 'fr-icon', itemGlyph(dit))}
+          ${itemLabel}
+          <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
+          ${questLabel}
+        </div>`;
+      }).join('')}</div>` : '';
+
   const abilitiesHtml = `<div class="fiche-section"><h3>${esc(tr('monsterAbilitiesN', m.abilities?.length || 0))}</h3>${
     m.abilities?.length
       ? m.abilities.map(a => `<div class="frow">
@@ -765,6 +792,7 @@ function openMonsterFiche(key) {
     ${zoneBtnHtml}
     ${lootHtml}
     ${harvestHtml}
+    ${questDropsHtml}
     ${abilitiesHtml}
     ${campsHtml}
     ${loreHtml}`);
@@ -1294,8 +1322,19 @@ function goalTargetChip(t, label, regionHint) {
     // position button, with zero name/link, even once a monster target
     // existed at all) + an inline "drops X" item chip when the goal was
     // joined to a specific quest item (sec 5.2).
-    const mk = t.key || null;
     const nameLbl = t.label || label || '';
+    // BUG FIX (deferred-render-race blast-radius audit, follow-up task 3):
+    // was `t.key || null` -- t.key is the RAW canonical monster key geo.py's
+    // resolver matched, not necessarily the (name,level)-grouped
+    // REPRESENTATIVE key monsters_site() keeps as S.monsters' own dict key
+    // (the exact class of bug actorRows had before its sec-5.3 fix -- see
+    // monsterKeyFor's own docstring in data.js). Using it unchecked either
+    // links to a monster page that doesn't exist under that key (a dead
+    // click, PERMANENTLY, not just during S.monsters' deferred-load window)
+    // or renders a link before S.monsters has even loaded. Same guarded
+    // pattern as actorRows: unresolved -> plain text, never a guessed link;
+    // self-heals once loadDeferred() completes and the quest fiche re-renders.
+    const mk = monsterKeyFor(t.key || null, nameLbl);
     const nameHtml = mk
       ? `<span class="goal-target-name link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
       : (nameLbl ? `<span class="goal-target-name">${esc(nameLbl)}</span>` : '');
@@ -1752,9 +1791,36 @@ function openItemFiche(key) {
     const qs = it.questSource;
     const srcQuest = S.quests.get(qs.quest);
     if (srcQuest) {
-      const viaName = qs.via === 'kill' ? (S.monsters[qs.monster_key]?.name || null) : (qs.object_label || null);
-      const viaLine = viaName
-        ? `<p class="hint">${esc(qs.via === 'kill' ? tr('obtainViaKill', viaName) : tr('obtainViaInteract', viaName))}</p>` : '';
+      // BUG FIX (deferred-render race, quest-guide-feature follow-up task
+      // 3): the monster's display name used to be read LIVE from
+      // S.monsters[qs.monster_key] -- S.monsters is a DEFERRED bundle,
+      // loaded well after S.items/S.quests (this very fiche's own data), so
+      // this line was silently ABSENT for several seconds on every cold
+      // cache load, only appearing once main.js's post-loadDeferred()
+      // re-render caught up. It also failed PERMANENTLY (not just during
+      // the race) for any monster whose resolved key got folded into a
+      // DIFFERENT (name,level)-grouped representative by monsters_site() --
+      // S.monsters[qs.monster_key] then stays undefined forever. qs.
+      // monster_name is now baked at build time straight from geo.py's own
+      // resolved monster name (see build_site_data.py::build_catalog()),
+      // independent of the client's catalog grouping -- first render is
+      // already correct, no client-side lookup needed at all.
+      const viaName = qs.via === 'kill' ? (qs.monster_name || null) : (qs.object_label || null);
+      const viaText = viaName
+        ? esc(qs.via === 'kill' ? tr('obtainViaKill', viaName) : tr('obtainViaInteract', viaName)) : '';
+      // The clickable upgrade (monster fiche link) legitimately CAN'T
+      // resolve before S.monsters loads -- monsterKeyFor guards it exactly
+      // like every other such link in this file (actorRows, goalTargetChip);
+      // it silently upgrades in place once loadDeferred() completes and this
+      // fiche gets re-rendered. Unlike the name above, this part of the
+      // race is unavoidable (S.monsters itself has to exist to know the
+      // fiche does), so it degrades to plain text instead, never a dead link.
+      const viaMonsterKey = qs.via === 'kill' && qs.monster_key ? monsterKeyFor(qs.monster_key, qs.monster_name) : null;
+      const viaLine = viaText
+        ? `<p class="hint">${viaMonsterKey
+            ? `<span class="link" data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
+            : viaText}</p>`
+        : '';
       questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
         <div class="frow">
           <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>

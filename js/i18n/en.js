@@ -171,6 +171,11 @@ export default {
       noLootCatalogued: 'No catalogued loot for this monster.',
       noAbilitiesKnown: 'No known abilities for this monster.',
       noCampsKnown: 'No known camp for this monster.',
+      // Monster fiche "Quest items" section (monster<->quest-item link
+      // follow-up, task 1/4): lists questDrops[] baked at build time --
+      // ONLY resolver-produced kill links, section omitted entirely when
+      // empty (never an empty fabricated block).
+      monsterQuestItemsTitle: 'Quest items',
       familyMonstersTitle: n => `Monsters of this family (${n})`,
       abilityLabel: 'Ability',
       harvestTitle: 'Harvesting',

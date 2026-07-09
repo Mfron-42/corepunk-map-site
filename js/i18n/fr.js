@@ -161,6 +161,11 @@ export default {
       noLootCatalogued: 'Butin non catalogué pour ce monstre.',
       noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
       noCampsKnown: 'Aucun camp connu pour ce monstre.',
+      // Section « Objets de quête » de la fiche monstre (suivi du lien
+      // monstre<->objet de quête, tâche 1/4) : liste questDrops[] cuit au
+      // build -- uniquement des liens produits par le résolveur, section
+      // absente si vide (jamais un bloc vide fabriqué).
+      monsterQuestItemsTitle: 'Objets de quête',
       familyMonstersTitle: n => `Monstres de cette famille (${n})`,
       abilityLabel: 'Capacité',
       harvestTitle: 'Dépeçage',
