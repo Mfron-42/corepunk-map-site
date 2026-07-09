@@ -95,7 +95,10 @@ export default {
       // posDynamic/posDynamicZone/posUncatalogued below, never this one.
       posUnknown: 'position not specified',
       posDynamic: 'Dynamic position',
-      posDynamicZone: 'Dynamic position — spawn zone',
+      // Kept short (was "Dynamic position — spawn zone"): this label sits on
+      // the same row as a "View zone" button inside a quest-item fiche, and
+      // the long form pushed the button off the right edge (overflow fix E).
+      posDynamicZone: 'Spawn zone',
       posUncatalogued: 'Uncatalogued position — check in-game',
       // Sub-label for a search result row for an entire QUEST with no
       // extracted position (giver/actors all lack x/z — e.g. the Prison
@@ -126,6 +129,13 @@ export default {
       viewZoneBtn: 'View zone',
       onMapTitle: 'On the map',
       dialogsN: n => `Dialogue (${n})`,
+      // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph, isDialogue —
+      // no goals/rewards): its fiche is headed with this instead of the empty
+      // quest layout, so opening one (dev-content ON, or a direct q= link) is
+      // never a blank quest sheet.
+      dialogueFicheKind: 'NPC dialogue',
+      dialogueHeading: 'NPC dialogue (not a quest)',
+      dialogueNote: 'Idle greeting lines this character says — not a quest with objectives or rewards.',
       journalTitle: 'Journal',
       relatedQuestsTitle: 'Related quests',
       questFicheKind: region => 'Quest' + (region ? ` · ${region}` : ''),

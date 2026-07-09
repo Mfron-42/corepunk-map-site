@@ -97,7 +97,7 @@ export default {
       // de misión usan posDynamic/posDynamicZone/posUncatalogued más abajo.
       posUnknown: 'posición no especificada',
       posDynamic: 'Posición dinámica',
-      posDynamicZone: 'Posición dinámica — zona de aparición',
+      posDynamicZone: 'Zona de aparición',
       posUncatalogued: 'Posición no catalogada — verificar en el juego',
       // Subtítulo de la fila de resultado de búsqueda para una MISIÓN
       // entera sin posición extraída (el dador/actores no tienen x/z — p.
@@ -128,6 +128,9 @@ export default {
       viewZoneBtn: 'Ver la zona',
       onMapTitle: 'En el mapa',
       dialogsN: n => `Diálogos (${n})`,
+      dialogueFicheKind: 'Diálogo de PNJ',
+      dialogueHeading: 'Diálogo de PNJ (no es una misión)',
+      dialogueNote: 'Frases de ambiente que dice este personaje; no es una misión con objetivos ni recompensas.',
       journalTitle: 'Diario',
       relatedQuestsTitle: 'Misiones relacionadas',
       questFicheKind: region => 'Misión' + (region ? ` · ${region}` : ''),

@@ -96,7 +96,7 @@ export default {
       // використовують posDynamic/posDynamicZone/posUncatalogued нижче.
       posUnknown: 'позиція не вказана',
       posDynamic: 'Динамічна позиція',
-      posDynamicZone: 'Динамічна позиція — зона спавну',
+      posDynamicZone: 'Зона спавну',
       posUncatalogued: 'Позиція не каталогізована — перевірте в грі',
       // Підпис рядка результату пошуку для ЦІЛОГО КВЕСТУ без знайденої
       // позиції (у видавця/учасників немає x/z — напр. квести Prison
@@ -126,6 +126,9 @@ export default {
       viewZoneBtn: 'Дивитися зону',
       onMapTitle: 'На карті',
       dialogsN: n => `Діалоги (${n})`,
+      dialogueFicheKind: 'Діалог НПС',
+      dialogueHeading: 'Діалог НПС (не квест)',
+      dialogueNote: 'Репліки, які говорить цей персонаж, — це не квест із цілями та нагородами.',
       journalTitle: 'Журнал',
       relatedQuestsTitle: 'Пов’язані квести',
       questFicheKind: region => 'Квест' + (region ? ` · ${region}` : ''),

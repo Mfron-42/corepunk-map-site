@@ -96,7 +96,7 @@ export default {
       // ci-dessous, jamais celui-ci.
       posUnknown: 'position non précisée',
       posDynamic: 'Position dynamique',
-      posDynamicZone: 'Position dynamique — zone de spawn',
+      posDynamicZone: 'Zone de spawn',
       posUncatalogued: 'Position non cataloguée — à vérifier en jeu',
       // Sous-libellé de la ligne de résultat de recherche pour une QUÊTE
       // entière sans position extraite (giver/acteurs tous sans x/z — ex.
@@ -127,6 +127,9 @@ export default {
       viewZoneBtn: 'Voir la zone',
       onMapTitle: 'Sur la carte',
       dialogsN: n => `Dialogues (${n})`,
+      dialogueFicheKind: 'Dialogue PNJ',
+      dialogueHeading: 'Dialogue PNJ (pas une quête)',
+      dialogueNote: 'Répliques d’ambiance dites par ce personnage — ce n’est pas une quête avec objectifs ni récompenses.',
       journalTitle: 'Journal',
       relatedQuestsTitle: 'Quêtes liées',
       questFicheKind: region => 'Quête' + (region ? ` · ${region}` : ''),

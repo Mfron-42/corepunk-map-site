@@ -189,6 +189,17 @@ function buildCrossMapSearch() {
   const seen = new Set(searchIndex.map(searchDedupKey));
   for (const e of S.crossIndex) {
     if (e.map === S.map) continue;
+    // Dev/test + dialogue-bark gating parity (data-accuracy audit, dialogue-
+    // search finding #1): a hello_/info_ NPC greeting "quest" (isTest+
+    // isDialogue) that lives on a map OTHER than the one loaded came in
+    // through THIS cross-map path, which — unlike the per-map rich index
+    // (buildSearch above) and the map's own quest dense layer — had no
+    // isHiddenTest() gate, so searching an NPC name surfaced its empty
+    // "Hello X" dialogue fiche by default. The pipeline now stamps isTest/
+    // isDialogue onto every search_index.bin quest entry (build_site_data.py
+    // build_map_bundles) so the SAME single gate applies here too; revealed
+    // with the dev-content toggle exactly like everywhere else.
+    if (isHiddenTest(e)) continue;
     const key = `${e.cat}|${e.ref || fold(e.label)}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -203,8 +214,17 @@ function buildCrossMapSearch() {
             : e.cat === 'searchable_chest' ? CATS.searchable_chest.hex
               : e.cat === 'workshop' ? CATS.workshop.hex
                 : e.cat === 'camp' ? (CAMP_COLORS[e.kind] || '#888') : '#8d99ae';
+    // `terms` (quests only, build_site_data.py::_quest_search_terms): a
+    // compact localized digest (name + goal actions/labels + item labels +
+    // objective keywords). A quest on another map ships NO objectives/
+    // goalTexts/journal in the light cross-map index — this single string is
+    // the only objective/item text it carries, fed in as one `body` segment
+    // so runSearch()'s token matching (bodyMatch) can surface it by objective
+    // wording too, not just its title (issue D, cross-map parity with the
+    // active map's questSearchBody()).
+    const body = e.terms ? [e.terms] : null;
     pushSearchEntry(e.label, e.cat, hex, e.x ?? null, e.z ?? null,
-      () => crossMapOpen(e), null, null, null, 0, null, { map: e.map, ref: e.ref });
+      () => crossMapOpen(e), null, null, null, 0, body, { map: e.map, ref: e.ref });
   }
 }
 

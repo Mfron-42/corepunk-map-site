@@ -11,6 +11,7 @@ import {
 import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor } from './data.js';
+import { visibleQuestSlugs } from './devcontent.js';
 
 /* ── Popups ─────────────────────────────────────────────────── */
 function actionBtns(id, extra = '') {
@@ -54,10 +55,16 @@ function popupHtml(cat, r, id) {
   // l'ancien catLabel('chest') générique ("Coffres") qui conflait les 3
   // vraies catégories (voir DATA_CONTRACT.md §3.1/§6) — CATS.chest n'existe
   // plus du tout, `c` (CATS[cat]) est donc undefined pour cat === 'chest'.
+  // « N quêtes » : seulement les quêtes RÉELLEMENT visibles (jamais un
+  // dialogue-bark hello_*/info_* masqué par défaut, voir devcontent.js
+  // visibleQuestSlugs) — sinon un PNJ qui ne donne AUCUNE vraie quête (juste
+  // le bark générateur de son propre "Hello X") affichait quand même
+  // « · 2 quêtes », trompeur.
+  const npcQuests = cat === 'npc' ? visibleQuestSlugs(r.quests) : null;
   const catLine = cat === 'chest' ? chestKindLabel(r)
     : catLabel(cat)
       + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
-      + (cat === 'npc' && r.quests?.length ? tr('questCountSuffix', r.quests.length) : '');
+      + (cat === 'npc' && npcQuests.length ? tr('questCountSuffix', npcQuests.length) : '');
   // Titre : nom d'affichage localisé pour un coffre (chestDisplayName — le
   // nom brut est un jeton d'asset d'art jamais localisé, voir config.js) ;
   // nettoyage TEXTURING/QItem générique (cleanLabel) pour tout le reste.

@@ -29,6 +29,21 @@ function isHiddenTest(rec) {
   return !!(rec && rec.isTest && !S.devOn);
 }
 
+/* Slugs from an NPC's `quests` list (site npcs.json — quest-giver links)
+   narrowed to the ones actually visible right now, same isHiddenTest gate as
+   everywhere else. An NPC whose ONLY given "quests" are the hello_ / info_
+   dialogue barks (isTest+isDialogue, see build_site_data.py::quest_hints())
+   must not list/count them as real quests by default — fiches.js
+   openNpcFiche's "N quests given" section and popups.js's map-popup
+   "N quêtes" badge both read this instead of the raw `r.quests`/`n.quests`
+   array (data-accuracy audit, NPC-duplication finding #4: a merged NPC pin
+   (see build_site_data.py::link_npc_quests()) can carry BOTH a real quest
+   slug and a hidden dialogue slug in the same list). `S.quests` (slug ->
+   site quest record) must already be populated, see data.js::loadCritical. */
+function visibleQuestSlugs(slugs) {
+  return (slugs || []).filter(slug => !isHiddenTest(S.quests.get(slug)));
+}
+
 /* Comptes bruts (pas dédupliqués par modèle) pour l'étiquette « Contenu dev
    (N) » — reflète exactement les 4 jeux de données concernés par la mission
    (monstres/items/objets de quête/quêtes). Recalculé à chaque appel (pas de
@@ -43,4 +58,4 @@ function devContentCounts() {
   return { monsters, items, qao, quests, total: monsters + items + qao + quests };
 }
 
-export { isHiddenTest, devContentCounts };
+export { isHiddenTest, devContentCounts, visibleQuestSlugs };

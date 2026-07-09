@@ -96,7 +96,7 @@ export default {
       // используют posDynamic/posDynamicZone/posUncatalogued ниже.
       posUnknown: 'позиция не указана',
       posDynamic: 'Динамическая позиция',
-      posDynamicZone: 'Динамическая позиция — зона спавна',
+      posDynamicZone: 'Зона спавна',
       posUncatalogued: 'Позиция не каталогизирована — проверьте в игре',
       // Подпись строки результата поиска для ЗАДАНИЯ целиком без найденной
       // позиции (у выдающего/участников нет x/z — напр. задания Prison
@@ -126,6 +126,9 @@ export default {
       viewZoneBtn: 'Смотреть зону',
       onMapTitle: 'На карте',
       dialogsN: n => `Диалоги (${n})`,
+      dialogueFicheKind: 'Диалог НПС',
+      dialogueHeading: 'Диалог НПС (не задание)',
+      dialogueNote: 'Реплики, которые говорит этот персонаж, — это не задание с целями и наградами.',
       journalTitle: 'Журнал',
       relatedQuestsTitle: 'Связанные задания',
       questFicheKind: region => 'Задание' + (region ? ` · ${region}` : ''),

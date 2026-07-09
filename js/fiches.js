@@ -21,7 +21,7 @@ import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
-import { isHiddenTest } from './devcontent.js';
+import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -1023,7 +1023,14 @@ function openNpcFiche(idx) {
   if (!r) return;
   S.openFiche = { kind: 'npc', id: idx };
   const img = r.icon ? `icons/npc_map/${encodeURIComponent(r.icon)}.png` : null;
-  const quests = (r.quests || []).map(slug => {
+  // Seulement les quêtes RÉELLEMENT visibles : un dialogue-bark hello_*/info_*
+  // (isTest+isDialogue) que ce PNJ « donne » ne compte pas comme une quête et
+  // n'apparaît pas ici par défaut (voir devcontent.js visibleQuestSlugs) —
+  // sinon un PNJ sans aucune vraie quête affichait « Quêtes données (2) » +
+  // 2 lignes qui, cliquées, ouvraient une fiche vide. Révélé avec le contenu
+  // dev (S.devOn), exactement comme partout ailleurs.
+  const visibleSlugs = visibleQuestSlugs(r.quests);
+  const quests = visibleSlugs.map(slug => {
     const q = S.quests.get(slug);
     return q ? `<div class="frow">
       <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
@@ -1047,6 +1054,29 @@ function openNpcFiche(idx) {
   const mapBtn = r.x != null
     ? `<button class="act primary" data-act="goto" data-x="${r.x}" data-z="${r.z}" data-label="${esc(r.name)}">${esc(tr('viewOnMapBtn'))}</button>`
     : '';
+  // Dialogue du personnage (data-accuracy audit, NPC-duplication fix): les
+  // barks hello_/info_ que ce PNJ « donne » sont masqués de la liste de quêtes
+  // (visibleQuestSlugs ci-dessus) car ce ne sont pas des quêtes — mais leurs
+  // répliques d'ambiance SONT ce personnage. Comme les pins dupliqués (le
+  // donneur-de-dialogue + le donneur-de-quête + le vrai PNJ) sont désormais
+  // fusionnés en UN seul pin (build_site_data.py::link_npc_quests), on rattache
+  // ici ses dialogues À CÔTÉ de ses vraies quêtes, dans une section repliée et
+  // clairement étiquetée — jamais une fausse entrée de quête vide. Toujours
+  // visible (c'est du lore, pas du contenu dev), dédupliqué ligne à ligne.
+  const dialogueLines = [];
+  const seenLines = new Set();
+  for (const slug of (r.quests || [])) {
+    const q = S.quests.get(slug);
+    if (!q || !q.isDialogue) continue;
+    for (const l of (q.dialogs?.npc || [])) {
+      if (!seenLines.has(l)) { seenLines.add(l); dialogueLines.push(l); }
+    }
+  }
+  const dialogueSection = dialogueLines.length
+    ? `<div class="fiche-section"><details class="fiche-dialogs">
+        <summary>${esc(tr('dialogsN', dialogueLines.length))}</summary>
+        ${dialogueLines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')}
+      </details></div>` : '';
   openFiche(`
     <div class="fiche-head">${iconTag(img, 'fiche-avatar', initials(r.name))}
       <div><div class="fiche-kind">${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}</div><h2>${esc(r.name)}</h2>
@@ -1056,8 +1086,9 @@ function openNpcFiche(idx) {
         ${mapBtn}
         <button class="act" data-act="track" data-id="npc:${idx}">${esc(tr('trackBtn'))}</button>
       </div></div>
-    <div class="fiche-section"><h3>${esc(tr('questsGivenN', (r.quests || []).length))}</h3>
+    <div class="fiche-section"><h3>${esc(tr('questsGivenN', visibleSlugs.length))}</h3>
       ${quests || `<p class="hint">${esc(tr('noQuestsForNpc'))}</p>`}</div>
+    ${dialogueSection}
     ${r.vendor ? vendorStockSection(r.vendor) : ''}`);
   setFicheHash('npc', idx);
 }
@@ -1289,12 +1320,52 @@ function questRewardsSection(q) {
   return `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3>${fixedHtml}${choicesHtml}</div>`;
 }
 
+/* Fiche d'un dialogue-bark PNJ (q.isDialogue) : les répliques d'ambiance du
+   personnage (q.dialogs.npc/player), sous un en-tête explicite « Dialogue PNJ
+   (pas une quête) » — jamais la mise en page d'une quête vide. Toujours
+   ouvrable (contenu dev activé / lien profond direct) ; garde le hash de
+   quête (setFicheHash('quest', slug)) pour que le partage d'URL rouvre
+   exactement cette fiche. */
+function openDialogueFiche(q, slug) {
+  const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
+  const lines = [...(q.dialogs?.npc || []), ...(q.dialogs?.player || [])];
+  const linesHtml = lines.length
+    ? lines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')
+    : `<p class="hint">${esc(tr('noResults'))}</p>`;
+  // Le PNJ qui « donne » ce bark, cliquable vers sa vraie fiche quand il est
+  // connu de la carte active (navigation dialogue → PNJ).
+  const ni = q.giver ? npcIndexByName(q.giver) : -1;
+  const giverLine = q.giver
+    ? (ni >= 0
+      ? `<span class="pop-coords link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('givenByPlain', q.giver))}</span>`
+      : `<span class="pop-coords">${esc(tr('givenByPlain', q.giver))}</span>`)
+    : '';
+  openFiche(`
+    <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name))}
+      <div><div class="fiche-kind">${esc(tr('dialogueFicheKind'))}</div><h2>${esc(q.name)}</h2>
+      ${giverLine}</div></div>
+    <div class="fiche-section">
+      <h3>${esc(tr('dialogueHeading'))}</h3>
+      <p class="hint">${esc(tr('dialogueNote'))}</p>
+      <div class="fiche-dialogs-flat">${linesHtml}</div>
+    </div>`);
+  setFicheHash('quest', slug);
+}
+
 function openQuestFiche(slug) {
   const q = S.quests.get(slug);
   if (!q) return;
   S.openFiche = { kind: 'quest', id: slug };
   currentGoalZones = [];   // ré-indexé à chaque ouverture (voir goalTargetChip/dynamicPosBadge)
   clearGoalZone();
+  // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph — isDialogue,
+  // 0 goals/0 rewards/no real items, see build_site_data.py::quest_hints()).
+  // Masqué de la recherche/carte par défaut (isHiddenTest), mais ENCORE
+  // ouvrable (contenu dev activé, OU lien profond q=<slug> direct) — dans ce
+  // cas on ne rend PAS une fiche de quête vide (l'ancien comportement : titre
+  // "Hello Blitz Hyperstorm" + zéro objectif/récompense/item), mais une fiche
+  // clairement étiquetée « Dialogue PNJ (pas une quête) » avec ses répliques.
+  if (q.isDialogue) { openDialogueFiche(q, slug); return; }
   const regionHint = q.regions?.length ? q.regions[0] : null;
   const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
   // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :
