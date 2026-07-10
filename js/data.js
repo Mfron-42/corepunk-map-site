@@ -6,6 +6,7 @@ import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
 import { DECOR_FAMILIES } from './config.js';
+import { positionCounts } from './devcontent.js';
 
 /* ── Version stamp (cache-busting) ──────────────────────────────────────
    Incident réel motivant ce bloc : un onglet resté ouvert des heures a
@@ -87,18 +88,23 @@ const dataPath = name => `data/${S.lang}/${name}`;
    ce sont désormais leurs propres couches de haut niveau (config.js CATS),
    pas des sous-filtres. */
 function buildDecorGroups(chests, prevOn = {}) {
-  const counts = {};
+  const byFam = {};
   for (const c of chests) {
     let fam = null;
     if (c.group === 'decor') fam = c.family || 'misc';
     else if (c.group === 'legacy_chest') fam = 'legacy';
     else continue;
-    counts[fam] = (counts[fam] || 0) + 1;
+    (byFam[fam] || (byFam[fam] = [])).push(c);
   }
   const next = {};
   for (const fam of DECOR_FAMILIES) {
-    if (!(fam in counts)) continue;
-    next[fam] = { on: fam in prevOn ? prevOn[fam] : false, count: counts[fam] };
+    if (!(fam in byFam)) continue;
+    // { count, hidden } : même honnêteté que catStats (js/sidebar.js) —
+    // `count` = ce qui sera réellement dessiné (position connue, hors gate
+    // dev), `hidden` = décor réel mais sans position connue (voir
+    // devcontent.js::positionCounts, jamais un isTest -- déjà exclu des deux).
+    const { shown, hidden } = positionCounts(byFam[fam]);
+    next[fam] = { on: fam in prevOn ? prevOn[fam] : false, count: shown, hidden };
   }
   return next;
 }

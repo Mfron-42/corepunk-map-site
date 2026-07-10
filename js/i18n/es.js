@@ -125,11 +125,23 @@ export default {
       craftableTag: 'crafteable',
       lootTag: 'botín',
       activableBadge: 'Activable',
+      // Insignia «Contenedor» (decodificación de mecanismo, tarea A):
+      // identidad propia del objeto de collect_from_object (t.label, p. ej.
+      // "Caja vieja") — distinta de activableBadge de arriba (objeto
+      // autosuficiente de use_object, no un contenedor donde se encuentra
+      // OTRA COSA).
+      containerBadge: 'Contenedor',
       // Relación explícita de la tarjeta de objetivo (design review, julio
       // 2026): ver en.js para el contexto -- nunca interpolado con el
       // nombre (que queda como span cliqueable aparte, ver goalTargetChip).
       goalDroppedByLabel: 'soltado por',
       goalObtainedHereLabel: 'obtenido aquí',
+      // Contraparte "contenedor" de goalObtainedHereLabel de arriba, propia
+      // de collect_from_object (decodificación de mecanismo, tarea A): solo
+      // se usa cuando se conoce la etiqueta del contenedor (t.label) — solo
+      // el verbo, el nombre va en su propio span justo después, mismo
+      // esquema que goalDroppedByLabel/nameSpan.
+      goalFoundInLabel: 'encontrado en',
       // Mismo vocabulario de fila de relación, pase de cableado por lotes: un
       // objeto entregado por quien da la misión (given_by_giver, p. ej.
       // "Time of Death" de eight_legged_freaks) y un objeto solo crafteable
@@ -137,6 +149,23 @@ export default {
       // los dos es una aparición en el mundo, así que nunca llevan posición
       // ni zona.
       goalGivenByLabel: 'entregado por',
+      // Mecanismo receive_reward (decodificación de mecanismo, tarea A): el
+      // objeto se obtiene al completar OTRA misión (geo.py reward_of), no
+      // entregado por quien da esta misión — solo el verbo, sigue un span de
+      // misión cliqueable por cada entrada de reward_of (ver rewardOfRelRow).
+      goalRewardOfLabel: 'obtenido al completar',
+      // Mecanismo harvest: un nodo de recolección de recursos (tala/
+      // herboristería/minería — target.profession, localizado vía
+      // professionLabel).
+      goalHarvestLabel: profession => `recolectar (${profession})`,
+      // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
+      // bytes) — distinto del dropChanceApprox genérico (parte calculada,
+      // nunca "≈" aquí, es el porcentaje diseñado por el juego).
+      goalDropChanceLabel: pct => `(${pct} %)`,
+      // Mecanismo kill_player: target.player_specs combinados vía
+      // heroSpecLabel (fiches.js) — no hay una única ubicación para un
+      // objetivo JcJ.
+      goalKillPlayerLabel: specs => `Derrotar jugadores (${specs})`,
       goalCraftLabel: 'a craftear',
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
@@ -151,12 +180,21 @@ export default {
       // mismo círculo estimado que viewZoneBtn — nunca el mismo texto, para
       // no confundirlo con una zona confirmada.
       viewEstimatedZoneBtn: 'Ver estimación',
-      onMapTitle: 'En el mapa',
+      onMapTitleN: n => `En el mapa (${n})`,
       dialogsN: n => `Diálogos (${n})`,
+      // Insignia de confianza en la cabecera (rediseño de layout, julio 2026):
+      // `q.explained` {goals_total, goals_resolved} viene tal cual del
+      // decodificador del grafo de misión — 333 de 335 misiones decodificadas
+      // están hoy totalmente explicadas, 2 conservan al menos un objetivo sin
+      // resolver. Nunca se muestra sin grafo de objetivos en absoluto
+      // (diálogos de ambiente, etc.).
+      questExplainedFull: 'Totalmente explicada',
+      questExplainedPartial: n => `${n} objetivo${n > 1 ? 's' : ''} incierto${n > 1 ? 's' : ''}`,
       dialogueFicheKind: 'Diálogo de PNJ',
       dialogueHeading: 'Diálogo de PNJ (no es una misión)',
       dialogueNote: 'Frases de ambiente que dice este personaje; no es una misión con objetivos ni recompensas.',
-      journalTitle: 'Diario',
+      journalShowMoreBtn: 'Ver más',
+      journalShowLessBtn: 'Ver menos',
       relatedQuestsTitle: 'Misiones relacionadas',
       questFicheKind: region => 'Misión' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Probabilidades de botín',
@@ -165,6 +203,16 @@ export default {
       obtainDuringQuestTitle: 'Cómo obtenerlo',
       obtainViaKill: name => `Matando a ${name}`,
       obtainViaInteract: label => `Interactuando con ${label}`,
+      // Extensión de quest_source_of, decodificación de mecanismo, tarea B
+      // (harvest/reward_of/world -- given_by reutiliza ui.givenByPlain,
+      // container reutiliza obtainViaInteract de arriba, ver
+      // build_site_data.py + fiches.js openItemFiche).
+      obtainViaHarvest: profession => `Recolectando (${profession})`,
+      // Fragmento, no una frase completa -- se combina con ui.givenByPlain
+      // como "Dado por X — quest Y" (caso cruzado de receive_reward, ver la
+      // rama qs.via === 'reward_of' de openItemFiche).
+      obtainViaRewardOfQuest: name => `misión ${name}`,
+      obtainViaWorld: 'Se encuentra al completar esta misión',
       moreMerchants: n => `+ ${n} comerciantes más`,
       merchantPosUnknown: 'Posición del comerciante no especificada.',
       recipeTitle: 'Receta',

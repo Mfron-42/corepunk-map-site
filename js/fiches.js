@@ -9,7 +9,7 @@ import {
   CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, ACTION_META, actionVerb, actionIconSvg, mapName,
+  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campDisplayName, campLootTableName, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX,
@@ -1026,6 +1026,19 @@ function gotoBtn(x, z, label, cat) {
 function crossMapBtn(mid, x, z, label) {
   return `<button class="goto goto-cross" data-act="map-goto" data-map="${esc(mid)}" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(mapName(mid))}</span></button>`;
 }
+/* Variante SANS position connue (batch-wiring pass, mechanism decode job A) :
+   geo.py attache parfois `target.map` seul, jamais avec x/z, pour une cible
+   npc/item/zone dont la seule position connue vit sur une AUTRE carte que
+   celle interrogée (ex. _npc_pos_target/_resolve_target_mech's receive_reward
+   branch — "cross-map: named, no local pin"). Avant cette passe, ce cas ne
+   déclenchait NI gotoBtn NI crossMapBtn (les deux exigent x/z) : la vignette
+   retombait sur le texte générique dynamicPosBadge "Position dynamique",
+   perdant complètement l'info de carte. Un simple bouton de bascule (pas de
+   goTo ensuite — aucune coordonnée à viser) répare ça honnêtement, sans
+   fabriquer une position qu'on n'a pas. */
+function crossMapOnlyBtn(mid, label) {
+  return `<button class="goto goto-cross" data-act="map-switch" data-map="${esc(mid)}" data-label="${esc(label || '')}" title="${esc(tr('mapBadgeTitle', mapName(mid)))}">${GOTO_ICON}<span>${esc(mapName(mid))}</span></button>`;
+}
 
 /* ── Position d'objectif de quête à 3 niveaux ──────────────────────────
    Un objectif de quête n'affiche PLUS JAMAIS « position inconnue » : un objet
@@ -1530,6 +1543,51 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   // tel quel dans le texte de la bulle quand le joueur le copiait/collait.
   return `<div class="goal-target-row goal-target-item${it ? ' link' : ''}"${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approxSup}</span>${badge}${extraBadge || ''}</div>`;
 }
+/* Relation row for a receive_reward mechanism target whose `reward_of`
+   (geo.py's _resolve_target_mech) names at least one quest OTHER than the
+   one currently open (S.openFiche.id, already set by openQuestFiche before
+   this section renders): "obtained by completing <that quest>", linked when
+   the quest is resolvable on S.quests, one span per entry joined by "or"
+   (several reward_of quests = several equally valid ways to obtain the
+   item). Same-quest rewards (reward_of holding ONLY the open quest's own
+   slug, e.g. puzzles_of_the_afterlife's saddle) return '' -- the caller's
+   own plain given-by/identity wording already covers that case correctly,
+   "obtained by completing X" would be circular on X's own fiche.
+   Display name: S.quests' own (live, current-locale, guaranteed aligned)
+   name first; `reward_of_names` (baked pipeline-side) only as a fallback
+   when a slug isn't in S.quests AND the two arrays are the same length --
+   geo.py's own `names = [n for n in names if n]` can silently drop entries,
+   so a length mismatch means the arrays are NOT positionally aligned and
+   the raw slug is shown instead of risking a wrong quest name. */
+function rewardOfRelRow(t) {
+  const others = (t.reward_of || []).filter(s => s !== S.openFiche?.id);
+  if (!others.length) return '';
+  const namesAligned = t.reward_of_names && t.reward_of_names.length === t.reward_of.length;
+  const links = others.map(slug => {
+    const rq = S.quests.get(slug);
+    const idx = t.reward_of.indexOf(slug);
+    const qname = rq?.name || (namesAligned ? t.reward_of_names[idx] : slug);
+    return rq
+      ? `<span class="goal-target-name link" data-act="fiche-quest" data-id="${esc(slug)}">${esc(qname)}</span>`
+      : `<span class="goal-target-name">${esc(qname)}</span>`;
+  }).join(esc(tr('orWord')));
+  return `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`;
+}
+/* kill_player mech_target.player_specs codes (e.g. "CHA_S1") are a hero-class
+   prefix + spec number. The prefix matches trial_of_worthiness's OWN
+   goal_ids byte-for-byte (kill_champions/kill_warmongers/kill_bombers ->
+   CHA/ORC/BOM -- see data/quest_graphs.json), so these are the SAME 3
+   already-localized weaponClass tokens sourced from Units.xml (see
+   config.js weaponClassLabel/fr.js's own comment on that dict) -- never a
+   separate/guessed vocabulary. An unrecognized prefix (a hypothetical 4th
+   class) falls back to the raw code untouched, never a fabricated name. */
+const HERO_SPEC_CLASS = { CHA: 'Champion', BOM: 'Bomber', ORC: 'Warmonger' };
+function heroSpecLabel(code) {
+  const m = /^([A-Z]+)_S(\d+)$/.exec(code || '');
+  if (!m) return code;
+  const cls = HERO_SPEC_CLASS[m[1]];
+  return cls ? `${weaponClassLabel(cls)} ${m[2]}` : code;
+}
 function goalTargetChip(t, label, regionHint) {
   if (!t || t.kind === 'multiple') return '';
   const lbl = esc(label || '');
@@ -1544,7 +1602,15 @@ function goalTargetChip(t, label, regionHint) {
   const posX = npcPin && npcPin.x != null ? npcPin.x : t.x;
   const posZ = npcPin && npcPin.x != null ? npcPin.z : t.z;
   const posCat = npcPin && npcPin.x != null ? 'npc' : null;
-  const posRow = `<div class="goal-target-row goal-target-row-pos">${t.x != null ? gotoBtn(posX, posZ, lbl, posCat) : dynamicPosBadge(t, regionHint)}</div>`;
+  // `t.map` seul (sans x/z) -- cible cross-carte dont geo.py ne connaît QUE la
+  // carte, jamais une coordonnée locale (mechanism decode job A, ex. le PNJ de
+  // remise d'un receive_reward sur une autre carte) : bascule simple plutôt
+  // que le texte générique dynamicPosBadge, qui masquait l'info de carte.
+  const posRow = `<div class="goal-target-row goal-target-row-pos">${
+    t.x != null ? gotoBtn(posX, posZ, lbl, posCat)
+      : t.map ? crossMapOnlyBtn(t.map, lbl)
+        : dynamicPosBadge(t, regionHint)
+  }</div>`;
 
   if (t.kind === 'item') {
     // La cible EST l'item lui-même -- rien à relier, juste son identité
@@ -1554,6 +1620,16 @@ function goalTargetChip(t, label, regionHint) {
     // interne non nettoyé, ex. "Quest item removed start quest troll head",
     // quand aucun `key` catalogue ne résout) + sa position à 3 niveaux.
     const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem) || '';
+    // receive_reward (mechanism) whose single-quest-caller shape resolved a
+    // bare item identity (no quest_refs available -- see geo.py's
+    // _resolve_target_mech, the theoretical fallback of that branch): still
+    // carries `reward_of`/`reward_of_names` regardless of the target's own
+    // kind, so the same cross-quest relation wording as the npc branch below
+    // applies here too -- see rewardOfRelRow's own doc.
+    const itemRewardRow = rewardOfRelRow(t);
+    if (itemRewardRow) {
+      return `<div class="goal-target">${itemRow}${itemRewardRow}${posRow}</div>`;
+    }
     // craft:true (geo.py's craft-only pre-check, e.g. construction_lesson's
     // "Recipe: Immuno-Stimulating Implant"): items.json proves this item is
     // produced_by_recipes/craftable with ZERO world drop/farm evidence -- the
@@ -1573,6 +1649,21 @@ function goalTargetChip(t, label, regionHint) {
   }
 
   if (t.kind === 'object') {
+    // harvest (mechanism): a resource-gathering node (logging/herbalism/
+    // mining -- geo.py's dedicated harvest branch, `target.profession`),
+    // never an "Activatable" quest prop -- checked FIRST, before the
+    // generic item_key/key join below (a harvest target always carries
+    // item_key too, which would otherwise misroute it into the differing/
+    // "Activatable" wording meant for actual interactive objects). No
+    // position ever ships for these (geo.py never resolves one) -- `posRow`
+    // still renders its honest generic "dynamic position" fallback, exactly
+    // like any other position-less target.
+    if (t.profession) {
+      const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
+      const profLabel = professionLabel(capitalize(t.profession));
+      const relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalHarvestLabel', profLabel))}</span></div>`;
+      return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+    }
     // t.item_key (quest-guide-feature plan sec 5.2) est une chose DIFFÉRENTE
     // de t.key ci-dessus : t.key est la clé catalogue PROPRE de cet objet
     // (rare), t.item_key est l'item de quête concret que cette interaction
@@ -1588,7 +1679,19 @@ function goalTargetChip(t, label, regionHint) {
     let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, differing ? '' : activableBadge);
     let relRow = '';
     if (itemRow && differing) {
-      relRow = `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+      // collect_from_object (mechanism): the ONLY mech that ever attaches an
+      // item_key distinct from the object's own key (use_object never does,
+      // see geo.py's _resolve_target_mech) -- named "container" wording +
+      // the actual container's own label when known (t.label, e.g. "Old
+      // crate"), never a fabricated container name when it isn't (falls
+      // back to the previous generic "obtained here" phrasing untouched).
+      relRow = t.label
+        ? `<div class="goal-target-row goal-target-row-rel">
+            <span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('containerBadge'))}</span>
+            <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
+            <span class="goal-target-name">${esc(t.label)}</span>
+          </div>`
+        : `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
     // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
@@ -1642,12 +1745,22 @@ function goalTargetChip(t, label, regionHint) {
       : (nameLbl ? `<span class="goal-target-name">${esc(nameLbl)}</span>` : '');
     const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
     const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
+    // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
+    // byte-attached -- see geo.py's drops_quest_loot join on BOTH mechs):
+    // `target.drop_chance` (0-100, byte-exact from SetQuestLootDirect, NOT
+    // the generic loot-table weight share dropRateHtml renders elsewhere) --
+    // shown as a plain percentage, or "Guaranteed" at the 100% direct-grant
+    // value QUEST_FORMAT.md sec 9b documents. Purely data-driven (no mechanism
+    // string needed): only ever present when a real quest-loot join happened.
+    const chanceText = t.drop_chance == null ? null
+      : t.drop_chance >= 100 ? tr('guaranteedLabel') : tr('goalDropChanceLabel', t.drop_chance);
+    const chanceSpan = (itemRow && chanceText) ? `<span class="goal-target-lvl">${esc(chanceText)}</span>` : '';
     // Relation EXPLICITE seulement quand un item de quête est réellement
     // rattaché (le point central de cette passe) : "dropped by <monstre>".
     // Sans item (kill pur, ex. killig_creatures_field_robot), rien à relier
     // -- la ligne redevient juste le nom+niveau, sans verbe inventé.
     const relRow = itemRow
-      ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}</div>`
+      ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}${chanceSpan}</div>`
       : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}${lvlSpan}</div>` : '');
     return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
   }
@@ -1668,6 +1781,21 @@ function goalTargetChip(t, label, regionHint) {
     // never a fabricated one.
     if (t.given_by_giver) {
       const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
+      // receive_reward (mechanism) whose reward_of names a quest OTHER than
+      // the one currently open: "obtained by completing <that quest>" wins
+      // over the plain given-by wording below -- t.label here is merely
+      // THAT quest's own turn-in NPC (geo.py's _resolve_target_mech
+      // receive_reward branch, e.g. eight_legged_freaks' Ophelia Voss
+      // handing over thistlebrooks_terrifying_task's "Time of Death"),
+      // saying "given by" would misattribute the grant to the OPEN quest.
+      // Same-quest rewards (reward_of holding only the open quest's own
+      // slug, e.g. puzzles_of_the_afterlife's saddle) return '' here and
+      // fall through to the unchanged given-by wording -- this quest really
+      // is the source. See rewardOfRelRow's own doc.
+      const rewardRow = rewardOfRelRow(t);
+      if (rewardRow) {
+        return `<div class="goal-target">${itemRow}${rewardRow}${posRow}</div>`;
+      }
       const ni = t.label ? npcIndexByName(t.label) : -1;
       const giverSpan = (ni >= 0)
         ? `<span class="goal-target-name link" data-act="fiche-npc" data-id="npc:${ni}">${esc(t.label)}</span>`
@@ -1693,7 +1821,59 @@ function goalTargetChip(t, label, regionHint) {
   if (t.kind === 'dynamic') {
     return `<div class="goal-target">${posRow}</div>`;
   }
-  return '';
+
+  if (t.kind === 'ability') {
+    // use_ability (mechanism): mech_target.label is a raw slot/trigger name
+    // (e.g. "use_ability", "quest ability death_raven"), not always a real
+    // in-game ability display name -- shown as-is (cleaned), never guessed
+    // against S.abilities by name (no reliable fold-match source exists for
+    // these labels, unlike npc/monster names -- a wrong ability link would
+    // be worse than a plain unlinked chip). No position: casting an ability
+    // has no location concept (unlike a harvest node or a zone), so `posRow`
+    // is deliberately NOT rendered here -- same "never a fabricated position
+    // for a non-world target" rule as the craft branch above.
+    const abLabel = t.label ? cleanLabel(t.label) : null;
+    if (!abLabel) return '';
+    return `<div class="goal-target">
+      <div class="goal-target-row goal-target-item">
+        <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
+        <span class="goal-target-item-label">${esc(abLabel)}</span>
+        <span class="k-chip" style="--chip-c:${ABILITY_HEX}">${esc(tr('abilityLabel'))}</span>
+      </div>
+    </div>`;
+  }
+
+  if (t.kind === 'zone') {
+    // enter_zone/exit_zone (mechanism): a named area (mech_target.label),
+    // sometimes with a real slot position (geo.py's enter_zone branch) --
+    // `posRow` (shared, computed above) already renders it (gotoBtn) or the
+    // honest generic dynamic-position fallback when it isn't known.
+    const zLabel = t.label ? cleanLabel(t.label) : null;
+    const nameRow = zLabel
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name">${esc(zLabel)}</span></div>` : '';
+    return `<div class="goal-target">${nameRow}${posRow}</div>`;
+  }
+
+  if (t.kind === 'players') {
+    // kill_player (mechanism): mech_target.player_specs codes (e.g.
+    // "CHA_S1") -- see heroSpecLabel's own doc for the class-name join. No
+    // position: a PvP kill objective has no single world location.
+    const specs = (t.player_specs || []).map(heroSpecLabel);
+    if (!specs.length) return '';
+    const text = tr('goalKillPlayerLabel', specs.join(', '));
+    return `<div class="goal-target"><div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-name">${esc(text)}</span></div></div>`;
+  }
+
+  // Honest last-resort fallback (batch-wiring pass, mechanism decode job A):
+  // an unrecognized/future target kind (or one of the 4 byte-parse-gap
+  // residuals, mechanism: null -- QUEST_FORMAT.md sec 12) never renders
+  // silently blank under a normal-looking objective sentence -- shows
+  // whatever name the resolver actually produced, never a fabricated
+  // relation/position beyond what's genuinely on `t`.
+  const customName = t.label ? cleanLabel(t.label) : null;
+  return customName
+    ? `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span></div></div>`
+    : '';
 }
 
 /* Détecte si la cible d'un objectif fait partie d'une SÉRIE NUMÉROTÉE (ex.
@@ -1825,6 +2005,53 @@ function questRewardsSection(q) {
   return `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3>${fixedHtml}${choicesHtml}</div>`;
 }
 
+/* Pastille de confiance : `q.explained` {goals_total, goals_resolved, pct}
+   vient tel quel du décodeur de graphe de quête (
+   -- jamais recalculé ici). 333 quêtes sur 335 dotées d'un graphe de buts sont
+   intégralement expliquées (chaque but a un mécanisme/une cible résolus) ; les
+   2 restantes gardent au moins un but non résolu -- le badge le dit sans
+   détour plutôt que de laisser croire que CHAQUE étape vient à coup sûr des
+   données du jeu (honnêteté > fabrication, voir project memory). Repli
+   silencieux (pas de badge du tout) sur les quêtes sans graphe de buts décodé
+   (dialogues-barks, quelques gabarits internes) -- rien à confirmer/infirmer.
+   Discret dans les deux cas : la variante "tout expliqué" (l'écrasante
+   majorité) reste presque invisible (texte atténué, pas de fond), seule la
+   variante "incertain" (rarissime) est un peu plus visible -- jamais une
+   couleur criarde ni un `title` supplémentaire redondant avec le texte. */
+function questExplainedBadge(q) {
+  const e = q.explained;
+  if (!e || !e.goals_total) return '';
+  const uncertain = e.goals_total - e.goals_resolved;
+  return uncertain <= 0
+    ? `<div class="quest-explain-badge quest-explain-full"><span aria-hidden="true">✓</span> ${esc(tr('questExplainedFull'))}</div>`
+    : `<div class="quest-explain-badge quest-explain-partial"><span aria-hidden="true">⚠</span> ${esc(tr('questExplainedPartial', uncertain))}</div>`;
+}
+
+/* Journal : texte de présentation de la quête (ambiance), sorti du tiroir
+   replié -- rendu tel quel juste sous le titre (revue de layout, juillet
+   2026) comme un paragraphe stylé ordinaire, sans étiquette de section (même
+   parti pris que la description d'objet, voir descHtml plus bas : un texte
+   d'ambiance n'a pas besoin d'un <h3> qui le nomme). Repli en clamp CSS pur
+   (case à cocher invisible + sélecteur ~ général, aucune mesure DOM/JS)
+   seulement passé un certain seuil de longueur -- ~14 quêtes sur 336 dans le
+   jeu de données actuel (max observé 313 caractères) ; les 322 autres
+   s'affichent toujours en entier, jamais tronquées à la lettre près. */
+const JOURNAL_CLAMP_THRESHOLD = 220;
+function questJournalSection(q) {
+  if (!q.journal) return '';
+  if (q.journal.length <= JOURNAL_CLAMP_THRESHOLD) {
+    return `<div class="fiche-section fiche-journal-section"><p class="fiche-journal">${esc(q.journal)}</p></div>`;
+  }
+  return `<div class="fiche-section fiche-journal-section">
+    <input type="checkbox" id="journal-expand-cb" class="journal-expand-cb">
+    <p class="fiche-journal fiche-journal-clamp">${esc(q.journal)}</p>
+    <label for="journal-expand-cb" class="journal-expand-toggle">
+      <span class="journal-expand-more">${esc(tr('journalShowMoreBtn'))}</span>
+      <span class="journal-expand-less">${esc(tr('journalShowLessBtn'))}</span>
+    </label>
+  </div>`;
+}
+
 /* Fiche d'un dialogue-bark PNJ (q.isDialogue) : les répliques d'ambiance du
    personnage (q.dialogs.npc/player), sous un en-tête explicite « Dialogue PNJ
    (pas une quête) » — jamais la mise en page d'une quête vide. Toujours
@@ -1929,8 +2156,14 @@ function openQuestFiche(slug) {
     </div>`;
   }).join('');
   const rewards = questRewardsSection(q);
+  // Secondaire (revue de layout, juillet 2026) : les étapes (goalSteps)
+  // couvrent déjà chaque item de quête individuellement (goalTargetChip) --
+  // replié par défaut, jamais supprimé (contenu réel, juste plus bas dans la
+  // hiérarchie visuelle). Même tiroir générique que dialogs/journal
+  // ci-dessous (classe .fiche-dialogs, réutilisée partout dans ce fichier
+  // pour un <details> de fiche, pas seulement les dialogues).
   const items = q.items?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('questItemsN', q.items.length))}</h3>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</div>` : '';
+    ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('questItemsN', q.items.length))}</summary>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</details></div>` : '';
   const goalSteps = goalStepsSection(q);
   // Repli texte historique — seulement pour les quêtes sans graphe de goals décodé.
   const objectives = (!goalSteps && q.objectives?.length)
@@ -1957,10 +2190,25 @@ function openQuestFiche(slug) {
   const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
   const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
   const giverCatAttr = giverCat ? ` data-cat="${giverCat}"` : '';
+  const explainBadge = questExplainedBadge(q);
+  const journalHtml = questJournalSection(q);
+  // « Sur la carte » (acteurs de la quête, positionnés ou non) : PAS
+  // redondant avec les cartes d'étape (goalTargetChip) malgré l'apparence --
+  // vérifié sur le jeu de données complet (batch d'analyse, revue de layout
+  // juillet 2026) : 309 quêtes sur 344 avec acteurs listent au moins un
+  // acteur qui N'EST LA CIBLE D'AUCUN but (personnage secondaire croisé dans
+  // le journal/les dialogues -- ex. imp_brain_hunt liste "Hilda Deeproot" et
+  // "Container" avec une position réelle connue, ni l'un ni l'autre cible
+  // d'un but). Repliée par défaut (secondaire), jamais supprimée : le ferait
+  // perdre ~424 positions réelles qui n'existent nulle part ailleurs dans la
+  // fiche.
+  const onMap = actorRows
+    ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('onMapTitleN', (q.actors || []).length))}</summary>${actorRows}</details></div>` : '';
 
   openFiche(`
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
       <div><div class="fiche-kind">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
+      ${explainBadge}
       ${q.giver ? `<span class="pop-coords">${esc(tr('givenByPlain', q.giver))}</span>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
     <div class="fiche-section"><div class="pop-actions">
@@ -1969,14 +2217,14 @@ function openQuestFiche(slug) {
       <button class="act" data-act="track" data-id="quest:${esc(slug)}">${esc(tr('trackBtn'))}</button>
       <button class="act" data-act="done" data-id="quest:${esc(slug)}">${esc(tr('doneBtn'))}</button>
     </div></div>
+    ${journalHtml}
+    ${dialogs}
     ${hintBox(q)}
     ${goalSteps}
     ${objectives}
-    ${actorRows ? `<div class="fiche-section"><h3>${esc(tr('onMapTitle'))}</h3>${actorRows}</div>` : ''}
-    ${items}
     ${rewards}
-    ${q.journal ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('journalTitle'))}</summary><p class="fiche-journal">${esc(q.journal)}</p></details></div>` : ''}
-    ${dialogs}
+    ${items}
+    ${onMap}
     ${related ? `<div class="fiche-section"><h3>${esc(tr('relatedQuestsTitle'))}</h3>${related}</div>` : ''}`);
   drawInvestigation(q);
   drawQuestZone(slug);
@@ -2182,22 +2430,74 @@ function openItemFiche(key) {
       // resolved monster name (see build_site_data.py::build_catalog()),
       // independent of the client's catalog grouping -- first render is
       // already correct, no client-side lookup needed at all.
-      const viaName = qs.via === 'kill' ? (qs.monster_name || null) : (qs.object_label || null);
-      const viaText = viaName
-        ? esc(qs.via === 'kill' ? tr('obtainViaKill', viaName) : tr('obtainViaInteract', viaName)) : '';
-      // The clickable upgrade (monster fiche link) legitimately CAN'T
-      // resolve before S.monsters loads -- monsterKeyFor guards it exactly
-      // like every other such link in this file (actorRows, goalTargetChip);
-      // it silently upgrades in place once loadDeferred() completes and this
-      // fiche gets re-rendered. Unlike the name above, this part of the
-      // race is unavoidable (S.monsters itself has to exist to know the
-      // fiche does), so it degrades to plain text instead, never a dead link.
-      const viaMonsterKey = qs.via === 'kill' && qs.monster_key ? monsterKeyFor(qs.monster_key, qs.monster_name) : null;
-      const viaLine = viaText
-        ? `<p class="hint">${viaMonsterKey
-            ? `<span class="link" data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
-            : viaText}</p>`
-        : '';
+      //
+      // Mechanism decode job B: quest_source_of now covers every mechanism
+      // that ever resolves an item (build_site_data.py's build_catalog()),
+      // not just kill/interact -- one viaLine phrase per `qs.via`, each
+      // mirroring the exact fact that mechanism's target shape carries
+      // (never inferred beyond what's on `qs`).
+      let viaLine = '';
+      if (qs.via === 'kill') {
+        const viaName = qs.monster_name || null;
+        const viaText = viaName ? esc(tr('obtainViaKill', viaName)) : '';
+        // The clickable upgrade (monster fiche link) legitimately CAN'T
+        // resolve before S.monsters loads -- monsterKeyFor guards it exactly
+        // like every other such link in this file (actorRows, goalTargetChip);
+        // it silently upgrades in place once loadDeferred() completes and this
+        // fiche gets re-rendered. Unlike the name above, this part of the
+        // race is unavoidable (S.monsters itself has to exist to know the
+        // fiche does), so it degrades to plain text instead, never a dead link.
+        const viaMonsterKey = qs.monster_key ? monsterKeyFor(qs.monster_key, qs.monster_name) : null;
+        viaLine = viaText
+          ? `<p class="hint">${viaMonsterKey
+              ? `<span class="link" data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
+              : viaText}</p>`
+          : '';
+      } else if (qs.via === 'container') {
+        // collect_from_object (renamed from the old generic "interact" --
+        // same wording, see build_site_data.py's own comment on the rename).
+        viaLine = qs.object_label ? `<p class="hint">${esc(tr('obtainViaInteract', qs.object_label))}</p>` : '';
+      } else if (qs.via === 'harvest') {
+        viaLine = `<p class="hint">${esc(tr('obtainViaHarvest', professionLabel(capitalize(qs.profession))))}</p>`;
+      } else if (qs.via === 'given_by') {
+        // receive_npc, or the "collect" mechanism's own given-by-giver
+        // safety-net branch (see build_site_data.py) -- reuses the SAME
+        // "given by X" wording as a quest giver line (givenByPlain), linked
+        // to the NPC's fiche when resolvable on the active map (never a
+        // guessed link, same npcIndexByName guard as every other name link
+        // in this file).
+        const ni = qs.npc ? npcIndexByName(qs.npc) : -1;
+        const givenText = qs.npc ? esc(tr('givenByPlain', qs.npc)) : '';
+        viaLine = givenText
+          ? `<p class="hint">${ni >= 0
+              ? `<span class="link" data-act="fiche-npc" data-id="npc:${ni}">${givenText}</span>`
+              : givenText}</p>`
+          : '';
+      } else if (qs.via === 'reward_of') {
+        // receive_reward: granted via a DIFFERENT quest's own turn-in NPC
+        // (qs.npc) upon completing THAT quest (qs.quests[0] -- the anchor
+        // case, "Time of Death": qs.quest is thistlebrooks_terrifying_task,
+        // the quest whose journal lists this as an objective, but qs.
+        // quests[0] is eight_legged_freaks, whose completion actually grants
+        // it) -- both facts named explicitly, the quest name clickable when
+        // resolvable, never a guessed/fabricated link.
+        const ni = qs.npc ? npcIndexByName(qs.npc) : -1;
+        const givenText = qs.npc ? esc(tr('givenByPlain', qs.npc)) : '';
+        const givenSpan = givenText
+          ? (ni >= 0 ? `<span class="link" data-act="fiche-npc" data-id="npc:${ni}">${givenText}</span>` : givenText)
+          : '';
+        const rqSlug = qs.quests?.[0];
+        const rqName = qs.quest_names?.[0] || (rqSlug ? pretty(rqSlug) : null);
+        const rqSpan = rqName
+          ? (rqSlug && S.quests.has(rqSlug)
+              ? `<span class="link" data-act="fiche-quest" data-id="${esc(rqSlug)}">${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`
+              : `<span>${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`)
+          : '';
+        const bits = [givenSpan, rqSpan].filter(Boolean);
+        viaLine = bits.length ? `<p class="hint">${bits.join(' — ')}</p>` : '';
+      } else if (qs.via === 'world') {
+        viaLine = `<p class="hint">${esc(tr('obtainViaWorld'))}</p>`;
+      }
       questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
         <div class="frow">
           <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>

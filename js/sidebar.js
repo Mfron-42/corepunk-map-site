@@ -11,7 +11,7 @@ import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './ma
 import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
 import { whenDeferred, deferredReady } from './data.js';
-import { isHiddenTest } from './devcontent.js';
+import { isHiddenTest, positionCounts } from './devcontent.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -69,13 +69,28 @@ function renderTracked() {
   });
 }
 /* ── Filtres (sidebar) ──────────────────────────────────────── */
-function filterRow(key, label, hex, count, on, toggle, extraClass = '') {
+/* Badge discret "+N" quand une catégorie a des enregistrements réels sans
+   position connue (voir catStats/positionCounts ci-dessous) — jamais un
+   simple nombre qui prétendrait montrer plus de pins que la carte n'en
+   dessinera jamais (rapport : "PNJ affiche 11 mais 1 seul pin sur Prison
+   Island"). Tooltip (title + aria-label, même convention que sidebar.js
+   zoneBtn) localisée, jamais un compteur muet. Pas d'affordance de clic ici
+   (recherche non filtrable par catégorie+carte à ce jour — voir
+   js/search.js runSearch, qui matche par libellé flou, pas par catégorie
+   exacte : ajouter ce filtre ne serait pas un geste "gratuit", laissé pour
+   une mission dédiée) : la tooltip suffit à rendre le nombre honnête. */
+function hiddenBadge(hidden) {
+  if (!hidden) return '';
+  const label = tr('filterHiddenTooltip', hidden);
+  return `<span class="fcount-hidden" title="${esc(label)}" aria-label="${esc(label)}">+${hidden.toLocaleString(numberLocale())}</span>`;
+}
+function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') {
   const li = document.createElement('li');
   li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
     <input type="checkbox" ${on ? 'checked' : ''}>
     <span class="swatch" style="background:${hex}"></span>
     <span class="flabel">${esc(label)}</span>
-    <span class="fcount">${count.toLocaleString(numberLocale())}</span></label>`;
+    <span class="fcount">${count.toLocaleString(numberLocale())}</span>${hiddenBadge(hidden)}</label>`;
   li.querySelector('input').addEventListener('change', e => {
     li.querySelector('.filter-row').classList.toggle('off', !e.target.checked);
     toggle(e.target.checked);
@@ -84,15 +99,21 @@ function filterRow(key, label, hex, count, on, toggle, extraClass = '') {
   return li;
 }
 
-/* Effectif d'une catégorie de haut niveau (CATS) pour la ligne de filtre —
-   `camp_chest` n'a pas son propre tableau S.data (les points viennent du
-   même S.data.chest que la décor/legacy, filtrés par `group`, voir
-   config.js/main.js registerAllDenseRenderers) : seule exception à la règle
-   générale "un tableau S.data par clé CATS". */
-function catCount(key) {
-  if (key === 'quest') return S.data.quest.length;
-  if (key === 'camp_chest') return S.data.chest.filter(r => r.group === 'camp_chest').length;
-  return S.data[key].length;
+/* Effectif RÉEL d'une catégorie de haut niveau (CATS) pour la ligne de
+   filtre : { shown, hidden } (voir devcontent.js::positionCounts) plutôt que
+   la simple taille du tableau -- le compte affiché doit correspondre à ce
+   que la couche carte dessine VRAIMENT (renderDomCulled/renderDense, voir
+   main.js registerAllDenseRenderers), jamais au nombre brut d'enregistrements
+   connus (qui inclut des PNJ/quêtes sans position connue -- apparition
+   côté serveur, ex. Captain Rob sur Prison Island -- et exclut déjà les
+   isTest, comptés à part). `camp_chest` n'a pas son propre tableau S.data
+   (les points viennent du même S.data.chest que la décor/legacy, filtrés par
+   `group`, voir config.js/main.js registerAllDenseRenderers) : seule
+   exception à la règle générale "un tableau S.data par clé CATS". */
+function catStats(key) {
+  if (key === 'quest') return positionCounts(S.data.quest);
+  if (key === 'camp_chest') return positionCounts(S.data.chest.filter(r => r.group === 'camp_chest'));
+  return positionCounts(S.data[key]);
 }
 
 /* Groupe « Décor » (S.decor : famille -> {on, count}, voir data.js
@@ -113,6 +134,11 @@ function buildDecorGroup() {
   const entries = DECOR_FAMILIES.map(f => [f, S.decor[f]]).filter(([, st]) => st);
   if (!entries.length) return null;
   const totalCount = entries.reduce((n, [, st]) => n + st.count, 0);
+  // Même honnêteté que catStats/hiddenBadge ci-dessus, appliquée au total du
+  // groupe repliable (chaque famille porte déjà son propre st.hidden, voir
+  // data.js buildDecorGroups) : un décor réel sans position connue compte
+  // ici aussi, jamais silencieusement absorbé dans le seul total replié.
+  const totalHidden = entries.reduce((n, [, st]) => n + (st.hidden || 0), 0);
 
   const li = document.createElement('li');
   const det = document.createElement('details');
@@ -120,7 +146,7 @@ function buildDecorGroup() {
   const summary = document.createElement('summary');
   summary.innerHTML = `<span class="swatch" style="background:${DECOR_HEX.misc}"></span>
     <span class="flabel">${esc(tr('decorGroupLabel'))}</span>
-    <span class="fcount">${totalCount.toLocaleString(numberLocale())}</span>`;
+    <span class="fcount">${totalCount.toLocaleString(numberLocale())}</span>${hiddenBadge(totalHidden)}`;
   det.appendChild(summary);
 
   const sub = document.createElement('ul');
@@ -142,7 +168,7 @@ function buildDecorGroup() {
   });
   sub.appendChild(head);
   for (const [fam, st] of entries) {
-    sub.appendChild(filterRow('decor:' + fam, decorFamilyLabel(fam), DECOR_HEX[fam], st.count, st.on, on => {
+    sub.appendChild(filterRow('decor:' + fam, decorFamilyLabel(fam), DECOR_HEX[fam], st.count, st.hidden, st.on, on => {
       st.on = on;
       scheduleRedraw();
     }, 'filter-row-sub'));
@@ -169,7 +195,8 @@ function buildFilters() {
   const ul = $('#filter-list');
   ul.innerHTML = '';
   for (const [key, c] of Object.entries(CATS)) {
-    const li = filterRow(key, catLabel(key), c.hex, catCount(key), c.on, on => {
+    const { shown, hidden } = catStats(key);
+    const li = filterRow(key, catLabel(key), c.hex, shown, hidden, c.on, on => {
       c.on = on;
       if (c.dense) scheduleRedraw();
       else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
@@ -177,8 +204,10 @@ function buildFilters() {
     ul.appendChild(li);
   }
   if (S.zonesGeo.length) {
+    // Pas de notion de "sans position" pour une région (zones_geo est déjà
+    // 100% ce qui est dessiné) : hidden fixé à 0, jamais de badge ici.
     ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX,
-      S.zonesGeo.length, S.zonesOn, toggleZones));
+      S.zonesGeo.length, 0, S.zonesOn, toggleZones));
   }
   const decorLi = buildDecorGroup();
   if (decorLi) ul.appendChild(decorLi);

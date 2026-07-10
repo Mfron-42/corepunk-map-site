@@ -123,11 +123,21 @@ export default {
       craftableTag: 'крафтится',
       lootTag: 'лут',
       activableBadge: 'Активируется',
+      // Значок «Контейнер» (декодирование механизма, задача A): собственная
+      // идентичность объекта у collect_from_object (t.label, напр. «Старый
+      // ящик») — отличается от activableBadge выше (самодостаточный объект
+      // use_object, а не контейнер, где находится ЧТО-ТО ДРУГОЕ).
+      containerBadge: 'Контейнер',
       // Явная связь на карточке цели объектива (design review, июль 2026):
       // контекст см. в en.js -- никогда не интерполируется с именем (оно
       // остаётся отдельным кликабельным span, см. goalTargetChip).
       goalDroppedByLabel: 'дроп с',
       goalObtainedHereLabel: 'получено здесь',
+      // «Контейнерный» аналог goalObtainedHereLabel выше, специфичный для
+      // collect_from_object (декодирование механизма, задача A): используется
+      // только когда известна метка контейнера (t.label) — только глагол,
+      // имя идёт отдельным span сразу после, как и goalDroppedByLabel/nameSpan.
+      goalFoundInLabel: 'найдено в',
       // Та же схема строки связи, пакетная доработка: предмет, выданный
       // квестодателем (given_by_giver, напр. "Time of Death" из
       // eight_legged_freaks) и предмет только для крафта (craft:true, напр.
@@ -135,6 +145,21 @@ export default {
       // мире, поэтому ни позиции, ни зоны никогда не показывается.
       goalGivenByLabel: 'получено от',
       goalCraftLabel: 'нужно скрафтить',
+      // Механизм receive_reward (декодирование механизма, задача A): предмет
+      // получается за прохождение ДРУГОГО задания (geo.py reward_of), а не
+      // выдаётся квестодателем этого задания — только глагол, дальше идёт
+      // кликабельный span задания на каждую запись reward_of (см. rewardOfRelRow).
+      goalRewardOfLabel: 'получено за прохождение',
+      // Механизм harvest: узел добычи ресурсов (лесозаготовка/травничество/
+      // добыча руды — target.profession, локализовано через professionLabel).
+      goalHarvestLabel: profession => `добыча (${profession})`,
+      // Механизм kill_collect/kill: target.drop_chance (0-100, побайтово
+      // точное значение) — отличается от общего dropChanceApprox (расчётная
+      // доля, здесь никогда нет "≈" — это заданный игрой процент).
+      goalDropChanceLabel: pct => `(${pct} %)`,
+      // Механизм kill_player: target.player_specs, объединённые через
+      // heroSpecLabel (fiches.js) — единой позиции для PvP-цели не бывает.
+      goalKillPlayerLabel: specs => `Победить игроков (${specs})`,
       objectivesN: n => `Цели (${n})`,
       objectivesTitle: 'Цели',
       howToTitle: 'Как выполнить',
@@ -147,12 +172,20 @@ export default {
       // их загрузила, иначе — тот же примерный круг, что и viewZoneBtn, но
       // никогда с той же подписью, чтобы не путать с подтверждённой зоной.
       viewEstimatedZoneBtn: 'Смотреть примерно',
-      onMapTitle: 'На карте',
+      onMapTitleN: n => `На карте (${n})`,
       dialogsN: n => `Диалоги (${n})`,
+      // Значок доверия в шапке (переработка макета, июль 2026): `q.explained`
+      // {goals_total, goals_resolved} приходит как есть из декодера графа
+      // задания — 333 из 335 разобранных заданий сегодня объяснены
+      // полностью, у 2 остаётся хотя бы одна неразрешённая цель. Никогда не
+      // показывается без графа целей вовсе (диалоги-реплики и т. п.).
+      questExplainedFull: 'Полностью объяснено',
+      questExplainedPartial: n => `${n} ${pluralSlavic(n, 'цель', 'цели', 'целей')} под вопросом`,
       dialogueFicheKind: 'Диалог НПС',
       dialogueHeading: 'Диалог НПС (не задание)',
       dialogueNote: 'Реплики, которые говорит этот персонаж, — это не задание с целями и наградами.',
-      journalTitle: 'Журнал',
+      journalShowMoreBtn: 'Показать полностью',
+      journalShowLessBtn: 'Свернуть',
       relatedQuestsTitle: 'Связанные задания',
       questFicheKind: region => 'Задание' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Шансы выпадения',
@@ -161,6 +194,16 @@ export default {
       obtainDuringQuestTitle: 'Как получить',
       obtainViaKill: name => `Убив ${name}`,
       obtainViaInteract: label => `Взаимодействуя с ${label}`,
+      // Расширение quest_source_of, декодирование механизма, задача B
+      // (harvest/reward_of/world -- given_by переиспользует ui.givenByPlain,
+      // container переиспользует obtainViaInteract выше, см. build_site_data.py
+      // + fiches.js openItemFiche).
+      obtainViaHarvest: profession => `Добыв (${profession})`,
+      // Фрагмент, а не законченная фраза -- сочетается с ui.givenByPlain как
+      // «Получено от X — quest Y» (кросс-квестовый случай receive_reward, см.
+      // ветку qs.via === 'reward_of' в openItemFiche).
+      obtainViaRewardOfQuest: name => `задание ${name}`,
+      obtainViaWorld: 'Находится по ходу этого задания',
       moreMerchants: n => `+ ${n} других торговцев`,
       merchantPosUnknown: 'Позиция торговца не указана.',
       recipeTitle: 'Рецепт',

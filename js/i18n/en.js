@@ -126,6 +126,11 @@ export default {
       craftableTag: 'craftable',
       lootTag: 'loot',
       activableBadge: 'Activatable',
+      // "Container" badge (mechanism decode job A): collect_from_object's
+      // own object identity (t.label, e.g. "Old crate") — distinct from
+      // activableBadge above, which is for USE_object's self-contained
+      // "Activatable" prop, not a container something else is found in.
+      containerBadge: 'Container',
       // Goal-target card relation wording (design review, July 2026): the
       // card used to just juxtapose an item and its monster/object with no
       // word connecting them ("looks like a tag but doesn't say where to
@@ -134,12 +139,34 @@ export default {
       // own separate clickable spans right after, see goalTargetChip).
       goalDroppedByLabel: 'dropped by',
       goalObtainedHereLabel: 'obtained here',
+      // collect_from_object's container-specific counterpart to
+      // goalObtainedHereLabel above (mechanism decode job A): used only when
+      // the container's own label is known (t.label) — verb only, the name
+      // renders as its own separate span right after, same pattern as
+      // goalDroppedByLabel/nameSpan.
+      goalFoundInLabel: 'found in',
       // Same relation-row vocabulary, batch-wiring pass: a quest-granted item
       // (given_by_giver, e.g. eight_legged_freaks' "Time of Death") and a
       // craft-only item (craft:true, e.g. construction_lesson's implant) —
       // neither is ever a world spawn, so neither ever gets a position/zone.
       goalGivenByLabel: 'given by',
       goalCraftLabel: 'craft it',
+      // receive_reward mechanism (mechanism decode job A): the item is
+      // granted by completing a DIFFERENT quest (geo.py's reward_of), not
+      // handed over by this quest's own giver — verb only, one clickable
+      // quest-name span per reward_of entry follows (see rewardOfRelRow).
+      goalRewardOfLabel: 'obtained by completing',
+      // harvest mechanism: a resource-gathering node (logging/herbalism/
+      // mining — target.profession, localized via professionLabel).
+      goalHarvestLabel: profession => `harvest (${profession})`,
+      // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
+      // shown next to the dropped-by name+level — distinct from the generic
+      // loot-table dropChanceApprox (that one is a computed weight SHARE,
+      // this one is the game's own designed percentage, never "≈").
+      goalDropChanceLabel: pct => `(${pct} %)`,
+      // kill_player mechanism: target.player_specs joined via heroSpecLabel
+      // (fiches.js) — no single world location for a PvP objective.
+      goalKillPlayerLabel: specs => `Defeat players (${specs})`,
       objectivesN: n => `Objectives (${n})`,
       objectivesTitle: 'Objectives',
       howToTitle: 'How to',
@@ -152,8 +179,18 @@ export default {
       // them loaded, else falls back to the same guessed circle as viewZoneBtn
       // — never the same label, so it's never mistaken for a confirmed zone.
       viewEstimatedZoneBtn: 'View estimate',
-      onMapTitle: 'On the map',
+      // Layout rework (July 2026): now a collapsed-by-default drawer (see
+      // openQuestFiche) — count in the label like the other drawers
+      // (dialogsN/questItemsN) since it's no longer an always-open <h3>.
+      onMapTitleN: n => `On the map (${n})`,
       dialogsN: n => `Dialogue (${n})`,
+      // Header-area trust badge (layout rework, July 2026): `q.explained`
+      // {goals_total, goals_resolved} comes straight from the quest-graph
+      // decoder — 333/335 decoded quests are fully explained today, 2 keep
+      // at least one unresolved goal. Never shown when there's no goal graph
+      // at all (dialogue barks etc.) — nothing to confirm either way there.
+      questExplainedFull: 'Fully explained',
+      questExplainedPartial: n => `${n} objective${n > 1 ? 's' : ''} uncertain`,
       // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph, isDialogue —
       // no goals/rewards): its fiche is headed with this instead of the empty
       // quest layout, so opening one (dev-content ON, or a direct q= link) is
@@ -161,7 +198,12 @@ export default {
       dialogueFicheKind: 'NPC dialogue',
       dialogueHeading: 'NPC dialogue (not a quest)',
       dialogueNote: 'Idle greeting lines this character says — not a quest with objectives or rewards.',
-      journalTitle: 'Journal',
+      // Journal now renders as a plain presentation paragraph right under the
+      // title (layout rework, July 2026) — no more section heading (same
+      // choice as the item description, see descHtml). Only shown when the
+      // text is long enough to actually need the CSS clamp+expand toggle.
+      journalShowMoreBtn: 'Show more',
+      journalShowLessBtn: 'Show less',
       relatedQuestsTitle: 'Related quests',
       questFicheKind: region => 'Quest' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Drop rates',
@@ -174,6 +216,15 @@ export default {
       obtainDuringQuestTitle: 'How to obtain',
       obtainViaKill: name => `By killing ${name}`,
       obtainViaInteract: label => `By interacting with ${label}`,
+      // Mechanism decode job B: quest_source_of extension (harvest/reward_of/
+      // world -- given_by reuses ui.givenByPlain, container reuses
+      // obtainViaInteract above, see build_site_data.py + fiches.js openItemFiche).
+      obtainViaHarvest: profession => `By harvesting (${profession})`,
+      // Fragment, not a full sentence -- composed with ui.givenByPlain as
+      // "Given by X — quest Y" (receive_reward's cross-quest case, see
+      // openItemFiche's qs.via === 'reward_of' branch).
+      obtainViaRewardOfQuest: name => `quest ${name}`,
+      obtainViaWorld: 'Found while completing this quest',
       moreMerchants: n => `+ ${n} more merchants`,
       merchantPosUnknown: 'Merchant position not specified.',
       recipeTitle: 'Recipe',

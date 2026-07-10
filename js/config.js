@@ -359,7 +359,7 @@ export {
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLabel, weaponTypeLine, ACTION_META, actionVerb, actionIconSvg,
+  weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName,
   campDisplayName, chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,

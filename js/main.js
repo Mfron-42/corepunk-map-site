@@ -88,6 +88,13 @@ document.addEventListener('click', e => {
     const mid = b.dataset.map, x = +b.dataset.x, z = +b.dataset.z, lbl = b.dataset.label;
     switchMap(mid, { keepView: true }).then(() => goTo(x, z, undefined, lbl));
   }
+  else if (b.dataset.act === 'map-switch') {
+    // Cible sur une AUTRE carte mais SANS position connue dessus (ex.
+    // target.map d'une cible receive_reward/talk cross-map — geo.py n'attache
+    // jamais x/z avec map dans ce cas précis, voir fiches.js::crossMapOnlyBtn) :
+    // simple bascule, rien à viser après (contrairement à map-goto ci-dessus).
+    switchMap(b.dataset.map, { keepView: true });
+  }
   // (Ex-second délégué, fusionné : un seul écouteur global data-act.)
   else if (b.dataset.act === 'copy-ping' && S.ping) {
     navigator.clipboard?.writeText(location.href.split('#')[0] + buildHash());

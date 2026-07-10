@@ -123,11 +123,22 @@ export default {
       craftableTag: 'craftable',
       lootTag: 'loot',
       activableBadge: 'Activable',
+      // Badge « Conteneur » (passe décodage mécanisme, job A) : identité de
+      // l'objet propre à collect_from_object (t.label, ex. « Vieille
+      // caisse ») — distinct d'activableBadge ci-dessus (objet auto-suffisant
+      // de use_object, pas un conteneur où AUTRE CHOSE est trouvé).
+      containerBadge: 'Conteneur',
       // Relation explicite de la carte de cible d'objectif (design review,
       // juillet 2026) : voir en.js pour le contexte -- jamais interpolé avec
       // le nom (celui-ci reste un span cliquable séparé, voir goalTargetChip).
       goalDroppedByLabel: 'lâché par',
       goalObtainedHereLabel: 'obtenu ici',
+      // Pendant « conteneur » de goalObtainedHereLabel ci-dessus, propre à
+      // collect_from_object (passe décodage mécanisme, job A) : utilisé
+      // seulement quand le libellé du conteneur est connu (t.label) — verbe
+      // seul, le nom suit dans son propre span, même schéma que
+      // goalDroppedByLabel/nameSpan.
+      goalFoundInLabel: 'trouvé dans',
       // Même vocabulaire de ligne de relation, passe de câblage batch : un
       // item donné par le donneur de quête (given_by_giver, ex. "Time of
       // Death" d'eight_legged_freaks) et un item à fabriquer uniquement
@@ -135,6 +146,21 @@ export default {
       // l'autre n'est un spawn dans le monde, donc jamais de position/zone.
       goalGivenByLabel: 'donné par',
       goalCraftLabel: 'à fabriquer',
+      // Mécanisme receive_reward (passe décodage mécanisme, job A) : l'item
+      // est obtenu en terminant une AUTRE quête (geo.py reward_of), pas remis
+      // par le donneur de cette quête-ci — verbe seul, un span de quête
+      // cliquable par entrée reward_of suit (voir rewardOfRelRow).
+      goalRewardOfLabel: 'obtenu en terminant',
+      // Mécanisme harvest : un nœud de récolte (bûcheronnage/herboristerie/
+      // minage — target.profession, localisé via professionLabel).
+      goalHarvestLabel: profession => `récolte (${profession})`,
+      // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
+      // depuis les octets) — distinct du dropChanceApprox générique (part
+      // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).
+      goalDropChanceLabel: pct => `(${pct} %)`,
+      // Mécanisme kill_player : target.player_specs joints via heroSpecLabel
+      // (fiches.js) — aucune position unique pour un objectif JcJ.
+      goalKillPlayerLabel: specs => `Vaincre des joueurs (${specs})`,
       objectivesN: n => `Objectifs (${n})`,
       objectivesTitle: 'Objectifs',
       howToTitle: 'Comment faire',
@@ -148,12 +174,28 @@ export default {
       // deviné que viewZoneBtn — jamais le même libellé, pour ne jamais le
       // confondre avec une zone confirmée.
       viewEstimatedZoneBtn: "Voir l'estimation",
-      onMapTitle: 'Sur la carte',
+      // Refonte layout (juillet 2026) : tiroir replié par défaut désormais
+      // (voir openQuestFiche) — compte dans le libellé comme les autres
+      // tiroirs (dialogsN/questItemsN), ce n'est plus un <h3> toujours ouvert.
+      onMapTitleN: n => `Sur la carte (${n})`,
       dialogsN: n => `Dialogues (${n})`,
+      // Pastille de confiance en en-tête (refonte layout, juillet 2026) :
+      // `q.explained` {goals_total, goals_resolved} vient tel quel du
+      // décodeur de graphe de quête — 333 quêtes sur 335 décodées sont
+      // intégralement expliquées aujourd'hui, 2 gardent au moins un but non
+      // résolu. Jamais affichée sans graphe de buts du tout (dialogues-barks
+      // etc.) — rien à confirmer ni infirmer là.
+      questExplainedFull: 'Entièrement expliquée',
+      questExplainedPartial: n => `${n} objectif${n > 1 ? 's' : ''} incertain${n > 1 ? 's' : ''}`,
       dialogueFicheKind: 'Dialogue PNJ',
       dialogueHeading: 'Dialogue PNJ (pas une quête)',
       dialogueNote: 'Répliques d’ambiance dites par ce personnage — ce n’est pas une quête avec objectifs ni récompenses.',
-      journalTitle: 'Journal',
+      // Le journal s'affiche désormais en simple paragraphe de présentation
+      // juste sous le titre (refonte layout, juillet 2026) — plus de titre de
+      // section (même choix que la description d'objet, voir descHtml).
+      // Utilisées seulement quand le texte dépasse le seuil de clamp CSS.
+      journalShowMoreBtn: 'Voir plus',
+      journalShowLessBtn: 'Voir moins',
       relatedQuestsTitle: 'Quêtes liées',
       questFicheKind: region => 'Quête' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Taux de drop',
@@ -162,6 +204,16 @@ export default {
       obtainDuringQuestTitle: 'Comment obtenir',
       obtainViaKill: name => `En tuant ${name}`,
       obtainViaInteract: label => `En interagissant avec ${label}`,
+      // Extension quest_source_of, passe décodage mécanisme job B (harvest/
+      // reward_of/world -- given_by réutilise ui.givenByPlain, container
+      // réutilise obtainViaInteract ci-dessus, voir build_site_data.py +
+      // fiches.js openItemFiche).
+      obtainViaHarvest: profession => `En récoltant (${profession})`,
+      // Fragment, pas une phrase complète -- composé avec ui.givenByPlain en
+      // « Donné par X — quest Y » (cas cross-quête de receive_reward, voir
+      // la branche qs.via === 'reward_of' d'openItemFiche).
+      obtainViaRewardOfQuest: name => `quête ${name}`,
+      obtainViaWorld: 'Trouvé en accomplissant cette quête',
       moreMerchants: n => `+ ${n} autres marchands`,
       merchantPosUnknown: 'Position du marchand non précisée.',
       recipeTitle: 'Recette',

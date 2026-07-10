@@ -58,4 +58,30 @@ function devContentCounts() {
   return { monsters, items, qao, quests, total: monsters + items + qao + quests };
 }
 
-export { isHiddenTest, devContentCounts, visibleQuestSlugs };
+/* Legend/menu honesty fix (report: "NPC category shows 11 but only 1 pin
+   renders on Prison Island") — the count a filter row displays must match
+   what the map layer actually draws, not the raw record count. Splits a
+   category's records into `shown` (will actually render: known x/z AND not
+   dev-gated) vs `hidden` (real, non-test record, just no known position —
+   e.g. Captain Rob/Doc Greene/Jax, server-side spawns never placed on the
+   client map). Mirrors EXACTLY the two gates already applied at render time
+   (mapview.js renderDomCulled/renderDense via main.js registerAllDenseRenderers:
+   `r.x == null || r.z == null` skip + `isHiddenTest(r)` skip) — never a
+   separate/looser rule that could drift from what's actually drawn. An
+   isTest record hidden by the dev-content gate counts in NEITHER bucket: it
+   already has its own counter (devContentCounts/buildDevToggle above), and
+   must never be double-counted as a "position-less" gap here (dev-content
+   gating parity, same discipline as everywhere else in this module) — when
+   S.devOn flips on, isHiddenTest() itself starts returning false, so such a
+   record naturally lands in `shown` or `hidden` instead, no separate branch
+   needed. */
+function positionCounts(list) {
+  let shown = 0, hidden = 0;
+  for (const r of (list || [])) {
+    if (isHiddenTest(r)) continue;
+    if (r && r.x != null && r.z != null) shown++; else hidden++;
+  }
+  return { shown, hidden };
+}
+
+export { isHiddenTest, devContentCounts, visibleQuestSlugs, positionCounts };
