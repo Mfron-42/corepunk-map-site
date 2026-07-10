@@ -3,9 +3,9 @@
    de déroulé de quête, et rendu de la liste de résultats. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
+  CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX,
   catLabel, campDisplayName, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
-  rarityLabel, itemKindLabel, weaponTypeLabel,
+  rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel,
   locationKindLabel, mapName,
 } from './config.js';
 import { $, esc, fmtCoord, fold, editLe, iconTag, initials, itemGlyph, pretty } from './utils.js';
@@ -17,6 +17,7 @@ import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
+  openRecipeFiche,
 } from './fiches.js';
 import { isDeprecatedItem, rarityGroupFor } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
@@ -50,7 +51,7 @@ function itemBias(key, it) {
 const CAT_GLYPH = {
   npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦',
   monster: '🐾', zone: '🗺', location: '📖', ability: '✨', event: '⚑', chest: '🧰',
-  searchable_chest: '🗝',
+  searchable_chest: '🗝', recipe: '📜',
 };
 const searchCatLabel = key => tbl('searchCat', key) || key;
 let searchIndex = [];
@@ -152,6 +153,27 @@ function buildSearch() {
     // (a-bis) isTest (feature #13) : masqué par défaut, même garde que
     // quêtes/objets de quête ci-dessus — 128 items concernés.
     if (isHiddenTest(it)) return;
+    // (a-ter) Recette (task #78a, recipes-searchable pass) : it.kind==='recipe'
+    // est un pseudo-item catalogue de RÉFÉRENCE (une entrée standalone par
+    // craft distinct, name/icon/rarities copiés de l'objet produit — voir
+    // data/SCHEMA.md recipes.json "Site propagation") plutôt qu'un objet du
+    // jeu. AVANT cette passe il retombait dans la branche générique ci-dessous
+    // (cat "item", couleur de rareté -- souvent grise faute de it.rarity
+    // propre --, et un clic ouvrait openItemFiche() sur un titre IDENTIQUE à
+    // celui de l'objet qu'il sert à fabriquer, ex. "Ronin Bow" apparaissait
+    // deux fois sans rien pour les distinguer) : sa propre catégorie/couleur
+    // (RECIPE_HEX) + sa propre fiche (openRecipeFiche) le rendent immédiatement
+    // reconnaissable et cohérent avec le chip [Recette : X] de la fiche objet
+    // (task #78b) -- "Ronin Bow" recherché sort maintenant l'ARME (item) ET sa
+    // RECETTE (recipe), chacune avec son kind propre. Bias PARTAGÉ (itemBias
+    // -- même dosage "juste après l'objet qu'elle fabrique", voir son doc).
+    if (it.kind === 'recipe') {
+      const devSub = it.isTest ? tr('devBadge') : '';
+      push(it.name, 'recipe', RECIPE_HEX, null, null, () => openRecipeFiche(key),
+        it.icon ? `icons/${it.icon}` : null, [professionLabel(it.prof), devSub].filter(Boolean).join(' · '),
+        '📜', itemBias(key, it));
+      return;
+    }
     // (b) membre non-représentant d'un groupe de rareté (voir rarity.js) :
     // une seule entrée par groupe (le représentant), la rareté se choisit
     // sur la fiche (pill selector, voir openItemFiche).

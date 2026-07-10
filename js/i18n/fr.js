@@ -242,6 +242,7 @@ export default {
       merchantPosUnknown: 'Position du marchand non précisée.',
       recipeTitle: 'Recette',
       producesArrow: 'produit → ',
+      recipeChipLabel: name => `Recette : ${name}`,
       usedInTitle: 'Utilisé dans',
       rewardBadge: 'Récompense',
       requiredBadge: 'Requis',
@@ -431,7 +432,7 @@ export default {
     },
     searchCat: {
       npc: 'PNJ', poi: 'Lieu', quest: 'Quête', qao: 'Objet',
-      workshop: 'Atelier', camp: 'Camp', item: 'Item',
+      workshop: 'Atelier', camp: 'Camp', item: 'Item', recipe: 'Recette',
       monster: 'Monstre', zone: 'Région', location: 'Lieu',
       ability: 'Capacité', event: 'Événement', chest: 'Coffre',
       searchable_chest: 'Coffre fouillable',

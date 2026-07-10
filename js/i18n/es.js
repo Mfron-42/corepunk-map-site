@@ -242,6 +242,7 @@ export default {
       merchantPosUnknown: 'Posición del comerciante no especificada.',
       recipeTitle: 'Receta',
       producesArrow: 'produce → ',
+      recipeChipLabel: name => `Receta: ${name}`,
       usedInTitle: 'Se usa en',
       rewardBadge: 'Recompensa',
       requiredBadge: 'Requerido',

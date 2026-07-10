@@ -235,6 +235,7 @@ export default {
       merchantPosUnknown: 'Позиція торговця не вказана.',
       recipeTitle: 'Рецепт',
       producesArrow: 'створює → ',
+      recipeChipLabel: name => `Рецепт: ${name}`,
       usedInTitle: 'Використовується в',
       rewardBadge: 'Нагорода',
       requiredBadge: 'Потрібно',

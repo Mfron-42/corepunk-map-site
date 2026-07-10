@@ -4,9 +4,9 @@
    voir main.js). */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, catLabel, campKindLabel,
+  CATS, CAMP_COLORS, MONSTER_HEX, catLabel, campKindLabel,
   campDisplayName, chestDisplayName, activableTypeLabel,
-  chestHex, chestKindLabel, prettyRegion,
+  chestHex, chestKindLabel, prettyRegion, ecAttr,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
@@ -110,9 +110,12 @@ function questPopup(q) {
    monstre quand elle existe, texte simple sinon. */
 function mobLabelHtml(m, cls) {
   const mk = monsterKeyFor(m.key, m.name);
+  // Couleur d'entité (task #77) : c'est toujours un monstre, qu'il soit
+  // résolu vers sa fiche ou non (même parti pris que npcChip -- la teinte
+  // affirme le KIND, pas la cliquabilité, déjà portée par .link/data-act).
   return mk
-    ? `<span class="${cls} link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(m.name)}</span>`
-    : `<span class="${cls}">${esc(m.name)}</span>`;
+    ? `<span class="${cls} link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(m.name)}</span>`
+    : `<span class="${cls}"${ecAttr(MONSTER_HEX, 'monster')}>${esc(m.name)}</span>`;
 }
 
 function campPopup(p, n) {
@@ -123,7 +126,7 @@ function campPopup(p, n) {
     extra = `<div class="pop-mobs">${det.mobs.slice(0, 4).map(m => {
       const mk = monsterKeyFor(m.key, m.name);
       const attrs = mk ? ` data-act="fiche-monster" data-id="${esc(mk)}"` : '';
-      return `<span class="chip"${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${m.lvl ? ` <i>${esc(tr('levelAbbrev', m.lvl))}</i>` : ''}</span>`;
+      return `<span class="chip"${ecAttr(MONSTER_HEX, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${m.lvl ? ` <i>${esc(tr('levelAbbrev', m.lvl))}</i>` : ''}</span>`;
     }).join('')}</div>`;
   }
   // Fiche TOUJOURS accessible (même sans fiche camp détaillée : la fiche

@@ -1041,6 +1041,11 @@ body {
    faire couper au milieu du nom du donneur. Marge légère seulement, la
    pastille de badge juste au-dessus a déjà son propre espacement. */
 .quest-giver-row { margin: 4px 0 2px; }
+/* Chip [Recette : X] de l'en-tête d'une fiche objet craftable (task #78b) /
+   chip "produit →" de l'en-tête d'une fiche recette (openRecipeFiche) — même
+   raison d'être que .quest-giver-row juste au-dessus (.reward-chips termine
+   le contexte de formatage en ligne des lignes pop-coords qui précèdent). */
+.item-recipe-row { margin: 4px 0 2px; }
 .fiche-section { margin-top: 18px; }
 .fiche-section > h3 {
   font-family: var(--font-display);
@@ -1349,6 +1354,12 @@ body {
    item doit s'afficher (cible directe, "dropped by", "obtained here"). */
 .goal-target-item.link { cursor: pointer; }
 .goal-target-item.link:hover .goal-target-item-label { color: var(--accent); }
+/* Entity color (task #77) : la cible EST un item -- itemColor() (rareté)
+   posée en --chip-c sur le conteneur (voir goalTargetItemRow, fiches.js),
+   consommée par le libellé enfant. [data-kind] présent -> repos teinté,
+   hover plus franc ; absent -> comportement inchangé ci-dessus. */
+.goal-target-item[data-kind] .goal-target-item-label { color: var(--chip-c); }
+.goal-target-item.link[data-kind]:hover .goal-target-item-label { color: color-mix(in srgb, var(--chip-c) 82%, white); }
 .goal-target-item-icon {
   width: 22px; height: 22px; border-radius: 5px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; flex: none;
@@ -1550,6 +1561,58 @@ body {
    choix (choice_group) — un simple mot muet en italique entre deux chips,
    jamais un chip lui-même (ce n'est pas un choix possible). */
 .choice-or { color: var(--muted); font-size: .74rem; font-style: italic; align-self: center; }
+
+/* ── Accent d'entité par kind (task #77, coherence pass) ──────────────────
+   .chip devient une chip TEINTÉE par son kind (PNJ/objet/recette…) — le
+   texte reste à sa couleur normale (lisibilité, dixit le mandat), seuls le
+   liseré/le fond captent la teinte, comme .k-chip/.cat-chip/.rar-pill mais
+   sur le fond neutre existant plutôt qu'un aplat. `[data-kind]` (posé par
+   config.js::ecAttr) est le SEUL interrupteur — un .chip sans cet attribut
+   (tag de monstre, séparateur…) garde l'ancien rendu neutre à l'identique.
+   Hover : la couleur devient franche (liseré + texte), à la place de l'accent
+   générique — cohérent avec .k-chip/.rar-pill qui font déjà ça. */
+.chip[data-kind] {
+  border-color: color-mix(in srgb, var(--chip-c) 55%, var(--line-soft));
+  background: color-mix(in srgb, var(--chip-c) 14%, var(--panel-3));
+}
+.chip[data-kind][data-act]:hover {
+  border-color: var(--chip-c);
+  color: var(--chip-c);
+  background: color-mix(in srgb, var(--chip-c) 22%, var(--panel-3));
+}
+/* Même traitement pour les chips de mob de popup camp (.pop-mobs .chip a sa
+   propre règle de fond/liseré non-teintée, plus loin dans ce fichier — cette
+   règle-ci doit rester APRÈS elle et/ou plus spécifique pour gagner sur les
+   deux propriétés qu'elle partage). Voir la règle jumelle plus bas. */
+
+/* Liens texte inline qui référencent une autre fiche (nom de PNJ/monstre/
+   objet/quête/recette cliquable, jamais un simple badge) — même interrupteur
+   `[data-kind]`, mais la couleur porte sur le TEXTE cette fois (pas de fond :
+   ces éléments ne sont pas des pastilles). Fallback explicite à la couleur
+   de repos préexistante de chaque sélecteur (jamais une régression pour un
+   lien non converti) : .frow .fr-label/.bst-name/.link héritent (var(--ink)
+   du body), .goal-target-name pose var(--ink) en dur, .frow .muted pose
+   var(--muted) — donc chacun reprend EXACTEMENT sa propre couleur de base en
+   fallback plutôt qu'un unique repli partagé. */
+.frow .fr-label[data-kind], .bst-name[data-kind] { color: var(--chip-c); }
+.frow .fr-label.link[data-kind]:hover, .bst-name[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
+.goal-target-name[data-kind] { color: var(--chip-c); }
+.goal-target-name.link[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
+.frow .muted[data-kind] { color: var(--chip-c); }
+.frow .muted.link[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
+.link[data-kind] { color: var(--chip-c); text-decoration-color: color-mix(in srgb, var(--chip-c) 45%, transparent); }
+.link[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); text-decoration-color: var(--chip-c); }
+/* Utilitaire : ne teinte qu'un NOM à l'intérieur d'un span plus large déjà
+   cliquable/muet dans son ensemble (ex. "donné par <nom>" -- questItemRow,
+   js/fiches.js) -- seul le nom doit porter la couleur d'entité, pas le verbe
+   qui l'entoure. */
+.ec-name[data-kind] { color: var(--chip-c); }
+/* Ligne « catégorie » d'en-tête de fiche (.fiche-kind) : PNJ et Quête posaient
+   jusqu'ici AUCUNE couleur inline (bug — .fiche-kind retombe alors sur
+   var(--muted), seule fiche/camp/monstre/objet/lieu/capacité en avaient une)
+   — corrigé côté JS (style="color:…" ajouté), rien à changer ici : la règle
+   de base existante (var(--muted)) sert déjà de repli pour tout kind futur
+   sans couleur assignée. */
 
 /* ── Fiche item (base de données) ────────────────────────────── */
 .fiche-sub {
@@ -1908,6 +1971,15 @@ button.rar-pill:hover {
    affordance que les chips de récompense (.reward-chips .chip[data-act]). */
 .pop-mobs .chip[data-act] { cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease); }
 .pop-mobs .chip[data-act]:hover { border-color: var(--accent); color: var(--accent); }
+/* Entity color (task #77) : un mob de popup camp EST un monstre — même
+   interrupteur [data-kind]/--chip-c que .chip[data-kind] plus haut, mais
+   redéclaré ici (specificité égale à .pop-mobs .chip, qui le précède dans ce
+   fichier et gagnerait sinon sur border/background). */
+.pop-mobs .chip[data-kind] {
+  border-color: color-mix(in srgb, var(--chip-c) 55%, var(--line));
+  background: color-mix(in srgb, var(--chip-c) 14%, var(--panel-3));
+}
+.pop-mobs .chip[data-kind][data-act]:hover { border-color: var(--chip-c); color: var(--chip-c); }
 /* Pastille de rareté (stock du vendeur) : couleur RARITY, purement visuelle. */
 .rar-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 /* Prix vendeur : nombre localisé + pièce stylisée (l'unité n'est pas nommée

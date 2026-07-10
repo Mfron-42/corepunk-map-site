@@ -100,6 +100,14 @@ const ZONE_HEX = '#7fc8a9';
 const LOCATION_HEX = '#e0c68c';
 const ABILITY_HEX = '#5fa8d3';
 const EVENT_HEX = '#d65db1';
+/* Recette (task #78a/#78b) : nouvelle catégorie de recherche/fiche, sa
+   propre teinte — jamais une couleur déjà prise (npc/poi/quest/qao/workshop/
+   searchable_chest/camp_chest ci-dessus + CAMP_COLORS/RARITY/ZONE/LOCATION/
+   ABILITY/EVENT plus bas) : un brasage cuivré/or (thème artisanat), choisi
+   dans l'un des rares intervalles de teinte encore libres de la roue
+   chromatique du site (~45-80°, entre les ors/tans existants ~30-42° et les
+   verts ~90°+ — même méthode que le commentaire CAMP_COLORS ci-dessus). */
+const RECIPE_HEX = '#c2a83f';
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 /* Statistiques de monstre (stats_decoded / stat_curve) — voir
@@ -353,14 +361,32 @@ function campLootTableName(k) {
 const FAMILY_ALIAS = { robo: 'robot' };
 const familyKey = f => FAMILY_ALIAS[f] || f;
 
+/* ── Accent d'entité (task #77, entity-color coherence) ──────────────────
+   UNE convention pour tout chip/lien qui référence une AUTRE fiche (PNJ,
+   objet, quête, monstre, camp, recette…) : la couleur vient TOUJOURS de la
+   même source qu'un pin/filtre de carte pour ce kind (CATS[x].hex/
+   CAMP_COLORS[kind]/MONSTER_HEX/RARITY[rarity].hex pour un objet…), jamais
+   une teinte dupliquée en dur au site d'appel. Posée comme custom prop
+   --chip-c (même idiome que .k-chip/.cat-chip/.rar-pill/.mk-pin's --pin) +
+   un attribut `data-kind` qui ne sert QUE de sélecteur CSS (voir style.css
+   ".chip[data-kind]"/".link[data-kind]" etc.) — sa valeur n'est jamais lue,
+   seule sa PRÉSENCE active le style teinté ; un chip/lien sans cet attribut
+   garde l'apparence neutre historique (aucune régression pour les usages
+   non convertis). `hex` falsy (ex. itemColor() sur un item non résolu) :
+   toujours 'var(--muted)' en amont, jamais un attribut vide — voir les
+   appelants (itemColor ci-après dans fiches.js). */
+function ecAttr(hex, kind) {
+  return ` data-kind="${kind}" style="--chip-c:${hex}"`;
+}
+
 export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
-  MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX,
+  MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
-  prettyMapId, mapName,
+  prettyMapId, mapName, ecAttr,
   campDisplayName, chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,
   prettyRegion, LOOT_TABLE_HEX,

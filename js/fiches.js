@@ -6,13 +6,13 @@
    ici aussi. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX,
+  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campDisplayName, campLootTableName, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX,
+  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -858,10 +858,10 @@ function openMonsterFiche(key) {
         const dit = S.items[d.item_key];
         const dicon = dit?.icon ? `icons/${dit.icon}` : null;
         const itemLabel = dit
-          ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(d.item_key)}">${esc(d.item_name)}</span>`
+          ? `<span class="fr-label link"${ecAttr(itemEcHex(dit), itemEcKind(dit))} data-act="${itemFicheAct(dit)}" data-id="${esc(d.item_key)}">${esc(d.item_name)}</span>`
           : `<span class="fr-label">${esc(d.item_name)}</span>`;
         const questLabel = S.quests.has(d.quest_slug)
-          ? `<span class="fr-label link" data-act="fiche-quest" data-id="${esc(d.quest_slug)}">${esc(d.quest_name)}</span>`
+          ? `<span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(d.quest_slug)}">${esc(d.quest_name)}</span>`
           : `<span class="fr-label">${esc(d.quest_name)}</span>`;
         return `<div class="frow">
           ${iconTag(dicon, 'fr-icon', itemGlyph(dit))}
@@ -892,7 +892,7 @@ function openMonsterFiche(key) {
   const loreHtml = loreIdx != null ? `<div class="fiche-section"><h3>${esc(tr('loreEntryTitle'))}</h3>
     <div class="frow">
       <span class="fr-icon icon-broken" data-fb="📖"></span>
-      <span class="fr-label link" data-act="fiche-location" data-id="${loreIdx}">${esc(S.locations[loreIdx].title)}</span>
+      <span class="fr-label link"${ecAttr(LOCATION_HEX, 'location')} data-act="fiche-location" data-id="${loreIdx}">${esc(S.locations[loreIdx].title)}</span>
     </div></div>` : '';
 
   openFiche(`
@@ -926,7 +926,7 @@ function openLocationFiche(idx) {
     ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm => {
         const known = S.monsters[fm.key];
         return `<div class="frow">
-          <span class="fr-label${known ? ' link' : ''}"${known ? ` data-act="fiche-monster" data-id="${esc(fm.key)}"` : ''}>${esc(fm.name)}</span>
+          <span class="fr-label${known ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${known ? ` data-act="fiche-monster" data-id="${esc(fm.key)}"` : ''}>${esc(fm.name)}</span>
           <span class="muted">${fm.level != null ? tr('levelAbbrev', fm.level) : ''}</span>
         </div>`;
       }).join('')}</div>` : '';
@@ -1325,11 +1325,14 @@ function vendorStockSection(vendorKey) {
     const icon = it?.icon ? `icons/${it.icon}` : null;
     // Pastille de rareté (couleur RARITY) quand elle est connue : repère
     // visuel de « ce que vaut » chaque article du stock sans surcharger la
-    // ligne — le nom garde sa couleur normale (et son hover accent).
+    // ligne. Le nom porte désormais la MÊME teinte (task #77, coherence
+    // pass) — dot + texte coloré coexistent déjà partout ailleurs sur le
+    // site (npcChip icône + liseré, k-chip badge + nom de quête…), garder ce
+    // seul endroit neutre aurait fait une exception isolée, pas une règle.
     const rar = it && RARITY[it.rarity];
     const dot = rar ? `<span class="rar-dot" style="background:${rar.hex}" title="${esc(rarityLabel(it.rarity))}"></span>` : '';
     const label = it
-      ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(key)}">${esc(name)}</span>`
+      ? `<span class="fr-label link"${ecAttr(itemEcHex(it), itemEcKind(it))} data-act="${itemFicheAct(it)}" data-id="${esc(key)}">${esc(name)}</span>`
       : `<span class="fr-label">${esc(name)}</span>`;
     return `<div class="frow" data-n="${esc(fold(name))}">
       ${iconTag(icon, 'fr-icon', itemGlyph(it))}
@@ -1358,7 +1361,7 @@ function openNpcFiche(idx) {
     const q = S.quests.get(slug);
     return q ? `<div class="frow">
       <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-      <span class="fr-label link" data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+      <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
       ${gotoBtn(q.x, q.z, q.name)}
     </div>` : '';
   }).join('');
@@ -1403,7 +1406,7 @@ function openNpcFiche(idx) {
       </details></div>` : '';
   openFiche(`
     <div class="fiche-head">${iconTag(img, 'fiche-avatar', initials(r.name))}
-      <div><div class="fiche-kind">${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}</div><h2>${esc(r.name)}</h2>
+      <div><div class="fiche-kind" style="color:${CATS.npc.hex}">${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}</div><h2>${esc(r.name)}</h2>
       ${posLine}${variantLine}</div></div>
     <div class="fiche-section">
       <div class="pop-actions">
@@ -1421,20 +1424,38 @@ function openNpcFiche(idx) {
    clé est connue du catalogue (site/data/items.json) ; sinon repli fidèle au
    rendu historique (nom prettifié, non cliquable). */
 function itemColor(it) { return (it && RARITY[it.rarity]?.hex) || 'var(--muted)'; }
+/* Entité "recette" (task #78a/#78b) : un item catalogue avec it.kind==='recipe'
+   est un pseudo-item de RÉFÉRENCE (voir data/SCHEMA.md recipes.json "Site
+   propagation" -- une entrée par craft distinct, name/icon/rarities copiés du
+   crafté, jamais un objet du jeu à part entière) -- sa propre couleur/fiche,
+   jamais celle (souvent grise, sans rareté propre) ni la fiche générique de
+   l'objet qu'elle sert à fabriquer (qui affichait jusqu'ici un titre dupliqué
+   et confus avec l'item réel, voir openItemFiche's guard + openRecipeFiche).
+   Centralisé ici : TOUTE chip/lien qui référence une clé catalogue (recette
+   d'ingrédient, récompense de quête, cible d'objectif…) passe par ces 3
+   helpers pour rester automatiquement cohérent, sans re-tester it.kind à
+   chaque site d'appel. */
+function isRecipeKind(it) { return it?.kind === 'recipe'; }
+function itemFicheAct(it) { return isRecipeKind(it) ? 'fiche-recipe' : 'fiche-item'; }
+function itemEcHex(it) { return isRecipeKind(it) ? RECIPE_HEX : itemColor(it); }
+function itemEcKind(it) { return isRecipeKind(it) ? 'recipe' : 'item'; }
 /* Chip QUANTIFIÉE ({key, count}) — rendu commun ingrédient de recette /
    récompense de quête, avec un suffixe "×N" au-delà de count 1 (voir
     pour les ingrédients et
     pour les récompenses fixes/au choix). itemChip
    (une simple clé, jamais de suffixe de quantité) n'en est qu'un appel avec
-   count omis -- même rendu, pas de duplication. */
+   count omis -- même rendu, pas de duplication. Couleur d'entité (task #77) :
+   teinte de rareté (ou RECIPE_HEX pour une chip "recette", voir ci-dessus),
+   même source que la fiche/le résultat de recherche de cet item -- jamais une
+   chip neutre pour une info dont la couleur est déjà connue ailleurs. */
 function qtyItemChip(entry) {
   const key = entry.key, count = entry.count;
   const it = S.items[key];
   const name = it ? it.name : pretty(key);
   const icon = it?.icon ? `icons/${it.icon}` : null;
-  const attrs = it ? ` data-act="fiche-item" data-id="${esc(key)}"` : '';
+  const attrs = it ? ` data-act="${itemFicheAct(it)}" data-id="${esc(key)}"` : '';
   const qty = count > 1 ? `<span class="chip-qty">×${count}</span>` : '';
-  return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', itemGlyph(it))}${esc(name)}${qty}</span>`;
+  return `<span class="chip"${ecAttr(itemEcHex(it), itemEcKind(it))}${attrs}>${iconTag(icon, 'chip-icon', itemGlyph(it))}${esc(name)}${qty}</span>`;
 }
 function itemChip(key) { return qtyItemChip({ key }); }
 function qtyChipList(list) {
@@ -1452,12 +1473,15 @@ function qtyChipList(list) {
    générique, quand `ni` résout un PNJ connu de la carte active ; repli
    glyphe d'initiales (iconTag) sinon. Cliquable (data-act=fiche-npc)
    seulement quand résolu -- jamais un lien deviné, le nom reste affiché
-   honnêtement en texte stylé sinon (jamais un lien mort). */
+   honnêtement en texte stylé sinon (jamais un lien mort). Couleur d'entité
+   (task #77) : CATS.npc.hex, posée que le PNJ soit résolu ou non -- c'est
+   TOUJOURS un PNJ, la teinte n'affirme rien sur la cliquabilité (déjà portée
+   par data-act/le curseur), jamais un lien deviné pour autant. */
 function npcChip(name, ni) {
   const rec = ni >= 0 ? S.data.npc[ni] : null;
   const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
   const attrs = ni >= 0 ? ` data-act="fiche-npc" data-id="npc:${ni}"` : '';
-  return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
+  return `<span class="chip"${ecAttr(CATS.npc.hex, 'npc')}${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
 }
 
 /* Désambiguïsation des items de quête « même nom » (quest-guide-feature plan
@@ -1588,7 +1612,7 @@ function questItemRow(qi, regionHint) {
     if (cat.drops?.length) bits.push(tr('lootTag'));
   }
   const label = cat
-    ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(qi.key)}">${esc(name)}</span>`
+    ? `<span class="fr-label link"${ecAttr(itemEcHex(cat), itemEcKind(cat))} data-act="${itemFicheAct(cat)}" data-id="${esc(qi.key)}">${esc(name)}</span>`
     : `<span class="fr-label">${esc(name)}</span>`;
   // craft:true (geo.py's craft-only pre-check, propagated onto this exact
   // item row by import_quests.py -- e.g. no_witnesses_to_glory's "Savory
@@ -1606,9 +1630,13 @@ function questItemRow(qi, regionHint) {
   // goalTargetChip's own given_by_giver branch), plain text otherwise
   // (never a guessed link).
   const ni = qi.givenBy ? npcIndexByName(qi.givenBy) : -1;
+  // Couleur d'entité (task #77) : seul le NOM du PNJ prend la teinte npc,
+  // pas le verbe "donné par" qui l'entoure -- .ec-name est une classe utilitaire
+  // dédiée à ce cas (une sous-chaîne colorée dans un span plus large déjà
+  // cliquable/muted dans son ensemble), voir style.css.
   const givenByBit = qi.givenBy
     ? (ni >= 0
-      ? `<span class="muted link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('goalGivenByLabel'))} ${esc(qi.givenBy)}</span>`
+      ? `<span class="muted link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('goalGivenByLabel'))} <span class="ec-name"${ecAttr(CATS.npc.hex, 'npc')}>${esc(qi.givenBy)}</span></span>`
       : `<span class="muted">${esc(tr('goalGivenByLabel'))} ${esc(qi.givenBy)}</span>`)
     : '';
   const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
@@ -1676,7 +1704,7 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   if (!base) return '';
   const name = disambiguatedItemName(base, key, currentQuestItemDisambig);
   const icon = it?.icon ? `icons/${it.icon}` : null;
-  const attrs = it ? ` data-act="fiche-item" data-id="${esc(key)}"` : '';
+  const attrs = it ? ` data-act="${itemFicheAct(it)}" data-id="${esc(key)}"` : '';
   const approxSup = approx ? '<sup>≈</sup>' : '';
   const qiFlag = key ? currentQuestItemFlags?.get(key) : undefined;
   const isQuest = qiFlag !== undefined ? qiFlag : (hint !== undefined ? hint : (it ? it.kind === 'quest_item' : null));
@@ -1686,7 +1714,10 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   // Une seule ligne SANS retours/indentation internes (fix bulle « ligne
   // vide ») : le newline+indentation d'un gabarit multi-lignes se retrouvait
   // tel quel dans le texte de la bulle quand le joueur le copiait/collait.
-  return `<div class="goal-target-row goal-target-item${it ? ' link' : ''}"${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approxSup}</span>${badge}${extraBadge || ''}</div>`;
+  // Couleur d'entité (task #77) : posée sur le CONTENEUR (--chip-c consommé
+  // par .goal-target-item-label enfant, voir style.css) -- même teinte que
+  // itemChip/qtyItemChip pour cette même clé partout ailleurs sur le site.
+  return `<div class="goal-target-row goal-target-item${it ? ' link' : ''}"${it ? ecAttr(itemEcHex(it), itemEcKind(it)) : ''}${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approxSup}</span>${badge}${extraBadge || ''}</div>`;
 }
 /* Relation row for a receive_reward mechanism target whose `reward_of`
    (geo.py's _resolve_target_mech) names at least one quest OTHER than the
@@ -1713,8 +1744,8 @@ function rewardOfRelRow(t) {
     const idx = t.reward_of.indexOf(slug);
     const qname = rq?.name || (namesAligned ? t.reward_of_names[idx] : slug);
     return rq
-      ? `<span class="goal-target-name link" data-act="fiche-quest" data-id="${esc(slug)}">${esc(qname)}</span>`
-      : `<span class="goal-target-name">${esc(qname)}</span>`;
+      ? `<span class="goal-target-name link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(qname)}</span>`
+      : `<span class="goal-target-name"${ecAttr(CATS.quest.hex, 'quest')}>${esc(qname)}</span>`;
   }).join(esc(tr('orWord')));
   return `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`;
 }
@@ -1886,8 +1917,8 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // deviné entre-temps.
     const lvl = (mk && S.monsters[mk]?.level != null) ? tr('levelAbbrev', S.monsters[mk].level) : null;
     const nameSpan = mk
-      ? `<span class="goal-target-name link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
-      : (nameLbl ? `<span class="goal-target-name">${esc(nameLbl)}</span>` : '');
+      ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
+      : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
     const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
     const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
@@ -1943,8 +1974,8 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       }
       const ni = t.label ? npcIndexByName(t.label) : -1;
       const giverSpan = (ni >= 0)
-        ? `<span class="goal-target-name link" data-act="fiche-npc" data-id="npc:${ni}">${esc(t.label)}</span>`
-        : (t.label ? `<span class="goal-target-name">${esc(t.label)}</span>` : '');
+        ? `<span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(t.label)}</span>`
+        : (t.label ? `<span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${esc(t.label)}</span>` : '');
       const relRow = giverSpan
         ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverSpan}</div>` : '';
       return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
@@ -1958,8 +1989,8 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // lien deviné).
     const ni = label ? npcIndexByName(label) : -1;
     const nameRow = (ni >= 0)
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link" data-act="fiche-npc" data-id="npc:${ni}">${lbl}</span></div>`
-      : (label ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name">${lbl}</span></div>` : '');
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${lbl}</span></div>`
+      : (label ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${lbl}</span></div>` : '');
     return `<div class="goal-target">${nameRow}${posRow}</div>`;
   }
 
@@ -1994,8 +2025,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // `posRow` (shared, computed above) already renders it (gotoBtn) or the
     // honest generic dynamic-position fallback when it isn't known.
     const zLabel = t.label ? cleanLabel(t.label) : null;
+    // Couleur d'entité (task #77) : ZONE_HEX, même teinte que la ligne "Zones
+    // (régions)" du panneau/de la recherche -- ce n'est ni un PNJ ni un
+    // monstre, une zone nommée est une entité de carte à part entière.
     const nameRow = zLabel
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name">${esc(zLabel)}</span></div>` : '';
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(ZONE_HEX, 'zone')}>${esc(zLabel)}</span></div>` : '';
     return `<div class="goal-target">${nameRow}${posRow}</div>`;
   }
 
@@ -2293,7 +2327,7 @@ function openQuestFiche(slug) {
     const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
     let labelHtml = `<span class="fr-label">${esc(aLabel)}</span>`;
     if (ni >= 0) {
-      labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
+      labelHtml = `<span class="fr-label link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
     } else if (a.kind === 'mob') {
       // BUG FIX (quest-guide-feature plan sec 5.3): q.actors[].kind is built
       // straight from slots[].kind (import_quests.py), which only ever uses
@@ -2304,11 +2338,17 @@ function openQuestFiche(slug) {
       // though monsterKeyFor() (already imported, already correct) resolves
       // most of them immediately.
       const mk = monsterKeyFor(null, a.label);
-      if (mk) labelHtml = `<span class="fr-label link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(aLabel)}</span>`;
+      if (mk) labelHtml = `<span class="fr-label link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(aLabel)}</span>`;
     }
+    // Couleur d'entité (task #77) : le badge de kind d'acteur distinguait déjà
+    // PNJ/Activable (CATS.npc/CATS.qao) mais confondait un acteur "mob"
+    // (créature, voir le correctif juste au-dessus) avec le générique #8d99ae
+    // -- un acteur monstre porte désormais MONSTER_HEX, cohérent avec le lien
+    // qu'il ouvre (fiche-monster) juste à côté.
+    const actorHex = a.kind === 'npc' ? CATS.npc.hex : a.kind === 'object' ? CATS.qao.hex : a.kind === 'mob' ? MONSTER_HEX : '#8d99ae';
     return `
     <div class="frow">
-      <span class="k-chip" style="--chip-c:${a.kind === 'npc' ? CATS.npc.hex : a.kind === 'object' ? CATS.qao.hex : '#8d99ae'}">${a.kind === 'object' ? tr('activableBadge') : actorKindLabel(a.kind)}</span>
+      <span class="k-chip" style="--chip-c:${actorHex}">${a.kind === 'object' ? tr('activableBadge') : actorKindLabel(a.kind)}</span>
       ${labelHtml}
       ${posCell}
     </div>`;
@@ -2340,7 +2380,7 @@ function openQuestFiche(slug) {
       </details></div>` : '';
   const related = (q.related || []).filter(s => S.quests.has(s)).map(s =>
     `<div class="frow"><span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-     <span class="fr-label link" data-act="fiche-quest" data-id="${esc(s)}">${esc(S.quests.get(s).name)}</span></div>`).join('');
+     <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(s)}">${esc(S.quests.get(s).name)}</span></div>`).join('');
   const zoneBtn = S.zonesQuest[slug]
     ? `<button class="act ghost" data-act="zone-view" data-id="${esc(slug)}">${esc(tr('viewZoneBtn'))}</button>` : '';
   // « Voir le donneur » : même correctif que les actorRows ci-dessus -- vise
@@ -2372,7 +2412,7 @@ function openQuestFiche(slug) {
 
   openFiche(`
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
-      <div><div class="fiche-kind">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
+      <div><div class="fiche-kind" style="color:${CATS.quest.hex}">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
       ${explainBadge}
       ${q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, giverNi)}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
@@ -2396,19 +2436,33 @@ function openQuestFiche(slug) {
   setFicheHash('quest', slug);
 }
 
-/* Fiche item : taux de drop (garanti / % séparés), vendeurs (+ position),
-   recette (ingrédients cliquables), utilisé dans, quêtes liées, spots de
-   farm. Toute clé du catalogue (site/data/items.json) est ouvrable ici,
-   y compris les « recette d'objet » vendues/récompensées sans exister comme
-   item à part entière (isRecipe). */
+/* Ligne de butin partagée (fiche monstre/camp/coffre/table) : icône + nom
+   cliquable + taux (dropRateHtml : ×N/garanti/%). Couleur d'entité (task
+   #77) dérivée du linkAct : une ligne "fiche-item" est un OBJET (couleur de
+   rareté, ou RECIPE_HEX + la bonne fiche si la clé résout en fait à un
+   pseudo-item recette, voir itemFicheAct/itemEcHex/itemEcKind) ; une ligne
+   "fiche-loot" (openItemFiche's dropsHtml -- le libellé est le nom d'une
+   TABLE de butin, pas d'un autre item) porte LOOT_TABLE_HEX. Pas de couleur
+   pour une ligne sans lien (rien à distinguer). */
 function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
+  const it = linkAct === 'fiche-item' ? S.items[linkId] : null;
+  const act = it ? itemFicheAct(it) : linkAct;
+  const ecHtml = it ? ecAttr(itemEcHex(it), itemEcKind(it)) : linkAct === 'fiche-loot' ? ecAttr(LOOT_TABLE_HEX, 'loot') : '';
   const labelHtml = linkAct
-    ? `<span class="fr-label link" data-act="${linkAct}" data-id="${esc(linkId)}">${esc(label)}</span>`
+    ? `<span class="fr-label link"${ecHtml} data-act="${act}" data-id="${esc(linkId)}">${esc(label)}</span>`
     : `<span class="fr-label">${esc(label)}</span>`;
   // data-n : nom replié pour le filtre local des longues listes (voir le
   // listener .stock-filter posé sur le drawer plus haut).
   return `<div class="frow" data-n="${esc(fold(label))}">${iconTag(icon, 'fr-icon', glyph || '📦')}${labelHtml}${rateHtml || ''}</div>`;
 }
+
+/* Fiche item : taux de drop (garanti / % séparés), vendeurs (+ position),
+   recette (ingrédients cliquables), utilisé dans, quêtes liées, spots de
+   farm. Toute clé du catalogue objet (site/data/items.json) est ouvrable
+   ici -- SAUF les pseudo-items « recette » (it.kind==='recipe'/isRecipe),
+   qui redirigent vers leur propre fiche dédiée (openRecipeFiche, task
+   #78a/#78b) depuis fin juillet 2026 plutôt que de s'afficher ici sous un
+   titre confus, dupliqué avec l'objet qu'elles servent à fabriquer. */
 
 /* Fusion d'affichage des tables par TRANCHES DE NIVEAU : « Gathering
    Butchering Boars L01 04 / L05 09 / L10 14 » au même taux deviennent UNE
@@ -2512,9 +2566,10 @@ function isGenericFarmPoolItem(drops) {
    contexte précis. Sans 2ᵉ argument (fiche objet), comportement inchangé. */
 function farmCampRow(key, g, displayName = campDisplayName(key)) {
   const n = g.pts.length;
+  const campHex = CAMP_COLORS[g.kind] || '#999';
   return `<div class="frow">
-    <span class="rar-dot" style="background:${CAMP_COLORS[g.kind] || '#999'}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(key)}">${esc(displayName)}</span>
+    <span class="rar-dot" style="background:${campHex}" title="${esc(campKindLabel(g.kind))}"></span>
+    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(displayName)}</span>
     <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
   </div>`;
 }
@@ -2662,9 +2717,103 @@ function monsterCampsHtml(m) {
   return `<div class="fiche-section"><h3>${title}</h3>${highlightAllBtn}${rowsHtml}</div>`;
 }
 
+/* Bloc(s) « ingrédients » d'une recette -- UN bloc par référence ATTEIGNABLE
+   (it.recipes : [{key, rarity?}]), PARTAGÉ par openItemFiche (section
+   « Recette » d'un objet craftable) ET openRecipeFiche ci-dessous (la recette
+   EST la fiche, task #78a/#78b) -- même rendu, jamais dupliqué. `ownKey` = la
+   clé de la fiche actuellement ouverte (l'objet crafté pour openItemFiche, le
+   pseudo-item recette lui-même pour openRecipeFiche) : le chip "produit →"
+   ne s'affiche que quand r.output diffère de CETTE clé (jamais un lien qui
+   pointerait vers la fiche déjà ouverte). */
+function recipeIngredientBlocks(recipeRefs, ownKey) {
+  return (recipeRefs || []).map(ref => {
+    const rk = typeof ref === 'string' ? ref : ref.key;
+    const rarity = typeof ref === 'string' ? null : ref.rarity;
+    const r = S.recipes[rk];
+    if (!r) return '';
+    const metaLine = [r.prof ? professionLabel(r.prof) : null, rarity ? rarityLabel(rarity) : null]
+      .filter(Boolean).join(' · ');
+    const meta = metaLine ? `<div class="pop-coords recipe-meta">${esc(metaLine)}</div>` : '';
+    // BUG FIX (regression, was chipList(r.ingredients)): r.ingredients is
+    // [{key,count}] (see  not
+    // an array of string keys -- chipList's itemChip(key) did S.items[key]
+    // with `key` being an OBJECT (always undefined), then pretty(key) threw
+    // a TypeError (.replace on a non-string), aborting openItemFiche()
+    // before openFiche() ever ran. Net effect: opening ANY item fiche with
+    // a recipe that has ingredients silently did nothing in the UI. Use the
+    // quantity-aware chip list instead (same {key,count} shape as quest
+    // rewards, see qtyItemChip/qtyChipList above).
+    const ing = qtyChipList(r.ingredients);
+    const out = (r.output && r.output !== ownKey)
+      ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(r.output)}</div>` : '';
+    return `<div class="recipe-block">${meta}<div class="reward-chips">${ing}</div>${out}</div>`;
+  }).join('');
+}
+
+/* Fiche « recette » (task #78a searchable-recipes / #78b item IA) : LE
+   pseudo-item catalogue it.kind==='recipe' EST la recette (voir
+   data/SCHEMA.md recipes.json "Site propagation" -- une entrée standalone
+   par craft distinct, name/icon/rarities copiés de l'objet produit, jamais
+   un objet du jeu à part entière) -- cherchable même sans présence propre
+   (vendu/looté/quête), voir search.js. Avant cette passe, cette clé restait
+   ouvrable UNIQUEMENT via openItemFiche (jamais fausse — voir son ancien
+   commentaire "y compris les « recette d'objet »" -- mais confuse : même nom
+   que l'objet qu'elle sert à fabriquer, aucune couleur/kind propre, jusqu'à 3
+   blocs d'ingrédients identiques répétés pour Epic/Rare/Uncommon). Contenu ici :
+   identité (nom = celui du crafté, profession, raretés atteignables), un chip
+   "produit →" bien visible vers l'objet fabriqué (symétrique du chip
+   [Recette : X] posé sur SA fiche, task #78b), les ingrédients
+   (recipeIngredientBlocks, PARTAGÉ avec openItemFiche) et les quêtes qui
+   citent cette recette (it.quests, même forme {slug,role} qu'un item normal).
+   Pas de lien profond dédié (setFicheHash(null)) -- même choix que
+   openLocationFiche/openAbilityFiche/openLootTableFiche ci-dessus : un
+   catalogue de référence ouvert depuis une autre fiche/la recherche, pas un
+   marqueur carte avec sa propre URL partageable. */
+function openRecipeFiche(key) {
+  const it = S.items[key];
+  if (!it || !isRecipeKind(it)) return;
+  S.openFiche = { kind: 'recipe', id: key };
+  const icon = it.icon ? `icons/${it.icon}` : null;
+  const devMark = it.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+  const raritiesLine = it.rarities?.length ? it.rarities.map(rarityLabel).join(' / ') : '';
+  const outKey = (it.recipes || [])
+    .map(ref => (typeof ref === 'string' ? ref : ref.key))
+    .map(rk => S.recipes[rk]?.output)
+    .find(o => o && o !== key) || null;
+  const outItem = outKey ? S.items[outKey] : null;
+  const craftsHtml = outItem
+    ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(outKey)}</div>` : '';
+  const blocks = recipeIngredientBlocks(it.recipes, key);
+  const ingredientsHtml = blocks ? `<div class="fiche-section">${blocks}</div>` : '';
+  const questsHtml = it.quests?.length
+    ? `<div class="fiche-section"><h3>${esc(tr('relatedQuestsTitle'))}</h3>${it.quests.map(({ slug, role }) => {
+        const q = S.quests.get(slug);
+        if (!q) return '';
+        return `<div class="frow">
+          <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
+          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+        </div>`;
+      }).join('')}</div>` : '';
+  openFiche(`
+    <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
+      <div><div class="fiche-kind" style="color:${RECIPE_HEX}">${esc(tr('recipeTitle'))}${it.prof ? ' · ' + esc(professionLabel(it.prof)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${devMark}</div>
+      <h2>${esc(it.name)}</h2>
+      ${craftsHtml}</div></div>
+    ${ingredientsHtml}
+    ${questsHtml}`);
+  setFicheHash(null);
+}
+
 function openItemFiche(key) {
   const it = S.items[key];
   if (!it) return;
+  // Recette (task #78a/#78b) : jamais la fiche objet générique pour un
+  // pseudo-item recette -- voir itemFicheAct/openRecipeFiche ci-dessus. Filet
+  // de sécurité (tout appelant qui n'est PAS déjà passé par itemFicheAct,
+  // ex. un vieux lien profond partagé i=rec_..._unlocked avant cette passe) :
+  // s'auto-corrige vers la bonne fiche plutôt que d'afficher la fiche objet
+  // confuse d'avant cette passe.
+  if (isRecipeKind(it)) { openRecipeFiche(key); return; }
   S.openFiche = { kind: 'item', id: key };
   const icon = it.icon ? `icons/${it.icon}` : null;
   const rarity = RARITY[it.rarity];
@@ -2719,8 +2868,8 @@ function openItemFiche(key) {
         const rec = ni >= 0 ? S.data.npc[ni] : null;
         const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
         const label = ni >= 0
-          ? `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(n.name)}</span>`
-          : `<span class="fr-label">${esc(n.name)}</span>`;
+          ? `<span class="fr-label link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(n.name)}</span>`
+          : `<span class="fr-label"${ecAttr(CATS.npc.hex, 'npc')}>${esc(n.name)}</span>`;
         return `<div class="frow">
           ${iconTag(icon, 'fr-icon', initials(n.name))}
           ${label}
@@ -2736,36 +2885,32 @@ function openItemFiche(key) {
     if (blocks) vendorsHtml = `<div class="fiche-section"><h3>${esc(tr('soldByTitle'))}</h3>${blocks}</div>`;
   }
 
-  let recipeHtml = '';
+  // Une entrée par rareté ATTEIGNABLE (déjà dédupliqué côté pipeline — voir
+  // data/SCHEMA.md recipes.json "rarity"/"variant_group" : un seul craft/jeu
+  // d'ingrédients peut produire plusieurs raretés en tirage pondéré). Rendu
+  // PARTAGÉ avec openRecipeFiche (recipeIngredientBlocks ci-dessus) — jamais
+  // deux implémentations du même bloc ingrédients/produit.
+  const recipeBlocks = it.recipes?.length ? recipeIngredientBlocks(it.recipes, key) : '';
+  const recipeHtml = recipeBlocks ? `<div class="fiche-section"><h3>${esc(tr('recipeTitle'))}</h3>${recipeBlocks}</div>` : '';
+  // Chip [Recette : <nom>] bien visible dans l'en-tête (task #78b, item IA
+  // pass) : référence PROMINENTE vers la fiche recette dédiée
+  // (openRecipeFiche), une par clé de recette DISTINCTE (un seul craft a
+  // presque toujours une seule clé canonique partagée par ses raretés — voir
+  // le commentaire ci-dessus —, mais un item avec 2 méthodes de craft
+  // vraiment séparées montrerait 2 chips, jamais un doublon). Jamais affiché
+  // pour un item non craftable (it.recipes vide) -- pas de chip fantôme.
+  let recipeChipHtml = '';
   if (it.recipes?.length) {
-    // Une entrée par rareté ATTEIGNABLE (déjà dédupliqué côté pipeline —
-    // voir data/SCHEMA.md recipes.json "rarity"/"variant_group" : un seul
-    // craft/jeu d'ingrédients peut produire plusieurs raretés en tirage
-    // pondéré). Chaque ref = {key, rarity?} ; métier + rareté affichés en
-    // en-tête de bloc, jamais 17 lignes identiques pour le même craft.
-    const blocks = it.recipes.map(ref => {
+    const seenRk = new Set();
+    const chips = [];
+    for (const ref of it.recipes) {
       const rk = typeof ref === 'string' ? ref : ref.key;
-      const rarity = typeof ref === 'string' ? null : ref.rarity;
-      const r = S.recipes[rk];
-      if (!r) return '';
-      const metaLine = [r.prof ? professionLabel(r.prof) : null, rarity ? rarityLabel(rarity) : null]
-        .filter(Boolean).join(' · ');
-      const meta = metaLine ? `<div class="pop-coords recipe-meta">${esc(metaLine)}</div>` : '';
-      // BUG FIX (regression, was chipList(r.ingredients)): r.ingredients is
-      // [{key,count}] (see  not
-      // an array of string keys -- chipList's itemChip(key) did S.items[key]
-      // with `key` being an OBJECT (always undefined), then pretty(key) threw
-      // a TypeError (.replace on a non-string), aborting openItemFiche()
-      // before openFiche() ever ran. Net effect: opening ANY item fiche with
-      // a recipe that has ingredients silently did nothing in the UI. Use the
-      // quantity-aware chip list instead (same {key,count} shape as quest
-      // rewards, see qtyItemChip/qtyChipList above).
-      const ing = qtyChipList(r.ingredients);
-      const out = (r.output && r.output !== key)
-        ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(r.output)}</div>` : '';
-      return `<div class="recipe-block">${meta}<div class="reward-chips">${ing}</div>${out}</div>`;
-    }).join('');
-    if (blocks) recipeHtml = `<div class="fiche-section"><h3>${esc(tr('recipeTitle'))}</h3>${blocks}</div>`;
+      if (seenRk.has(rk) || !S.recipes[rk]) continue;
+      seenRk.add(rk);
+      const rIcon = S.recipes[rk].icon ? `icons/${S.recipes[rk].icon}` : null;
+      chips.push(`<span class="chip"${ecAttr(RECIPE_HEX, 'recipe')} data-act="fiche-recipe" data-id="${esc(rk)}">${iconTag(rIcon, 'chip-icon', '📜')}${esc(tr('recipeChipLabel', it.name))}</span>`);
+    }
+    if (chips.length) recipeChipHtml = `<div class="reward-chips item-recipe-row">${chips.join('')}</div>`;
   }
 
   let usedHtml = '';
@@ -2834,7 +2979,7 @@ function openItemFiche(key) {
         const viaMonsterKey = qs.monster_key ? monsterKeyFor(qs.monster_key, qs.monster_name) : null;
         viaLine = viaText
           ? `<p class="hint">${viaMonsterKey
-              ? `<span class="link" data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
+              ? `<span class="link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
               : viaText}</p>`
           : '';
       } else if (qs.via === 'container') {
@@ -2872,7 +3017,7 @@ function openItemFiche(key) {
         const rqName = qs.quest_names?.[0] || (rqSlug ? pretty(rqSlug) : null);
         const rqSpan = rqName
           ? (rqSlug && S.quests.has(rqSlug)
-              ? `<span class="link" data-act="fiche-quest" data-id="${esc(rqSlug)}">${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`
+              ? `<span class="link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(rqSlug)}">${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`
               : `<span>${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`)
           : '';
         const bits = [givenBit, rqSpan].filter(Boolean);
@@ -2883,7 +3028,7 @@ function openItemFiche(key) {
       questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
         <div class="frow">
           <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-          <span class="fr-label link" data-act="fiche-quest" data-id="${esc(qs.quest)}">${esc(srcQuest.name)}</span>
+          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(qs.quest)}">${esc(srcQuest.name)}</span>
         </div>
         ${viaLine}
       </div>`;
@@ -2896,7 +3041,7 @@ function openItemFiche(key) {
         if (!q) return '';
         return `<div class="frow">
           <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
-          <span class="fr-label link" data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
         </div>`;
       }).join('')}</div>` : '';
 
@@ -2938,25 +3083,51 @@ function openItemFiche(key) {
     }).join('');
     raritySelectHtml = pillSelectHtml('rarityVariantsLabel', pills);
   }
+  // Ordre de la fiche (task #78b, item information-architecture pass) --
+  // jugé sur 4 archétypes réels (arme craftable Ronin Bow, matériau de
+  // récolte, item de quête Imp Brain/Cause of Death, consommable avec effet) :
+  //   1. IDENTITÉ    -- en-tête (icône/kind/rareté/titre) + sélecteur de
+  //      rareté + description -- qui c'est, jamais noyé sous "comment
+  //      l'obtenir" pour un simple survol.
+  //   2. COMMENT L'OBTENIR -- chip [Recette : X] bien visible dans l'en-tête
+  //      dès que craftable (task #78b) puis, dans l'ordre où un joueur les
+  //      envisagerait (le plus direct d'abord) : source de quête (le SEUL
+  //      fait pour un item de quête synthétique), vendeurs, taux de drop,
+  //      spots de farm.
+  //   3. UTILISATION -- effet d'usage, plage de jet/DPS, formule d'artefact,
+  //      mise à l'échelle -- ce que l'objet FAIT une fois obtenu, jamais avant
+  //      qu'on sache comment l'obtenir.
+  //   4. Ce dans quoi il sert d'INGRÉDIENT (usedHtml) -- symétrique de
+  //      "comment l'obtenir", mais secondaire (un craft qui consomme CET
+  //      objet, pas qui le produit).
+  //   5. Quêtes liées (récompense/requis) -- contexte narratif, pas une
+  //      action immédiate.
+  //   6. Le reste -- détail ingrédient-par-ingrédient de la recette
+  //      (recipeHtml, déjà résumé par le chip du point 2 ; son contenu
+  //      interne est inchangé, seule sa PLACE bouge ici).
+  // Rien n'est retiré : chaque section existante garde exactement son rendu
+  // interne (Use-effect/formule/farm/chips d'état/titres désambiguïsés) --
+  // seul l'ORDRE change, plus le chip [Recette] qui est net-new.
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
       <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}</div>
       <h2>${esc(titleName)}</h2>
       ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
-      ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>
+      ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}
+      ${recipeChipHtml}</div></div>
     ${raritySelectHtml}
     ${descHtml}
+    ${questSourceHtml}
+    ${vendorsHtml}
+    ${dropsHtml}
+    ${farmHtml}
     ${useEffectHtml}
     ${rollRangeHtml}
     ${formulaHtmlBlock}
     ${scalingHtml}
-    ${dropsHtml}
-    ${farmHtml}
-    ${vendorsHtml}
-    ${recipeHtml}
     ${usedHtml}
-    ${questSourceHtml}
-    ${questsHtml}`);
+    ${questsHtml}
+    ${recipeHtml}`);
   setFicheHash('item', key);
 }
 
@@ -3020,5 +3191,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  openChestFiche, openSearchableChestFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
+  openChestFiche, openSearchableChestFiche, openRecipeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 };

@@ -251,6 +251,10 @@ export default {
       merchantPosUnknown: 'Merchant position not specified.',
       recipeTitle: 'Recipe',
       producesArrow: 'produces → ',
+      // Prominent recipe chip on a craftable item's own fiche (task #78b) +
+      // recipe search result / fiche kind label (task #78a) -- see
+      // openItemFiche's recipeChipHtml / search.js buildSearch / openRecipeFiche.
+      recipeChipLabel: name => `Recipe: ${name}`,
       usedInTitle: 'Used in',
       rewardBadge: 'Reward',
       requiredBadge: 'Required',
@@ -431,7 +435,7 @@ export default {
     },
     searchCat: {
       npc: 'NPC', poi: 'Place', quest: 'Quest', qao: 'Object',
-      workshop: 'Workshop', camp: 'Camp', item: 'Item',
+      workshop: 'Workshop', camp: 'Camp', item: 'Item', recipe: 'Recipe',
       monster: 'Monster', zone: 'Region', location: 'Place',
       ability: 'Ability', event: 'Event', chest: 'Chest',
       searchable_chest: 'Searchable chest',

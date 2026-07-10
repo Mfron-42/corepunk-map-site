@@ -3,7 +3,7 @@
 import { S, LS, save } from './state.js';
 import {
   CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey,
-  chestDisplayName, chestHex, mapName, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion,
+  chestDisplayName, chestHex, mapName, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
 } from './config.js';
 import { $, $$, esc, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -325,7 +325,7 @@ function buildBestiary() {
       // révélé, jamais confondu avec une vraie créature du jeu.
       const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
       return `<li class="bst-row">
-        <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
+        <span class="bst-name"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
         ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}
         ${zoneBtn}
       </li>`;
