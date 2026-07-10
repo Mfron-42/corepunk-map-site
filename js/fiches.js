@@ -588,16 +588,32 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
    EXIGENCE FERME (override du manager, pas une nuance de style) : un token
    non résolu ne s'affiche JAMAIS en `{{chemin.brut}}` dans la phrase -- une
    petite pastille "?" cliquable-au-survol le remplace, avec le chemin brut
-   réservé au `title` (pour qui veut creuser), et DEUX styles bien distincts
+   réservé au `title` (pour qui veut creuser), et des styles bien distincts
    selon la nature du trou :
    - kind "runtime"     : valeur calculée EN JEU par nature (ShieldValue,
      CurrentStack) -- jamais un chiffre statique, même avec plus de RE.
    - kind "unextracted" : valeur réelle mais pas encore sortie des données
-     client (Modifiers/TotalTime/etc, voir la Phase C du plan). */
+     client.
+   Depuis la Phase C (décodage Modifiers/TotalTime, HANDOFF_modifiers_decode
+   .md), deux kinds SUBSTITUÉS s'ajoutent -- du vrai contenu décodé en ligne,
+   pas des trous :
+   - kind "base"    : u.value est le chiffre exact pour un personnage de
+     base (la formule complète, ex 0.035×(1+A_Reg+), reste dans le title --
+     elle varie avec les stats du joueur).
+   - kind "formula" : aucun chiffre statique n'existe (la valeur dépend des
+     stats du porteur) -- u.formula, l'expression réellement décodée
+     (ex 0.001×Hpm + 15), s'affiche en ligne, jamais un chiffre inventé. */
 const _EFFECT_SENTINEL_RE = /\x01(\d+)\x01/g;
 
 function effectVarChip(u) {
   if (!u) return '';
+  if (u.kind === 'base') {
+    const title = u.formula ? `${tr('effectVarBaseTooltip')} — ${u.formula}` : tr('effectVarBaseTooltip');
+    return `<span class="effect-var-inline effect-var-base" title="${esc(title)}">${esc(fmtNum(u.value))}</span>`;
+  }
+  if (u.kind === 'formula') {
+    return `<span class="effect-var-inline effect-var-formula" title="${esc(`${tr('effectVarFormulaTooltip')} — ${u.token}`)}">${esc(u.formula)}</span>`;
+  }
   const runtime = u.kind === 'runtime';
   const cls = runtime ? 'effect-var effect-var-runtime' : 'effect-var effect-var-unknown';
   const label = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');

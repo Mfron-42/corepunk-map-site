@@ -1027,6 +1027,22 @@ body {
   border: 1px dashed var(--muted);
   opacity: .85;
 }
+/* Valeurs SUBSTITUÉES par le décodage Phase C (Modifiers/TotalTime) -- du
+   vrai contenu en ligne, pas des pastilles-trous :
+   - .effect-var-base    : chiffre exact pour un personnage de base (la
+     formule complète reste dans le title) -- souligné pointillé discret.
+   - .effect-var-formula : pas de chiffre statique possible (dépend des
+     stats du porteur) -- l'expression décodée s'affiche telle quelle. */
+.effect-var-inline {
+  cursor: help;
+}
+.effect-var-base {
+  border-bottom: 1px dotted var(--muted);
+}
+.effect-var-formula {
+  font-style: italic;
+  color: var(--accent-hi);
+}
 
 /* ── Encart « Comment faire » (hint généré) ── */
 .hint-box {

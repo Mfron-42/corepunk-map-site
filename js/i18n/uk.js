@@ -245,6 +245,8 @@ export default {
       useEffectTitle: 'Ефект використання',
       effectVarRuntimeTooltip: 'Обчислюється наживо в грі (не фіксоване значення)',
       effectVarUnextractedTooltip: 'Значення ще не видобуте з даних клієнта',
+      effectVarBaseTooltip: 'Значення для базового персонажа — зростає з вашими характеристиками',
+      effectVarFormulaTooltip: 'Залежить від ваших характеристик (показано декодовану формулу)',
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',

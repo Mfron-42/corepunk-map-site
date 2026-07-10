@@ -248,6 +248,8 @@ export default {
       useEffectTitle: 'Efecto de uso',
       effectVarRuntimeTooltip: 'Calculado en vivo en el juego (no es un valor fijo)',
       effectVarUnextractedTooltip: 'Valor aún no extraído de los datos del cliente',
+      effectVarBaseTooltip: 'Valor para un personaje base — escala con tus estadísticas',
+      effectVarFormulaTooltip: 'Depende de tus estadísticas (se muestra la fórmula decodificada)',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',

@@ -265,6 +265,8 @@ export default {
       useEffectTitle: 'Use effect',
       effectVarRuntimeTooltip: 'Computed live in-game (not a fixed value)',
       effectVarUnextractedTooltip: 'Value not yet extracted from client data',
+      effectVarBaseTooltip: 'Value for a base character — scales with your stats',
+      effectVarFormulaTooltip: 'Depends on your stats (decoded formula shown)',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
