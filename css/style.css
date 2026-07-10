@@ -1033,6 +1033,14 @@ body {
   background: var(--accent-soft);
   border: 1px solid var(--line-strong);
 }
+/* Ligne « donné par » de l'en-tête (fiche-header identity pass, npcChip) :
+   .reward-chips est un flex (donc un vrai bloc) -- c'est CE qui répare le
+   bug de retour à la ligne (voir la note sur .quest-explain-badge plus haut,
+   display:inline-flex partage un contexte de formatage en ligne avec ce qui
+   suit) : un bloc juste après termine ce contexte, la puce ne peut plus se
+   faire couper au milieu du nom du donneur. Marge légère seulement, la
+   pastille de badge juste au-dessus a déjà son propre espacement. */
+.quest-giver-row { margin: 4px 0 2px; }
 .fiche-section { margin-top: 18px; }
 .fiche-section > h3 {
   font-family: var(--font-display);
@@ -1409,6 +1417,25 @@ body {
   text-underline-offset: 3px;
 }
 .frow .fr-label.link:hover { color: var(--accent); text-decoration-color: var(--accent); }
+/* Affordance générique pour un `.link` autonome, hors `.frow`/`.goal-target-*`
+   (audit sitewide task #70) : 4 lignes d'obtention d'objet (openItemFiche's
+   questSourceHtml -- "By killing X"/"obtained by completing Y") posaient déjà
+   `class="link" data-act="..."` (le clic fonctionnait) mais AUCUNE règle CSS
+   ne matchait ce nom de classe nu -- cliquable, mais visuellement identique
+   au texte autour (trouvaille de l'audit : "clickable-but-doesn't-look-it").
+   Même idiome que `.frow .fr-label.link` juste au-dessus, généralisé comme
+   base ; les sélecteurs plus spécifiques déjà présents dans ce fichier
+   (`.goal-target-name.link`, `.frow .muted.link`, etc.) restent prioritaires
+   partout où ils existent déjà -- aucune régression, cette règle ne comble
+   qu'un vrai trou. */
+.link {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
+  transition: color var(--dur) var(--ease);
+}
+.link:hover { color: var(--accent); text-decoration-color: var(--accent); }
 
 /* ── Bouton « carte » ─────────────────────────────────────────────────
    Pastille secondaire/ghost cohérente partout où un objet du monde peut être
@@ -1492,7 +1519,18 @@ body {
 .goal-step-aggregate > .goal-body > .goal-text { font-style: italic; opacity: .92; }
 
 .reward-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-.reward-chips .chip {
+/* Généralisée depuis `.reward-chips .chip` (fiche-header identity pass +
+   task #70) : une chip doit maintenant aussi pouvoir vivre TOUTE SEULE, en
+   ligne dans une phrase (npcChip, js/fiches.js -- "donné par [chip]" dans une
+   ligne d'obtention d'objet), pas seulement empilée dans un conteneur
+   `.reward-chips` en bloc (un `<div>` ne peut de toute façon pas s'imbriquer
+   dans un `<p>`). Règle de base non scopée : AUCUNE régression pour les
+   usages existants (tags monstre/capacité, récompenses, ingrédients de
+   recette, "produit →") -- ils vivent tous déjà dans un `.reward-chips`, qui
+   ne fournit plus que le comportement de RANGÉE (flex/wrap/gap), le look de
+   la pastille elle-même vient d'ici. `.pop-mobs .chip` (popups.js) reste une
+   règle plus spécifique séparée, intacte (aucune propriété ne change). */
+.chip {
   display: inline-flex; align-items: center; gap: 5px;
   border: 1px solid var(--line-soft);
   background: var(--panel-3);
@@ -1502,8 +1540,8 @@ body {
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
 .chip-icon { width: 20px; height: 20px; object-fit: contain; border-radius: 4px; font-size: .56rem; flex: none; }
-.reward-chips .chip[data-act] { cursor: pointer; }
-.reward-chips .chip[data-act]:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.chip[data-act] { cursor: pointer; }
+.chip[data-act]:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 /* Quantité d'une chip (ingrédient de recette / récompense toujours donnée) —
    suffixe discret, jamais un second badge encadré : juste un peu plus
    petit et muet que le libellé de la chip elle-même. */
@@ -1646,6 +1684,52 @@ button.rar-pill:hover {
   border-radius: 4px;
   padding: 1px 5px;
   vertical-align: middle;
+}
+
+/* ── Pastille d'état « on ne sait pas » (unknown_states_DESIGN.md, task #67)
+   ─────────────────────────────────────────────────────────────────────────
+   Taxonomie à 3 états partagée pour TOUTE incertitude affichée sur le site
+   (position, butin, stock vendeur, mise à l'échelle rareté/palier, résidu de
+   but de quête non résolu…) — un seul composant + un seul vocabulaire au
+   lieu des ~6 idiomes bespoke qui coexistaient déjà (chacun sa classe, son
+   texte, jamais partagés). "dev" RÉUTILISE .dev-mark tel quel ci-dessus (pas
+   de doublon de badge « Test ») — seuls dynamic/unknown sont de nouvelles
+   variantes. Voir js/fiches.js stateChip(). Un `title` (info-bulle courte)
+   accompagne toujours la pastille.
+   - .state-chip-dynamic : un FAIT confirmé (décidé par le serveur, prouvé
+     par le pipeline) — teinte accent, aussi affirmative qu'un fait réel.
+   - .state-chip-unknown : une incertitude honnête (non déterminable depuis
+     les données client extraites) — muette, en pointillés, jamais alarmante
+     (même registre visuel que .pos-dynamic/.effect-var-unknown ailleurs). */
+.state-chip {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: .6rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 1px 6px;
+  cursor: help;
+  vertical-align: middle;
+}
+.state-chip-dynamic {
+  color: var(--accent-hi);
+  background: var(--accent-soft);
+  border: 1px solid var(--line-strong);
+}
+.state-chip-dev {
+  color: var(--danger);
+  background: rgba(224, 100, 92, .14);
+  border: 1px solid rgba(224, 100, 92, .4);
+}
+.state-chip-unknown {
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--muted);
+  opacity: .85;
+  font-style: italic;
+  text-transform: none;
 }
 
 /* ── Fiche monstre : grille de statistiques ──────────────────────────

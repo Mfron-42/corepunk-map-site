@@ -266,6 +266,14 @@ export default {
       noLootCatalogued: 'Butin non catalogué pour ce monstre.',
       noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
       noCampsKnown: 'Aucun camp connu pour ce monstre.',
+      // Section faune de la fiche camp (unknown_states_DESIGN.md #4/#10,
+      // tâche #67) : un camp « monster-ish » (kind monsters/creeps/wildlife)
+      // dont le nom de manager ne donne aucune espèce résolue — prouvé au
+      // niveau des octets que les points de spawn du camp ne portent AUCUNE
+      // référence d'entité (data/SCHEMA.md « camp fauna »), 43/128 camps de ce
+      // type aujourd'hui. N'affichait jusqu'ici rien du tout (trou silencieux,
+      // voir openCampFiche) ; remplacé par une note honnête d'état dynamique.
+      campFaunaUnknownNote: "Les créatures précises de ce camp ne sont pas enregistrées dans les données client — apparition gérée dynamiquement par le serveur.",
       // Section « Objets de quête » de la fiche monstre (suivi du lien
       // monstre<->objet de quête, tâche 1/4) : liste questDrops[] cuit au
       // build -- uniquement des liens produits par le résolveur, section
@@ -326,6 +334,20 @@ export default {
       // révélé s'affiche (fiche, pastille de variante, bestiaire, recherche).
       devContentTag: n => `Contenu dev (${n})`,
       devBadge: 'Test',
+      // Taxonomie « on ne sait pas » à 3 états (unknown_states_DESIGN.md,
+      // tâche #67) : un seul composant `.state-chip` + vocabulaire court pour
+      // tout endroit du site qui explique honnêtement une incertitude
+      // (position, butin, stock vendeur, mise à l'échelle rareté/tier,
+      // résidu de but de quête non résolu…) au lieu des ~6 idiomes bespoke
+      // existants. "dev" réutilise devBadge ci-dessus comme libellé (cette
+      // clé n'ajoute que l'info-bulle manquante) — dynamic/unknown sont les
+      // deux seuls libellés réellement nouveaux. Voir stateChip() dans
+      // js/fiches.js.
+      devBadgeTitle: 'Contenu de test ou inachevé, jamais utilisé en jeu.',
+      stateDynamic: 'Dynamique',
+      stateDynamicTitle: 'Décidé par le serveur en temps réel — absent des données client.',
+      stateUnknown: 'Inconnu',
+      stateUnknownTitle: 'Non déterminable depuis les données client extraites.',
       // Plages de jet / DPS d'arme / formules / mise à l'échelle rune-puce
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, voir 
@@ -346,7 +368,14 @@ export default {
       formulaPartialNote: 'Une partie de cette ligne dépend d’une référence moteur non décodée.',
       rarityScalingTitle: 'Mise à l’échelle par rareté',
       tierScalingTitle: 'Mise à l’échelle par palier',
-      scalingServerSide: 'Ne varie pas avec la rareté dans les données du client (probablement géré côté serveur).',
+      // Reformulé (unknown_states_DESIGN.md §2 re-check #2, tâche #67) :
+      // l'ancienne formule « (probablement géré côté serveur) » affirmait une
+      // cause précise NON PROUVÉE — data/SCHEMA.md lui-même ne tranche pas
+      // entre mise à l'échelle côté serveur et une autre règle du jeu (ex. une
+      // règle liée au nombre d'emplacements de talent). Neutre désormais, et
+      // enveloppé dans une pastille d'état "unknown" par son appelant
+      // (formulaHtml) plutôt qu'un simple paragraphe .hint.
+      scalingServerSide: "Ne varie pas avec la rareté dans les données du client, pour une raison qui n'est pas déterminable depuis ce qui est extrait.",
       scalingNotLocated: 'Mise à l’échelle non localisée dans les données du client.',
       tierNotRarity: 'Évolue par PALIER (tier), pas par rareté.',
       useEffectTitle: 'Effet d’utilisation',

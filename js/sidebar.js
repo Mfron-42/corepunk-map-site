@@ -323,7 +323,7 @@ function buildBestiary() {
       // N'apparaît que si S.devOn est vrai (sinon isHiddenTest l'aurait déjà
       // exclu de `list` plus haut) : marque explicitement un monstre isTest
       // révélé, jamais confondu avec une vraie créature du jeu.
-      const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
+      const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
       return `<li class="bst-row">
         <span class="bst-name" data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
         ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}

@@ -266,6 +266,15 @@ export default {
       noLootCatalogued: 'Botín no catalogado para este monstruo.',
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
       noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
+      // Sección de fauna de la ficha de campamento (unknown_states_DESIGN.md
+      // #4/#10, tarea #67): un campamento "de tipo monstruo" (kind monsters/
+      // creeps/wildlife) cuyo nombre de manager no da ninguna especie
+      // resuelta — probado a nivel de bytes que los puntos de aparición del
+      // campamento no llevan NINGUNA referencia de entidad (data/SCHEMA.md
+      // "camp fauna"), 43/128 campamentos así hoy. Antes no mostraba nada en
+      // absoluto (vacío silencioso, ver openCampFiche); ahora una nota
+      // honesta de estado dinámico.
+      campFaunaUnknownNote: 'Las criaturas concretas de este campamento no están registradas en los datos del cliente — aparecen de forma dinámica por el servidor.',
       // Sección "Objetos de misión" de la ficha de monstruo (seguimiento del
       // vínculo monstruo<->objeto de misión, tarea 1/4): lista questDrops[]
       // horneado en la compilación -- solo enlaces producidos por el
@@ -321,6 +330,20 @@ export default {
       // bestiario, búsqueda).
       devContentTag: n => `Contenido de prueba (${n})`,
       devBadge: 'Prueba',
+      // Taxonomía de 3 estados "no lo sabemos" (unknown_states_DESIGN.md,
+      // tarea #67): un único componente `.state-chip` + vocabulario corto
+      // para cada rincón del sitio que explica honestamente una incertidumbre
+      // (posición, botín, stock del vendedor, escalado de rareza/nivel,
+      // residuo de objetivo de misión sin resolver…) en vez de los ~6
+      // idiomas artesanales que ya existían. "dev" reutiliza devBadge de
+      // arriba como etiqueta (esta clave solo añade el tooltip que faltaba)
+      // — dynamic/unknown son las dos únicas etiquetas realmente nuevas. Ver
+      // stateChip() en js/fiches.js.
+      devBadgeTitle: 'Contenido inacabado o de prueba que el juego incluye pero nunca usa.',
+      stateDynamic: 'Dinámico',
+      stateDynamicTitle: 'Decidido por el servidor en tiempo real — no almacenado en los datos del cliente.',
+      stateUnknown: 'Desconocido',
+      stateUnknownTitle: 'No se puede determinar a partir de los datos del cliente extraídos.',
       // Rangos de tirada / DPS de arma / fórmulas / escalado de runas y chips
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- nuevo, ver  +
@@ -340,7 +363,14 @@ export default {
       formulaPartialNote: 'Parte de esta línea depende de una referencia del motor no decodificada.',
       rarityScalingTitle: 'Escalado por rareza',
       tierScalingTitle: 'Escalado por nivel',
-      scalingServerSide: 'No varía con la rareza en los datos del cliente (probablemente gestionado en el servidor).',
+      // Reformulado (unknown_states_DESIGN.md §2 re-check #2, tarea #67): la
+      // antigua frase "(probablemente gestionado en el servidor)" afirmaba
+      // una causa concreta NO PROBADA — data/SCHEMA.md por sí mismo no puede
+      // determinar si es escalado del lado del servidor u otra regla del
+      // juego (p. ej. una regla ligada al número de ranuras de talento).
+      // Neutro ahora, y envuelto en una pastilla de estado "unknown" por su
+      // llamador (formulaHtml) en vez de un simple párrafo .hint.
+      scalingServerSide: 'No varía con la rareza en los datos del cliente, por un motivo que no se puede determinar a partir de lo extraído.',
       scalingNotLocated: 'Escalado no localizado en los datos del cliente.',
       tierNotRarity: 'Escala por NIVEL (tier), no por rareza.',
       useEffectTitle: 'Efecto de uso',

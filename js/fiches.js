@@ -31,6 +31,13 @@ import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
    cercueil, corps, coffre fouillable…) la table de butin associée PAR TYPE
    (voir campLootTableName — mention honnête, le lien prop→table n'est pas
    publié par le jeu). */
+/* Kinds "monster-ish" ( -- même classement, tokens
+   raw "monsters"/"monster"/"creeps"/"wild"/"peaceful" normalisés en kinds
+   site "monsters"/"creeps"/"wildlife", voir build_site_data.py
+   _CAMP_KIND_NORM) : la seule famille de camps pour laquelle une SECTION
+   FAUNE a un sens -- un camp de minerai/herboristerie n'a simplement aucune
+   créature à lister, ce n'est pas un trou de donnée. */
+const MONSTER_ISH_CAMP_KINDS = new Set(['monsters', 'creeps', 'wildlife']);
 function openCampFiche(key) {
   const det = S.campDetails[key] || null;
   const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === key);
@@ -43,6 +50,20 @@ function openCampFiche(key) {
       ${mobLabelHtml(m, 'fr-label')}
       <span class="muted">${m.lvl ? tr('levelAbbrev', m.lvl) : ''}${m.atk ? ' · ' + esc(m.atk) : ''}</span>
     </div>`).join('');
+  // Faune honnêtement vide (unknown_states_DESIGN.md #4/#10, task #67) : un
+  // camp "monster-ish" dont AUCUNE espèce n'a pu être résolue par le
+  // pipeline (heuristique de nom sur le manager du camp -- byte-prouvé que
+  // les points de spawn eux-mêmes ne portent aucune référence d'entité,
+  // data/SCHEMA.md "camp fauna") n'a même pas d'entrée dans camp_details.json
+  // (build_site_data.py::camp_details() saute tout camp sans monstres NI
+  // loot_tables) -- `det` est alors carrément `null`, et la section
+  // disparaissait en silence jusqu'ici (43/128 camps monster-ish, voir
+  // tmp/regen_20260710.log). Remplacé par une pastille + note honnêtes,
+  // jamais une liste inventée ni un silence qui se lit comme "pas de
+  // monstres ici du tout".
+  const faunaUnknown = (!mobs && MONSTER_ISH_CAMP_KINDS.has(g.kind))
+    ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', 0))}</h3>
+        <p class="hint">${stateChip('dynamic')} ${esc(tr('campFaunaUnknownNote'))}</p></div>` : '';
   const drops = det ? `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(det.drops, 'noLootCatalogued')}</div>` : '';
   const tableName = campLootTableName(key);
   const tableRows = tableName ? lootTableItems(tableName) : null;
@@ -58,7 +79,7 @@ function openCampFiche(key) {
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
       ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${g.pts.length}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
     </div></div>
-    ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : ''}
+    ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : faunaUnknown}
     ${drops}
     ${tableHtml}`);
   setFicheHash('camp', key);
@@ -128,7 +149,7 @@ function openSearchableChestFiche(k) {
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
     </div></div>
-    <div class="fiche-section"><p class="hint">${esc(tr('searchableChestRarityNote'))}</p></div>
+    <div class="fiche-section"><p class="hint">${stateChip('dynamic')} ${esc(tr('searchableChestRarityNote'))}</p></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash(null);
 }
@@ -193,7 +214,11 @@ function monsterLootRow(d) {
     S.items[d.key] ? 'fiche-item' : null, d.key, dropRateHtml(d), itemGlyph(S.items[d.key]));
 }
 function lootRowsHtml(list, emptyKey) {
-  if (!list?.length) return `<p class="hint">${esc(tr(emptyKey))}</p>`;
+  // Pastille "unknown" (unknown_states_DESIGN.md #9, task #67) : ce repli
+  // partagé (monstre/camp/coffre/table) dit "rien de catalogué" -- un vrai
+  // trou de couverture connu, jamais un aveu que le jeu n'a pas de butin ici
+  // (voir noLootCatalogued/noHarvestCatalogued -- suivi ouvert, pas final).
+  if (!list?.length) return `<p class="hint">${stateChip('unknown')} ${esc(tr(emptyKey))}</p>`;
   const guaranteed = list.filter(d => d.g);
   const chance = list.filter(d => !d.g);
   return (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(monsterLootRow).join('')}` : '')
@@ -578,7 +603,12 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
   const lines = entries.map(e => `<p class="formula-line">${e.tag ? `<span class="formula-role">${esc(e.tag)}</span>` : ''}${esc(e.text)}${
     e.hasExternal ? ` <span class="formula-partial" title="${esc(tr('formulaPartialNote'))}">†</span>` : ''
   }</p>`).join('');
-  const note = rarityNote ? `<p class="hint">${esc(tr('scalingServerSide'))}</p>` : '';
+  // Pastille "unknown" (unknown_states_DESIGN.md #12/re-check #2, task #67) :
+  // ce n'est PAS un fait serveur confirmé -- data/SCHEMA.md lui-même ne peut
+  // pas trancher entre mise à l'échelle côté serveur et une autre règle du
+  // jeu (voir le mot i18n reformulé qui a retiré l'implication "probablement
+  // côté serveur").
+  const note = rarityNote ? `<p class="hint">${stateChip('unknown')} ${esc(tr('scalingServerSide'))}</p>` : '';
   return `<div class="fiche-section"><h3>${esc(tr('formulaTitle'))}</h3>${lines}${note}</div>`;
 }
 
@@ -680,7 +710,9 @@ function scalingSection(it) {
     })).join('');
     if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
   } else if (it.rarity_scaling_status === 'no_template') {
-    parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${esc(tr('scalingNotLocated'))}</p></div>`);
+    // Pastille "unknown" (unknown_states_DESIGN.md #13, task #67) : contenu
+    // déjà correct, juste enveloppé dans le composant d'état partagé.
+    parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('scalingNotLocated'))}</p></div>`);
   }
   if (it.tier_scaling) {
     const rows = ['t1', 't2', 't3'].map(tk => {
@@ -742,7 +774,7 @@ function monsterVariantPickHtml(activeKey, variants, model) {
     const lvl = m.level != null ? tr('levelAbbrev', m.level) : null;
     const distinctName = model?.name && fold(m.name) !== fold(model.name) ? m.name : null;
     const label = [lvl, distinctName].filter(Boolean).join(' · ') || pretty(key);
-    const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
+    const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
     return pillHtml({ active: key === activeKey, hex: MONSTER_HEX, label, act: 'fiche-monster', id: key, mark: devMark });
   }).join('');
   return pillSelectHtml('monsterVariantsLabel', pills);
@@ -794,7 +826,7 @@ function openMonsterFiche(key) {
   // Contenu dev (feature #13) : marqueur explicite quand la variante
   // ACTIVEMENT affichée est isTest (toujours ouvrable par lien profond direct,
   // voir monsterModelVariants -- jamais un 404 silencieux, juste marqué).
-  const devMark = m.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
+  const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
   const kindLine = (kindBits.join(' · ') || tr('monsterLabel')) + (m.variants > 1 ? tr('variantsNote', m.variants) : '');
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
@@ -855,7 +887,10 @@ function openMonsterFiche(key) {
           <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
           ${gotoBtn(c.x, c.z, c.name)}
         </div>`).join('')
-      : `<p class="hint">${esc(tr('noCampsKnown'))}</p>`
+      // Pastille "unknown" (unknown_states_DESIGN.md #10, task #67) : la
+      // couverture camps.json ne référence qu'environ 25 % des monstres --
+      // un vrai trou de jointure, jamais "ce monstre n'a pas de camp du tout".
+      : `<p class="hint">${stateChip('unknown')} ${esc(tr('noCampsKnown'))}</p>`
   }</div>`;
 
   const loreIdx = loreIndexFor(key);
@@ -993,9 +1028,49 @@ function setFicheHash(kind, id) {
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
 
+/* Avatar HeroAvatars -- traite le leaf générique `Dwarf_dark` comme "pas
+   d'icône" (fiche-header identity pass) : dans les données expédiées, ce
+   catch-all est assigné à quasi tout PNJ jamais doté d'un portrait bespoke de
+   sélection de héros (57 % des donneurs de quête aujourd'hui) -- l'afficher
+   tel quel montre le MÊME nain à capuche verte pour des dizaines de
+   personnages sans rapport (ex. Police-Tron 5000, un robot). Un appelant qui
+   reçoit `null` ici retombe sur une identité plus spécifique (portrait de pin
+   NPC réel) ou, à défaut, le glyphe d'initiales habituel -- jamais ce
+   placeholder trompeur. */
 function heroAvatar(iconPath) {
   if (!iconPath || !iconPath.includes('HeroAvatars')) return null;
-  return 'icons/hero_avatars/' + encodeURIComponent(iconPath.split('/').pop()) + '.png';
+  const leaf = iconPath.split('/').pop();
+  if (leaf === 'Dwarf_dark') return null;
+  return 'icons/hero_avatars/' + encodeURIComponent(leaf) + '.png';
+}
+/* Avatar partagé openQuestFiche/openDialogueFiche (les deux dérivent leur
+   identité du même donneur) -- ordre de préférence (fiche_header_DESIGN.md
+   §1) : 1) le portrait de PIN réel du donneur (icons/npc_map/<leaf>.png,
+   EXACTEMENT la même source qu'openNpcFiche/les lignes vendeur -- l'identité
+   est "empruntée" à ce PNJ, jamais son propre HeroAvatars) quand ce donneur
+   est résolu sur la carte active (`giverPin`, déjà calculé par l'appelant) ;
+   2) repli HeroAvatars (heroAvatar ci-dessus, déjà gardé contre Dwarf_dark) ;
+   3) repli glyphe d'initiales (iconTag, universel, posé par l'appelant). */
+function questGiverAvatar(q, giverPin) {
+  if (giverPin?.icon) return `icons/npc_map/${encodeURIComponent(giverPin.icon)}.png`;
+  return heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
+}
+
+/* ── Pastille d'état "on ne sait pas" (unknown_states_DESIGN.md, task #67) ──
+   Taxonomie à 3 états PARTAGÉE (voir style.css .state-chip) pour toute
+   incertitude honnête affichée sur le site -- remplace ~6 idiomes bespoke
+   qui coexistaient déjà (chacun sa classe, son texte, jamais partagés).
+   "dev" réutilise .dev-mark/devBadge tel quel PARTOUT ailleurs dans ce
+   fichier (jamais dupliqué via cette pastille) -- seuls "dynamic"/"unknown"
+   sont de nouvelles variantes ici. `extraTitle` (facultatif) ajoute le SEUL
+   fait concret qui rend la phrase générique utile pour cet appel précis
+   (ex. "camp fauna is spawned server-side") sans forker la phrase de base
+   par site d'appel -- même idée que dynamicPosBadge's regionHint. */
+function stateChip(state, extraTitle) {
+  const label = state === 'dev' ? tr('devBadge') : tr(`state${capitalize(state)}`);
+  const titleBase = state === 'dev' ? tr('devBadgeTitle') : tr(`state${capitalize(state)}Title`);
+  const title = extraTitle ? `${titleBase} — ${extraTitle}` : titleBase;
+  return `<span class="state-chip state-chip-${state}" title="${esc(title)}">${esc(label)}</span>`;
 }
 
 /* Bouton « Carte » standard (icône + libellé) pour tout slot localisable —
@@ -1183,6 +1258,29 @@ function viewMonsterZone(key) {
    position · Westwind Woods »), jamais scindable par le flex-wrap parent, et
    le rappel de région hérite nativement la couleur/l'italique de son parent
    (voir .pos-region dans style.css, dé-italique seulement). */
+/* États (unknown_states_DESIGN.md #2/#3/#4/#5, task #67) : ces 3 niveaux
+   rendaient jusqu'ici TOUS le même texte muet/italique sans jamais dire au
+   survol POURQUOI la position n'est pas un simple bouton carte -- un `title`
+   par branche adopte maintenant le vocabulaire d'état partagé (stateChip),
+   sans toucher aux libellés visibles eux-mêmes (ils restent plus spécifiques
+   et plus utiles que "Dynamic"/"Unknown" tout court) :
+   - confiance HAUTE (b) : un vrai fait étayé par une preuve de drop/farm --
+     title "dynamic".
+   - confiance MOYENNE (b') et « monstre non catalogué » (c, camps.json ~25 %
+     de couverture seulement) : une hypothèse, jamais une preuve de spawn --
+     title "unknown" (cohérent avec leurs libellés déjà prudents, "Zone
+     estimée"/"Position non cataloguée").
+   - repli générique (tout autre acteur sans x/z ni search_zone) : le libellé
+     "Position dynamique" reste sa propre affirmation -- AUCUN classificateur
+     par instance n'est exposé côté client aujourd'hui pour prouver ou
+     infirmer ce cas au cas par cas (voir §2 re-check #3 -- 18 PNJ
+     d'Extraction Island sont byte-prouvés dynamiques côté pipeline, data/
+     quests.json pos_source=server_spawn, mais ce classifieur n'est publié
+     dans AUCUN .bin du site) ; changer sa sémantique sans preuve serait
+     l'inverse du problème que cette passe corrige. Title "dynamic" par
+     cohérence avec son propre libellé -- un vrai audit par échantillonnage
+     (déjà flaggé comme suivi séparé dans le design doc) reste à faire avant
+     de le reclasser. */
 function dynamicPosBadge(t, regionHint) {
   const sz = t && t.search_zone;
   if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
@@ -1193,13 +1291,14 @@ function dynamicPosBadge(t, regionHint) {
     // "Spawn zone"/"View zone" pour un simple calcul de voisinage.
     const isEstimate = sz.confidence === 'medium';
     const label = isEstimate ? tr('posEstimatedZone') : tr('posDynamicZone');
-    return `<span class="pos-dynamic">${esc(label)}</span>${zoneViewBtn(zi, isEstimate)}`;
+    const title = tr(isEstimate ? 'stateUnknownTitle' : 'stateDynamicTitle');
+    return `<span class="pos-dynamic" title="${esc(title)}">${esc(label)}</span>${zoneViewBtn(zi, isEstimate)}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
-    return `<span class="pos-dynamic">${esc(tr('posUncatalogued'))}</span>`;
+    return `<span class="pos-dynamic" title="${esc(tr('stateUnknownTitle'))}">${esc(tr('posUncatalogued'))}</span>`;
   }
   const region = regionHint ? ` <span class="pos-region">· ${esc(regionHint)}</span>` : '';
-  return `<span class="pos-dynamic">${esc(tr('posDynamic'))}${region}</span>`;
+  return `<span class="pos-dynamic" title="${esc(tr('stateDynamicTitle'))}">${esc(tr('posDynamic'))}${region}</span>`;
 }
 
 /* Prix vendeur : nombre au format de la langue + pictogramme de pièce —
@@ -1213,7 +1312,15 @@ function vendorStockSection(vendorKey) {
   const v = S.vendors[vendorKey];
   if (!v) return '';
   if (!v.sells?.length) {
-    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${esc(tr('noVendorItems'))}</p></div>`;
+    // Pastille "unknown" par défaut (unknown_states_DESIGN.md #19/re-check #4,
+    // task #67) : 20/69 vendors.json ont un `sells:[]` littéral, aucune
+    // documentation ne tranche pourquoi -- au moins 2 sous-populations
+    // probables (vendeurs de spec de héros S1/S2 potentiellement générés
+    // côté client vs. simple trou d'extraction), non distinguées ici faute
+    // d'un signal fiable ; "unknown" reste la formulation honnête par défaut
+    // tant que cette distinction n'est pas faite (suivi séparé, pas cette
+    // passe).
+    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('noVendorItems'))}</p></div>`;
   }
   const rows = v.sells.map(s => {
     const key = typeof s === 'string' ? s : s.key;
@@ -1337,6 +1444,25 @@ function qtyItemChip(entry) {
 function itemChip(key) { return qtyItemChip({ key }); }
 function qtyChipList(list) {
   return (list || []).map(qtyItemChip).join('');
+}
+
+/* Chip PNJ (fiche-header identity pass + task #70) : même composant que les
+   chips objet ci-dessus (`.chip`/`.chip-icon`, généralisés en base dans
+   style.css pour vivre aussi bien empilée dans un `<div class="reward-chips">`
+   en bloc -- l'en-tête de fiche quête/dialogue, "donné par" -- que directement
+   EN LIGNE dans une phrase -- la ligne d'obtention d'objet, "donné par
+   [chip]", puisqu'un `<div>` ne peut de toute façon pas s'imbriquer dans un
+   `<p>`). Icône : le portrait de PIN RÉEL du PNJ (icons/npc_map/<leaf>.png --
+   la même source qu'openNpcFiche/les lignes vendeur), jamais une icône
+   générique, quand `ni` résout un PNJ connu de la carte active ; repli
+   glyphe d'initiales (iconTag) sinon. Cliquable (data-act=fiche-npc)
+   seulement quand résolu -- jamais un lien deviné, le nom reste affiché
+   honnêtement en texte stylé sinon (jamais un lien mort). */
+function npcChip(name, ni) {
+  const rec = ni >= 0 ? S.data.npc[ni] : null;
+  const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
+  const attrs = ni >= 0 ? ` data-act="fiche-npc" data-id="npc:${ni}"` : '';
+  return `<span class="chip"${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
 }
 
 /* Désambiguïsation des items de quête « même nom » (quest-guide-feature plan
@@ -1612,7 +1738,7 @@ function heroSpecLabel(code) {
   const cls = HERO_SPEC_CLASS[m[1]];
   return cls ? `${weaponClassLabel(cls)} ${m[2]}` : code;
 }
-function goalTargetChip(t, label, regionHint) {
+function goalTargetChip(t, label, regionHint, isTestQuest) {
   if (!t || t.kind === 'multiple') return '';
   const lbl = esc(label || '');
   // Cible NPC déjà résolue par nom (voir la branche t.kind === 'npc' plus
@@ -1895,9 +2021,15 @@ function goalTargetChip(t, label, regionHint) {
   // whatever name the resolver actually produced, never a fabricated
   // relation/position beyond what's genuinely on `t`.
   const customName = t.label ? cleanLabel(t.label) : null;
-  return customName
-    ? `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span></div></div>`
-    : '';
+  if (!customName) return '';
+  // Pastille "unknown" (unknown_states_DESIGN.md #15, task #67) : ce résidu
+  // couvre 4 buts au total -- 3 sur test_craft_trigger (quête de test) + 1
+  // sur zero_to_hero_ish (contenu joueur RÉEL, opcode moteur non décodé --
+  // ni "dev", ni "dynamique", juste non déterminable depuis les données
+  // extraites, voir QUEST_FORMAT.md §12). Jamais pour le contenu de test (déjà
+  // couvert par isTest ailleurs) -- pas de double pastille sur le même but.
+  const unknownChip = isTestQuest ? '' : ` ${stateChip('unknown')}`;
+  return `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span>${unknownChip}</div></div>`;
 }
 
 /* Détecte si la cible d'un objectif fait partie d'une SÉRIE NUMÉROTÉE (ex.
@@ -1964,7 +2096,7 @@ function goalStepsSection(q) {
     const series = n > 1 ? seriesActorsFor(q, g) : null;
     const targetHtml = series
       ? seriesTargetChips(series, g.target.kind, regionHint)
-      : goalTargetChip(g.target, cleanLabel(g.label), regionHint);
+      : goalTargetChip(g.target, cleanLabel(g.label), regionHint, q.isTest);
     // `verb_included` : le libellé du but contient DÉJÀ son verbe ("Bring
     // book to King Head") — ne pas re-préfixer, sinon verbe doublé
     // ("Livrer Bring book to…"). Le pictogramme d'action reste.
@@ -2083,23 +2215,23 @@ function questJournalSection(q) {
    quête (setFicheHash('quest', slug)) pour que le partage d'URL rouvre
    exactement cette fiche. */
 function openDialogueFiche(q, slug) {
-  const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
+  // Le PNJ qui « donne » ce bark : même résolution que le donneur d'une
+  // vraie quête (npcIndexByName) -- réutilisée pour l'avatar (portrait de PIN
+  // réel en priorité, fiche_header_DESIGN.md §1) ET pour le chip cliquable
+  // vers sa vraie fiche, au lieu de l'ancien <span class="pop-coords link">
+  // (zéro chip, juste une phrase "given by X" linkifiée).
+  const ni = q.giver ? npcIndexByName(q.giver) : -1;
+  const giverPin = ni >= 0 ? S.data.npc[ni] : null;
+  const avatar = questGiverAvatar(q, giverPin);
   const lines = [...(q.dialogs?.npc || []), ...(q.dialogs?.player || [])];
   const linesHtml = lines.length
     ? lines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')
     : `<p class="hint">${esc(tr('noResults'))}</p>`;
-  // Le PNJ qui « donne » ce bark, cliquable vers sa vraie fiche quand il est
-  // connu de la carte active (navigation dialogue → PNJ).
-  const ni = q.giver ? npcIndexByName(q.giver) : -1;
-  const giverLine = q.giver
-    ? (ni >= 0
-      ? `<span class="pop-coords link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('givenByPlain', q.giver))}</span>`
-      : `<span class="pop-coords">${esc(tr('givenByPlain', q.giver))}</span>`)
-    : '';
+  const giverRow = q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, ni)}</div>` : '';
   openFiche(`
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name))}
       <div><div class="fiche-kind">${esc(tr('dialogueFicheKind'))}</div><h2>${esc(q.name)}</h2>
-      ${giverLine}</div></div>
+      ${giverRow}</div></div>
     <div class="fiche-section">
       <h3>${esc(tr('dialogueHeading'))}</h3>
       <p class="hint">${esc(tr('dialogueNote'))}</p>
@@ -2127,7 +2259,14 @@ function openQuestFiche(slug) {
   currentQuestItemDisambig = q.items?.length ? disambiguateQuestItems(q.items) : null;
   currentQuestItemFlags = q.items?.length ? new Map(q.items.map(qi => [qi.key, qi.isQuestItem])) : null;
   const regionHint = q.regions?.length ? q.regions[0] : null;
-  const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
+  // Donneur résolu UNE SEULE FOIS (fiche-header identity pass) -- alimente
+  // l'avatar (portrait de PIN réel en priorité, questGiverAvatar ci-dessus),
+  // le chip "donné par" de l'en-tête, ET le bouton « Voir le donneur » plus
+  // bas (giverX/giverZ/giverCat) : plus besoin de re-résoudre npcIndexByName
+  // une seconde fois en fin de fonction.
+  const giverNi = q.giver ? npcIndexByName(q.giver) : -1;
+  const giverPin = giverNi >= 0 ? S.data.npc[giverNi] : null;
+  const avatar = questGiverAvatar(q, giverPin);
   // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :
   // (a) position fixe -> gotoBtn normal ; (b)/(c) pas de position fixe mais
   // une search_zone propagée depuis le goal dont ce slot est la cible ->
@@ -2214,9 +2353,9 @@ function openQuestFiche(slug) {
   // donneur (q.x/q.z, souvent à quelques unités du pin -- cas Ophelia Voss,
   // voir npc_dual_identity_INVESTIGATION.md §2/§3) quand ce donneur est connu
   // de la carte active, et porte le `cat` que gotoBtn/pins.js utilisent pour
-  // mettre en avant CE marqueur au lieu d'un réticule redondant.
-  const giverNi = q.giver ? npcIndexByName(q.giver) : -1;
-  const giverPin = giverNi >= 0 ? S.data.npc[giverNi] : null;
+  // mettre en avant CE marqueur au lieu d'un réticule redondant. giverNi/
+  // giverPin sont déjà résolus plus haut (avatar de l'en-tête) -- pas de
+  // second lookup ici.
   const giverX = giverPin && giverPin.x != null ? giverPin.x : q.x;
   const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
   const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
@@ -2240,7 +2379,7 @@ function openQuestFiche(slug) {
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
       <div><div class="fiche-kind">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
       ${explainBadge}
-      ${q.giver ? `<span class="pop-coords">${esc(tr('givenByPlain', q.giver))}</span>` : ''}
+      ${q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, giverNi)}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
@@ -2479,7 +2618,7 @@ function openItemFiche(key) {
   // Contenu dev (feature #13) : marqueur explicite sur un item isTest ouvert
   // (toujours ouvrable par lien profond direct, jamais un 404 silencieux —
   // seule sa présence dans la RECHERCHE dépend de S.devOn, voir search.js).
-  const devMark = it.isTest ? `<span class="dev-mark">${esc(tr('devBadge'))}</span>` : '';
+  const devMark = it.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
 
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
@@ -2651,17 +2790,17 @@ function openItemFiche(key) {
         viaLine = `<p class="hint">${esc(tr('obtainViaHarvest', professionLabel(capitalize(qs.profession))))}</p>`;
       } else if (qs.via === 'given_by') {
         // receive_npc, or the "collect" mechanism's own given-by-giver
-        // safety-net branch (see build_site_data.py) -- reuses the SAME
-        // "given by X" wording as a quest giver line (givenByPlain), linked
-        // to the NPC's fiche when resolvable on the active map (never a
-        // guessed link, same npcIndexByName guard as every other name link
-        // in this file).
-        const ni = qs.npc ? npcIndexByName(qs.npc) : -1;
-        const givenText = qs.npc ? esc(tr('givenByPlain', qs.npc)) : '';
-        viaLine = givenText
-          ? `<p class="hint">${ni >= 0
-              ? `<span class="link" data-act="fiche-npc" data-id="npc:${ni}">${givenText}</span>`
-              : givenText}</p>`
+        // safety-net branch (see build_site_data.py) -- NPC name is now the
+        // SHARED npcChip component (task #70 / fiche-header identity pass),
+        // the same one the quest header's own "given by" row uses, instead
+        // of the whole sentence wrapped in a bare `.link` span (audit
+        // finding: wired to a real data-act click but with ZERO matching CSS
+        // rule -- clickable, but visually identical to plain text). Prefix
+        // text reuses goalGivenByLabel ("given by") -- only the chip carries
+        // the click/link now, never a guessed link when the NPC isn't
+        // resolvable (npcChip degrades to a plain styled name honestly).
+        viaLine = qs.npc
+          ? `<p class="hint">${esc(tr('goalGivenByLabel'))} ${npcChip(qs.npc, qs.npc ? npcIndexByName(qs.npc) : -1)}</p>`
           : '';
       } else if (qs.via === 'reward_of') {
         // receive_reward: granted via a DIFFERENT quest's own turn-in NPC
@@ -2669,13 +2808,11 @@ function openItemFiche(key) {
         // case, "Time of Death": qs.quest is thistlebrooks_terrifying_task,
         // the quest whose journal lists this as an objective, but qs.
         // quests[0] is eight_legged_freaks, whose completion actually grants
-        // it) -- both facts named explicitly, the quest name clickable when
-        // resolvable, never a guessed/fabricated link.
-        const ni = qs.npc ? npcIndexByName(qs.npc) : -1;
-        const givenText = qs.npc ? esc(tr('givenByPlain', qs.npc)) : '';
-        const givenSpan = givenText
-          ? (ni >= 0 ? `<span class="link" data-act="fiche-npc" data-id="npc:${ni}">${givenText}</span>` : givenText)
-          : '';
+        // it) -- both facts named explicitly. NPC name: same npcChip as
+        // given_by above (task #70). Quest name: kept as a `.link`-styled
+        // span (now visibly affordant too, see the generalized `.link` CSS
+        // rule) rather than a second chip -- never a guessed/fabricated link.
+        const givenBit = qs.npc ? `${esc(tr('goalGivenByLabel'))} ${npcChip(qs.npc, npcIndexByName(qs.npc))}` : '';
         const rqSlug = qs.quests?.[0];
         const rqName = qs.quest_names?.[0] || (rqSlug ? pretty(rqSlug) : null);
         const rqSpan = rqName
@@ -2683,7 +2820,7 @@ function openItemFiche(key) {
               ? `<span class="link" data-act="fiche-quest" data-id="${esc(rqSlug)}">${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`
               : `<span>${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`)
           : '';
-        const bits = [givenSpan, rqSpan].filter(Boolean);
+        const bits = [givenBit, rqSpan].filter(Boolean);
         viaLine = bits.length ? `<p class="hint">${bits.join(' — ')}</p>` : '';
       } else if (qs.via === 'world') {
         viaLine = `<p class="hint">${esc(tr('obtainViaWorld'))}</p>`;

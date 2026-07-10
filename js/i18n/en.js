@@ -274,6 +274,13 @@ export default {
       noLootCatalogued: 'No catalogued loot for this monster.',
       noAbilitiesKnown: 'No known abilities for this monster.',
       noCampsKnown: 'No known camp for this monster.',
+      // Camp fiche fauna section (unknown_states_DESIGN.md #4/#10, task #67):
+      // a "monster-ish" camp (monsters/creeps/wildlife kind) whose manager
+      // name yields zero resolved species — byte-proven the camp's own spawn
+      // points carry no entity reference at all (data/SCHEMA.md "camp fauna"),
+      // 43/128 such camps today. Used to render nothing at all (silent gap,
+      // see openCampFiche); now an honest dynamic-state note instead.
+      campFaunaUnknownNote: "This camp's specific creatures aren't recorded in the client data — spawned dynamically by the server.",
       // Monster fiche "Quest items" section (monster<->quest-item link
       // follow-up, task 1/4): lists questDrops[] baked at build time --
       // ONLY resolver-produced kill links, section omitted entirely when
@@ -326,6 +333,19 @@ export default {
       // content is displayed (fiche, variant pill, bestiary, search).
       devContentTag: n => `Dev content (${n})`,
       devBadge: 'Test',
+      // "We don't know" 3-state taxonomy (unknown_states_DESIGN.md, task #67):
+      // one shared `.state-chip` component + short vocabulary for every "why
+      // don't we know this" spot on the site (position, loot, vendor stock,
+      // rarity/tier scaling, unresolved quest-goal residuals…) instead of the
+      // ~6 independent bespoke idioms that already existed. "dev" reuses
+      // devBadge above as its label (this key only adds the missing tooltip)
+      // — dynamic/unknown are the two genuinely new labels. See stateChip()
+      // in js/fiches.js.
+      devBadgeTitle: 'Unfinished or test content the game ships but never uses.',
+      stateDynamic: 'Dynamic',
+      stateDynamicTitle: 'Decided by the server at runtime — not stored in client data.',
+      stateUnknown: 'Unknown',
+      stateUnknownTitle: "Can't be determined from the extracted client data.",
       // Roll ranges / weapon DPS / formulas / rune-chip scaling
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, see 
@@ -346,7 +366,13 @@ export default {
       formulaPartialNote: 'Part of this line depends on an undecoded engine reference.',
       rarityScalingTitle: 'Rarity scaling',
       tierScalingTitle: 'Tier scaling',
-      scalingServerSide: "Doesn't vary with rarity in the client data (likely handled server-side).",
+      // Reworded (unknown_states_DESIGN.md §2 re-check #2, task #67): the old
+      // "(likely handled server-side)" phrasing asserted a specific, UNPROVEN
+      // cause — data/SCHEMA.md itself can't tell whether this is server-side
+      // scaling or a different in-game rule (e.g. a talent-slot-count rule).
+      // Neutral now, and wrapped in an `unknown` state-chip by its caller
+      // (formulaHtml) instead of the old bare `.hint` paragraph.
+      scalingServerSide: "Doesn't vary with rarity in the client data, for a reason that can't be pinned down from what's extracted.",
       scalingNotLocated: 'Scaling not located in the client data.',
       tierNotRarity: 'Scales by TIER, not by rarity.',
       // "Use effect" section (item_desc_PLAN.md Phase B): a linked ability's
