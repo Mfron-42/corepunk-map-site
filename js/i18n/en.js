@@ -251,6 +251,20 @@ export default {
       scalingServerSide: "Doesn't vary with rarity in the client data (likely handled server-side).",
       scalingNotLocated: 'Scaling not located in the client data.',
       tierNotRarity: 'Scales by TIER, not by rarity.',
+      // "Use effect" section (item_desc_PLAN.md Phase B): a linked ability's
+      // own tooltip prose, joined from item.abilities[] at build time (see
+      //  build_catalog()). Never a fabricated
+      // number: every token this build can't honestly resolve renders as a
+      // small "?" marker chip instead of the raw {{mustache}} path, with the
+      // raw token surfaced only in the tooltip for the curious. Two
+      // distinct kinds of gap, two distinct tooltip texts (manager's UX
+      // override) -- "runtime" (ShieldValue/CurrentStack, computed live
+      // in-game BY NATURE, never a data gap) vs "unextracted" (Modifiers/
+      // TotalTime/etc, a real static value this build just hasn't decoded
+      // yet, see Phase C in the plan).
+      useEffectTitle: 'Use effect',
+      effectVarRuntimeTooltip: 'Computed live in-game (not a fixed value)',
+      effectVarUnextractedTooltip: 'Value not yet extracted from client data',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',

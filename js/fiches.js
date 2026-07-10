@@ -575,6 +575,67 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
   return `<div class="fiche-section"><h3>${esc(tr('formulaTitle'))}</h3>${lines}${note}</div>`;
 }
 
+/* "Use effect" section (item_desc_PLAN.md Phase B) : it.useEffect[] est une
+   jointure FAITE AU BUILD (item.abilities[] -> abilities.json, voir
+    -- rien
+   n'est résolu ici côté client, seulement mis en forme. Chaque entrée porte
+   déjà `resolvedDesc` (le texte localisé, chaque {{Data.N.<code>}} résolu via
+   le params_raw propre à CETTE capacité substitué en clair, et un sentinel de
+   contrôle \x01N\x01 à la place de tout token que ce build ne sait pas
+   résoudre honnêtement) + `unresolved[]` (le {token, kind} réel derrière
+   chaque sentinel) + une éventuelle `formula` déjà décodée.
+
+   EXIGENCE FERME (override du manager, pas une nuance de style) : un token
+   non résolu ne s'affiche JAMAIS en `{{chemin.brut}}` dans la phrase -- une
+   petite pastille "?" cliquable-au-survol le remplace, avec le chemin brut
+   réservé au `title` (pour qui veut creuser), et DEUX styles bien distincts
+   selon la nature du trou :
+   - kind "runtime"     : valeur calculée EN JEU par nature (ShieldValue,
+     CurrentStack) -- jamais un chiffre statique, même avec plus de RE.
+   - kind "unextracted" : valeur réelle mais pas encore sortie des données
+     client (Modifiers/TotalTime/etc, voir la Phase C du plan). */
+const _EFFECT_SENTINEL_RE = /\x01(\d+)\x01/g;
+
+function effectVarChip(u) {
+  if (!u) return '';
+  const runtime = u.kind === 'runtime';
+  const cls = runtime ? 'effect-var effect-var-runtime' : 'effect-var effect-var-unknown';
+  const label = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');
+  return `<span class="${cls}" title="${esc(`${label} — ${u.token}`)}">?</span>`;
+}
+
+/* Texte résolu -> HTML : découpe sur les sentinels \x01N\x01, échappe et
+   convertit \n -> <br> chaque fragment littéral, insère la pastille chip à
+   la place de chaque sentinel (jamais le sentinel brut, jamais le {{token}}
+   d'origine). */
+function effectResolvedTextHtml(ability) {
+  if (ability.resolvedDesc == null) return '';
+  const unresolved = ability.unresolved || [];
+  const text = ability.resolvedDesc;
+  let out = '', last = 0, m;
+  _EFFECT_SENTINEL_RE.lastIndex = 0;
+  while ((m = _EFFECT_SENTINEL_RE.exec(text))) {
+    out += esc(text.slice(last, m.index)).replace(/\n/g, '<br>');
+    out += effectVarChip(unresolved[+m[1]]);
+    last = _EFFECT_SENTINEL_RE.lastIndex;
+  }
+  out += esc(text.slice(last)).replace(/\n/g, '<br>');
+  return out;
+}
+
+function useEffectSection(it) {
+  const list = it.useEffect;
+  if (!list?.length) return '';
+  const blocks = list.map(a => {
+    const formulaBlock = a.formula ? formulaHtml(a.formula) : '';
+    const textHtml = effectResolvedTextHtml(a);
+    const textBlock = textHtml ? `<p class="use-effect-text">${textHtml}</p>` : '';
+    return formulaBlock + textBlock;
+  }).join('');
+  if (!blocks) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('useEffectTitle'))}</h3>${blocks}</div>`;
+}
+
 /* Mise à l'échelle rune (rarity_scaling, 13/24 runes actives décodées) et
    puce (tier_scaling, 1/71 seulement -- combo_crusher) : port_map.md #10.
    EXIGENCE FERME (pas une nuance de style) : un statut "no_template" montre
@@ -994,7 +1055,19 @@ function viewMonsterZone(key) {
 }
 /* Libellé + éventuel bouton pour une cible sans position fixe. `regionHint`
    (facultatif) = région du journal de la quête, affichée en cas (c) quand
-   aucune zone n'est disponible du tout — mieux que rien pour se repérer. */
+   aucune zone n'est disponible du tout — mieux que rien pour se repérer.
+   BUG FIX (popup/bubble layout cleanup pass) : le rappel de région vivait
+   dans un <span class="pos-region"> FRÈRE de .pos-dynamic, pas un enfant —
+   sur une bulle étroite (fiche de quête, ~300px), le conteneur flex-wrap
+   parent (.goal-target) pouvait donc les scinder sur deux lignes ("Dynamic
+   position" seul puis "(Westwind Woods)" seul, visuellement cramé/décousu),
+   et le rappel de région n'héritait pas la teinte muette de .pos-dynamic
+   (étant un frère, pas un descendant) — il ressortait à pleine opacité,
+   comme une info plus importante que le badge discret juste à côté. Les deux
+   segments sont maintenant un seul fragment de texte cohérent (« Dynamic
+   position · Westwind Woods »), jamais scindable par le flex-wrap parent, et
+   le rappel de région hérite nativement la couleur/l'italique de son parent
+   (voir .pos-region dans style.css, dé-italique seulement). */
 function dynamicPosBadge(t, regionHint) {
   const sz = t && t.search_zone;
   if (sz && sz.confidence === 'high') {
@@ -1004,8 +1077,8 @@ function dynamicPosBadge(t, regionHint) {
   if (t && t.kind === 'monster' && !t.camp) {
     return `<span class="pos-dynamic">${esc(tr('posUncatalogued'))}</span>`;
   }
-  const region = regionHint ? ` <span class="pos-region">(${esc(regionHint)})</span>` : '';
-  return `<span class="pos-dynamic">${esc(tr('posDynamic'))}</span>${region}`;
+  const region = regionHint ? ` <span class="pos-region">· ${esc(regionHint)}</span>` : '';
+  return `<span class="pos-dynamic">${esc(tr('posDynamic'))}${region}</span>`;
 }
 
 /* Prix vendeur : nombre au format de la langue + pictogramme de pièce —
@@ -1281,9 +1354,12 @@ function goalItemMiniChip(t) {
   const icon = it?.icon ? `icons/${it.icon}` : null;
   const attrs = it ? ` data-act="fiche-item" data-id="${esc(t.item_key)}"` : '';
   const approx = t.item_approx ? '<sup>≈</sup>' : '';
-  return `<span class="goal-target-item${it ? ' link' : ''}"${attrs}>
-    ${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approx}</span>
-  </span>`;
+  // Une seule ligne SANS retours/indentation internes (fix bulle « ligne
+  // vide ») : le newline+indentation du gabarit multi-lignes se retrouvait
+  // tel quel dans le texte de la bulle quand le joueur le copiait/collait
+  // (une fausse ligne vide au milieu de l'étape) — aucun bénéfice de
+  // lisibilité du HTML généré ne justifie ce bruit dans la sélection.
+  return `<span class="goal-target-item${it ? ' link' : ''}"${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approx}</span></span>`;
 }
 function goalTargetChip(t, label, regionHint) {
   if (!t || t.kind === 'multiple') return '';
@@ -1322,7 +1398,20 @@ function goalTargetChip(t, label, regionHint) {
     // position button, with zero name/link, even once a monster target
     // existed at all) + an inline "drops X" item chip when the goal was
     // joined to a specific quest item (sec 5.2).
-    const nameLbl = t.label || label || '';
+    // BUG FIX (popup/bubble layout cleanup pass): `label` (the objective
+    // sentence above this chip, e.g. "Collect Imp Executioner") and `t.label`
+    // (the target's own actor/catalog label, e.g. "Imp executioner") are TWO
+    // DIFFERENT data fields that very often name the exact same entity with
+    // DIFFERENT casing -- shown verbatim, the chip below reads as a typo'd
+    // duplicate of the sentence above rather than the deliberate "click here
+    // to open its fiche" reference it actually is. A fold-compare (same
+    // general helper used for search/dedup elsewhere in this file) detects
+    // when they're the SAME entity and reuses the sentence's already-cleaned
+    // casing for both -- purely a display choice, `mk` resolution below
+    // already matches by folded name too, so this never changes which
+    // monster fiche the link opens. Genuinely different labels (rare) are
+    // left untouched -- never inventing or destroying real information.
+    const nameLbl = (t.label && label && fold(t.label) === fold(label)) ? label : (t.label || label || '');
     // BUG FIX (deferred-render-race blast-radius audit, follow-up task 3):
     // was `t.key || null` -- t.key is the RAW canonical monster key geo.py's
     // resolver matched, not necessarily the (name,level)-grouped
@@ -1667,6 +1756,10 @@ function openItemFiche(key) {
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
 
+  // Effet(s) de la/des capacité(s) liée(s) (item_desc_PLAN.md Phase B) --
+  // jointure déjà faite au build (it.useEffect), rendue ici seulement.
+  const useEffectHtml = useEffectSection(it);
+
   // Plages de jet/DPS d'arme (stat_ranges/weapon_dps), formule d'artefact
   // T3 (artifact_formula) et mise à l'échelle rune/puce (rarity_scaling/
   // tier_scaling) -- port_map.md #8/#9/#10, voir les fonctions partagées
@@ -1887,6 +1980,7 @@ function openItemFiche(key) {
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}</div></div>
     ${raritySelectHtml}
     ${descHtml}
+    ${useEffectHtml}
     ${rollRangeHtml}
     ${formulaHtmlBlock}
     ${scalingHtml}

@@ -245,6 +245,9 @@ export default {
       scalingServerSide: 'No varía con la rareza en los datos del cliente (probablemente gestionado en el servidor).',
       scalingNotLocated: 'Escalado no localizado en los datos del cliente.',
       tierNotRarity: 'Escala por NIVEL (tier), no por rareza.',
+      useEffectTitle: 'Efecto de uso',
+      effectVarRuntimeTooltip: 'Calculado en vivo en el juego (no es un valor fijo)',
+      effectVarUnextractedTooltip: 'Valor aún no extraído de los datos del cliente',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',

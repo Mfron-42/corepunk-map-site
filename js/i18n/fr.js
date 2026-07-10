@@ -250,6 +250,9 @@ export default {
       scalingServerSide: 'Ne varie pas avec la rareté dans les données du client (probablement géré côté serveur).',
       scalingNotLocated: 'Mise à l’échelle non localisée dans les données du client.',
       tierNotRarity: 'Évolue par PALIER (tier), pas par rareté.',
+      useEffectTitle: 'Effet d’utilisation',
+      effectVarRuntimeTooltip: 'Calculé en direct en jeu (pas une valeur fixe)',
+      effectVarUnextractedTooltip: 'Valeur pas encore extraite des données du client',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
