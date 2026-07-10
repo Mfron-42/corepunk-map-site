@@ -120,6 +120,14 @@ export default {
       craftableTag: 'craftable',
       lootTag: 'loot',
       activableBadge: 'Activatable',
+      // Goal-target card relation wording (design review, July 2026): the
+      // card used to just juxtapose an item and its monster/object with no
+      // word connecting them ("looks like a tag but doesn't say where to
+      // get the brain"). These two short phrases are the explicit relation
+      // -- never interpolated with the name (the name/level render as their
+      // own separate clickable spans right after, see goalTargetChip).
+      goalDroppedByLabel: 'dropped by',
+      goalObtainedHereLabel: 'obtained here',
       objectivesN: n => `Objectives (${n})`,
       objectivesTitle: 'Objectives',
       howToTitle: 'How to',

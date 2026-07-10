@@ -118,6 +118,11 @@ export default {
       craftableTag: 'craftable',
       lootTag: 'loot',
       activableBadge: 'Activable',
+      // Relation explicite de la carte de cible d'objectif (design review,
+      // juillet 2026) : voir en.js pour le contexte -- jamais interpolé avec
+      // le nom (celui-ci reste un span cliquable séparé, voir goalTargetChip).
+      goalDroppedByLabel: 'lâché par',
+      goalObtainedHereLabel: 'obtenu ici',
       objectivesN: n => `Objectifs (${n})`,
       objectivesTitle: 'Objectifs',
       howToTitle: 'Comment faire',

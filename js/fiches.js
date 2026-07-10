@@ -1300,6 +1300,17 @@ function disambiguatedItemName(base, ref, disambig) {
    qui ne reçoivent pas q.items — lise la MÊME Map que questItemRow, sans
    passer un paramètre à travers toute la chaîne d'appels. */
 let currentQuestItemDisambig = null;
+/* Map clé d'item -> qi.isQuestItem (même liste q.items, même cycle de vie que
+   ci-dessus) : BUG FIX (goal-target card redesign) -- goalTargetItemRow avait
+   d'abord dérivé son badge Objet de quête/Item du jeu du `kind` CATALOGUE de
+   l'item (it.kind==='quest_item'), une propriété GLOBALE de l'item qui peut
+   contredire la section « Quest Items » de CETTE MÊME fiche (ex. Short T2
+   Mana Flask est un consommable catalogue normal -- kind!=='quest_item' --
+   mais mana_market_resupply le traite comme objet de quête, isQuestItem:true
+   dans q.items ; la fiche montrait alors deux badges différents pour LE
+   MÊME item sur LA MÊME page). Priorité à ce flag PAR QUÊTE, quand connu --
+   jamais deux classifications concurrentes pour un même item. */
+let currentQuestItemFlags = null;
 
 /* Ligne d'item de quête : distingue objet de quête (synthétique) et item du
    jeu — pour ces derniers, résumé d'obtention (vendu / craftable / loot)
@@ -1340,80 +1351,119 @@ function questItemRow(qi, regionHint) {
   </div>`;
 }
 
-/* Vignette de la cible d'un objectif : item (icône catalogue + badge objet
-   de quête/jeu, clic -> fiche), activable (icône catalogue si résolue sinon
-   pictogramme générique + badge « Activable »), PNJ/monstre — chacun avec
-   soit un bouton carte (position fixe), soit le badge à 3 niveaux
-   (dynamicPosBadge, voir plus haut) quand il n'y a pas de position fixe.
+/* Vignette de la cible d'un objectif — CARTE structurée (design review
+   manager, juillet 2026 : l'ancienne pastille inline juxtaposait item et
+   monstre sans un mot pour les relier -- "ressemble à un tag mais ça dit
+   toujours pas où chopper le brain"). Toutes les branches ci-dessous
+   produisent le MÊME vocabulaire visuel empilé en lignes :
+     1. ligne d'IDENTITÉ  -- l'item à obtenir (icône + nom cliquable + badge
+        objet de quête/jeu), quand il y en a un ;
+     2. ligne de RELATION -- énonce EXPLICITEMENT le lien avec la cible
+        principale ("dropped by <monstre> (lvl N)", "obtained here" pour un
+        objet interactif) -- jamais juste deux entités posées côte à côte ;
+     3. ligne de POSITION -- toujours en dernier (bouton carte / badge à 3
+        niveaux, voir dynamicPosBadge plus haut), séparée par un liseré.
    `kind: "multiple"` (objectif agrégat) n'a jamais de vignette : c'est un
    en-tête de checklist, ses enfants s'affichent comme des étapes normales
    juste en dessous. */
 const ACTIVABLE_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 2.8 20 7v10l-8 4.2L4 17V7l8-4.2Z"/><circle cx="12" cy="12" r="3"/></svg>`;
-/* Mini-vignette « cet objectif fait aussi obtenir tel item » (quest-guide-
-   feature plan sec 5.2/6.4) : cliquable vers la fiche objet quand la clé est
-   connue, sinon juste le libellé (jamais un lien devine). Utilisée par les
-   branches monstre/objet de goalTargetChip ci-dessous quand le goal a été
-   joint à un item_key spécifique (geo.py::_resolve_goal_item) -- affiche
-   "drops X" en plus de la cible principale, sur la même ligne d'étape.
-   Nom désambiguïsé via la MÊME Map que la section « Quest Items »
-   (currentQuestItemDisambig — fix UX : les 3 chips d'imp_brain_hunt
-   affichaient toutes « Imp Brain » identique, la distinction n'existait
-   que dans une section que le joueur ne regarde pas en suivant les étapes). */
-function goalItemMiniChip(t) {
-  if (!t.item_key && !t.item_label) return '';
-  const it = t.item_key ? S.items[t.item_key] : null;
-  const base = it?.name || t.item_label;
+/* Ligne d'identité "item" — UNIQUE renderer partagé par les 3 cas où un item
+   doit s'afficher dans une vignette de cible : cible directe (kind item),
+   item lâché par un monstre (kind monster + item_key), item obtenu via un
+   objet interactif (kind object + item_key). Remplace l'ancien
+   goalItemMiniChip (même garde jamais-de-lien-deviné : `it` résolu au
+   catalogue ou rien). Nom désambiguïsé via la MÊME Map que la section
+   « Quest Items » (currentQuestItemDisambig — fix UX : les 3 chips
+   d'imp_brain_hunt affichaient toutes « Imp Brain » identique). `approx`
+   (target.approx ou target.item_approx selon l'appelant, jamais les deux) --
+   pastille ≈ discrète, même traitement que g.approx (compteur ×N) : un fait
+   incertain reste affiché, jamais caché ni présenté comme sûr.
+   `extraBadge` (HTML déjà construit, ex. badge Activable) : ajouté par
+   l'appelant objet quand cette ligne fait aussi office d'identité de
+   l'objet interactif lui-même (item_key === key), pour ne pas dupliquer une
+   deuxième ligne juste pour ce badge.
+   Badge Objet de quête/Item du jeu -- priorité au flag resolver PAR QUÊTE
+   (currentQuestItemFlags, même liste q.items que la section « Quest Items »)
+   plutôt qu'au `kind` catalogue global de l'item : un item catalogué normal
+   (ex. Short T2 Mana Flask, un consommable craftable/vendu) peut être traité
+   comme objet de quête PAR CETTE quête précise (mana_market_resupply) sans
+   que sa nature catalogue change -- dériver le badge du seul `kind` créait
+   une contradiction avec la section Quest Items de la MÊME fiche (deux
+   classifications différentes pour le même item sur la même page). `hint`
+   (2e priorité) : t.isQuestItem direct, pour la cible `item` elle-même
+   quand elle n'apparaît pas dans q.items pour une raison quelconque. Repli
+   sur le kind catalogue seulement en dernier recours (item attaché à un
+   monstre/objet, jamais listé nulle part ailleurs). */
+function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
+  const it = key ? S.items[key] : null;
+  const base = it?.name || fallbackLabel;
   if (!base) return '';
-  const name = disambiguatedItemName(base, t.item_key, currentQuestItemDisambig);
+  const name = disambiguatedItemName(base, key, currentQuestItemDisambig);
   const icon = it?.icon ? `icons/${it.icon}` : null;
-  const attrs = it ? ` data-act="fiche-item" data-id="${esc(t.item_key)}"` : '';
-  const approx = t.item_approx ? '<sup>≈</sup>' : '';
+  const attrs = it ? ` data-act="fiche-item" data-id="${esc(key)}"` : '';
+  const approxSup = approx ? '<sup>≈</sup>' : '';
+  const qiFlag = key ? currentQuestItemFlags?.get(key) : undefined;
+  const isQuest = qiFlag !== undefined ? qiFlag : (hint !== undefined ? hint : (it ? it.kind === 'quest_item' : null));
+  const badge = isQuest != null
+    ? `<span class="k-chip" style="--chip-c:${isQuest ? CATS.qao.hex : CATS.workshop.hex}">${esc(isQuest ? tr('questItemBadge') : tr('gameItemBadge'))}</span>`
+    : '';
   // Une seule ligne SANS retours/indentation internes (fix bulle « ligne
-  // vide ») : le newline+indentation du gabarit multi-lignes se retrouvait
-  // tel quel dans le texte de la bulle quand le joueur le copiait/collait
-  // (une fausse ligne vide au milieu de l'étape) — aucun bénéfice de
-  // lisibilité du HTML généré ne justifie ce bruit dans la sélection.
-  return `<span class="goal-target-item${it ? ' link' : ''}"${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approx}</span></span>`;
+  // vide ») : le newline+indentation d'un gabarit multi-lignes se retrouvait
+  // tel quel dans le texte de la bulle quand le joueur le copiait/collait.
+  return `<div class="goal-target-row goal-target-item${it ? ' link' : ''}"${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approxSup}</span>${badge}${extraBadge || ''}</div>`;
 }
 function goalTargetChip(t, label, regionHint) {
   if (!t || t.kind === 'multiple') return '';
   const lbl = esc(label || '');
+  const posRow = `<div class="goal-target-row goal-target-row-pos">${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}</div>`;
+
   if (t.kind === 'item') {
-    const it = t.key ? S.items[t.key] : null;
-    const icon = it?.icon ? `icons/${it.icon}` : null;
-    const badgeHex = t.isQuestItem ? CATS.qao.hex : CATS.workshop.hex;
-    const badgeLabel = t.isQuestItem ? tr('questItemBadge') : tr('gameItemBadge');
-    const attrs = it ? ` data-act="fiche-item" data-id="${esc(t.key)}"` : '';
-    return `<span class="goal-target${it ? ' link' : ''}"${attrs}>
-      <span class="goal-target-icon">${iconTag(icon, '', itemGlyph(it))}</span>
-      <span class="k-chip" style="--chip-c:${badgeHex}">${badgeLabel}</span>
-      ${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}
-    </span>`;
+    // La cible EST l'item lui-même -- rien à relier, juste son identité
+    // (nom catalogue en priorité ; repli sur `label`, la phrase d'objectif
+    // DÉJÀ nettoyée et affichée juste au-dessus -- JAMAIS t.label brut, dont
+    // l'audit montre qu'il porte souvent le verbe ou un libellé de slot
+    // interne non nettoyé, ex. "Quest item removed start quest troll head",
+    // quand aucun `key` catalogue ne résout) + sa position à 3 niveaux.
+    const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem) || '';
+    return `<div class="goal-target">${itemRow}${posRow}</div>`;
   }
+
   if (t.kind === 'object') {
-    const it = t.key ? S.items[t.key] : null;
-    const icon = it?.icon ? `icons/${it.icon}` : null;
-    // t.item_key (quest-guide-feature plan sec 5.2) is a DIFFERENT thing
-    // from t.key above: t.key is this OBJECT's own catalog key (rare), while
-    // t.item_key is the specific quest_item this interaction was joined to
-    // (e.g. an activable machine that hands out a scripted quest item) --
-    // both can render on the same line when they differ.
-    const itemChipHtml = (t.item_key && t.item_key !== t.key) ? goalItemMiniChip(t) : '';
-    return `<span class="goal-target">
-      <span class="goal-target-icon">${icon ? iconTag(icon, '', '⚙') : ACTIVABLE_GLYPH}</span>
-      <span class="k-chip" style="--chip-c:${CATS.qao.hex}">${tr('activableBadge')}</span>
-      ${itemChipHtml}
-      ${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}
-    </span>`;
+    // t.item_key (quest-guide-feature plan sec 5.2) est une chose DIFFÉRENTE
+    // de t.key ci-dessus : t.key est la clé catalogue PROPRE de cet objet
+    // (rare), t.item_key est l'item de quête concret que cette interaction
+    // a produit -- `differing` distingue les deux mécaniques réelles :
+    //   - item_key === key (ou pas de key du tout) : l'objet EST l'item
+    //     (ramassage au sol) -- une seule ligne d'identité suffit.
+    //   - item_key !== key : interagir avec un AUTRE objet (levier, machine,
+    //     baril...) produit cet item -- ligne de relation explicite en plus.
+    const differing = !!(t.item_key && t.item_key !== t.key);
+    const primaryKey = differing ? t.item_key : (t.item_key || t.key);
+    const approxForItem = t.item_key ? t.item_approx : t.approx;
+    const activableBadge = `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('activableBadge'))}</span>`;
+    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, differing ? '' : activableBadge);
+    let relRow = '';
+    if (itemRow && differing) {
+      relRow = `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+    }
+    // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
+    // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
+    // `label` (la phrase d'objectif déjà affichée au-dessus), la seule donnée
+    // honnête qu'on ait pour nommer cet objet, plutôt qu'une icône+badge sans
+    // aucun texte (le "ressemble à un tag mais y'a rien dedans" d'origine).
+    if (!itemRow) {
+      itemRow = `<div class="goal-target-row goal-target-item">
+        <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
+        <span class="goal-target-item-label">${lbl}</span>
+        ${activableBadge}
+      </div>`;
+    }
+    return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
   }
+
   if (t.kind === 'monster') {
-    // Clickable monster-name link (mirrors the `item` branch above --
-    // quest-guide-feature plan sec 5.3/6.4: this used to only ever render a
-    // position button, with zero name/link, even once a monster target
-    // existed at all) + an inline "drops X" item chip when the goal was
-    // joined to a specific quest item (sec 5.2).
     // BUG FIX (popup/bubble layout cleanup pass): `label` (the objective
     // sentence above this chip, e.g. "Collect Imp Executioner") and `t.label`
     // (the target's own actor/catalog label, e.g. "Imp executioner") are TWO
@@ -1440,20 +1490,43 @@ function goalTargetChip(t, label, regionHint) {
     // pattern as actorRows: unresolved -> plain text, never a guessed link;
     // self-heals once loadDeferred() completes and the quest fiche re-renders.
     const mk = monsterKeyFor(t.key || null, nameLbl);
-    const nameHtml = mk
+    // Niveau (S.monsters[mk].level) -- même garde différé que le lien : un
+    // niveau non résolu ne s'affiche simplement pas encore, il apparaît au
+    // re-rendu post-loadDeferred() comme le lien lui-même, jamais un chiffre
+    // deviné entre-temps.
+    const lvl = (mk && S.monsters[mk]?.level != null) ? tr('levelAbbrev', S.monsters[mk].level) : null;
+    const nameSpan = mk
       ? `<span class="goal-target-name link" data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
       : (nameLbl ? `<span class="goal-target-name">${esc(nameLbl)}</span>` : '');
-    return `<span class="goal-target">
-      ${nameHtml}
-      ${goalItemMiniChip(t)}
-      ${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}
-    </span>`;
+    const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
+    const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
+    // Relation EXPLICITE seulement quand un item de quête est réellement
+    // rattaché (le point central de cette passe) : "dropped by <monstre>".
+    // Sans item (kill pur, ex. killig_creatures_field_robot), rien à relier
+    // -- la ligne redevient juste le nom+niveau, sans verbe inventé.
+    const relRow = itemRow
+      ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}</div>`
+      : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}${lvlSpan}</div>` : '');
+    return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
   }
+
   if (t.kind === 'npc') {
-    return `<span class="goal-target">${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}</span>`;
+    // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) : ce
+    // branch n'affichait avant QUE le bouton de position, zéro identité --
+    // même défaut "juste un tag vide" que les autres branches avant cette
+    // passe. `label` est la seule source de nom fiable ici (les cibles npc
+    // ne portent jamais leur propre `t.label`, voir audit ci-dessus) ; repli
+    // texte simple si le PNJ n'est pas trouvé sur la carte active (jamais un
+    // lien deviné).
+    const ni = label ? npcIndexByName(label) : -1;
+    const nameRow = (ni >= 0)
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link" data-act="fiche-npc" data-id="npc:${ni}">${lbl}</span></div>`
+      : (label ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name">${lbl}</span></div>` : '');
+    return `<div class="goal-target">${nameRow}${posRow}</div>`;
   }
+
   if (t.kind === 'dynamic') {
-    return `<span class="goal-target">${dynamicPosBadge(t, regionHint)}</span>`;
+    return `<div class="goal-target">${posRow}</div>`;
   }
   return '';
 }
@@ -1485,17 +1558,22 @@ function seriesActorsFor(q, g) {
 /* Rendu d'une série de cibles positionnées : une vignette PAR MEMBRE (avec
    son propre libellé numéroté) — la phrase de l'objectif ne cite qu'un seul
    représentant, mais tous les membres doivent rester trouvables sur la
-   carte, pas seulement celui-là. */
+   carte, pas seulement celui-là. Variante COMPACTE de la carte de cible
+   (.goal-target-compact, voir style.css) : plusieurs membres coexistent côte
+   à côte, une carte empilée par membre prendrait trop de place -- garde donc
+   le même vocabulaire visuel (fond/liseré/rayon) mais en pastille horizontale
+   comme avant cette passe, jamais la mise en page verticale des vignettes à
+   cible unique. */
 function seriesTargetChips(members, kind, regionHint) {
   const badge = kind === 'object'
     ? `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${tr('activableBadge')}</span>` : '';
   const icon = kind === 'object' ? `<span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>` : '';
-  return `<span class="goal-target-series">${members.map(a => `
-    <span class="goal-target">
+  return `<div class="goal-target-series">${members.map(a => `
+    <div class="goal-target goal-target-compact">
       ${icon}${badge}
       <span class="goal-target-mini-label">${esc(cleanLabel(a.label))}</span>
       ${a.x != null ? gotoBtn(a.x, a.z, cleanLabel(a.label)) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
-    </span>`).join('')}</span>`;
+    </div>`).join('')}</div>`;
 }
 
 /* Étapes numérotées, machine-exactes (goals[]). Repli sur la liste texte
@@ -1629,8 +1707,9 @@ function openQuestFiche(slug) {
   // clairement étiquetée « Dialogue PNJ (pas une quête) » avec ses répliques.
   if (q.isDialogue) { openDialogueFiche(q, slug); return; }
   // Recalculée AVANT la construction des sections (items + étapes) : la même
-  // Map sert questItemRow ET goalItemMiniChip — voir currentQuestItemDisambig.
+  // Map sert questItemRow ET goalTargetItemRow — voir currentQuestItemDisambig.
   currentQuestItemDisambig = q.items?.length ? disambiguateQuestItems(q.items) : null;
+  currentQuestItemFlags = q.items?.length ? new Map(q.items.map(qi => [qi.key, qi.isQuestItem])) : null;
   const regionHint = q.regions?.length ? q.regions[0] : null;
   const avatar = heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
   // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :

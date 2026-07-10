@@ -1103,7 +1103,12 @@ body {
 .goal-ico-svg { width: 16px; height: 16px; }
 .goal-body {
   flex: 1; min-width: 0;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 9px;
+  /* Colonne, pas ligne (fix design review, juillet 2026) : la vignette de
+     cible (.goal-target) est maintenant une VRAIE carte, pas une pastille
+     inline qui pouvait se poser à côté de la phrase -- elle vit sur sa
+     propre ligne, pleine largeur, sous le texte de l'objectif. */
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  width: 100%;
   padding-top: 3px;
 }
 .goal-text { font-size: .85rem; line-height: 1.45; }
@@ -1124,25 +1129,45 @@ body {
   margin-left: 5px;
 }
 .goal-count sup { font-size: .7em; opacity: .8; }
+
+/* ── Vignette de cible d'objectif — CARTE structurée (design review manager,
+   juillet 2026) ──────────────────────────────────────────────────────────
+   Remplace l'ancienne pastille inline (pill arrondie, item+monstre juxtaposés
+   sans un mot pour les relier). Toujours pleine largeur sous la phrase de
+   l'objectif (voir .goal-body ci-dessus), lignes empilées : identité(s) ->
+   relation explicite ("dropped by"/"obtained here") -> position, cette
+   dernière séparée par un liseré (voir .goal-target-row-pos). Même
+   vocabulaire de fond/liseré/rayon que le reste des fiches (.frow, .hint-box)
+   -- jamais un aplat saturé, une carte cohérente avec le design du site. */
 .goal-target {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 3px 8px 3px 3px;
-  border-radius: 20px;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 100%;
+  margin-top: 2px;
+  padding: 7px 9px 6px;
+  border-radius: var(--radius-m);
   background: var(--panel-3);
   border: 1px solid var(--line-soft);
-  /* Anti-débordement (fix E) : la vignette de cible (badge + « Voir la zone »)
-     ne peut pas dépasser la largeur de la fiche ; ses éléments se replient sur
-     une 2e ligne au lieu de pousser le bouton hors cadre (débordait en ru/uk/es
-     où « Смотреть зону »/etc. sont plus longs que « View zone »). */
-  flex-wrap: wrap; max-width: 100%;
 }
-.goal-target.link { cursor: pointer; transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease); }
-.goal-target.link:hover { border-color: var(--accent); background: var(--accent-soft); }
-/* Le bouton carte hérite déjà d'un cadre via .goal-target : un second liseré
-   ferait doublon, il reste transparent jusqu'au survol. */
-.goal-target .goto { border-color: transparent; padding: 3px 8px 3px 6px; }
-.goal-target .goto:hover { border-color: var(--accent); }
-.goal-target .pos-unknown { padding: 0 4px 0 3px; }
+.goal-target-row {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap; min-width: 0;
+  padding: 2px 0;
+}
+/* Ligne de POSITION -- toujours la dernière, visuellement détachée du "quoi"
+   (identité+relation) par un liseré : le joueur scanne la carte de haut en
+   bas ("c'est quoi" -> "d'où ça vient" -> "où aller"), jamais mêlée au reste. */
+.goal-target-row-pos {
+  margin-top: 3px; padding-top: 5px;
+  border-top: 1px solid var(--line-soft);
+}
+/* Le bouton carte a déjà le cadre de sa ligne : un second liseré ferait
+   doublon, il reste transparent jusqu'au survol (inchangé). */
+.goal-target-row-pos .goto { border-color: transparent; padding: 3px 8px 3px 6px; }
+.goal-target-row-pos .goto:hover { border-color: var(--accent); }
+.goal-target-row-pos .pos-unknown { padding: 0 4px 0 3px; }
+/* .pos-dynamic's own extra padding inside a target card is set once, further
+   down next to its base rule (.goal-target .pos-dynamic) -- not duplicated
+   here, the descendant selector still matches through the row wrapper. */
 .goal-target-icon {
   width: 20px; height: 20px;
   border-radius: 50%;
@@ -1156,55 +1181,70 @@ body {
 .goal-target-icon .icon-broken { width: 100%; height: 100%; font-size: .58rem; background: none; }
 .goal-target-icon svg { width: 13px; height: 13px; }
 
-/* Série numérotée (ex. "Broken pipe 1/2/3") : une vignette .goal-target par
-   membre, toutes trouvables sur la carte — même style que la vignette de
-   cible unique, juste répétée avec son propre libellé miniature. */
-.goal-target-series { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+/* Série numérotée (ex. "Broken pipe 1/2/3") : plusieurs membres côte à côte
+   -- une carte empilée PAR MEMBRE prendrait trop de place, donc ce variant
+   COMPACT (.goal-target-compact) revient à une pastille horizontale en ligne,
+   même vocabulaire fond/liseré/rayon que la carte à cible unique, juste
+   applati sur une seule ligne. */
+.goal-target-series { display: flex; flex-wrap: wrap; gap: 6px 8px; width: 100%; }
+.goal-target.goal-target-compact {
+  flex-direction: row; align-items: center; gap: 6px;
+  width: auto; max-width: 100%;
+  padding: 3px 8px 3px 3px;
+  border-radius: 20px;
+  margin-top: 0;
+}
 /* Libellés nowrap DANS une vignette de cible (nom de monstre, libellé de
-   membre de série, libellé de la mini-chip item) : défense anti-débordement
-   partagée (même famille que le fix E) — nowrap sans borne laissait un
-   libellé exceptionnellement long (clés brutes du jeu ex. « 20 Lacertian
-   Large 01 Amphx », ou traductions ru/uk plus longues) déborder de la
-   vignette et donc de la fiche ; borné à la largeur disponible + ellipse,
-   le clic et le survol restent entiers. */
+   membre de série, libellé de l'item) : défense anti-débordement partagée
+   (même famille que le fix E) — nowrap sans borne laissait un libellé
+   exceptionnellement long (clés brutes du jeu ex. « 20 Lacertian Large 01
+   Amphx », ou traductions ru/uk plus longues) déborder de la vignette et donc
+   de la fiche ; borné à la largeur disponible + ellipse, le clic et le
+   survol restent entiers. */
 .goal-target-mini-label, .goal-target-name, .goal-target-item-label {
   max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
 .goal-target-mini-label { font-size: .72rem; color: var(--ink); white-space: nowrap; }
 
-/* Nom de monstre cliquable dans une vignette de cible d'objectif (quest-guide
+/* Nom de monstre/PNJ cliquable dans une vignette de cible (quest-guide
    -feature plan sec 5.3/6.4) -- même traitement que .fr-label.link, mais
    scopé ici plutôt qu'à l'intérieur d'un .frow (goalTargetChip n'en a pas). */
-.goal-target-name { font-size: .74rem; color: var(--ink); white-space: nowrap; }
+.goal-target-name { font-size: .8rem; color: var(--ink); white-space: nowrap; }
 .goal-target-name.link {
   cursor: pointer; color: var(--accent); text-decoration: underline;
   text-decoration-color: transparent;
   transition: text-decoration-color var(--dur) var(--ease);
 }
 .goal-target-name.link:hover { text-decoration-color: var(--accent); }
+/* Niveau du monstre (S.monsters[key].level, tr('levelAbbrev')) -- texte
+   discret accolé au nom, jamais un badge lourd : simple précision, pas une
+   info aussi importante que l'identité elle-même. */
+.goal-target-lvl { font-family: var(--font-mono); font-size: .68rem; color: var(--muted); flex: none; }
+/* Verbe de relation explicite ("dropped by" / "lâché par"...) -- énonce le
+   lien entre la ligne d'identité au-dessus et le nom qui suit, plutôt que de
+   laisser les deux entités simplement côte à côte (le coeur de cette passe :
+   "ça dit toujours pas où chopper le brain"). Une cible de pur kill sans item
+   (.goal-target-row-rel-plain) n'a rien à relier -- pas de verbe, juste
+   nom+niveau. */
+.goal-target-rel-verb { font-size: .74rem; font-style: italic; color: var(--muted); }
+.goal-target-row-rel-plain .goal-target-name { font-weight: 600; }
 
-/* Mini-chip "cet objectif fait aussi obtenir tel item" (drops X), accolée à
-   la cible monstre/objet principale sur la même ligne d'étape (sec 5.2). */
-.goal-target-item {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: .72rem; color: var(--muted);
-  padding: 1px 6px 1px 2px; border-radius: 12px;
-  background: var(--panel-4);
-  /* Même défense anti-débordement que le bloc ci-dessus : la chip entière
-     est bornée à la vignette, et son libellé (flex item) doit pouvoir se
-     rétrécir sous sa largeur de contenu (min-width:0) pour que l'ellipse
-     du libellé s'applique réellement au lieu de pousser la chip hors cadre. */
-  max-width: 100%;
-}
-.goal-target-item .goal-target-item-label { min-width: 0; }
+/* Ligne d'identité "item" (icône + nom + badge objet de quête/jeu) --
+   voir goalTargetItemRow, js/fiches.js : renderer PARTAGÉ par les 3 cas où un
+   item doit s'afficher (cible directe, "dropped by", "obtained here"). */
 .goal-target-item.link { cursor: pointer; }
-.goal-target-item.link:hover { color: var(--accent); background: var(--accent-soft); }
+.goal-target-item.link:hover .goal-target-item-label { color: var(--accent); }
 .goal-target-item-icon {
-  width: 16px; height: 16px; border-radius: 3px; overflow: hidden;
+  width: 22px; height: 22px; border-radius: 5px; overflow: hidden;
   display: flex; align-items: center; justify-content: center; flex: none;
+  background: var(--panel-4);
 }
 .goal-target-item-icon img { width: 100%; height: 100%; object-fit: contain; }
-.goal-target-item-label { white-space: nowrap; }
+.goal-target-item-label {
+  font-size: .84rem; font-weight: 600; color: var(--ink);
+  white-space: nowrap; min-width: 0;
+  transition: color var(--dur) var(--ease);
+}
 
 /* ── Corps de fiche : lignes, chips ── */
 .frow {

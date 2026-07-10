@@ -117,6 +117,11 @@ export default {
       craftableTag: 'крафтиться',
       lootTag: 'лут',
       activableBadge: 'Активується',
+      // Явний зв'язок на картці цілі об'єктиву (design review, липень 2026):
+      // контекст див. у en.js -- ніколи не інтерполюється з іменем (воно
+      // лишається окремим клікабельним span, див. goalTargetChip).
+      goalDroppedByLabel: 'дроп з',
+      goalObtainedHereLabel: 'отримано тут',
       objectivesN: n => `Цілі (${n})`,
       objectivesTitle: 'Цілі',
       howToTitle: 'Як виконати',

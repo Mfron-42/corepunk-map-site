@@ -119,6 +119,11 @@ export default {
       craftableTag: 'crafteable',
       lootTag: 'botín',
       activableBadge: 'Activable',
+      // Relación explícita de la tarjeta de objetivo (design review, julio
+      // 2026): ver en.js para el contexto -- nunca interpolado con el
+      // nombre (que queda como span cliqueable aparte, ver goalTargetChip).
+      goalDroppedByLabel: 'soltado por',
+      goalObtainedHereLabel: 'obtenido aquí',
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
       howToTitle: 'Cómo hacerlo',

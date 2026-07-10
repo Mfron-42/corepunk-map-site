@@ -117,6 +117,11 @@ export default {
       craftableTag: 'крафтится',
       lootTag: 'лут',
       activableBadge: 'Активируется',
+      // Явная связь на карточке цели объектива (design review, июль 2026):
+      // контекст см. в en.js -- никогда не интерполируется с именем (оно
+      // остаётся отдельным кликабельным span, см. goalTargetChip).
+      goalDroppedByLabel: 'дроп с',
+      goalObtainedHereLabel: 'получено здесь',
       objectivesN: n => `Цели (${n})`,
       objectivesTitle: 'Цели',
       howToTitle: 'Как выполнить',
