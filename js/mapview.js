@@ -10,13 +10,27 @@ import { isHiddenTest } from './devcontent.js';
 export let activeMap = KWALAT_DEFAULTS;
 export function setActiveMap(m) { activeMap = m; }
 /* ── Carte ──────────────────────────────────────────────────── */
+// minZoom -1 (au lieu de 0) : un cran de dézoom en plus pour voir tout le
+// monde plus petit d'un coup (demande utilisateur, map-legibility task).
+// minNativeZoom de la couche de tuiles (ci-dessous) reste 0 -- déjà le niveau
+// réel le plus bas de la pyramide (dossier "0/") -- donc Leaflet agrandit
+// simplement les tuiles zoom 0 pour ce nouveau niveau -1 au lieu de servir du
+// gris : aucune tuile "-1/" à générer.
+// maxBoundsViscosity 1 (bornes "solides") : sans ça (0 par défaut Leaflet),
+// un glisser-déposer rapide au-delà du bord du monde laisse la vue s'arrêter
+// dans le vide au-delà de worldBounds.pad(0.12) SANS revenir en arrière au
+// relâchement (viscosité 0 = aucune résistance, pas de rebond -- vérifié en
+// testant un drag agressif). Avec minZoom -1 la vue couvre plus de monde
+// d'un coup, ce vide est donc plus facile à atteindre par erreur -- des
+// bornes pleinement solides l'empêchent, quel que soit le niveau de zoom.
 const map = L.map('map', {
   crs: L.CRS.Simple,
-  minZoom: 0, maxZoom: 5,
+  minZoom: -1, maxZoom: 5,
   zoomSnap: 0.25, zoomDelta: 0.5,
   wheelPxPerZoomLevel: 90,
   zoomControl: false,
   attributionControl: true,
+  maxBoundsViscosity: 1,
 });
 map.attributionControl.setPrefix(false);
 map.attributionControl.addAttribution(
@@ -40,7 +54,7 @@ let tileLayer = null;
 function makeTileLayer() {
   return new Tiles('', {
     tileSize: 512, minNativeZoom: 0, maxNativeZoom: activeMap.tile_max_zoom,
-    minZoom: 0, maxZoom: 5, noWrap: true, keepBuffer: 3,
+    minZoom: -1, maxZoom: 5, noWrap: true, keepBuffer: 3,
     bounds: worldBounds, className: 'map-tiles',
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
   });

@@ -58,9 +58,30 @@ const CATS = {
   camp_chest:       { hex: '#f2a65a', on: true, dense: true },
 };
 const catLabel = key => tbl('cat', key) || key;
+/* Palette pass (map-legibility task) : mining/herbalism/logging (les 3
+   métiers de récolte) recouraient chacun à une teinte qui se fond dans SON
+   PROPRE terrain typique -- mining #9ba7c0 (gris-bleu neutre) sur roche
+   grise/beige, herbalism #80ed99 (vert menthe) sur herbe/feuillage, logging
+   #b08968 (brun-beige) sur chemins de terre/écorce en forêt. Remplacées par
+   3 teintes choisies à la fois pour la LISIBILITÉ (perceptuellement loin de
+   leur terrain — jamais de vert pour un point posé sur de l'herbe, jamais de
+   brun/gris neutre sur de la roche/terre) ET la DIFFÉRENCIATION mutuelle (ces
+   3 couches sont activées ensemble pour planifier une tournée de récolte) :
+   les 3 nouvelles teintes occupent chacune un des plus grands intervalles
+   libres de la roue chromatique du site (calculé sur TOUTES les couleurs de
+   catégorie existantes, cf. rapport de mission) plutôt que de se caser à côté
+   d'une teinte déjà prise. mining -> turquoise profond (mine/minerai,
+   contraste franc sur roche chaude neutre) ; herbalism -> orchidée/magenta
+   (association florale, contraste franc sur herbe/feuillage) ; logging ->
+   indigo (le seul intervalle large restant ; l'association bois est plus
+   faible que les deux autres — assumé, la lisibilité prime ici sur le
+   symbolisme, cf. rapport). wildlife (#a3b18a, même défaut que herbalism —
+   vert-sauge décoloré sur herbe) laissée telle quelle : signalée dans le
+   rapport plutôt que corrigée, pour ne pas re-resserer les 2 intervalles
+   ci-dessus en les partageant à 4. */
 const CAMP_COLORS = {
   monsters: '#ef476f', creeps: '#f78c6b', wildlife: '#a3b18a',
-  herbalism: '#80ed99', logging: '#b08968', mining: '#9ba7c0',
+  herbalism: '#cd42d7', logging: '#3949ac', mining: '#258a93',
   searchable: '#ffd166', destroyable: '#e07a5f',
   reactive: '#06d6a0', shrines: '#bdb2ff', soulkeeper: '#7b2cbf',
   quest: '#c77dff', guards: '#778da9', event: '#f4a259', other: '#6c757d',
