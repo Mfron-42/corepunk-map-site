@@ -1285,6 +1285,10 @@ body {
 .goal-target-row-pos .goto { border-color: transparent; padding: 3px 8px 3px 6px; }
 .goal-target-row-pos .goto:hover { border-color: var(--accent); }
 .goal-target-row-pos .pos-unknown { padding: 0 4px 0 3px; }
+/* Ligne « Montrer les spawns » (task #79, quest-driven spawn highlighting) --
+   après la ligne de position, même bouton fantôme que partout ailleurs
+   (fiche monstre/objet), juste un peu de respiration au-dessus. */
+.goal-target-row-spawns { margin-top: 4px; }
 /* .pos-dynamic's own extra padding inside a target card is set once, further
    down next to its base rule (.goal-target .pos-dynamic) -- not duplicated
    here, the descendant selector still matches through the row wrapper. */
@@ -1793,6 +1797,18 @@ button.rar-pill:hover {
   opacity: .85;
   font-style: italic;
   text-transform: none;
+}
+/* .state-chip-fixed (task #80, monsterStatsSection "relevé fixe") : un
+   4ᵉ état -- un relevé RÉEL (de vrais octets client, jamais une invention)
+   mais partagé/indépendant du niveau, donc jamais aussi affirmatif que
+   .stats-badge (« réel », teinte --core) ni aussi muet que .state-chip-unknown
+   ci-dessus -- solide (bordure pleine, pas de dashed) mais dans la teinte
+   --accent déjà réservée aux faits "décidés ailleurs" (cf. .state-chip-dynamic),
+   pour rester visuellement dans la même famille "confirmé mais à nuancer". */
+.state-chip-fixed {
+  color: var(--accent-hi);
+  background: var(--accent-soft-2);
+  border: 1px solid var(--accent);
 }
 
 /* ── Fiche monstre : grille de statistiques ──────────────────────────

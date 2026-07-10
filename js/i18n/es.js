@@ -83,6 +83,10 @@ export default {
       spawnsTotal: n => `${n} apariciones en total`,
       campFicheBtn: 'Ficha del campamento',
       levelAbbrev: lvl => `niv. ${lvl}`,
+      // Rango de NIVEL (task #80 — filas de especie del bestiario/fauna de
+      // campamento, ej. una especie que cubre niv. 5-20): misma familia de
+      // abreviatura que levelAbbrev arriba.
+      levelRangeAbbrev: (min, max) => `niv. ${min}–${max}`,
       spawnPointsCount: n => `${n} puntos de aparición`,
       viewOnMapBtn: 'Ver en el mapa',
       likelyMonsters: n => `Monstruos probables (${n})`,
@@ -328,12 +332,17 @@ export default {
       // + pista de búsqueda «N rarezas» en el resultado agrupado.
       rarityVariantsLabel: 'Rareza',
       rarityVariantsCount: n => `${n} rarezas`,
-      // Selector de nivel/variante de monstruo (feature #12 — un modelo
+      // Selector de nivel/variante de monstruo (task #80 — una ESPECIE
       // agrupa todos sus niveles/reskins, ver js/fiches.js
-      // monsterModelVariants) + pista de búsqueda «N variantes» en el
+      // speciesVariantSpawns) + pista de búsqueda «N variantes» en el
       // resultado agrupado, mismo idioma que rarityVariantsCount arriba.
       monsterVariantsLabel: 'Nivel',
       monsterVariantsCount: n => `${n} variantes`,
+      // Recuento de claves brutas/cosméticas plegadas en UN grupo (nombre,
+      // nivel) (task #80, pulido — antes en línea en kindLine vía
+      // variantsNote arriba; movido a su propia línea silenciada bajo el
+      // selector de variante, provenance técnica, no un hecho de juego).
+      rawRecordsNote: n => `${n} registros brutos`,
       // Contenido de prueba (feature #13, isTest:true oculto por defecto):
       // etiqueta de revelación al fondo del panel + insignia mostrada donde
       // sea que aparezca contenido revelado (ficha, píldora de variante,
@@ -354,6 +363,19 @@ export default {
       stateDynamicTitle: 'Decidido por el servidor en tiempo real — no almacenado en los datos del cliente.',
       stateUnknown: 'Desconocido',
       stateUnknownTitle: 'No se puede determinar a partir de los datos del cliente extraídos.',
+      // 4º estado (task #80, monsterStatsSection): un bloque de estadísticas
+      // REAL (registro hermano m_abs_*, compartido por todos los niveles de
+      // un grupo degradado) — nunca la lectura PROPIA del monstruo, nunca la
+      // insignia "real" de arriba, pero siempre bytes reales del cliente, a
+      // diferencia del rango genérico estimado.
+      stateFixed: 'lectura fija',
+      stateFixedTitle: 'Lectura fija (arena/CBT) — independiente del nivel, no confirmada en el juego.',
+      // Línea de procedencia plegable bajo el rango por nivel (formula_range +
+      // statsFixedReading, task #80): el resumen muestra el número más
+      // elocuente (salud), el detalle la fuente + el rango de niveles que
+      // cubre. Nunca mostrado como las estadísticas PROPIAS de este monstruo.
+      statsFixedProvenanceLine: (label, value) => `Lectura fija: ${label} ${value} — no correlacionada con el nivel`,
+      statsFixedProvenanceDetail: (src, cbt, lvlText) => `Fuente: ${src}${cbt ? ' (CBT)' : ''} · niveles ${lvlText}`,
       // Rangos de tirada / DPS de arma / fórmulas / escalado de runas y chips
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- nuevo, ver  +

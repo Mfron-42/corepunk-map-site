@@ -377,50 +377,67 @@ function buildZoneSearchIndex() {
   });
 }
 
-/* Monstres : DÉDUPLIQUÉS PAR MODÈLE (feature #12 — site/data/<lang>/
-   monster_models.bin) au lieu d'une entrée par groupe brut (917 groupes,
-   ex. jusqu'à 14 lignes identiques "Sanglier mammouth maigre" pour une seule
-   créature déclinée niveau 3 à 20). Regroupement fait ici sur `m.model`
-   (garanti présent sur chaque groupe, jamais sur monster_models[x].levels
-   seul : ce dernier exclut parfois de vraies variantes non-test — reskins
-   de même niveau, ex. trollfat_yellow_arena — qui doivent quand même
-   apparaître/être ouvrables ; voir js/fiches.js monsterModelVariants pour
-   la même discipline côté fiche). Une seule entrée par modèle, avec un
-   indice "N variantes" quand il y en a plus d'une (même idiome que "N
-   raretés" pour les objets ci-dessus) ; clic -> fiche modèle (openMonsterFiche)
-   ouverte sur son niveau REPRÉSENTATIF (canonicalSiteKey du modèle s'il est
-   visible, sinon le niveau le plus bas visible).
+/* Monstres : DÉDUPLIQUÉS PAR ESPÈCE (task #80, monster-model overhaul part 2
+   — site/data/<lang>/species.bin) au lieu d'une entrée par groupe brut (917
+   groupes, ex. jusqu'à 14 lignes identiques "Sanglier mammouth maigre" pour
+   une seule créature déclinée niveau 3 à 20) OU par modèle (335 -- l'ancien
+   axe utilisé ici, plus étroit qu'une espèce : "Troll"/"Mighty Troll"/
+   "Overweight Troll" sont 3 modèles DIFFÉRENTS -- CamelCase-glué, voir
+   data/SCHEMA.md "Known limitation" -- qui ne partagent pourtant AUCUN nom en
+   commun avec le nom canonique, donc ne pouvaient jamais se retrouver l'un
+   l'autre par le texte de leur PROPRE titre). Regroupement fait ici sur
+   `m.species` (garanti présent sur les 916/916 groupes du build actuel,
+   voir data/SCHEMA.md "monster_species.json"). Une seule entrée par espèce,
+   avec un indice "N variantes" quand elle couvre plus d'un groupe (name,level)
+   (même idiome que "N raretés" pour les objets ci-dessus) ; clic -> fiche
+   (openMonsterFiche) ouverte sur le représentant de l'espèce
+   (canonicalSiteKey — même règle de richesse que la fiche modèle/le
+   bestiaire, voir js/sidebar.js buildBestiary).
+   ALIAS DE RECHERCHE (audit punch #6, "63 lost names") : `species.namesAll`
+   liste CHAQUE nom distinct replié dans l'espèce, y compris ceux qu'aucun
+   MODÈLE ne partage avec le représentant (ex. "Young Woodraptor"/"Overweight
+   Troll"/"Gravecrusher" — rejoints par simple égalité de nom, pas de modèle,
+   voir data/SCHEMA.md "monster_species.json" "connected components") :
+   auparavant totalement absents de tout titre de recherche (seul le nom du
+   REPRÉSENTANT du modèle était indexé), ils sont maintenant chacun leur
+   propre segment de corpus (`body`, même mécanisme que questSearchBody plus
+   haut) — "young woodraptor" matche via bodyMatch même si le titre affiché
+   reste "Woodraptor".
    Monstres isTest (162/917, feature #13) exclus du regroupement par défaut
-   -- un modèle 100 % test (toutes ses variantes isTest, ex. oldman_soldier_*)
-   disparaît alors entièrement de la recherche tant que S.devOn est faux. */
+   -- une espèce 100 % test disparaît alors entièrement de la recherche tant
+   que S.devOn est faux. */
 function buildMonsterSearchIndex() {
-  const byModel = new Map();   // model_key -> [[key, m], …] (membres VISIBLES seulement)
+  const bySpecies = new Map();   // species id -> [[key, m], …] (membres VISIBLES seulement)
   for (const [key, m] of Object.entries(S.monsters)) {
     if (isHiddenTest(m)) continue;
-    const modelKey = m.model || key;   // repli défensif -- `model` est garanti sur chaque groupe (voir data/SCHEMA.md)
-    let arr = byModel.get(modelKey);
-    if (!arr) byModel.set(modelKey, arr = []);
+    const spId = m.species || key;   // repli défensif -- `species` est garanti sur chaque groupe (voir data/SCHEMA.md)
+    let arr = bySpecies.get(spId);
+    if (!arr) bySpecies.set(spId, arr = []);
     arr.push([key, m]);
   }
-  for (const [modelKey, members] of byModel) {
+  for (const [spId, members] of bySpecies) {
     members.sort((a, b) => (a[1].level ?? 99) - (b[1].level ?? 99) || a[0].localeCompare(b[0]));
-    const canon = S.monsterModels[modelKey]?.canonicalSiteKey;
+    const sp = S.species[spId];
+    const canon = sp?.canonicalSiteKey;
     const rep = (canon && members.find(([k]) => k === canon)) || members[0];
     const [repKey, repM] = rep;
     const sub = [repM.level != null ? tr('levelAbbrev', repM.level) : null, repM.family ? pretty(repM.family) : null]
       .filter(Boolean).join(' · ');
     const variantsSub = members.length > 1 ? tr('monsterVariantsCount', members.length) : '';
     // Dev marker (feature #13) : seulement quand la variante REPRÉSENTATIVE
-    // elle-même est isTest (ex. oldman_soldier_blade, 100 % test — son seul
-    // niveau catalogué dans monster_models.levels est justement isTest).
-    // Un modèle MIXTE (ex. boarmammoth_albion : niveaux réels + quelques
-    // skins SkinTest annexes) garde un représentant non-test et n'affiche
-    // donc PAS ce badge ici — les variantes de test restent marquées
-    // individuellement dans la fiche (voir fiches.js monsterVariantPickHtml),
-    // jamais étiqueter toute une créature "Test" à cause d'un seul reskin.
+    // elle-même est isTest. Une espèce MIXTE (ex. boarmammoth_albion :
+    // niveaux réels + quelques skins SkinTest annexes) garde un représentant
+    // non-test et n'affiche donc PAS ce badge ici — les variantes de test
+    // restent marquées individuellement dans la fiche (voir fiches.js
+    // monsterVariantPickHtml), jamais étiqueter toute une créature "Test" à
+    // cause d'un seul reskin.
     const devSub = repM.isTest ? tr('devBadge') : '';
+    // Alias namesAll -- exclut le nom du représentant lui-même (déjà le
+    // titre affiché, un doublon dans `body` serait sans effet mais inutile).
+    const aliases = (sp?.namesAll || []).filter(nm => fold(nm) !== fold(repM.name));
     pushSearchEntry(repM.name, 'monster', MONSTER_HEX, null, null, () => openMonsterFiche(repKey),
-      repM.icon ? `icons/${repM.icon}` : null, [sub, variantsSub, devSub].filter(Boolean).join(' · '), '🐾');
+      repM.icon ? `icons/${repM.icon}` : null, [sub, variantsSub, devSub].filter(Boolean).join(' · '), '🐾',
+      0, aliases.length ? aliases : null);
   }
 }
 

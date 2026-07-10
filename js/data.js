@@ -6,7 +6,7 @@ import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
 import { DECOR_FAMILIES } from './config.js';
-import { positionCounts } from './devcontent.js';
+import { positionCounts, isHiddenTest } from './devcontent.js';
 
 /* ── Version stamp (cache-busting) ──────────────────────────────────────
    Incident réel motivant ce bloc : un onglet resté ouvert des heures a
@@ -161,7 +161,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, locations, abilities, events, lootTableContents] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -173,6 +173,18 @@ async function loadDeferred() {
     // (déferré) plutôt qu'au critique : jamais consulté avant la première
     // fiche/recherche monstre, comme monsters.bin lui-même.
     fetchJson(dataPath('monster_models.bin')).catch(() => ({})),
+    // Espèces (task #80 — monster-model overhaul part 2, site/data/<lang>/
+    // species.bin, voir data/SCHEMA.md "monster_species.json") : l'unité
+    // "créature" au sens joueur (~224), un cran plus large que `model`
+    // ci-dessus (un modèle peut sur-scinder — ex. Imp servant sur 9 modèles
+    // d'arme tenue ; une espèce peut au contraire UNIR plusieurs modèles qui
+    // partagent un nom, ex. Troll/Mighty Troll/Overweight Troll). Alimente le
+    // bestiaire (js/sidebar.js buildBestiary), la recherche (js/search.js
+    // buildMonsterSearchIndex — alias namesAll), le sélecteur de variante et
+    // monsterKeyFor (js/fiches.js / ci-dessous) — 404-tolérant comme le reste
+    // de ce bundle (une carte/build sans ce fichier retombe juste sur les
+    // anciens mécanismes model/nom, jamais un plantage).
+    fetchJson(dataPath('species.bin')).catch(() => ({})),
     fetchJson(dataPath('locations.bin')).catch(() => []),
     fetchJson(dataPath('abilities.bin')).catch(() => ({})),
     fetchJson(dataPath('events.bin')).catch(() => []),
@@ -189,11 +201,13 @@ async function loadDeferred() {
   S.vendors = vendors;
   S.monsters = monsters;
   S.monsterModels = monsterModels;
+  S.species = species;
   S.locations = locations;
   S.abilities = abilities;
   S.events = events;
   S.lootTableContents = lootTableContents;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
+  speciesNameIdx = null;   // index paresseux nom (replié, alias namesAll inclus) → id d'espèce (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)
   // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
   // maps ship their own in their bundle (loadMapData). This deferred load is
@@ -218,22 +232,67 @@ async function loadDeferred() {
   onDeferredReady.splice(0).forEach(fn => fn());
 }
 /* ── Résolution croisée mob/PNJ → fiche ───────────────────────
-   Un mob de camp (camp_details) porte sa clé de variante exacte ; le
-   catalogue monstres (S.monsters) ne garde qu'une variante REPRÉSENTATIVE
-   par nom (488/576 clés directes) — repli par nom replié pour les variantes
-   regroupées, jamais de lien inventé si aucune fiche n'existe. Index paresseux,
-   invalidé quand S.monsters est rechargé (loadDeferred/setLang). */
+   Un mob de camp (camp_details) ou une cible de but de quête (goalTargetChip)
+   porte sa clé de variante exacte ; le catalogue monstres (S.monsters) ne
+   garde qu'une variante REPRÉSENTATIVE par (nom, niveau) — reliés ici en
+   cascade, jamais de lien inventé si aucune fiche n'existe :
+     1) `key` tel quel, quand il désigne DÉJÀ une clé de groupe (le cas
+        courant — la clé brute EST la clé représentative) ;
+     2) ESPÈCE (species.bin, task #80) : résout par nom, alias `namesAll`
+        compris (namesAll couvre aussi des noms qu'AUCUN modèle ne partage —
+        "Overweight Troll"/"Mighty Troll" rejoignent l'espèce "Troll" par
+        égalité de nom, pas de modèle, voir data/SCHEMA.md
+        "monster_species.json") — choix déterministe parmi les spawns
+        VISIBLES de l'espèce : le spawn dont le niveau est le plus proche de
+        `levelHint` quand l'appelant en connaît un (ex. le niveau du mob dans
+        CE camp précis, camp_details `m.lvl`/`m.lvlMax`, ou celui de la zone
+        de quête résolue — voir js/fiches.js goalTargetChip), sinon le
+        `canonicalSiteKey` de l'espèce (même règle de richesse que partout
+        ailleurs), sinon son premier spawn ;
+     3) repli FINAL, historique : nom replié -> première clé S.monsters
+        trouvée (filet de sécurité pour les enregistrements sans espèce —
+        aucun aujourd'hui, 224/224 espèces couvrent 100% de S.monsters, mais
+        gardé au cas où un futur build en laisse hors du regroupement).
+   Index paresseux, invalidés quand S.monsters/S.species sont rechargés
+   (loadDeferred/setLang). */
 let monsterNameIdx = null;
-function monsterKeyFor(key, name) {
-  if (key && S.monsters[key]) return key;
-  if (!monsterNameIdx) {
-    monsterNameIdx = new Map();
-    for (const [k, m] of Object.entries(S.monsters)) {
-      const n = fold(m.name);
-      if (!monsterNameIdx.has(n)) monsterNameIdx.set(n, k);
+let speciesNameIdx = null;
+function buildMonsterNameIdx() {
+  monsterNameIdx = new Map();
+  for (const [k, m] of Object.entries(S.monsters)) {
+    const n = fold(m.name);
+    if (!monsterNameIdx.has(n)) monsterNameIdx.set(n, k);
+  }
+  speciesNameIdx = new Map();
+  for (const [id, sp] of Object.entries(S.species || {})) {
+    const names = sp.namesAll?.length ? sp.namesAll : [sp.name];
+    for (const nm of names) {
+      const n = fold(nm);
+      if (!speciesNameIdx.has(n)) speciesNameIdx.set(n, id);
     }
   }
-  return monsterNameIdx.get(fold(name || '')) || null;
+}
+function monsterKeyFor(key, name, levelHint) {
+  if (key && S.monsters[key]) return key;
+  if (!monsterNameIdx) buildMonsterNameIdx();
+  const n = fold(name || '');
+  const sp = S.species[speciesNameIdx.get(n)];
+  if (sp) {
+    // Un spawn isTest révélé nulle part par défaut ici : ce repli sert des
+    // données publiques (camp/quête), jamais un lien profond direct assumé
+    // déjà ouvert -- même garde que speciesVariantSpawns (js/fiches.js).
+    const spawns = (sp.spawns || []).filter(s => S.monsters[s.siteKey] && !isHiddenTest(S.monsters[s.siteKey]));
+    if (spawns.length) {
+      if (levelHint != null) {
+        const bySame = spawns.filter(s => s.level != null);
+        const pool = bySame.length ? bySame : spawns;
+        return pool.reduce((best, s) => Math.abs(s.level - levelHint) < Math.abs(best.level - levelHint) ? s : best, pool[0]).siteKey;
+      }
+      if (sp.canonicalSiteKey && spawns.some(s => s.siteKey === sp.canonicalSiteKey)) return sp.canonicalSiteKey;
+      return spawns[0].siteKey;
+    }
+  }
+  return monsterNameIdx.get(n) || null;
 }
 /* PNJ par nom exact → index de fiche (carte ACTIVE uniquement : les données
    vendeurs/acteurs citent des noms, pas des index). -1 si inconnu ici. */

@@ -81,6 +81,11 @@ export default {
       spawnsTotal: n => `${n} spawns au total`,
       campFicheBtn: 'Fiche du camp',
       levelAbbrev: lvl => `niv ${lvl}`,
+      // Fourchette de NIVEAU (task #80 — lignes d'espèce du bestiaire/faune
+      // de camp, ex. une espèce couvrant niv 5-20, ou la fourchette propre
+      // d'une espèce dans UN camp précis) : même famille d'abréviation que
+      // levelAbbrev ci-dessus.
+      levelRangeAbbrev: (min, max) => `niv ${min}–${max}`,
       spawnPointsCount: n => `${n} points de spawn`,
       viewOnMapBtn: 'Voir sur la carte',
       likelyMonsters: n => `Monstres probables (${n})`,
@@ -333,12 +338,17 @@ export default {
       // de recherche « N raretés » sur le résultat regroupé.
       rarityVariantsLabel: 'Rareté',
       rarityVariantsCount: n => `${n} raretés`,
-      // Sélecteur de niveau/variante de monstre (feature #12, un modèle
+      // Sélecteur de niveau/variante de monstre (task #80, une ESPÈCE
       // regroupe tous ses niveaux/reskins — voir js/fiches.js
-      // monsterModelVariants) + indice de recherche « N variantes » sur le
+      // speciesVariantSpawns) + indice de recherche « N variantes » sur le
       // résultat regroupé, même idiome que rarityVariantsCount ci-dessus.
       monsterVariantsLabel: 'Niveau',
       monsterVariantsCount: n => `${n} variantes`,
+      // Compte de clés brutes/cosmétiques repliées dans UN groupe (name,level)
+      // (task #80, polish — vivait avant en ligne dans kindLine via
+      // variantsNote ci-dessus ; déplacé en ligne muette dédiée sous le
+      // sélecteur de variante, provenance technique, pas un fait de gameplay).
+      rawRecordsNote: n => `${n} enregistrements bruts`,
       // Contenu dev/test (feature #13, isTest:true masqué par défaut) : tag
       // de révélation en bas du panneau + badge apposé partout où du contenu
       // révélé s'affiche (fiche, pastille de variante, bestiaire, recherche).
@@ -358,6 +368,20 @@ export default {
       stateDynamicTitle: 'Décidé par le serveur en temps réel — absent des données client.',
       stateUnknown: 'Inconnu',
       stateUnknownTitle: 'Non déterminable depuis les données client extraites.',
+      // 4ᵉ état (task #80, monsterStatsSection) : un bloc de stats RÉEL
+      // (relevé m_abs_* sœur, partagé par tous les niveaux d'un groupe
+      // démoté) -- jamais le relevé PROPRE au mob, jamais le badge « réel »
+      // ci-dessus, mais toujours de vrais octets client, contrairement à la
+      // fourchette générique estimée.
+      stateFixed: 'relevé fixe',
+      stateFixedTitle: 'relevé fixe (arène/CBT), indépendant du niveau, non prouvé en jeu',
+      // Ligne de provenance repliable sous la fourchette par palier
+      // (formula_range + statsFixedReading, task #80) : le résumé montre le
+      // chiffre le plus parlant (santé), le détail la source + la fourchette
+      // de niveaux qu'elle couvre. Jamais affiché comme les stats PROPRES à
+      // ce mob.
+      statsFixedProvenanceLine: (label, value) => `Relevé fixe : ${label} ${value} — non corrélé au niveau`,
+      statsFixedProvenanceDetail: (src, cbt, lvlText) => `Source : ${src}${cbt ? ' (CBT)' : ''} · niveaux ${lvlText}`,
       // Plages de jet / DPS d'arme / formules / mise à l'échelle rune-puce
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, voir 

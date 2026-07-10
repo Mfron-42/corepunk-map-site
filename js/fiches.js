@@ -38,6 +38,22 @@ import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
    FAUNE a un sens -- un camp de minerai/herboristerie n'a simplement aucune
    créature à lister, ce n'est pas un trou de donnée. */
 const MONSTER_ISH_CAMP_KINDS = new Set(['monsters', 'creeps', 'wildlife']);
+/* Ligne muette « niv <min>–<max> ×N · <attaque> » d'une ligne de faune de
+   camp (camp_details `mobs[]`, folded PAR ESPÈCE — task #80) : `lvl`/`lvlMax`
+   sont la fourchette de niveau RÉELLE de cette espèce dans CE camp précis
+   (identiques quand l'espèce n'y a qu'un seul niveau — pas de "–" inventé),
+   `count` = le nombre de clés brutes/cosmétiques repliées dans cette ligne
+   (voir data/SCHEMA.md camps.json "One mobs[] row per species", omis quand
+   ≤ 1 -- jamais un "×1" qui laisserait croire à une variante réelle). `atk`
+   passe désormais par monsterAttackLabel (même traduction que la fiche
+   monstre elle-même, openMonsterFiche) au lieu du jeton brut "Melee"/"Range". */
+function campMobLevelLine(m) {
+  const lvlTxt = m.lvl != null
+    ? (m.lvlMax != null && m.lvlMax !== m.lvl ? tr('levelRangeAbbrev', m.lvl, m.lvlMax) : tr('levelAbbrev', m.lvl))
+    : '';
+  const withCount = m.count > 1 ? `${lvlTxt} ×${m.count}` : lvlTxt;
+  return [withCount, m.atk ? monsterAttackLabel(m.atk) : null].filter(Boolean).join(' · ');
+}
 function openCampFiche(key) {
   const det = S.campDetails[key] || null;
   const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === key);
@@ -48,7 +64,7 @@ function openCampFiche(key) {
     <div class="frow">
       ${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'fr-icon', initials(m.name))}
       ${mobLabelHtml(m, 'fr-label')}
-      <span class="muted">${m.lvl ? tr('levelAbbrev', m.lvl) : ''}${m.atk ? ' · ' + esc(m.atk) : ''}</span>
+      <span class="muted">${esc(campMobLevelLine(m))}</span>
     </div>`).join('');
   // Faune honnêtement vide (unknown_states_DESIGN.md #4/#10, task #67) : un
   // camp "monster-ish" dont AUCUNE espèce n'a pu être résolue par le
@@ -315,7 +331,25 @@ function computedStatsGridHtml(sc) {
    fourchette générique. Le marqueur "*" + la note ne s'affichent QUE si l'une
    de ces deux colonnes est présente. */
 const _UNVERIFIED_TIERS = new Set(['elit', 'boss']);
-function perTierStatsSection(level, sf) {
+/* Ligne de provenance REPLIABLE (task #80) : un mob `formula_range` dont le
+   groupe m_abs_* sœur porte, EN PLUS de la fourchette calculée ci-dessus, un
+   relevé CHIFFRÉ réel indépendant du niveau (démoté depuis
+   record_fixed_sibling quand ce même m_abs_* couvre plusieurs niveaux — voir
+   data/SCHEMA.md "m_abs_* fixed-stat sibling records") : jamais montré comme
+   les stats DE ce mob (exactement l'erreur que l'ancienne courbe rétractée
+   commettait), juste un repère honnête, replié par défaut pour ne pas
+   concurrencer visuellement la fourchette qui EST la donnée principale ici.
+   `fr` = m.statsFixedReading ({src, cbt, stats, levels}) ; `''` si absent. */
+function statsFixedProvenanceHtml(fr) {
+  if (!fr?.stats?.health) return '';
+  const levels = fr.levels || [];
+  const lvlText = levels.length > 1 ? `${levels[0]}–${levels[levels.length - 1]}` : (levels[0] != null ? String(levels[0]) : '?');
+  return `<details class="fiche-dialogs stats-fixed-details">
+    <summary>${esc(tr('statsFixedProvenanceLine', statLabel('health'), fmtStatNum(fr.stats.health)))}</summary>
+    <p class="hint">${esc(tr('statsFixedProvenanceDetail', fr.src, fr.cbt, lvlText))}</p>
+  </details>`;
+}
+function perTierStatsSection(level, sf, fixedReading) {
   const tiers = PER_TIER_ORDER.filter(t => sf.tiers[t]);
   if (!tiers.length) return '';
   const hasUnverified = tiers.some(t => _UNVERIFIED_TIERS.has(t));
@@ -326,31 +360,61 @@ function perTierStatsSection(level, sf) {
   return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('levelAbbrev', level))}</span></h3>
     <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <p class="hint">${esc(tr('statsPerTierNote'))}</p>
-    ${hasUnverified ? `<p class="hint">${esc(tr('statsBossEliteCaveat'))}</p>` : ''}</div>`;
+    ${hasUnverified ? `<p class="hint">${esc(tr('statsBossEliteCaveat'))}</p>` : ''}
+    ${statsFixedProvenanceHtml(fixedReading)}</div>`;
 }
+/* Bloc statistiques de fiche monstre — bascule EXPLICITE sur
+   `m.statsProvenance` (task #80, mandatory honest display enum, voir
+   data/SCHEMA.md "Monster stats") plutôt que de déduire l'état à partir de
+   `statsSource`/`level`/présence de champs comme avant cette passe :
+     - record_own    -> badge « réel » (inchangé, un relevé client PROPRE à
+                        CE mob : mbt_10_troll_rusty_boss + les bosses
+                        d'arène nommés récupérés via m_abs_*).
+     - record_fixed_sibling -> NOUVEAU badge « relevé fixe » (state-chip
+                        dédié, vocabulaire .state-chip partagé avec
+                        dynamic/unknown/dev, voir stateChip()) : les nombres
+                        SONT montrés (de vrais octets client, jamais une
+                        invention) mais jamais confondus avec un relevé
+                        propre au mob -- indépendant de son niveau, non
+                        prouvé en jeu pour CETTE variante précise.
+     - formula_range -> fourchette par palier inchangée + (nouveau) ligne de
+                        provenance repliable quand statsFixedReading
+                        accompagne la fourchette (voir
+                        statsFixedProvenanceHtml ci-dessus).
+     - unknown       -> inchangé : ces 11 groupes n'ont aujourd'hui aucun
+                        niveau catalogué, donc retombent déjà sur le
+                        chemin 4 (silence honnête) sans branche dédiée. */
 function monsterStatsSection(m) {
-  // 1. Relevé client RÉEL (mbt_10_troll_rusty_boss, les 4 bosses d'arène
-  //    nommés récupérés via m_abs_* -- voir Finding 1 -- + quelques mobs à
-  //    bloc complet) : grille numérique + badge « réel » avec info-bulle
-  //    explicite pour bien le distinguer de la fourchette générique estimée
-  //    ci-dessus (même donnée qu'avant ce correctif, badge juste plus explicite).
-  if (m.statsSource === 'record' && m.stats && Object.keys(m.stats).length) {
+  // 1. record_own : relevé client RÉEL (mbt_10_troll_rusty_boss + quelques
+  //    mobs à bloc complet) : grille numérique + badge « réel » avec
+  //    info-bulle explicite.
+  if (m.statsProvenance === 'record_own' && m.stats && Object.keys(m.stats).length) {
     return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge" title="${esc(tr('realStatsTooltip'))}">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
   }
-  // 2. Mob portant DIRECTEMENT des stats calculées par la formule (palier
+  // 1-bis. Mob portant DIRECTEMENT des stats calculées par la formule (palier
   //    résolu côté données — dormant aujourd'hui, aucun mob non-template n'en
   //    a, mais honoré si un décodage futur en publie) : grille + badge
   //    « calculé (formule du jeu) ».
   if (m.statsComputed) {
     return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('computedStatsBadge'))}</span></h3>${computedStatsGridHtml(m.statsComputed)}</div>`;
   }
-  // 3. Mob régulier AVEC niveau + statFormula chargée -> fourchette par palier
-  //    (les vrais nombres du jeu pour chaque palier à ce niveau).
-  const sf = S.meta?.statFormula;
-  if (m.level != null && sf?.tiers && sf?.growth) {
-    return perTierStatsSection(m.level, sf);
+  // 2. record_fixed_sibling : relevé fixe (arène/CBT) — le template m_abs_*
+  //    sœur porte un bloc de stats RÉEL, mais partagé et indépendant du
+  //    niveau ; état chip dédié, jamais le badge « réel » ci-dessus.
+  if (m.statsProvenance === 'record_fixed_sibling' && m.stats && Object.keys(m.stats).length) {
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${stateChip('fixed')}</h3>${statsGridHtml(m.stats)}</div>`;
   }
-  // 4. Sans niveau NI statFormula : repli honnête palier deviné + note serveur.
+  // 3. formula_range : fourchette par palier (les vrais nombres du jeu pour
+  //    chaque palier à ce niveau) + provenance repliable optionnelle.
+  const sf = S.meta?.statFormula;
+  if (m.statsProvenance === 'formula_range' && m.level != null && sf?.tiers && sf?.growth) {
+    return perTierStatsSection(m.level, sf, m.statsFixedReading);
+  }
+  // 4. unknown (toujours sans niveau côté données actuelles) + tout résidu
+  //    (ex. formule non chargée -- panne réseau ponctuelle) : jamais de
+  //    palier deviné fabriqué pour un mob SANS niveau ; avec niveau mais sans
+  //    formule chargée, repli honnête palier deviné + note serveur (comme
+  //    avant cette passe).
   if (m.level == null) return '';
   const tier = guessStatTier(m);
   const tierLine = [tr('levelAbbrev', m.level), statTierLabel(tier)].filter(Boolean).join(' · ');
@@ -725,36 +789,45 @@ function scalingSection(it) {
   return parts.join('');
 }
 
-/* ── Modèle de monstre + sélecteur de niveau/variante (feature #12) ─────
-   Une créature (« modèle », site/data/<lang>/monster_models.bin) se décline
-   souvent en plusieurs niveaux/variantes — jusqu'à 917 groupes bruts au
-   total dans monsters.bin pour ~335 modèles — qui affichaient jusqu'ici UNE
-   FICHE PAR GROUPE, sans lien entre elles. openMonsterFiche(key) prend
-   toujours une clé de groupe précise (compat totale avec tous les appelants
-   existants : recherche, bestiaire, camps, quêtes, lien profond `mon=`) mais
-   affiche désormais la fiche du MODÈLE entier avec un sélecteur pour
-   changer de niveau/variante sans revenir à la recherche.
+/* ── Espèce de monstre + sélecteur de niveau/variante (task #80, monster-
+   model overhaul part 2 -- remplace l'ancien sélecteur par MODÈLE, feature
+   #12) ─────
+   Une créature (« espèce », site/data/<lang>/species.bin) se décline souvent
+   en plusieurs niveaux/spawns — jusqu'à 917 groupes bruts au total dans
+   monsters.bin pour ~224 espèces — qui affichaient jusqu'ici UNE FICHE PAR
+   GROUPE, sans lien entre elles. openMonsterFiche(key) prend toujours une clé
+   de groupe précise (compat totale avec tous les appelants existants :
+   recherche, bestiaire, camps, quêtes, lien profond `mon=`) mais affiche
+   désormais la fiche de l'ESPÈCE entière avec un sélecteur pour changer de
+   niveau/variante sans revenir à la recherche.
 
-   monsterModelVariants ne fait PAS confiance à monster_models.levels seul :
-   vérifié sur les données réelles, ce tableau exclut parfois de vraies
-   variantes non-test (reskins de même niveau — ex. trollfat_yellow_arena
-   partage model="trollfat" avec le canonique trollfat_green mais n'apparaît
-   pas dans model.levels ; à l'inverse, le seul niveau listé pour
-   oldman_soldier_blade est lui-même isTest). La source de vérité est donc
-   TOUJOURS S.monsters filtré par `m.model` — monster_models ne sert qu'à
-   trouver canonicalSiteKey (repli d'affichage, voir search.js
-   buildMonsterSearchIndex), jamais à décider quelles variantes existent. */
-function monsterModelVariants(modelKey, activeKey) {
+   L'espèce est un cran plus large qu'un MODÈLE (monster_models.json, encore
+   utilisé ailleurs -- voir js/search.js) : "Troll"/"Mighty Troll"/"Overweight
+   Troll" sont 3 modèles DIFFÉRENTS (CamelCase-glué, voir data/SCHEMA.md
+   "Known limitation") qu'un sélecteur par modèle ne réunissait jamais, alors
+   qu'ils désignent la MÊME créature aux yeux du joueur -- la bonne raison de
+   ce changement d'axe (raw cosmetic counts polish, task #80).
+
+   speciesVariantSpawns ne fait PAS confiance à species.spawns seul (même
+   discipline que l'ancien monsterModelVariants vis-à-vis de
+   monster_models.levels) : la source de vérité reste TOUJOURS S.monsters
+   filtré par `m.species` (garanti présent sur chaque groupe, chargé QUOI
+   QU'IL ARRIVE dès que monsters.bin l'est) -- species.bin lui-même ne sert
+   qu'à comparer les noms (distinctName ci-dessous) et, ailleurs, à fournir
+   `canonicalSiteKey`/`namesAll` ; un species.bin absent/404 dégrade donc en
+   douceur (liste de pastilles intacte, juste sans le nom distinctif en plus
+   du niveau), jamais un sélecteur vide. */
+function speciesVariantSpawns(spId, activeKey) {
   const out = [];
-  for (const [key, m] of Object.entries(S.monsters)) {
-    if (m.model !== modelKey) continue;
+  for (const [key, mm] of Object.entries(S.monsters)) {
+    if (mm.species !== spId) continue;
     // Contenu dev (feature #13) : une variante isTest reste masquée DE LA
     // LISTE des pastilles sauf si S.devOn est vrai OU qu'elle est la
     // variante ACTIVEMENT affichée (jamais masquer ce qu'on montre déjà,
     // même via un lien profond partagé avant tout clic sur le tag « Contenu
     // dev » — voir js/devcontent.js isHiddenTest).
-    if (key !== activeKey && isHiddenTest(m)) continue;
-    out.push({ key, m });
+    if (key !== activeKey && isHiddenTest(mm)) continue;
+    out.push({ key, m: mm });
   }
   out.sort((a, b) => (a.m.level ?? 99) - (b.m.level ?? 99) || a.key.localeCompare(b.key));
   return out;
@@ -767,12 +840,15 @@ function monsterModelVariants(modelKey, activeKey) {
    EXACTEMENT le même niveau (reskins, ex. trollfat vert/jaune) affichent
    chacune leur propre nom en plus du niveau pour rester distinguables (sinon
    deux pastilles identiques "niv 20" côte à côte, illisible) ; marqueur
-   "dev" (feature #13) sur les variantes isTest visibles. */
-function monsterVariantPickHtml(activeKey, variants, model) {
+   "dev" (feature #13) sur les variantes isTest visibles. `species` (repli
+   optionnel, voir doc ci-dessus) : `null`/sans `.name` -> distinctName
+   toujours null, pastilles réduites au seul niveau (repli honnête, jamais un
+   sélecteur vide). */
+function monsterVariantPickHtml(activeKey, variants, species) {
   if (variants.length < 2) return '';
   const pills = variants.map(({ key, m }) => {
     const lvl = m.level != null ? tr('levelAbbrev', m.level) : null;
-    const distinctName = model?.name && fold(m.name) !== fold(model.name) ? m.name : null;
+    const distinctName = species?.name && fold(m.name) !== fold(species.name) ? m.name : null;
     const label = [lvl, distinctName].filter(Boolean).join(' · ') || pretty(key);
     const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
     return pillHtml({ active: key === activeKey, hex: MONSTER_HEX, label, act: 'fiche-monster', id: key, mark: devMark });
@@ -795,14 +871,14 @@ function openMonsterFiche(key) {
   const m = S.monsters[key];
   if (!m) return;
   S.openFiche = { kind: 'monster', id: key };
-  // Modèle + sélecteur de niveau/variante (feature #12, voir
-  // monsterModelVariants/monsterVariantPickHtml ci-dessus) : `key` reste la
+  // Espèce + sélecteur de niveau/variante (task #80, voir
+  // speciesVariantSpawns/monsterVariantPickHtml ci-dessus) : `key` reste la
   // variante ACTIVEMENT affichée (tout le corps de la fiche ci-dessous décrit
-  // TOUJOURS `m`, jamais le modèle abstrait), le sélecteur ne fait que
-  // proposer les autres niveaux/variantes du même modèle.
-  const modelKey = m.model || key;
-  const model = S.monsterModels[modelKey] || null;
-  const variantSelectHtml = monsterVariantPickHtml(key, monsterModelVariants(modelKey, key), model);
+  // TOUJOURS `m`, jamais l'espèce abstraite), le sélecteur ne fait que
+  // proposer les autres niveaux/variantes de la même espèce.
+  const spId = m.species || key;
+  const species = S.species[spId] || null;
+  const variantSelectHtml = monsterVariantPickHtml(key, speciesVariantSpawns(spId, key), species);
   const icon = m.icon ? `icons/${m.icon}` : null;
   // Zone(s) où ce monstre apparaît : champ `m.zones` cuit dans les données
   // (build_site_data.py::_monster_zone_names — croisement camps ⨯ régions,
@@ -825,9 +901,29 @@ function openMonsterFiche(key) {
     : '';
   // Contenu dev (feature #13) : marqueur explicite quand la variante
   // ACTIVEMENT affichée est isTest (toujours ouvrable par lien profond direct,
-  // voir monsterModelVariants -- jamais un 404 silencieux, juste marqué).
+  // voir speciesVariantSpawns -- jamais un 404 silencieux, juste marqué).
   const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
-  const kindLine = (kindBits.join(' · ') || tr('monsterLabel')) + (m.variants > 1 ? tr('variantsNote', m.variants) : '');
+  const kindLine = kindBits.join(' · ') || tr('monsterLabel');
+  // Compte de clés brutes/cosmétiques repliées dans CE groupe (name,level) --
+  // task #80 polish : vivait avant dans le fil de kindLine ci-dessus
+  // (`variantsNote`, coloré comme une info de premier plan) ; c'est une
+  // provenance technique ("ce spawn recouvre 40 skins identiques"), pas un
+  // fait de gameplay -- déplacé en ligne muette dédiée, sous le sélecteur de
+  // variante (jamais affiché s'il n'y a rien à replier, m.variants ≤ 1).
+  const rawRecordsHtml = m.variants > 1 ? `<p class="hint variant-rawrecords">${esc(tr('rawRecordsNote', m.variants))}</p>` : '';
+  // Jointure camp -> vrai nuage de points + bouton "voir tous les spawns"
+  // (monsterCampsHtml ci-dessous, réutilise farmCampRow/farmUnjoinedRow/
+  // allCampGroupsFlat de farmSectionHtml -- "où sont les imps bleus ?" doit
+  // dessiner l'union réelle de tous les camps du monstre, jamais une poignée
+  // de points). Pastille "unknown" (unknown_states_DESIGN.md #10, task #67)
+  // toujours au même endroit quand m.camps est vide -- comportement inchangé.
+  // PLACEMENT (manager feedback, task #80/#79) : c'est l'info que le joueur
+  // vient chercher en premier depuis une quête ("où farmer ça ?") -- montée
+  // tout en haut de la fiche, juste après l'identité/zone/sélecteur de
+  // variante et AVANT stats/butin/capacités, y compris quand la réponse est
+  // honnêtement "inconnu" (le joueur a sa réponse immédiatement, sans
+  // scroller au travers de sections qui ne l'intéressent pas encore).
+  const campsHtml = monsterCampsHtml(m);
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   const statsHtml = monsterStatsSection(m);
@@ -880,14 +976,6 @@ function openMonsterFiche(key) {
       : `<p class="hint">${esc(tr('noAbilitiesKnown'))}</p>`
   }</div>`;
 
-  // Jointure camp -> vrai nuage de points + bouton "voir tous les spawns"
-  // (monsterCampsHtml ci-dessous, réutilise farmCampRow/farmUnjoinedRow/
-  // allCampGroupsFlat de farmSectionHtml -- "où sont les imps bleus ?" doit
-  // dessiner l'union réelle de tous les camps du monstre, jamais une poignée
-  // de points). Pastille "unknown" (unknown_states_DESIGN.md #10, task #67)
-  // toujours au même endroit quand m.camps est vide -- comportement inchangé.
-  const campsHtml = monsterCampsHtml(m);
-
   const loreIdx = loreIndexFor(key);
   const loreHtml = loreIdx != null ? `<div class="fiche-section"><h3>${esc(tr('loreEntryTitle'))}</h3>
     <div class="frow">
@@ -895,19 +983,26 @@ function openMonsterFiche(key) {
       <span class="fr-label link"${ecAttr(LOCATION_HEX, 'location')} data-act="fiche-location" data-id="${loreIdx}">${esc(S.locations[loreIdx].title)}</span>
     </div></div>` : '';
 
+  // Ordre de la fiche (manager feedback, task #80/#79) : identité (tête,
+  // zone, sélecteur de variante) -> SPAWNS (la question n°1 d'un joueur qui
+  // arrive depuis une quête, "où farmer ça ?", honnête même quand la réponse
+  // est "inconnu" -- stateChip('unknown') dans monsterCampsHtml) -> tags ->
+  // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
+  // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', initials(m.name))}
       <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}${devMark}</div>
       <h2>${esc(m.name)}</h2></div></div>
+    ${zoneBtnHtml}
     ${variantSelectHtml}
+    ${rawRecordsHtml}
+    ${campsHtml}
     ${tagsHtml}
     ${statsHtml}
-    ${zoneBtnHtml}
     ${lootHtml}
     ${harvestHtml}
     ${questDropsHtml}
     ${abilitiesHtml}
-    ${campsHtml}
     ${loreHtml}`);
   setFicheHash('monster', key);
 }
@@ -1052,15 +1147,20 @@ function questGiverAvatar(q, giverPin) {
 }
 
 /* ── Pastille d'état "on ne sait pas" (unknown_states_DESIGN.md, task #67) ──
-   Taxonomie à 3 états PARTAGÉE (voir style.css .state-chip) pour toute
-   incertitude honnête affichée sur le site -- remplace ~6 idiomes bespoke
-   qui coexistaient déjà (chacun sa classe, son texte, jamais partagés).
+   Taxonomie PARTAGÉE (voir style.css .state-chip) pour toute incertitude
+   honnête affichée sur le site -- remplace ~6 idiomes bespoke qui
+   coexistaient déjà (chacun sa classe, son texte, jamais partagés).
    "dev" réutilise .dev-mark/devBadge tel quel PARTOUT ailleurs dans ce
-   fichier (jamais dupliqué via cette pastille) -- seuls "dynamic"/"unknown"
-   sont de nouvelles variantes ici. `extraTitle` (facultatif) ajoute le SEUL
-   fait concret qui rend la phrase générique utile pour cet appel précis
-   (ex. "camp fauna is spawned server-side") sans forker la phrase de base
-   par site d'appel -- même idée que dynamicPosBadge's regionHint. */
+   fichier (jamais dupliqué via cette pastille) -- "dynamic"/"unknown" sont
+   les 2 variantes d'origine ; "fixed" (task #80, monsterStatsSection) est un
+   4ᵉ état ajouté pour le badge « relevé fixe » (record_fixed_sibling) --
+   même composant/CSS que les 3 autres, juste son propre couple libellé/
+   info-bulle (stateFixed/stateFixedTitle, i18n), jamais le badge « réel »
+   (.stats-badge) qui affirme un relevé PROPRE au mob. `extraTitle`
+   (facultatif) ajoute le SEUL fait concret qui rend la phrase générique
+   utile pour cet appel précis (ex. "camp fauna is spawned server-side") sans
+   forker la phrase de base par site d'appel -- même idée que
+   dynamicPosBadge's regionHint. */
 function stateChip(state, extraTitle) {
   const label = state === 'dev' ? tr('devBadge') : tr(`state${capitalize(state)}`);
   const titleBase = state === 'dev' ? tr('devBadgeTitle') : tr(`state${capitalize(state)}Title`);
@@ -1899,6 +1999,20 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // monster fiche the link opens. Genuinely different labels (rare) are
     // left untouched -- never inventing or destroying real information.
     const nameLbl = (t.label && label && fold(t.label) === fold(label)) ? label : (t.label || label || '');
+    // Indice de niveau (task #80, "quest zone/step level hint") : la ZONE de
+    // ce but EST le camp résolu par geo.py (t.camp / t.search_zone.camp) --
+    // camp_details.json (déjà chargé, S.campDetails) porte justement le
+    // niveau RÉEL de cette espèce dans CE camp précis (`mobs[].lvl`, voir
+    // data/SCHEMA.md camps.json "One mobs[] row per species"). Quand la ligne
+    // se retrouve (par clé brute exacte ou, à défaut, par nom replié -- même
+    // repli que monsterKeyFor's dernier recours), monsterKeyFor résout vers
+    // le spawn de l'ESPÈCE le plus proche de CE niveau plutôt qu'un repli
+    // arbitraire (canonicalSiteKey pourrait être un niveau tout autre pour
+    // une espèce qui couvre 2 à 20). Même strip de préfixe que
+    // campPointsForZone ci-dessous (fulfillment-manager-/ffm-island-).
+    const campKeyShort = t.camp ? t.camp.replace(/^fulfillment-manager-/, '').replace(/^ffm-island-/, '') : null;
+    const campMobRow = campKeyShort && S.campDetails[campKeyShort]?.mobs?.find(mm => mm.key === t.key || fold(mm.name) === fold(nameLbl));
+    const levelHint = campMobRow?.lvl ?? null;
     // BUG FIX (deferred-render-race blast-radius audit, follow-up task 3):
     // was `t.key || null` -- t.key is the RAW canonical monster key geo.py's
     // resolver matched, not necessarily the (name,level)-grouped
@@ -1910,7 +2024,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // or renders a link before S.monsters has even loaded. Same guarded
     // pattern as actorRows: unresolved -> plain text, never a guessed link;
     // self-heals once loadDeferred() completes and the quest fiche re-renders.
-    const mk = monsterKeyFor(t.key || null, nameLbl);
+    const mk = monsterKeyFor(t.key || null, nameLbl, levelHint);
     // Niveau (S.monsters[mk].level) -- même garde différé que le lien : un
     // niveau non résolu ne s'affiche simplement pas encore, il apparaît au
     // re-rendu post-loadDeferred() comme le lien lui-même, jamais un chiffre
@@ -1938,7 +2052,16 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const relRow = itemRow
       ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}${chanceSpan}</div>`
       : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}${lvlSpan}</div>` : '');
-    return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+    // « Montrer les spawns » (task #79, quest-driven spawn highlighting) :
+    // union de TOUS les camps joints du monstre cible, même primitive que la
+    // fiche monstre (monsterSpawnHighlightBtn, réutilise allCampGroupsFlat --
+    // voir sa doc plus bas) -- "Tuer 20 araignées" doit pouvoir allumer les
+    // points de spawn concernés SANS quitter la fiche quête. Repli honnête :
+    // monstre non résolu (mk null) ou résolu mais sans AUCUN camp joint ->
+    // chaîne vide, jamais un bouton qui ne surlignerait rien.
+    const spawnBtn = mk ? monsterSpawnHighlightBtn(S.monsters[mk]) : '';
+    const spawnRow = spawnBtn ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn}</div>` : '';
+    return `<div class="goal-target">${itemRow}${relRow}${posRow}${spawnRow}</div>`;
   }
 
   if (t.kind === 'npc') {
@@ -2609,6 +2732,31 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
    de main.js, calculée une fois par site d'appel plutôt que dupliquée. */
 function allCampGroupsFlat() { return Object.values(S.camps).flatMap(st => st.groups); }
 
+/* Bouton « Montrer/voir tous les spawns » PARTAGÉ (task #79, quest-driven
+   spawn highlighting) : union de TOUS les camps joints d'un monstre en un
+   seul surlignage -- même primitive/libellé que le bouton de groupe de
+   monsterCampsHtml ci-dessous (qui l'utilise désormais aussi, DRY) ET que
+   goalTargetChip (étape de quête kill/kill_collect, "montre-moi les araignées
+   concernées"). `m.camps` (voir data/SCHEMA.md monsters.json record shape)
+   est l'UNION déjà cuite de tous les camps de la créature ; ce helper ne fait
+   que la jointure vers le vrai nuage de points (allCampGroupsFlat) et compte
+   RÉELLEMENT ce qui sera surligné -- jamais le compte brut `m.camps.length`
+   quand certains de ces camps n'existent que sur une AUTRE carte (préfixe
+   ffm-island-*, non joints ici) : le libellé doit rester honnête ("N camps"
+   = N camps RÉELLEMENT allumables). Repli honnête : monstre sans camp DU
+   TOUT, ou dont AUCUN camp ne se rejoint (autre carte) -> chaîne vide, jamais
+   un bouton qui ne surlignerait rien. */
+function monsterSpawnHighlightBtn(m) {
+  const camps = m?.camps || [];
+  if (!camps.length) return '';
+  const allCampGroups = allCampGroupsFlat();
+  const joined = camps.map(c => ({ c, g: allCampGroups.find(x => x.k === c.camp) })).filter(r => r.g);
+  if (!joined.length) return '';
+  const totalPts = joined.reduce((s, r) => s + r.g.pts.length, 0);
+  const ids = joined.map(r => r.c.camp).join(',');
+  return `<button class="act ghost" data-act="camp-highlight" data-ids="${esc(ids)}" data-n="${totalPts}" data-color="${MONSTER_HEX}">${esc(tr('monsterHighlightAllSpawns', joined.length, totalPts))}</button>`;
+}
+
 function farmSectionHtml(it) {
   if (!it.farm?.length) {
     // Repli honnête : des taux de drop catalogués mais AUCUN camp connu
@@ -2705,9 +2853,11 @@ function monsterCampsHtml(m) {
     if (g) joined.push({ c, g }); else unjoined.push(c);
   }
   joined.sort((a, b) => b.g.pts.length - a.g.pts.length);
-  const totalPts = joined.reduce((s, r) => s + r.g.pts.length, 0);
+  // Bouton de groupe (monsterSpawnHighlightBtn, PARTAGÉ avec goalTargetChip
+  // -- task #79) omis à ≤1 camp joint : ferait doublon exact du bouton de sa
+  // propre ligne (farmCampRow, même highlight/même clic) juste en dessous.
   const highlightAllBtn = joined.length > 1
-    ? `<div class="pop-actions"><button class="act ghost" data-act="camp-highlight" data-ids="${esc(joined.map(r => r.c.camp).join(','))}" data-n="${totalPts}" data-color="${MONSTER_HEX}">${esc(tr('monsterHighlightAllSpawns', joined.length, totalPts))}</button></div>`
+    ? `<div class="pop-actions">${monsterSpawnHighlightBtn(m)}</div>`
     : '';
   const rowsHtml = farmCapRows(
     [...joined.map(r => ({ row: r, joined: true })), ...unjoined.map(c => ({ row: c, joined: false }))],

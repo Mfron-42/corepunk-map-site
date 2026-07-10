@@ -80,6 +80,10 @@ export default {
       spawnsTotal: n => `${n} total spawns`,
       campFicheBtn: 'Camp details',
       levelAbbrev: lvl => `lvl ${lvl}`,
+      // Level RANGE (task #80 — bestiary species rows/camp fauna rows, e.g.
+      // a species spanning lvl 5-20, or a camp's own level span for one
+      // species): same abbreviation family as levelAbbrev above.
+      levelRangeAbbrev: (min, max) => `lvl ${min}–${max}`,
       spawnPointsCount: n => `${n} spawn points`,
       viewOnMapBtn: 'View on map',
       likelyMonsters: n => `Likely monsters (${n})`,
@@ -334,12 +338,18 @@ export default {
       // result search hint "N rarities".
       rarityVariantsLabel: 'Rarity',
       rarityVariantsCount: n => `${n} rarities`,
-      // Monster level/variant selector (feature #12 — a model groups all its
-      // levels/reskins together, see js/fiches.js monsterModelVariants) +
+      // Monster level/variant selector (task #80 — a species groups all its
+      // levels/reskins together, see js/fiches.js speciesVariantSpawns) +
       // grouped-result search hint "N variants", same idiom as
       // rarityVariantsCount above.
       monsterVariantsLabel: 'Level',
       monsterVariantsCount: n => `${n} variants`,
+      // Raw cosmetic key count folded into ONE (name,level) group (task #80
+      // polish — used to ride inline in the fiche's kind line via
+      // variantsNote above; moved to its own muted provenance line under the
+      // variant selector, since it's a technical fold count, not a gameplay
+      // fact).
+      rawRecordsNote: n => `${n} raw records`,
       // Dev/test content (feature #13, isTest:true hidden by default): reveal
       // tag at the bottom of the panel + badge shown wherever revealed
       // content is displayed (fiche, variant pill, bestiary, search).
@@ -358,6 +368,18 @@ export default {
       stateDynamicTitle: 'Decided by the server at runtime — not stored in client data.',
       stateUnknown: 'Unknown',
       stateUnknownTitle: "Can't be determined from the extracted client data.",
+      // 4th state (task #80, monsterStatsSection): a REAL client stat block
+      // (m_abs_* fixed-stat sibling record) shared across every level of a
+      // demoted group — never the mob's OWN reading, never the "real" badge
+      // above, but still real bytes, unlike the generic per-tier estimate.
+      stateFixed: 'fixed reading',
+      stateFixedTitle: 'Fixed reading (arena/CBT) — level-independent, not proven in-game.',
+      // Collapsible provenance line under the per-tier range (formula_range +
+      // statsFixedReading, task #80): summary shows the one number that says
+      // the most (health), detail shows the source template + level span it
+      // covers. Never displayed as this mob's OWN stats.
+      statsFixedProvenanceLine: (label, value) => `Fixed reading: ${label} ${value} — not correlated with level`,
+      statsFixedProvenanceDetail: (src, cbt, lvlText) => `Source: ${src}${cbt ? ' (CBT)' : ''} · levels ${lvlText}`,
       // Roll ranges / weapon DPS / formulas / rune-chip scaling
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, see 

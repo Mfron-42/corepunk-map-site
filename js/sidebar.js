@@ -238,17 +238,54 @@ function buildCampFilters() {
   }
 }
 /* ── Bestiaire (sidebar) ─────────────────────────────────────
-   Monstres du catalogue GLOBAL groupés par famille (repliables), triés par
-   taille de famille décroissante ; chaque monstre : nom cliquable → fiche
-   (data-act, délégué global de main.js — pas d'import de vues ici), niveau,
-   zones où il apparaît (champ cuit `m.zones`, hors zone attrape-tout — voir
-   build_site_data.py::_monster_zone_names) et, quand une région est dessinable,
-   une affordance « voir la zone » qui trace son/ses polygone(s) sur la carte.
-   Filtre PAR CARTE : les mobs dont `m.maps` ne contient pas la carte active
-   sont masqués (un mob SANS donnée de carte reste toujours affiché — couverture
-   maps partielle, 332/917 groupes) ; le filtre se met à jour à la bascule de
-   carte (main.js onMapSwitch) et se bascule via la case en tête de liste. */
+   ESPÈCES du catalogue GLOBAL (site/data/<lang>/species.bin, task #80 —
+   monster-model overhaul part 2) groupées par famille (repliables), triées
+   par taille de famille décroissante ; ~224 espèces au lieu des 754-917
+   groupes (name,level) bruts d'avant cette passe — "Woodraptor"/"Young
+   Woodraptor"/"Frenzied Woodraptor"/"Furious Woodraptor" ne faisaient QUATRE
+   lignes de bestiaire pour la même créature, désormais une seule. Chaque
+   ligne : nom cliquable → la fiche du `canonicalSiteKey` de l'espèce (même
+   choix de richesse que partout ailleurs — modèles, recherche), niveau
+   FOURCHETTE (`levelMin`–`levelMax`, voir data/SCHEMA.md), zones où le
+   représentant apparaît (repris de son enregistrement `S.monsters`, champ
+   cuit `zones` — species.bin lui-même n'en porte pas) et, quand une région
+   est dessinable, une affordance « voir la zone ». Filtre PAR CARTE : une
+   espèce dont AUCUN spawn connu n'atteste la carte active est masquée (une
+   espèce sans aucune donnée de carte sur AUCUN de ses spawns reste toujours
+   affichée — couverture `maps` partielle, voir _monster_zone_names/maps
+   attribution) ; le filtre se met à jour à la bascule de carte (main.js
+   onMapSwitch) et se bascule via la case en tête de liste. */
 let bestiaryMapOnly = true;   // filtrer le bestiaire à la carte active (défaut : oui)
+/* Représentant S.monsters d'une espèce -- [key, m] tuple, jamais l'objet
+   espèce lui-même (fiche-monster/monster-zone attendent une clé de GROUPE
+   S.monsters, voir openMonsterFiche/viewMonsterZone) : `canonicalSiteKey`
+   d'abord (garanti résolvable sur les 224/224 espèces du build actuel),
+   repli premier spawn présent dans S.monsters sinon (filet de sécurité, ne
+   devrait jamais servir aujourd'hui). */
+function speciesRep(sp) {
+  if (sp.canonicalSiteKey && S.monsters[sp.canonicalSiteKey]) return [sp.canonicalSiteKey, S.monsters[sp.canonicalSiteKey]];
+  for (const s of sp.spawns || []) { if (S.monsters[s.siteKey]) return [s.siteKey, S.monsters[s.siteKey]]; }
+  return [null, null];
+}
+/* Cartes attestées pour une espèce : union des `maps` (S.monsters, déjà
+   cuit — voir "Monster map attribution" data/SCHEMA.md) de CHAQUE spawn
+   présent dans le catalogue chargé -- species.bin ne porte pas son propre
+   champ `maps`, cette jointure cliente reste bon marché (au plus quelques
+   spawns par espèce) et honnête (null = couverture inconnue, jamais masqué,
+   même discipline que l'ancien filtre par-groupe). */
+function speciesMaps(sp) {
+  const maps = new Set();
+  let any = false;
+  for (const s of sp.spawns || []) {
+    const m = S.monsters[s.siteKey];
+    if (m?.maps?.length) { any = true; m.maps.forEach(x => maps.add(x)); }
+  }
+  return any ? maps : null;
+}
+function levelRangeSub(min, max) {
+  if (min == null) return '';
+  return (max != null && max !== min) ? tr('levelRangeAbbrev', min, max) : tr('levelAbbrev', min);
+}
 function buildBestiary() {
   const box = $('#bestiary-list');
   const title = $('#bestiary-title');
@@ -259,22 +296,24 @@ function buildBestiary() {
   }
   const fams = new Map();
   let hiddenByMap = 0;
-  for (const [key, m] of Object.entries(S.monsters)) {
-    // Contenu dev (feature #13) : monstres isTest masqués du bestiaire par
-    // défaut, même garde que la recherche (voir js/devcontent.js /
-    // search.js buildMonsterSearchIndex) — 162/917 groupes concernés.
-    if (isHiddenTest(m)) continue;
-    // Filtre par-carte : masque un mob CONFIRMÉ sur d'autres cartes seulement
-    // (m.maps présent sans la carte active). Un mob SANS m.maps (couverture
-    // partielle) n'est jamais masqué — on ne cache pas sur une donnée absente.
-    if (bestiaryMapOnly && Array.isArray(m.maps) && m.maps.length && !m.maps.includes(S.map)) {
+  for (const [id, sp] of Object.entries(S.species)) {
+    // Contenu dev (feature #13) : espèce 100% test masquée par défaut, même
+    // garde que la recherche (voir js/devcontent.js / search.js
+    // buildMonsterSearchIndex) -- species.bin's `isTest` n'est vrai que
+    // quand CHAQUE membre replié l'est (voir data/SCHEMA.md).
+    if (isHiddenTest(sp)) continue;
+    // Filtre par-carte : masque une espèce CONFIRMÉE sur d'autres cartes
+    // seulement (maps résolues sans la carte active). Une espèce SANS aucune
+    // donnée de carte (couverture partielle) n'est jamais masquée.
+    const maps = speciesMaps(sp);
+    if (bestiaryMapOnly && maps && !maps.has(S.map)) {
       hiddenByMap++;
       continue;
     }
-    const fam = familyKey(m.family || 'other');   // alias (robo→robot…), voir config.js
+    const fam = familyKey(sp.family || 'other');   // alias (robo→robot…), voir config.js
     let arr = fams.get(fam);
     if (!arr) fams.set(fam, arr = []);
-    arr.push({ key, m });
+    arr.push({ id, sp });
   }
   const hasAny = fams.size > 0;
   const sec = title.closest('.side-sec');
@@ -301,9 +340,10 @@ function buildBestiary() {
   }
   const sorted = [...fams.entries()].sort((a, b) => b[1].length - a[1].length);
   for (const [fam, list] of sorted) {
-    list.sort((a, b) => (a.m.level ?? 99) - (b.m.level ?? 99) || a.m.name.localeCompare(b.m.name));
-    const rows = list.map(({ key, m }) => {
-      const zones = m.zones || [];
+    list.sort((a, b) => (a.sp.levelMin ?? 99) - (b.sp.levelMin ?? 99) || a.sp.name.localeCompare(b.sp.name));
+    const rows = list.map(({ id, sp }) => {
+      const [key, m] = speciesRep(sp);
+      const zones = m?.zones || [];
       const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
       // 📍 devant le nom de zone : un nom de ZONE du jeu (ex. "Restricted
       // Area") se lisait avant comme un statut du monstre plutôt qu'un lieu
@@ -311,21 +351,22 @@ function buildBestiary() {
       // que openMonsterFiche (js/fiches.js), aucune traduction requise (le
       // nom de zone est déjà localisé côté données).
       const zoneBit = zoneTxt ? `📍 ${zoneTxt}` : '';
-      const sub = [m.level != null ? tr('levelAbbrev', m.level) : '', zoneBit].filter(Boolean).join(' · ');
-      // « Voir la zone » : n'apparaît que si au moins une des régions du mob a
-      // un polygone chargé (S.zonesGeo, propre à Kwalat) — sinon rien à
-      // dessiner. Trace le(s) polygone(s) sur la carte (viewMonsterZone,
-      // délégué main.js) sans ouvrir la fiche.
-      const zoneDrawable = zones.length && (S.zonesGeo || []).some(z => zones.some(n => fold(n) === fold(z.name)));
+      const sub = [levelRangeSub(sp.levelMin, sp.levelMax), zoneBit].filter(Boolean).join(' · ');
+      // « Voir la zone » : n'apparaît que si au moins une des régions du
+      // représentant a un polygone chargé (S.zonesGeo, propre à Kwalat) —
+      // sinon rien à dessiner. Trace le(s) polygone(s) sur la carte
+      // (viewMonsterZone, délégué main.js) sans ouvrir la fiche.
+      const zoneDrawable = key && zones.length && (S.zonesGeo || []).some(z => zones.some(n => fold(n) === fold(z.name)));
       const zoneBtn = zoneDrawable
         ? `<button type="button" class="bst-zone" data-act="monster-zone" data-id="${esc(key)}" title="${esc(tr('viewZoneBtn'))}" aria-label="${esc(tr('viewZoneBtn'))}">📍</button>`
         : '';
       // N'apparaît que si S.devOn est vrai (sinon isHiddenTest l'aurait déjà
-      // exclu de `list` plus haut) : marque explicitement un monstre isTest
-      // révélé, jamais confondu avec une vraie créature du jeu.
-      const devMark = m.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+      // exclu de `list` plus haut) : marque explicitement une espèce isTest
+      // révélée, jamais confondue avec une vraie créature du jeu.
+      const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+      const nameAttrs = key ? ` data-act="fiche-monster" data-id="${esc(key)}"` : '';
       return `<li class="bst-row">
-        <span class="bst-name"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(key)}">${esc(m.name)}${devMark}</span>
+        <span class="bst-name${key ? '' : ' bst-name-unresolved'}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}${devMark}</span>
         ${sub ? `<span class="muted">${esc(sub)}</span>` : ''}
         ${zoneBtn}
       </li>`;

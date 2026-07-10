@@ -55,6 +55,11 @@ const S = {
   monsterModels: {},        // clé de modèle -> {name, family?, canonicalSiteKey?, levels:[{level,tier?,siteKey}]}
                             // (site/data/<lang>/monster_models.bin, feature #12 — voir data.js loadDeferred
                             // et js/fiches.js openMonsterFiche « fiche modèle + sélecteur de variante »)
+  species: {},              // clé d'espèce -> {name, namesAll, family?, models, levelMin?, levelMax?,
+                            // canonicalSiteKey?, spawns:[{siteKey,name,level,rawKeys,isTest?}]}
+                            // (site/data/<lang>/species.bin, task #80 — voir data.js loadDeferred,
+                            // js/sidebar.js buildBestiary, js/search.js buildMonsterSearchIndex,
+                            // js/fiches.js monsterVariantPickHtml/monsterKeyFor)
   devOn: initialDevOn(),    // révèle le contenu isTest (monstres/items/objets de quête/quêtes, feature #13)
                             // — masqué par défaut, voir js/devcontent.js + main.js buildDevToggle()
   locations: [],            // bestiaire/lore (MapMarkers.xml), index = id de recherche/fiche

@@ -109,7 +109,12 @@ function questPopup(q) {
 /* Libellé de mob commun (fiche camp / popup camp) : cliquable vers la fiche
    monstre quand elle existe, texte simple sinon. */
 function mobLabelHtml(m, cls) {
-  const mk = monsterKeyFor(m.key, m.name);
+  // `m.lvl` (camp_details mob row) sert d'indice de niveau à monsterKeyFor
+  // (task #80 -- "quest zone/step level hint") : ce camp connaît le niveau
+  // réel du spawn ici, donc la fiche ouverte doit être la variante d'ESPÈCE
+  // la plus proche de CE niveau, pas un repli arbitraire (canonicalSiteKey
+  // pourrait être un niveau tout autre, ex. 20, pour un mob de camp niv 2).
+  const mk = monsterKeyFor(m.key, m.name, m.lvl);
   // Couleur d'entité (task #77) : c'est toujours un monstre, qu'il soit
   // résolu vers sa fiche ou non (même parti pris que npcChip -- la teinte
   // affirme le KIND, pas la cliquabilité, déjà portée par .link/data-act).
@@ -124,9 +129,15 @@ function campPopup(p, n) {
   let extra = '';
   if (det?.mobs?.length) {
     extra = `<div class="pop-mobs">${det.mobs.slice(0, 4).map(m => {
-      const mk = monsterKeyFor(m.key, m.name);
+      const mk = monsterKeyFor(m.key, m.name, m.lvl);
       const attrs = mk ? ` data-act="fiche-monster" data-id="${esc(mk)}"` : '';
-      return `<span class="chip"${ecAttr(MONSTER_HEX, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${m.lvl ? ` <i>${esc(tr('levelAbbrev', m.lvl))}</i>` : ''}</span>`;
+      // Fourchette de niveau du camp (m.lvlMax, folded-row polish task #80)
+      // quand elle diffère de m.lvl -- même idiome que openCampFiche/
+      // campMobLevelLine, juste sans le "×N" (chip de popup trop compact).
+      const lvlTxt = m.lvl != null
+        ? (m.lvlMax != null && m.lvlMax !== m.lvl ? tr('levelRangeAbbrev', m.lvl, m.lvlMax) : tr('levelAbbrev', m.lvl))
+        : '';
+      return `<span class="chip"${ecAttr(MONSTER_HEX, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${lvlTxt ? ` <i>${esc(lvlTxt)}</i>` : ''}</span>`;
     }).join('')}</div>`;
   }
   // Fiche TOUJOURS accessible (même sans fiche camp détaillée : la fiche

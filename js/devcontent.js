@@ -22,7 +22,7 @@ import { S } from './state.js';
    jamais, à lui seul, d'un lien profond direct vers cet enregistrement — les
    appelants qui affichent une fiche/variante déjà OUVERTE gardent leur
    propre garde « toujours inclure la clé activement affichée » (voir
-   js/fiches.js monsterModelVariants) : ce module ne fait que répondre à la
+   js/fiches.js speciesVariantSpawns) : ce module ne fait que répondre à la
    question « faut-il le lister ? », pas « peut-on l'ouvrir ? » (jamais de
    404 silencieux ailleurs sur ce site, même principe ici). */
 function isHiddenTest(rec) {
