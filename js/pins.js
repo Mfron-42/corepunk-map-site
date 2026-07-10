@@ -4,18 +4,98 @@
 import { S } from './state.js';
 import { esc, fmtCoord, reduceMotion } from './utils.js';
 import { tr } from './i18n/index.js';
-import { map, toLL, toWorld, activeMap } from './mapview.js';
+import { map, toLL, toWorld, activeMap, findRenderedMarker, refreshIconLayer } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
 
-function goTo(x, z, zoom, label) {
+/* `pinRef` (facultatif, {cat}) : le caller a déjà résolu la cible à une
+   entité CONNUE dont un marqueur peut déjà être affiché sur la carte (PNJ,
+   coffre placé, camp, coffre fouillable…) — voir resolveGotoMarker ci-dessous,
+   qui décide alors de mettre en avant CE marqueur plutôt que de poser un
+   réticule synthétique par-dessus (le bug rapporté, voir
+   npc_dual_identity_INVESTIGATION.md). Omis (undefined/null) : comportement
+   historique inchangé, réticule systématique — c'est le cas légitime pour
+   toute cible sans marqueur propre (zone dynamique, centroïde de camp non
+   résolu, position brute…). */
+function goTo(x, z, zoom, label, pinRef) {
   if (x == null || z == null) return;   // no fixed position (e.g. an NPC known
                                           // only from dialog/quest-slot) -- no-op
                                           // rather than flying to a NaN latlng.
   const ll = toLL(x, z);
   const target = Math.max(map.getZoom(), zoom ?? 3);
+  // Le marqueur ciblé (si `pinRef` résout) ne peut être retrouvé qu'une fois
+  // la vue effectivement arrivée à destination (couches denses reconstruites
+  // sur le NOUVEAU viewport, voir mapview.js renderDense/renderDomCulled) —
+  // on attend donc 'moveend', avec un filet de sécurité (setTimeout) pour le
+  // cas limite où flyTo/setView ne bougent en fait pas du tout (déjà sur
+  // place) et ne redéclenchent donc pas forcément l'événement.
+  let settled = false;
+  const settle = () => {
+    if (settled) return;
+    settled = true;
+    map.off('moveend', settle);
+    // mapview.js's own `scheduleRedraw` is ALSO bound to 'moveend' (registered
+    // once, at module init -- long before this call), and it only QUEUES a
+    // redraw of every dense layer via requestAnimationFrame rather than
+    // redrawing synchronously. rAF callbacks run in registration order, so a
+    // callback WE queue now (from a listener that necessarily runs AFTER that
+    // earlier one, same synchronous 'moveend' dispatch) always fires AFTER
+    // its full redraw completes. Without this, resolveGotoMarker's own
+    // targeted refreshIconLayer()+highlight would find/highlight/pop the
+    // right marker for one frame, only for scheduleRedraw's own pending
+    // redraw to immediately replace that exact DOM element (clearLayers() +
+    // rebuild) on the very next frame, silently wiping the highlight/popup —
+    // confirmed by direct repro before adding this rAF hop.
+    requestAnimationFrame(() => resolveGotoMarker(x, z, label, pinRef));
+  };
+  map.once('moveend', settle);
   reduceMotion ? map.setView(ll, target) : map.flyTo(ll, target, { duration: .7 });
-  setLocator(x, z, label);
+  setTimeout(settle, reduceMotion ? 0 : 750);
   pulse(ll);
+}
+
+/* Résout un « aller à » une fois la vue posée : avec un `pinRef` dont la
+   couche cible affiche RÉELLEMENT un marqueur à ces coordonnées exactes
+   (findRenderedMarker, gère aussi bien les couches DOM PNJ/POI/atelier que
+   les couches canvas denses) -> ouvre son popup + une brève animation de
+   sélection (highlightMarker), AUCUN réticule créé. Sinon (pas de pinRef,
+   couche masquée/éteinte, marqueur non retrouvé après rafraîchissement) ->
+   repli intégral sur le réticule ambré historique (setLocator) — jamais un
+   faux « trouvé » qui pointerait vers une entité différente, jamais un
+   marqueur supprimé à tort pour une cible qui n'en a réellement aucun. */
+function resolveGotoMarker(x, z, label, pinRef) {
+  clearMarkerHighlight();
+  if (pinRef && pinRef.cat) {
+    refreshIconLayer(pinRef.cat);   // rejoue le rendu de CETTE couche sur le viewport final avant de chercher
+    const mk = findRenderedMarker(pinRef.cat, x, z);
+    if (mk) {
+      clearLocator();   // un réticule d'un goto précédent ne doit pas rester à côté du marqueur retrouvé
+      mk.openPopup();
+      highlightMarker(mk);
+      return;
+    }
+  }
+  setLocator(x, z, label);
+}
+
+/* Animation de sélection posée sur un marqueur RÉEL déjà rendu (voir
+   resolveGotoMarker ci-dessus) : classe CSS auto-effacée (~3.2s, même durée
+   que .pulse-ring) ou remplacée par le prochain goto/highlight — jamais
+   cumulée (toujours clearMarkerHighlight() d'abord). Seuls les marqueurs DOM
+   (PNJ/POI/atelier, L.marker+divIcon) ont un `_icon` réel à styliser ; les
+   marqueurs canvas (L.circleMarker) n'ont pas d'élément DOM propre — pour
+   ceux-là, le popup ouvert + la vague `pulse()` déjà posée (goTo ci-dessus,
+   aux mêmes coordonnées) restent le seul retour visuel, honnête plutôt
+   qu'une classe CSS qui ne s'appliquerait à rien. */
+let highlightMk = null, highlightTimer = null;
+function clearMarkerHighlight() {
+  if (highlightTimer) { clearTimeout(highlightTimer); highlightTimer = null; }
+  if (highlightMk && highlightMk._icon) highlightMk._icon.classList.remove('pin-highlight');
+  highlightMk = null;
+}
+function highlightMarker(mk) {
+  if (mk._icon) mk._icon.classList.add('pin-highlight');
+  highlightMk = mk;
+  highlightTimer = setTimeout(() => { if (highlightMk === mk) clearMarkerHighlight(); }, 3200);
 }
 let pulseMk = null;
 function pulse(ll) {

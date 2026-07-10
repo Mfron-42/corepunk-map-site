@@ -17,6 +17,7 @@ import {
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, toLL, canvasR, clearHighlight } from './mapview.js';
+import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
 import { mobLabelHtml } from './popups.js';
@@ -54,7 +55,7 @@ function openCampFiche(key) {
       <h2>${esc(name)}</h2>
       <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
     <div class="fiche-section"><div class="pop-actions">
-      ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
+      ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
       ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${g.pts.length}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
     </div></div>
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : ''}
@@ -88,12 +89,18 @@ function openChestFiche(i) {
   // (lt_searchable*), pas une vraie table de coffre curée. Jamais présenté
   // comme un coffre farmable ciblé (voir DATA_CONTRACT.md §1/§3).
   const genericNote = r.lootGeneric ? `<p class="hint">${esc(tr('lootGenericNote'))}</p>` : '';
+  // Couche carte réelle de CE placement (voir main.js registerAllDenseRenderers) :
+  // camp_chest / decor:<famille> / decor:legacy -- jamais l'ancien "chest"
+  // générique, qui n'est plus le nom d'aucune couche (voir DATA_CONTRACT.md §3.1).
+  const chestCat = r.group === 'camp_chest' ? 'camp_chest'
+    : r.group === 'legacy_chest' ? 'decor:legacy'
+      : (r.group === 'decor' && r.family) ? 'decor:' + r.family : null;
   openFiche(`
     <div class="fiche-head"><div>
       <div class="fiche-kind" style="color:${chestHex(r)}">${esc(chestKindLabel(r))}</div>
       <h2>${esc(name)}</h2></div></div>
     <div class="fiche-section"><div class="pop-actions">
-      ${gotoBtn(r.x, r.z, name)}
+      ${gotoBtn(r.x, r.z, name, chestCat)}
     </div></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${genericNote}${drops}</div>`);
   setFicheHash(null);
@@ -119,7 +126,7 @@ function openSearchableChestFiche(k) {
       <div class="fiche-kind" style="color:${CATS.searchable_chest.hex}">${esc(region)}</div>
       <h2>${esc(tr('searchableChestTitle'))}</h2></div></div>
     <div class="fiche-section"><div class="pop-actions">
-      ${gotoBtn(r.x, r.z, tr('searchableChestTitle'))}
+      ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
     </div></div>
     <div class="fiche-section"><p class="hint">${esc(tr('searchableChestRarityNote'))}</p></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
@@ -956,6 +963,12 @@ function closeFiche() {
   if (S.questZoneLayer) { map.removeLayer(S.questZoneLayer); S.questZoneLayer = null; }
   clearGoalZone();
   clearHighlight();
+  // Le réticule ambré (pins.js setLocator) posé par un goto sans pin connu
+  // (goal dynamique, centroïde de camp…) ne devait jamais survivre à la
+  // fermeture de la fiche qui l'a fait apparaître -- avant ce correctif, rien
+  // ne l'effaçait jamais (voir npc_dual_identity_INVESTIGATION.md, "lingers
+  // forever"). No-op si aucun réticule n'est posé.
+  clearLocator();
   S.openFiche = null;
   setFicheHash(null);
 }
@@ -994,9 +1007,19 @@ function heroAvatar(iconPath) {
 const GOTO_ICON = `<svg class="goto-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
   <path d="M12 21s6.5-6.2 6.5-11.3a6.5 6.5 0 1 0-13 0C5.5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.2"/></svg>`;
-function gotoBtn(x, z, label) {
+/* `cat` (facultatif) : clé de couche carte (voir mapview.js `layers`/
+   config.js CATS, ex. 'npc', 'camp_chest', 'decor:legacy') quand `x,z` sont
+   CONNUS pour coïncider avec un marqueur RÉELLEMENT rendu de cette couche
+   (le pin lui-même, pas juste "quelque part près de lui" -- voir
+   npc_dual_identity_INVESTIGATION.md). Posé en `data-cat`, lu par main.js's
+   goto handler -- pins.js goTo() met alors en avant ce marqueur déjà rendu
+   au lieu d'un réticule ambré redondant à côté (repli automatique sur le
+   réticule si la couche est masquée/éteinte ou le marqueur introuvable).
+   Omis : comportement historique inchangé. */
+function gotoBtn(x, z, label, cat) {
   if (x == null) return `<span class="pos-unknown">${esc(tr('posUnknown'))}</span>`;
-  return `<button class="goto" data-act="goto" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(tr('mapLabel'))}</span></button>`;
+  const catAttr = cat ? ` data-cat="${esc(cat)}"` : '';
+  return `<button class="goto" data-act="goto" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}"${catAttr}>${GOTO_ICON}<span>${esc(tr('mapLabel'))}</span></button>`;
 }
 /* Cible sur une AUTRE carte : bouton de bascule cross-carte (libellé = nom de
    la carte cible) au lieu d'un goTo local. Le clic bascule puis focus. */
@@ -1169,7 +1192,7 @@ function openNpcFiche(idx) {
   const variantLine = variant && fold(variant) !== fold(r.name)
     ? `<span class="pop-coords">${esc(variant)}</span>` : '';
   const mapBtn = r.x != null
-    ? `<button class="act primary" data-act="goto" data-x="${r.x}" data-z="${r.z}" data-label="${esc(r.name)}">${esc(tr('viewOnMapBtn'))}</button>`
+    ? `<button class="act primary" data-act="goto" data-x="${r.x}" data-z="${r.z}" data-label="${esc(r.name)}" data-cat="npc">${esc(tr('viewOnMapBtn'))}</button>`
     : '';
   // Dialogue du personnage (data-accuracy audit, NPC-duplication fix): les
   // barks hello_/info_ que ce PNJ « donne » sont masqués de la liste de quêtes
@@ -1417,7 +1440,18 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
 function goalTargetChip(t, label, regionHint) {
   if (!t || t.kind === 'multiple') return '';
   const lbl = esc(label || '');
-  const posRow = `<div class="goal-target-row goal-target-row-pos">${t.x != null ? gotoBtn(t.x, t.z, lbl) : dynamicPosBadge(t, regionHint)}</div>`;
+  // Cible NPC déjà résolue par nom (voir la branche t.kind === 'npc' plus
+  // bas, même npcIndexByName) : quand une position fixe existe déjà (t.x !=
+  // null), viser le pin NPC réel plutôt que la position brute de la cible --
+  // même correctif qu'actorRows/« Voir le donneur » ci-dessus (voir
+  // npc_dual_identity_INVESTIGATION.md §2/§3). N'invente JAMAIS un bouton là
+  // où il n'y en avait pas (t.x == null garde `dynamicPosBadge` inchangé).
+  const npcNi = (t.kind === 'npc' && t.x != null && label) ? npcIndexByName(label) : -1;
+  const npcPin = npcNi >= 0 ? S.data.npc[npcNi] : null;
+  const posX = npcPin && npcPin.x != null ? npcPin.x : t.x;
+  const posZ = npcPin && npcPin.x != null ? npcPin.z : t.z;
+  const posCat = npcPin && npcPin.x != null ? 'npc' : null;
+  const posRow = `<div class="goal-target-row goal-target-row-pos">${t.x != null ? gotoBtn(posX, posZ, lbl, posCat) : dynamicPosBadge(t, regionHint)}</div>`;
 
   if (t.kind === 'item') {
     // La cible EST l'item lui-même -- rien à relier, juste son identité
@@ -1721,17 +1755,29 @@ function openQuestFiche(slug) {
   // cross-carte au lieu d'un goTo qui tomberait dans le mauvais repère.
   const actorRows = (q.actors || []).map(a => {
     const onOtherMap = a.map && a.map !== S.map;
+    // Acteur PNJ résolu par nom (npcIndexByName) : la position BRUTE de
+    // l'acteur (a.x/a.z, un placement/point de graphe de quête) peut différer
+    // de quelques unités du pin NPC réellement affiché pour ce même
+    // personnage (map_marker.pos -- voir npc_dual_identity_INVESTIGATION.md
+    // §2/§3, cas Ophelia Voss) ; quand le personnage est connu de la carte
+    // active, on vise directement SON pin -- fixe le "deux marqueurs, deux
+    // icônes" pour ce cas ET permet à findRenderedMarker() de le retrouver
+    // exactement (voir gotoBtn's `cat`/pins.js resolveGotoMarker).
+    const ni = (a.kind === 'npc' && !onOtherMap) ? npcIndexByName(a.label) : -1;
+    const npcPin = ni >= 0 ? S.data.npc[ni] : null;
+    const posX = npcPin && npcPin.x != null ? npcPin.x : a.x;
+    const posZ = npcPin && npcPin.x != null ? npcPin.z : a.z;
+    const posCat = npcPin && npcPin.x != null ? 'npc' : null;
     const posCell = a.x == null ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
       : onOtherMap ? crossMapBtn(a.map, a.x, a.z, cleanLabel(a.label))
-        : gotoBtn(a.x, a.z, cleanLabel(a.label));
+        : gotoBtn(posX, posZ, cleanLabel(a.label), posCat);
     // Acteur PNJ cliquable vers sa fiche (quêtes + boutique) quand il est
     // connu de la carte active ; monstre idem vers sa fiche bestiaire —
     // navigation quête → PNJ/monstre sans repasser par la recherche.
     const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
     let labelHtml = `<span class="fr-label">${esc(aLabel)}</span>`;
-    if (a.kind === 'npc' && !onOtherMap) {
-      const ni = npcIndexByName(a.label);
-      if (ni >= 0) labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
+    if (ni >= 0) {
+      labelHtml = `<span class="fr-label link" data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
     } else if (a.kind === 'mob') {
       // BUG FIX (quest-guide-feature plan sec 5.3): q.actors[].kind is built
       // straight from slots[].kind (import_quests.py), which only ever uses
@@ -1768,6 +1814,18 @@ function openQuestFiche(slug) {
      <span class="fr-label link" data-act="fiche-quest" data-id="${esc(s)}">${esc(S.quests.get(s).name)}</span></div>`).join('');
   const zoneBtn = S.zonesQuest[slug]
     ? `<button class="act ghost" data-act="zone-view" data-id="${esc(slug)}">${esc(tr('viewZoneBtn'))}</button>` : '';
+  // « Voir le donneur » : même correctif que les actorRows ci-dessus -- vise
+  // le pin NPC réel (S.data.npc[...].x/z) plutôt que la position brute du
+  // donneur (q.x/q.z, souvent à quelques unités du pin -- cas Ophelia Voss,
+  // voir npc_dual_identity_INVESTIGATION.md §2/§3) quand ce donneur est connu
+  // de la carte active, et porte le `cat` que gotoBtn/pins.js utilisent pour
+  // mettre en avant CE marqueur au lieu d'un réticule redondant.
+  const giverNi = q.giver ? npcIndexByName(q.giver) : -1;
+  const giverPin = giverNi >= 0 ? S.data.npc[giverNi] : null;
+  const giverX = giverPin && giverPin.x != null ? giverPin.x : q.x;
+  const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
+  const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
+  const giverCatAttr = giverCat ? ` data-cat="${giverCat}"` : '';
 
   openFiche(`
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
@@ -1775,7 +1833,7 @@ function openQuestFiche(slug) {
       ${q.giver ? `<span class="pop-coords">${esc(tr('givenByPlain', q.giver))}</span>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
     <div class="fiche-section"><div class="pop-actions">
-      ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${q.x}" data-z="${q.z}" data-label="${esc(q.giver || q.name)}">${esc(tr('viewGiverBtn'))}</button>` : ''}
+      ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
       ${zoneBtn}
       <button class="act" data-act="track" data-id="quest:${esc(slug)}">${esc(tr('trackBtn'))}</button>
       <button class="act" data-act="done" data-id="quest:${esc(slug)}">${esc(tr('doneBtn'))}</button>

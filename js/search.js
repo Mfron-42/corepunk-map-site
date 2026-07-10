@@ -77,6 +77,13 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
     glyph: glyph || CAT_GLYPH[cat] || '❖', bias: bias || 0,
     map: (opts && opts.map) || S.map,
     ref: (opts && opts.ref) || null,
+    // `pinCat` (facultatif) : clé de couche carte (mapview.js `layers`) quand
+    // (x,z) coïncident avec un marqueur RÉELLEMENT rendu de cette couche --
+    // voir pins.js goTo()'s pinRef. Un résultat sans pinCat garde le réticule
+    // ambré historique (comportement inchangé pour camp/coffre-skin/etc.,
+    // voir buildCampSearchIndex/buildChestSearchIndex qui ont chacun leur
+    // propre mécanisme de surlignage, pas un pin unique adressable ici).
+    pinCat: (opts && opts.pinCat) || null,
   };
   if (body && body.length) {
     entry.body = body.filter(Boolean).map(s => { const bn = fold(s); return { text: s, n: bn, words: bn.split(' ') }; });
@@ -102,9 +109,17 @@ function buildSearch() {
   // carte) n'a ni x ni z : la ligne de résultat le dit explicitement plutôt
   // que de laisser un espace vide (le sous-libellé n'était sinon utilisé que
   // pour x/z absents).
+  // `pinCat` (npc/poi/workshop/quest/qao ci-dessous) : ces catégories
+  // correspondent chacune à UNE couche carte adressable par coordonnées
+  // exactes (mapview.js findRenderedMarker) — un clic de résultat met alors
+  // en avant le marqueur RÉEL déjà rendu au lieu de poser un réticule ambré
+  // par-dessus (npc_dual_identity_INVESTIGATION.md, cas Ophelia Voss via
+  // recherche). camp/coffre-skin gardent le réticule : leur clic déclenche
+  // déjà son propre mécanisme de surlignage (showHighlight, voir
+  // buildCampSearchIndex/buildChestSearchIndex), pas un pin unique.
   S.data.npc.forEach((r, i) => push(r.name, 'npc', CATS.npc.hex, r.x, r.z, () => openNpcFiche(i),
-    null, r.x == null ? tr('posUnknown') : null, initials(r.name)));
-  S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z));
+    null, r.x == null ? tr('posUnknown') : null, initials(r.name), 0, null, { pinCat: 'npc' }));
+  S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'poi' }));
   // Une quête sans x/z (giver et acteurs tous sans position extraite — ex.
   // les quêtes de Prison Island, cf. questNoPos) reste indexée : le clic
   // ouvre sa fiche exactement comme d'habitude (openQuestFiche tolère déjà
@@ -123,10 +138,10 @@ function buildSearch() {
   S.data.quest.forEach(q => {
     if (isHiddenTest(q)) return;
     push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
-      null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug });
+      null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug, pinCat: 'quest' });
   });
-  S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', CATS.qao.hex, r.x, r.z); });
-  S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z));
+  S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', CATS.qao.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'qao' }); });
+  S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'workshop' }));
   // Base de données objets : icône + rareté, pas de position (fiche seule).
   // Bruit technique (ab_/ef_/… , is_test) déprioritisé au profit des objets joueur.
   // Sous-libellé : rareté/nature + type d'arme court (ex. "Rare · Pistolet")
@@ -297,7 +312,7 @@ function buildSearchableChestSearchIndex() {
   (S.data.searchable_chest || []).forEach(r => {
     const region = prettyRegion(r.region);
     pushSearchEntry(tr('searchableChestTitle'), 'searchable_chest', CATS.searchable_chest.hex, r.x, r.z,
-      () => openSearchableChestFiche(r.k), null, region, null, 0, null, { ref: 'searchable_chest:' + r.k });
+      () => openSearchableChestFiche(r.k), null, region, null, 0, null, { ref: 'searchable_chest:' + r.k, pinCat: 'searchable_chest' });
   });
 }
 
@@ -543,7 +558,7 @@ function renderSearch(raw) {
       pushFocusState();   // avant mutation — voir pushFocusState()'s doc
       resBox.hidden = true; $('#search').value = it.label;
       const focus = () => {
-        if (it.x != null) goTo(it.x, it.z, 3, it.label);
+        if (it.x != null) goTo(it.x, it.z, 3, it.label, it.pinCat ? { cat: it.pinCat } : null);
         if (it.open) it.open();
       };
       // Cross-carte : basculer d'abord (charge la carte cible), PUIS focus —

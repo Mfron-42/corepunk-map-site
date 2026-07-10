@@ -767,6 +767,19 @@ body {
 .mk:hover .mk-pin { transform: scale(1.2); box-shadow: 0 4px 14px rgba(0, 0, 0, .6), 0 0 0 1px var(--pin, var(--accent)); }
 .mk-done .mk-pin { opacity: .38; filter: grayscale(.7); }
 
+/* ── Sélection d'un pin déjà rendu (goto conscient du pin) ──
+   Posée brièvement (~3.2s, voir pins.js highlightMarker) sur le marqueur DOM
+   réel (PNJ/POI/atelier) qu'un « aller à » vient de retrouver au lieu de
+   poser un réticule ambré par-dessus (npc_dual_identity_INVESTIGATION.md) —
+   même teinte que le réticule (--accent) pour se lire comme la même famille
+   de repère de navigation, jamais un second marqueur. */
+.mk.pin-highlight .mk-pin { animation: pin-select-glow 1.6s ease-out 2; }
+@keyframes pin-select-glow {
+  0% { box-shadow: 0 0 0 0 rgba(224, 162, 63, .85), 0 2px 8px rgba(0, 0, 0, .55); transform: scale(1); }
+  40% { box-shadow: 0 0 0 9px rgba(224, 162, 63, 0), 0 2px 8px rgba(0, 0, 0, .55); transform: scale(1.16); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 162, 63, 0), 0 2px 8px rgba(0, 0, 0, .55); transform: scale(1); }
+}
+
 /* ── Repli d'image systématique (icônes/portraits manquants ou cassés) ──
    Jamais d'image vide/cassée : glyphe de catégorie (initiales ou
    pictogramme) sur fond neutre. Voir app.js::iconTag / le handler `error`

@@ -75,7 +75,12 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
   else if (b.dataset.act === 'monster-zone') viewMonsterZone(id);
   else if (b.dataset.act === 'goto') {
-    goTo(+b.dataset.x, +b.dataset.z, undefined, b.dataset.label);
+    // `data-cat` (facultatif, posé par gotoBtn/fiches.js sur les cibles déjà
+    // résolues à une entité connue -- PNJ, coffre placé, camp, coffre
+    // fouillable) : voir pins.js goTo()'s pinRef -- met en avant le
+    // marqueur RÉEL déjà rendu au lieu d'un réticule redondant à côté.
+    const cat = b.dataset.cat || null;
+    goTo(+b.dataset.x, +b.dataset.z, undefined, b.dataset.label, cat ? { cat } : null);
   }
   else if (b.dataset.act === 'map-goto') {
     // Acteur/cible sur une AUTRE carte : basculer d'abord, puis focus (les x/z

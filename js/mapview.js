@@ -156,6 +156,12 @@ function renderDense(cat, points, color, popupFor) {
       color: isDev ? '#e0645c' : '#0a0e14', weight: isDev ? 1.8 : 1.2, dashArray: isDev ? '2,2' : null,
       fillColor: color, fillOpacity: n > 1 ? .75 : .88,
     });
+    // Repère de position (goto conscient du pin, voir pins.js
+    // resolveGotoMarker/findRenderedMarker ci-dessous) : seulement pour un
+    // point NON agrégé (n===1) -- une cellule agrégée (n>1) représente
+    // plusieurs points confondus, aucun marqueur individuel n'existe pour
+    // l'un d'eux en particulier, jamais de correspondance inventée.
+    if (n === 1) mk._meta = { cat, p };
     if (n > 1) mk.bindTooltip('× ' + n, { direction: 'top', offset: [0, -6] });
     mk.bindPopup(() => popupFor(p, n), { maxWidth: 300 });
     g.addLayer(mk);
@@ -188,6 +194,7 @@ function renderDomDots(cat, g, popupFor, onSelect) {
       renderer: canvasR, radius: 4.6, color: '#0a0e14', weight: 1.2,
       fillColor: c.hex, fillOpacity: .88,
     });
+    mk._meta = { cat, i, id, r };
     mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });
     if (onSelect) mk.on('click', () => onSelect(r, i));
     g.addLayer(mk);
@@ -254,6 +261,36 @@ map.on('moveend zoomend', scheduleRedraw);
 function refreshIconLayer(cat) {
   denseByCat[cat]?.(); // rejoue le rendu (canvas ou DOM culled) de cette seule couche
 }
+/* Marqueur déjà RENDU à une position exacte (goto conscient du pin -- voir
+   pins.js resolveGotoMarker) : cherche, dans la couche `cat` actuellement
+   affichée, un marqueur dont la position mémorisée dans `_meta` (posée par
+   renderDomCulled/renderDomDots -- `.r`, le point de données -- ou
+   renderDense -- `.p`, seulement pour un point NON agrégé en cellule)
+   coïncide avec (x,z). `eps` minuscule : tolérance de round-trip flottant
+   (l'appelant relit x/z depuis un attribut data-x/data-z), PAS une tolérance
+   de proximité floue -- un point à quelques unités de là (ex. la position
+   brute d'un donneur de quête vs. le pin PNJ réel, voir
+   npc_dual_identity_INVESTIGATION.md §2/§3) ne doit JAMAIS matcher ici ; ce
+   cas se corrige en amont, à l'appelant, en visant directement les
+   coordonnées du pin plutôt qu'en élargissant cette tolérance. Renvoie null
+   pour toute autre raison (couche masquée/éteinte -- son groupe est alors
+   vide, voir renderDense/renderDomCulled -- hors vue même après
+   rafraîchissement, ou point agrégé) : l'appelant retombe alors sur le
+   réticule ambré historique, jamais un marqueur voisin mais différent. */
+function findRenderedMarker(cat, x, z, eps = 0.05) {
+  const g = layers[cat];
+  if (!g) return null;
+  let found = null;
+  g.eachLayer(mk => {
+    if (found) return;
+    const meta = mk._meta;
+    if (!meta) return;
+    const src = meta.r || meta.p;
+    if (!src || src.x == null || src.z == null) return;
+    if (Math.abs(src.x - x) <= eps && Math.abs(src.z - z) <= eps) found = mk;
+  });
+  return found;
+}
 /* ── Couche régions nommées (zones_geo) ─────────────────────── */
 function buildZoneLayer() {
   const g = L.layerGroup();
@@ -314,6 +351,6 @@ function applyMapGeometry() {
 export {
   map, toLL, toWorld, worldBounds, applyMapGeometry, canvasR,
   layers, markerId, registerDense, registerDomDense,
-  denseRenderers, scheduleRedraw, refreshIconLayer,
+  denseRenderers, scheduleRedraw, refreshIconLayer, findRenderedMarker,
   buildZoneLayer, toggleZones, showHighlight, clearHighlight, hasHighlight,
 };
