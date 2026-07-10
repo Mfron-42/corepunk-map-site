@@ -21,6 +21,19 @@ export default {
       loadingText: 'Surveying the terrain…',
       zonesLabel: 'Zones (regions)',
       campLoading: 'Loading camps…',
+      // Legend/menu counter honesty fix (report: NPC filter showed 11 on
+      // Prison Island but only 1 pin ever renders): tooltip on the discreet
+      // "+N" badge next to a filter row's main count (js/sidebar.js
+      // hiddenBadge) — N real, non-test records with no known position,
+      // never pins the map silently fails to draw. Deliberately NEUTRAL
+      // ("unknown", not "dynamic"/"server-side spawn"): a `pos_source`
+      // classifier proving a record is a genuine server-side spawn exists
+      // for only 18 Prison-Island NPCs in the pipeline-side data/quests.json
+      // (giver/slot level) and is NOT exposed in any site .bin at all (incl.
+      // npcs.bin/quests.bin) — asserting "server-side spawn" for the whole
+      // bucket would overclaim for the rest, which is simply unclassified
+      // (see  unknown_states_DESIGN.md §2 re-check #1).
+      filterHiddenTooltip: n => `${n} without a known position`,
       decorFamiliesTitle: 'Decor families',
       chestTypesAllBtn: 'All',
       chestTypesNoneBtn: 'None',
@@ -207,7 +220,16 @@ export default {
       relatedQuestsTitle: 'Related quests',
       questFicheKind: region => 'Quest' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Drop rates',
-      farmSpotsTitle: 'Farm spots',
+      farmSpotsTitle: 'How to farm',
+      // Farm-spot redesign (farm_spot_UX_DESIGN.md, July 2026): rows grouped
+      // by camp kind (Mining/Monsters/…) instead of a flat 24-row dump —
+      // header summary, "+N more" expander, and the honest fallbacks below
+      // (unjoined camp, no camp data at all, generic reward-pool collapse).
+      farmGroupSummary: (camps, pts) => `${camps} camp${camps > 1 ? 's' : ''} · ${pts} points`,
+      farmMoreCampsN: n => `+ ${n} more camps`,
+      farmGenericPoolNote: n => `Also a rare drop from ${n} generic reward camps — not a targeted farm spot.`,
+      farmSourcesNotMapped: 'Sources not mapped to a known camp yet.',
+      farmOtherSourcesTitle: 'Other sources',
       soldByTitle: 'Sold by',
       // Quest-scripted-only obtain fallback (quest-guide-feature plan sec
       // 5.2/6.3): shown ONLY when an item has no generic recipe/drop/vendor

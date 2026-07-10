@@ -32,7 +32,16 @@ import { goTo, clearPing, clearLocator } from './pins.js';
 import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
 
-let highlightedCampKey = null;   // toggle du bouton « Surligner les N points »
+// Toggle du bouton « Surligner les N points » -- identité trackée par
+// ÉLÉMENT bouton (pas par clé de camp) depuis la section « Comment farmer »
+// de la fiche objet (farm_spot_UX_DESIGN.md étape 6.2) : une fiche camp n'a
+// jamais qu'UNE seule instance de ce bouton (l'ancienne clé suffisait), mais
+// une fiche objet peut désormais en afficher plusieurs à la fois (une par
+// ligne de camp + une par groupe « Surligner tout » qui union plusieurs
+// camps) -- retrouver LEQUEL était actif pour réinitialiser son libellé
+// exige l'élément lui-même, pas une chaîne qui peut être partagée par
+// plusieurs boutons rendus simultanément.
+let highlightedBtn = null;
 
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
@@ -56,16 +65,32 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-searchable-chest') openSearchableChestFiche(id);
   else if (b.dataset.act === 'camp-highlight') {
     // « Montre-moi TOUS les points de ce contenant » — toggle : un second
-    // clic efface le surlignage sans fermer la fiche.
-    if (highlightedCampKey === id && hasHighlight()) {
+    // clic efface le surlignage sans fermer la fiche. `data-ids` (farm_spot_UX
+    // : bouton « Surligner tout » d'un groupe de camps, fiches.js openItemFiche)
+    // union les points de PLUSIEURS camps ; sans lui, comportement inchangé
+    // (un seul camp, `data-id`, exactement l'ancien code de la fiche camp).
+    if (highlightedBtn === b && hasHighlight()) {
       clearHighlight();
-      highlightedCampKey = null;
       b.textContent = tr('highlightPointsBtn', +b.dataset.n || 0);
+      highlightedBtn = null;
     } else {
-      const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === id);
-      if (g) {
-        showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
-        highlightedCampKey = id;
+      const ids = b.dataset.ids ? b.dataset.ids.split(',') : (id ? [id] : []);
+      const allGroups = Object.values(S.camps).flatMap(st => st.groups);
+      const pts = [];
+      let color = b.dataset.color || null;
+      for (const k of ids) {
+        const g = allGroups.find(c => c.k === k);
+        if (!g) continue;
+        if (!color) color = CAMP_COLORS[g.kind] || '#888';
+        pts.push(...g.pts.map(([x, z]) => ({ x, z })));
+      }
+      if (pts.length) {
+        showHighlight(pts, color || '#888');
+        // Un AUTRE bouton était actif (ex. on bascule de la ligne d'un camp
+        // au bouton « Surligner tout » de son groupe) : son libellé doit
+        // revenir à l'état par défaut, jamais rester bloqué sur « Masquer ».
+        if (highlightedBtn && highlightedBtn !== b) highlightedBtn.textContent = tr('highlightPointsBtn', +highlightedBtn.dataset.n || 0);
+        highlightedBtn = b;
         b.textContent = tr('hideHighlightBtn');
       }
     }
@@ -250,6 +275,14 @@ function buildDevToggle() {
       denseRenderers.forEach(fn => fn());
       buildSearch();
       buildBestiary();
+      // Légende (js/sidebar.js catStats/positionCounts) : le compte affiché
+      // par ligne de filtre applique désormais le même isHiddenTest que le
+      // rendu carte (honest-counter fix) -- sans ce rebuild, basculer le
+      // contenu dev révélerait des pins isTest supplémentaires sur la carte
+      // (registerAllDenseRenderers/denseRenderers ci-dessus) sans jamais
+      // mettre à jour le nombre affiché en légende, rouvrant exactement le
+      // même genre de décalage nombre-affiché ⨯ pins-réels que ce fix corrige.
+      buildFilters();
       buildDevToggle();
       syncHash();
       // La fiche ouverte peut afficher un sélecteur de variantes de monstre

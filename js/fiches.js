@@ -601,8 +601,7 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
      CurrentStack) -- jamais un chiffre statique, même avec plus de RE.
    - kind "unextracted" : valeur réelle mais pas encore sortie des données
      client.
-   Depuis la Phase C (décodage Modifiers/TotalTime, HANDOFF_modifiers_decode
-   .md), deux kinds SUBSTITUÉS s'ajoutent -- du vrai contenu décodé en ligne,
+   Depuis la Phase C (décodage Modifiers/TotalTime, doc interne de décodage), deux kinds SUBSTITUÉS s'ajoutent -- du vrai contenu décodé en ligne,
    pas des trous :
    - kind "base"    : u.value est le chiffre exact pour un personnage de
      base (la formule complète, ex 0.035×(1+A_Reg+), reste dans le title --
@@ -1429,6 +1428,31 @@ let currentQuestItemFlags = null;
    Le nom passe par disambiguatedItemName + currentQuestItemDisambig (la Map
    de la fiche quête ouverte) : suffixe distinctif quand 2+ items partagent
    le même nom affiché — même rendu que les chips d'étape. */
+/* Filtre du tiroir « Quest items » (link-veracity audit, quest-items-drawer
+   pass) : une entrée de q.items est déjà entièrement rendue ailleurs sur
+   CETTE MÊME fiche dès qu'elle est la cible d'un but (goalTargetChip --
+   ligne d'identité + relation + position, voir le flag `shownInSteps`,
+   import_quests.py) ou une récompense fixe/au choix (questRewardsSection --
+   icône + nom + quantité, voir `shownInRewards`) : répéter la ligne ici
+   n'ajoute alors aucune information (vérifié sur l'ensemble du jeu de
+   données -- une position de cible de but est TOUJOURS identique à celle
+   déjà montrée sur sa carte d'étape). La SEULE chose que goalTargetChip/
+   questRewardsSection ne rendent JAMAIS est le résumé vendu/craftable/loot
+   d'un Item du jeu (questItemRow's soldTag/craftableTag/lootTag juste plus
+   bas) -- donc une ligne déjà montrée ailleurs ne mérite sa place ici QUE
+   si ce résumé existe réellement pour elle (ex. mana_market_resupply's
+   Short T2 Mana Flask : cible de but ET vendu/craftable, donc affiché avec
+   ses puces ; imp_brain_hunt's 3 Imp Brain : cibles de but mais objets de
+   quête synthétiques sans résumé catalogue, donc masqués -- tout est déjà
+   dit sur leurs cartes d'étape). Un item registry-only (ni but ni
+   récompense, aucun des deux flags posé) est par construction la SEULE
+   surface de la fiche qui le montre : toujours affiché. */
+function questItemAddsInfo(qi) {
+  if (!qi.shownInSteps && !qi.shownInRewards) return true;
+  const cat = qi.key ? S.items[qi.key] : null;
+  return !!(cat && !qi.isQuestItem && (cat.soldBy?.length || cat.recipes?.length || cat.drops?.length));
+}
+
 function questItemRow(qi, regionHint) {
   const cat = qi.key ? S.items[qi.key] : null;
   const baseName = cleanLabel(cat?.name || qi.label);
@@ -2162,8 +2186,15 @@ function openQuestFiche(slug) {
   // hiérarchie visuelle). Même tiroir générique que dialogs/journal
   // ci-dessous (classe .fiche-dialogs, réutilisée partout dans ce fichier
   // pour un <details> de fiche, pas seulement les dialogues).
-  const items = q.items?.length
-    ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('questItemsN', q.items.length))}</summary>${q.items.map(qi => questItemRow(qi, regionHint)).join('')}</details></div>` : '';
+  // Filtré par questItemAddsInfo (link-veracity audit) : ne liste QUE les
+  // lignes qui ajoutent une info absente des cartes d'étape/récompenses --
+  // q.items lui-même reste INTACT (disambiguateQuestItems/les chips d'étape
+  // au-dessus en ont besoin en entier), seul le rendu du tiroir est réduit.
+  // Le tiroir disparaît entièrement quand plus aucune ligne ne qualifie
+  // (cas honnête : les étapes + récompenses racontent déjà toute l'histoire).
+  const questItemRows = (q.items || []).filter(questItemAddsInfo);
+  const items = questItemRows.length
+    ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('questItemsN', questItemRows.length))}</summary>${questItemRows.map(qi => questItemRow(qi, regionHint)).join('')}</details></div>` : '';
   const goalSteps = goalStepsSection(q);
   // Repli texte historique — seulement pour les quêtes sans graphe de goals décodé.
   const objectives = (!goalSteps && q.objectives?.length)
@@ -2272,6 +2303,171 @@ function dedupeTierDrops(drops) {
   }));
 }
 
+/* ── « Comment farmer » (farm_spot_UX_DESIGN.md, refonte juillet 2026) ──────
+   it.farm[] est une liste de camps DÉDUPLIQUÉE par le pipeline (une entrée
+   par camp distinct sur TOUTES les tables de butin de l'item, plafonnée à
+   24 -- build_site_data.py), chaque entrée ne portant que {camp, name, x, z}
+   (name/x/z = repli PRÉ-groupement, x/z = seulement le point de spawn #0 du
+   camp -- jamais un centroïde). La jointure vers le vrai nuage de points
+   (S.camps, même clé stripée que campDisplayName/openCampFiche/
+   campPointsForZone/le handler camp-highlight de main.js -- vérifiée
+   identique aux 3 endroits déjà) tourne à ZÉRO changement pipeline et donne
+   accès à g.kind (regroupement) + g.pts (nombre réel + surlignage complet),
+   déjà utilisés par la fiche camp elle-même -- juste jamais exposés ici. */
+const FARM_ROW_CAP = 6;
+
+/* Détection « pool de récompense générique » : étend isRewardRow
+   (openMonsterFiche, /_unlocked$/i + /tribute/i sur le butin monstre) au
+   bloc de farm des objets. Calibré sur les VRAIES données expédiées (site/
+   data/en/items.bin + camps.bin décodés directement pendant l'investigation,
+   pas devinés) : les anchors nommés Synthesis Fuel/Battlepass Exp/Auction
+   Ancient Coin/Weapon Masteries T4/Dismantling Tools/Reforge Recalibrator/
+   Res Reward Cipher (+ ~354 items cosmétiques d'arène/battlepass) forment un
+   cluster net et séparé de TOUT matériau thématique réel (Iron Ore, Res
+   Thornorb Shard, la cinquantaine de minerais/gemmes/herbes/consommables T1)
+   sur deux signaux tirés de it.drops (déjà chargé, aucune donnée pipeline
+   supplémentaire) :
+     - la PART des lignes de butin dont le libellé matche un motif de table
+       attrape-tout connu (tribut/cadeau éternel/battlepass/récompense
+       d'arène-dm-bg/« ne pas toucher »/farmsacks-épouvantails-tombes-livres-
+       coffre de camp génériques...) ;
+     - le nombre d'ESPÈCES DE MONSTRE distinctes (« Monster <Espèce> ») parmi
+       ces lignes -- un vrai matériau de créature reste homogène (Res
+       Thornorb Shard : 13 lignes « Monster Leaf ... » = 1 seule espèce, 6
+       vrais camps), alors qu'un pool universel traîne sur 6 à 12 espèces
+       sans rapport thématique (ex. Synthesis Fuel : Ratmutant/Sabath/
+       Boarmommnth/Wolf/Imp/Spider/Fungus/Gnoose...).
+   Seuils choisis par balayage complet du catalogue expédié (447 items avec
+   farm : 364 basculent, 83 restent groupés) : aucun faux positif/négatif
+   trouvé sur les anchors nommés ci-dessus ni sur les 83 items restants (tous
+   des minerais/gemmes/herbes/consommables/objets de quête légitimes, ex.
+   Iron Ore lui-même reste à 0.57 de ratio générique, sous le seuil 0.75).
+   Une HEURISTIQUE honnête, pas un champ dédié du jeu -- si un futur ajout de
+   contenu déjoue ces motifs, le pire cas est un retour silencieux à
+   l'affichage groupé complet (jamais un plantage, jamais une donnée
+   inventée). */
+const FARM_GENERIC_POOL_RE = /_unlocked$|tribute|eternal gift|battlepass|\breward\b|do not touch|camp wandering monster|farmsacks|scarecrow|kitchenware|tombstones|searchable books|camp chest/i;
+function isGenericFarmPoolItem(drops) {
+  if (!drops?.length) return false;
+  const generic = drops.filter(d => FARM_GENERIC_POOL_RE.test(d.label || '') || FARM_GENERIC_POOL_RE.test(d.first || ''));
+  const roots = new Set();
+  for (const d of drops) {
+    const m = /^Monster\s+([A-Za-z]+)/.exec(d.label || '');
+    if (m) roots.add(m[1]);
+  }
+  return (generic.length / drops.length) >= 0.75 || roots.size >= 3;
+}
+
+/* Ligne de camp JOINT (g trouvé dans S.camps) : pastille couleur de kind
+   (même teinte que la fiche camp/les couches carte -- CAMP_COLORS), nom
+   d'affichage réel (campDisplayName, pas le pretty() brut d'avant cette
+   passe) cliquable vers la fiche camp complète (inchangé), et un bouton
+   « Surligner » qui dessine le VRAI nuage de points de CE camp + vole à ses
+   bornes -- même primitive/même libellé que le bouton de la fiche camp
+   (data-n porte le compte BRUT, jamais formaté : main.js reconstruit ce même
+   libellé au toggle-off via +b.dataset.n, un texte initial formaté
+   différemment du texte de reset aurait clignoté au premier clic). */
+function farmCampRow(key, g) {
+  const n = g.pts.length;
+  return `<div class="frow">
+    <span class="rar-dot" style="background:${CAMP_COLORS[g.kind] || '#999'}" title="${esc(campKindLabel(g.kind))}"></span>
+    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(key)}">${esc(campDisplayName(key))}</span>
+    <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
+  </div>`;
+}
+
+/* Ligne de repli : camp NON trouvé dans S.camps (carte différente --
+   préfixe ffm-island-*, confirmé réel sur ~24 % des items déjà groupés dans
+   les données expédiées --, ou S.camps pas encore chargé). Comportement
+   EXACT d'avant cette passe (réticule ambré, pas de compte inventé, pas de
+   bouton Surligner qu'on ne peut pas honorer) -- honnête plutôt que de
+   fabriquer un kind/point count qu'on n'a pas. Cas S.camps-pas-encore-chargé :
+   se répare tout seul sans code supplémentaire ici, main.js ré-ouvre déjà
+   cette fiche après loadDeferred() (même mécanisme que la course it.
+   questSource/S.monsters documentée plus haut). */
+function farmUnjoinedRow(c) {
+  return `<div class="frow">
+    <span class="fr-icon icon-broken" data-fb="📍"></span>
+    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
+    ${gotoBtn(c.x, c.z, c.name)}
+  </div>`;
+}
+
+/* Plafonne à FARM_ROW_CAP lignes visibles + tiroir « +N » -- même idiome
+   <details class="fiche-dialogs"> que rewardTablesN/dialogsN/questItemsN
+   ailleurs dans ce fichier, jamais un nouveau composant. */
+function farmCapRows(rows, renderRow, moreLabelFn) {
+  const shown = rows.slice(0, FARM_ROW_CAP).map(renderRow).join('');
+  const rest = rows.slice(FARM_ROW_CAP);
+  const more = rest.length
+    ? `<details class="fiche-dialogs"><summary>${esc(moreLabelFn(rest.length))}</summary>${rest.map(renderRow).join('')}</details>` : '';
+  return shown + more;
+}
+
+function farmSectionHtml(it) {
+  if (!it.farm?.length) {
+    // Repli honnête : des taux de drop catalogués mais AUCUN camp connu
+    // derrière -- jamais une section farm absente en silence (ex. res_fang,
+    // 17 tables de butin dont aucune n'est référencée par un camp du jeu de
+    // données expédié -- un vrai trou de couverture, pas un bug de
+    // jointure, voir farm_spot_UX_DESIGN.md §4).
+    return it.drops?.length
+      ? `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3><p class="hint">${esc(tr('farmSourcesNotMapped'))}</p></div>` : '';
+  }
+  // Pool de récompense générique : toute la section se replie en UNE ligne
+  // muette plutôt que d'énumérer jusqu'à 24 camps sans rapport thématique.
+  if (isGenericFarmPoolItem(it.drops)) {
+    return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>
+      <p class="hint">${esc(tr('farmGenericPoolNote', it.farm.length))}</p></div>`;
+  }
+  // Jointure camp -> vrai nuage de points : même lookup que openCampFiche/
+  // campPointsForZone/le handler camp-highlight de main.js, construite UNE
+  // fois ici plutôt qu'une fois par ligne (it.farm va jusqu'à 24 entrées).
+  const allCampGroups = Object.values(S.camps).flatMap(st => st.groups);
+  const byKind = new Map();
+  const unjoined = [];
+  for (const c of it.farm) {
+    const g = allCampGroups.find(x => x.k === c.camp);
+    if (g) {
+      if (!byKind.has(g.kind)) byKind.set(g.kind, []);
+      byKind.get(g.kind).push({ key: c.camp, g });
+    } else {
+      unjoined.push(c);
+    }
+  }
+  // Groupes triés par total de points décroissant ; lignes internes pareil
+  // (« top N par nombre de points », voir design §Q2).
+  const groups = [...byKind.entries()].map(([kind, rows]) => {
+    rows.sort((a, b) => b.g.pts.length - a.g.pts.length);
+    const totalPts = rows.reduce((s, r) => s + r.g.pts.length, 0);
+    return { kind, rows, totalPts };
+  }).sort((a, b) => b.totalPts - a.totalPts);
+
+  const groupsHtml = groups.map(grp => {
+    // Bouton « Surligner tout » de groupe : n'a d'intérêt qu'à >1 camp --
+    // avec un seul, il ferait doublon exact du bouton de sa propre ligne.
+    const highlightAllBtn = grp.rows.length > 1
+      ? `<button class="act ghost" data-act="camp-highlight" data-ids="${esc(grp.rows.map(r => r.key).join(','))}" data-n="${grp.totalPts}" data-color="${CAMP_COLORS[grp.kind] || '#888'}">${esc(tr('highlightPointsBtn', grp.totalPts))}</button>`
+      : '';
+    return `<div class="farm-group">
+      <div class="farm-group-head">
+        <span class="farm-group-label" style="color:${CAMP_COLORS[grp.kind] || '#999'}">${esc(campKindLabel(grp.kind))}</span>
+        <span class="muted">${esc(tr('farmGroupSummary', grp.rows.length, grp.totalPts.toLocaleString(numberLocale())))}</span>
+        ${highlightAllBtn}
+      </div>
+      ${farmCapRows(grp.rows, r => farmCampRow(r.key, r.g), n => tr('farmMoreCampsN', n))}
+    </div>`;
+  }).join('');
+
+  const unjoinedHtml = unjoined.length
+    ? `<div class="farm-group">
+        <div class="fiche-sub">${esc(tr('farmOtherSourcesTitle'))}</div>
+        ${farmCapRows(unjoined, farmUnjoinedRow, n => tr('farmMoreCampsN', n))}
+      </div>` : '';
+
+  return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>${groupsHtml}${unjoinedHtml}</div>`;
+}
+
 function openItemFiche(key) {
   const it = S.items[key];
   if (!it) return;
@@ -2314,13 +2510,7 @@ function openItemFiche(key) {
     </div>`;
   }
 
-  const farmHtml = it.farm?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>${it.farm.map(c => `
-        <div class="frow">
-          <span class="fr-icon icon-broken" data-fb="📍"></span>
-          <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
-          ${gotoBtn(c.x, c.z, c.name)}
-        </div>`).join('')}</div>` : '';
+  const farmHtml = farmSectionHtml(it);
 
   let vendorsHtml = '';
   if (it.soldBy?.length) {
@@ -2340,7 +2530,7 @@ function openItemFiche(key) {
         return `<div class="frow">
           ${iconTag(icon, 'fr-icon', initials(n.name))}
           ${label}
-          ${gotoBtn(n.x, n.z, n.name)}
+          ${gotoBtn(n.x, n.z, n.name, 'npc')}
         </div>`;
       }).join('');
       const more = npcs.length > 6 ? `<p class="hint">${esc(tr('moreMerchants', npcs.length - 6))}</p>` : '';

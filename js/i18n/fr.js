@@ -21,6 +21,20 @@ export default {
       loadingText: 'Relevé topographique en cours…',
       zonesLabel: 'Zones (régions)',
       campLoading: 'Chargement des camps…',
+      // Correctif d'honnêteté du compteur légende/menu (rapport : le filtre
+      // PNJ affichait 11 sur Prison Island mais un seul pin ne s'affiche
+      // jamais) : tooltip du badge discret "+N" à côté du compte principal
+      // d'une ligne de filtre (js/sidebar.js hiddenBadge) — N enregistrements
+      // réels, non-test, sans position connue, jamais des pins que la carte
+      // échouerait silencieusement à dessiner. Formulation VOLONTAIREMENT
+      // neutre ("inconnu", pas "dynamique"/"apparition côté serveur") : un
+      // classifieur `pos_source` prouvant un vrai spawn serveur n'existe que
+      // pour 18 PNJ de Prison Island dans data/quests.json (côté pipeline,
+      // niveau giver/slot) et n'est exposé dans AUCUN .bin du site (ni
+      // npcs.bin ni quests.bin) — affirmer "côté serveur" pour tout le lot
+      // sur-affirmerait pour le reste, simplement non classifié (voir
+      //  unknown_states_DESIGN.md §2 re-check #1).
+      filterHiddenTooltip: n => `${n} sans position connue`,
       decorFamiliesTitle: 'Familles de décor',
       chestTypesAllBtn: 'Tous',
       chestTypesNoneBtn: 'Aucun',
@@ -199,7 +213,17 @@ export default {
       relatedQuestsTitle: 'Quêtes liées',
       questFicheKind: region => 'Quête' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Taux de drop',
-      farmSpotsTitle: 'Spots de farm',
+      farmSpotsTitle: 'Comment farmer',
+      // Refonte des spots de farm (farm_spot_UX_DESIGN.md, juillet 2026) :
+      // lignes groupées par kind de camp (Minerai/Monstres/…) au lieu d'un
+      // vidage à plat de 24 lignes — résumé d'en-tête, tiroir « +N », et les
+      // replis honnêtes ci-dessous (camp non joint, aucune donnée de camp,
+      // pool de récompense générique replié).
+      farmGroupSummary: (camps, pts) => `${camps} camp${camps > 1 ? 's' : ''} · ${pts} points`,
+      farmMoreCampsN: n => `+ ${n} autres camps`,
+      farmGenericPoolNote: n => `Aussi un drop rare parmi ${n} camps à récompense générique — pas un spot de farm ciblé.`,
+      farmSourcesNotMapped: 'Sources non rattachées à un camp connu pour l’instant.',
+      farmOtherSourcesTitle: 'Autres sources',
       soldByTitle: 'Vendu par',
       obtainDuringQuestTitle: 'Comment obtenir',
       obtainViaKill: name => `En tuant ${name}`,

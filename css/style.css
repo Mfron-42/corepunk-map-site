@@ -316,6 +316,28 @@ body {
   min-width: 2.6em;
   text-align: right;
 }
+/* Badge "+N" honnête (legend/menu counter fix — voir js/sidebar.js
+   hiddenBadge) : signale des enregistrements réels connus mais SANS position
+   connue (jamais dessinés), séparément du compte principal (ce que la carte
+   affiche vraiment). Volontairement neutre, jamais "apparition côté
+   serveur"/"dynamique" (voir js/i18n/*.js::filterHiddenTooltip et
+   js/devcontent.js::positionCounts : ce statut n'est prouvé que pour 18 PNJ
+   de Prison Island, champ non exposé côté site pour le reste). Générique
+   (pas scopé à .filter-row) : réutilisé tel quel dans le résumé du groupe
+   "Décor" (.decor-group > summary, voir js/sidebar.js buildDecorGroup).
+   Soulignement pointillé + curseur d'aide : seule affordance, la tooltip
+   (title/aria-label) porte le texte localisé complet. */
+.fcount-hidden {
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  color: var(--accent-hi);
+  opacity: .75;
+  margin-left: 3px;
+  cursor: help;
+  border-bottom: 1px dotted currentColor;
+  white-space: nowrap;
+}
+.filter-row.off .fcount-hidden { opacity: .4; }
 .filter-row input:focus-visible ~ .swatch { outline: 2px solid var(--accent); outline-offset: 3px; }
 .camp-loading { padding: 6px; }
 
@@ -1501,6 +1523,25 @@ body {
   color: var(--muted);
 }
 .fiche-sub:first-child { margin-top: 0; }
+/* ── Fiche item « Comment farmer » (farm_spot_UX_DESIGN.md) : groupes par
+   kind de camp (Mining/Monsters/…), en-tête compact (libellé teinté + compte
+   camps/points + bouton « Surligner tout » optionnel) au-dessus des lignes
+   .frow habituelles — mêmes jetons que le reste des fiches, aucun nouveau
+   composant visuel. */
+.farm-group { margin-top: 14px; }
+.farm-group:first-child { margin-top: 0; }
+.farm-group-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.farm-group-label {
+  font-family: var(--font-display);
+  font-size: .68rem;
+  font-variation-settings: 'wght' 640;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.farm-group-head .act { margin-left: auto; }
 .vendor-block { margin-bottom: 10px; }
 .vendor-block:last-child { margin-bottom: 0; }
 .vendor-name {

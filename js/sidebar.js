@@ -104,12 +104,18 @@ function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') 
    la simple taille du tableau -- le compte affiché doit correspondre à ce
    que la couche carte dessine VRAIMENT (renderDomCulled/renderDense, voir
    main.js registerAllDenseRenderers), jamais au nombre brut d'enregistrements
-   connus (qui inclut des PNJ/quêtes sans position connue -- apparition
-   côté serveur, ex. Captain Rob sur Prison Island -- et exclut déjà les
-   isTest, comptés à part). `camp_chest` n'a pas son propre tableau S.data
-   (les points viennent du même S.data.chest que la décor/legacy, filtrés par
-   `group`, voir config.js/main.js registerAllDenseRenderers) : seule
-   exception à la règle générale "un tableau S.data par clé CATS". */
+   connus (qui inclut des PNJ/quêtes sans position connue, ex. Captain Rob
+   sur Prison Island -- et exclut déjà les isTest, comptés à part). Le motif
+   du "sans position" reste délibérément NON qualifié ici (ni "dynamique
+   côté serveur" ni autre) : seuls 18 PNJ de Prison Island ont un vrai
+   classifieur `pos_source: server_spawn` prouvé (data/quests.json, côté
+   pipeline), et ce champ n'atteint aucun .bin du site -- voir
+   i18n/*.js::filterHiddenTooltip et  unknown_states_DESIGN.md §2
+   re-check #1 pour la même discipline appliquée au tooltip affiché.
+   `camp_chest` n'a pas son propre tableau S.data (les points viennent du
+   même S.data.chest que la décor/legacy, filtrés par `group`, voir
+   config.js/main.js registerAllDenseRenderers) : seule exception à la règle
+   générale "un tableau S.data par clé CATS". */
 function catStats(key) {
   if (key === 'quest') return positionCounts(S.data.quest);
   if (key === 'camp_chest') return positionCounts(S.data.chest.filter(r => r.group === 'camp_chest'));
@@ -225,8 +231,10 @@ function buildCampFilters() {
   cl.innerHTML = '';
   const kinds = Object.entries(S.camps).sort((a, b) => b[1].points.length - a[1].points.length);
   for (const [kind, st] of kinds) {
+    // st.points vient directement de g.pts (data.js/multimap.js loadMapData) :
+    // chaque entrée a TOUJOURS x/z, jamais de gap position -- hidden fixé à 0.
     cl.appendChild(filterRow('camp:' + kind, campKindLabel(kind), CAMP_COLORS[kind] || '#888',
-      st.points.length, st.on, on => { st.on = on; scheduleRedraw(); }));
+      st.points.length, 0, st.on, on => { st.on = on; scheduleRedraw(); }));
   }
 }
 /* ── Bestiaire (sidebar) ─────────────────────────────────────

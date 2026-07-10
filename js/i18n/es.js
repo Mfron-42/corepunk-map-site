@@ -21,6 +21,21 @@ export default {
       loadingText: 'Levantamiento del terreno…',
       zonesLabel: 'Zonas (regiones)',
       campLoading: 'Cargando campamentos…',
+      // Corrección de honestidad del contador de leyenda/menú (informe: el
+      // filtro de PNJ mostraba 11 en Prison Island pero solo se dibuja 1
+      // marcador): tooltip del distintivo discreto "+N" junto al recuento
+      // principal de una fila de filtro (js/sidebar.js hiddenBadge) — N
+      // registros reales, no de prueba, sin posición conocida, nunca
+      // marcadores que el mapa deja de dibujar en silencio. Redacción
+      // DELIBERADAMENTE neutra ("desconocido", no "dinámico"/"aparición del
+      // servidor"): un clasificador `pos_source` que demuestre una aparición
+      // real del lado del servidor solo existe para 18 PNJ de Prison Island
+      // en data/quests.json (lado del pipeline, nivel giver/slot) y no se
+      // expone en ningún .bin del sitio (ni npcs.bin ni quests.bin) —
+      // afirmar "lado del servidor" para todo el lote exageraría para el
+      // resto, simplemente sin clasificar (ver 
+      // unknown_states_DESIGN.md §2 re-check #1).
+      filterHiddenTooltip: n => `${n} sin posición conocida`,
       decorFamiliesTitle: 'Familias de decoración',
       chestTypesAllBtn: 'Todos',
       chestTypesNoneBtn: 'Ninguno',
@@ -198,7 +213,17 @@ export default {
       relatedQuestsTitle: 'Misiones relacionadas',
       questFicheKind: region => 'Misión' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Probabilidades de botín',
-      farmSpotsTitle: 'Zonas de farmeo',
+      farmSpotsTitle: 'Cómo farmear',
+      // Rediseño de zonas de farmeo (farm_spot_UX_DESIGN.md, julio 2026):
+      // filas agrupadas por tipo de campamento (Minería/Monstruos/…) en vez
+      // de un volcado plano de 24 filas — resumen de cabecera, desplegable
+      // «+N», y los repliegues honestos de abajo (campamento sin unir, sin
+      // datos de campamento, pool de recompensa genérica colapsado).
+      farmGroupSummary: (camps, pts) => `${camps} campamento${camps > 1 ? 's' : ''} · ${pts} puntos`,
+      farmMoreCampsN: n => `+ ${n} campamentos más`,
+      farmGenericPoolNote: n => `También un botín raro entre ${n} campamentos de recompensa genérica — no es una zona de farmeo específica.`,
+      farmSourcesNotMapped: 'Fuentes aún no vinculadas a un campamento conocido.',
+      farmOtherSourcesTitle: 'Otras fuentes',
       soldByTitle: 'Vendido por',
       obtainDuringQuestTitle: 'Cómo obtenerlo',
       obtainViaKill: name => `Matando a ${name}`,

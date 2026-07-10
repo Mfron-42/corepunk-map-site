@@ -63,18 +63,26 @@ function devContentCounts() {
    what the map layer actually draws, not the raw record count. Splits a
    category's records into `shown` (will actually render: known x/z AND not
    dev-gated) vs `hidden` (real, non-test record, just no known position —
-   e.g. Captain Rob/Doc Greene/Jax, server-side spawns never placed on the
-   client map). Mirrors EXACTLY the two gates already applied at render time
-   (mapview.js renderDomCulled/renderDense via main.js registerAllDenseRenderers:
-   `r.x == null || r.z == null` skip + `isHiddenTest(r)` skip) — never a
-   separate/looser rule that could drift from what's actually drawn. An
-   isTest record hidden by the dev-content gate counts in NEITHER bucket: it
-   already has its own counter (devContentCounts/buildDevToggle above), and
-   must never be double-counted as a "position-less" gap here (dev-content
-   gating parity, same discipline as everywhere else in this module) — when
-   S.devOn flips on, isHiddenTest() itself starts returning false, so such a
-   record naturally lands in `shown` or `hidden` instead, no separate branch
-   needed. */
+   e.g. Captain Rob/Doc Greene/Jax on Prison Island). Mirrors EXACTLY the two
+   gates already applied at render time (mapview.js renderDomCulled/
+   renderDense via main.js registerAllDenseRenderers: `r.x == null || r.z ==
+   null` skip + `isHiddenTest(r)` skip) — never a separate/looser rule that
+   could drift from what's actually drawn. An isTest record hidden by the
+   dev-content gate counts in NEITHER bucket: it already has its own counter
+   (devContentCounts/buildDevToggle above), and must never be double-counted
+   as a "position-less" gap here (dev-content gating parity, same discipline
+   as everywhere else in this module) — when S.devOn flips on, isHiddenTest()
+   itself starts returning false, so such a record naturally lands in `shown`
+   or `hidden` instead, no separate branch needed.
+   IMPORTANT — do NOT word `hidden` as proven "server-side spawn"/"dynamic"
+   anywhere this is displayed: only 18 Prison-Island NPCs carry an actual
+   `pos_source: server_spawn` classifier, and that field lives ONLY in the
+   pipeline-side data/quests.json (per giver/slot) — it is not exposed in any
+   site .bin (npcs.bin/quests.bin/etc. carry no such field at all, verified
+   directly). The rest of `hidden`, for every category, is simply
+   UNCLASSIFIED, not confirmed-dynamic. See i18n/*.js::filterHiddenTooltip
+   (deliberately neutral "without a known position", no parenthetical claim)
+   and  unknown_states_DESIGN.md §2 re-check #1. */
 function positionCounts(list) {
   let shown = 0, hidden = 0;
   for (const r of (list || [])) {
