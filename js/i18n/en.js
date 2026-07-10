@@ -99,6 +99,12 @@ export default {
       // the same row as a "View zone" button inside a quest-item fiche, and
       // the long form pushed the button off the right edge (overflow fix E).
       posDynamicZone: 'Spawn zone',
+      // Confidence "medium" (batch-wiring pass, proximity-only guess, see
+      //  zone_confidence): distinct wording from posDynamicZone
+      // above — a nearby camp cluster is not proof this item actually spawns
+      // there, never presented with the same authority as an evidence-backed
+      // zone.
+      posEstimatedZone: 'Estimated area',
       posUncatalogued: 'Uncatalogued position — check in-game',
       // Sub-label for a search result row for an entire QUEST with no
       // extracted position (giver/actors all lack x/z — e.g. the Prison
@@ -128,6 +134,12 @@ export default {
       // own separate clickable spans right after, see goalTargetChip).
       goalDroppedByLabel: 'dropped by',
       goalObtainedHereLabel: 'obtained here',
+      // Same relation-row vocabulary, batch-wiring pass: a quest-granted item
+      // (given_by_giver, e.g. eight_legged_freaks' "Time of Death") and a
+      // craft-only item (craft:true, e.g. construction_lesson's implant) —
+      // neither is ever a world spawn, so neither ever gets a position/zone.
+      goalGivenByLabel: 'given by',
+      goalCraftLabel: 'craft it',
       objectivesN: n => `Objectives (${n})`,
       objectivesTitle: 'Objectives',
       howToTitle: 'How to',
@@ -135,6 +147,11 @@ export default {
       questItemsN: n => `Quest items (${n})`,
       viewGiverBtn: 'View giver',
       viewZoneBtn: 'View zone',
+      // "medium" confidence counterpart (batch-wiring pass, see posEstimatedZone
+      // above): draws the cited camp's real points when the active map has
+      // them loaded, else falls back to the same guessed circle as viewZoneBtn
+      // — never the same label, so it's never mistaken for a confirmed zone.
+      viewEstimatedZoneBtn: 'View estimate',
       onMapTitle: 'On the map',
       dialogsN: n => `Dialogue (${n})`,
       // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph, isDialogue —

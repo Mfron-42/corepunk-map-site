@@ -16,7 +16,7 @@ import {
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
-import { map, toLL, canvasR, clearHighlight } from './mapview.js';
+import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js';
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
@@ -1032,10 +1032,26 @@ function crossMapBtn(mid, x, z, label) {
    à spawn dynamique (géré serveur, pas un trou de donnée) l'annonce
    honnêtement plutôt que de faire croire qu'on ignore où il se trouve.
      (a) position fixe connue         -> gotoBtn normal (bouton carte), inchangé
-     (b) pas de position fixe, mais search_zone confiance haute -> libellé +
-         bouton « Voir la zone » (cercle centroïde/bbox dessiné sur la carte)
-     (c) sinon -> libellé seul (jamais de zone dessinée en confiance
-         medium/low : le joueur a explicitement demandé de ne pas afficher un
+     (b) pas de position fixe, search_zone confiance HAUTE -> libellé « Zone
+         de spawn » + bouton « Voir la zone » (cercle centroïde/bbox dessiné
+         sur la carte, drawGoalZone) — étayé par une vraie preuve de drop/farm
+         (items.json, voir  zone_confidence), présenté comme tel.
+     (b') pas de position fixe, search_zone confiance MOYENNE -> même
+         affordance mais explicitement étiquetée ESTIMATION (posEstimatedZone/
+         viewEstimatedZoneBtn, jamais le même libellé qu'en (b) : une simple
+         proximité géographique n'est PAS une preuve de spawn). Le clic dessine
+         les VRAIS points du camp cité par la zone (campPointsForZone,
+         réutilise showHighlight — même primitive que le bouton « Surligner
+         les N points » de la fiche camp) filtrés à la bbox serrée de cette
+         zone, quand la carte active a chargé ce camp (S.camps, jointure sur
+         la clé stripée du préfixe fulfillment-manager-/ffm-island-) ; repli
+         sur le même cercle deviné qu'en (b) — mais visuellement plus prudent
+         (drawGoalZone estimate:true) — si le camp ne peut pas être trouvé
+         (quête listée sur une autre carte que celle où sa zone vit
+         géographiquement, ou nom non reconnu) : jamais un contour inventé de
+         toutes pièces, juste un rendu honnêtement moins affirmatif que (b).
+     (c) sinon (confiance basse ou absente) -> libellé seul (jamais de zone
+         dessinée : le joueur a explicitement demandé de ne pas afficher un
          contour incertain) ; cas particulier « monstre identifié mais aucun
          camp ne le référence » (couverture camps.json ~25 % seulement) rendu
          avec un libellé distinct de « position dynamique » — ce n'est pas la
@@ -1045,7 +1061,14 @@ let goalZoneLayer = null;       // cercle dessiné pour la dernière zone consul
 function clearGoalZone() {
   if (goalZoneLayer) { map.removeLayer(goalZoneLayer); goalZoneLayer = null; }
 }
-function drawGoalZone(sz) {
+/* `estimate` (repli d'une zone confiance MOYENNE dont le camp cité n'a pas pu
+   être joint à un vrai point, voir drawEstimatedZone ci-dessous) : même
+   géométrie que le cercle confiance haute, mais liseré plus fin/pointillé
+   plus lâche et remplissage plus faible — ne doit jamais avoir la même
+   autorité visuelle qu'un cercle (b), même si les deux sont au fond un
+   cercle deviné à partir d'une bbox (l'honnêteté vient surtout du
+   libellé/bouton distinct qui l'a amené, ce style n'en est qu'un rappel). */
+function drawGoalZone(sz, { estimate = false } = {}) {
   clearGoalZone();
   if (!sz) return;
   const [cx, cz] = sz.centroid;
@@ -1055,14 +1078,55 @@ function drawGoalZone(sz) {
   // centroïde, rayon = demi-diagonale de la bbox.
   const r = Math.max(35, Math.hypot(maxX - minX, maxZ - minZ) / 2);
   const circle = L.circle(toLL(cx, cz), {
-    radius: r, color: CATS.quest.hex, weight: 2, dashArray: '5 6',
-    fillColor: CATS.quest.hex, fillOpacity: .12, interactive: false,
+    radius: r, color: CATS.quest.hex, weight: estimate ? 1.4 : 2,
+    dashArray: estimate ? '2 8' : '5 6',
+    fillColor: CATS.quest.hex, fillOpacity: estimate ? .06 : .12, interactive: false,
   });
   goalZoneLayer = L.layerGroup([circle]).addTo(map);
   map.flyToBounds(circle.getBounds().pad(0.25));
 }
-function zoneViewBtn(zi) {
-  return `<button class="goto" data-act="goal-zone-view" data-zi="${zi}">${GOTO_ICON}<span>${esc(tr('viewZoneBtn'))}</span></button>`;
+/* Points RÉELS du camp cité par une search_zone (sz.camp — TOUJOURS le nom
+   complet fulfillment-manager-.../ffm-island-..., voir 
+   build_search_zone), filtrés à la bbox SERRÉE que le pipeline a calculée
+   pour CETTE zone précise (sz.bbox — jamais le groupe de camp entier :
+   "quest-object-camps" à lui seul couvre 713 points sur toute la carte).
+   Jointure sur S.camps (la carte ACTIVE seulement, voir data.js
+   loadDeferred/registerAllDenseRenderers) par clé stripée du préfixe
+   fulfillment-manager-/ffm-island- — IDENTIQUE au strip que déjà
+   build_site_data.py::camp_details()/extract_markers.py::scan_camps()
+   appliquent pour construire cette même clé `g.k` (voir DATA_CONTRACT.md).
+   Renvoie null quand le camp n'existe pas sur la carte active (quête listée
+   sur plusieurs cartes mais dont cette zone précise vit géographiquement sur
+   une autre, camp non encore chargé, ou aucun point dans la bbox) — jamais
+   une liste inventée : l'appelant retombe alors sur le cercle deviné. */
+function campPointsForZone(sz) {
+  if (!sz?.camp || !sz.bbox) return null;
+  const campKey = sz.camp.replace(/^fulfillment-manager-/, '').replace(/^ffm-island-/, '');
+  const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === campKey);
+  if (!g) return null;
+  const [minX, minZ, maxX, maxZ] = sz.bbox;
+  const pts = g.pts
+    .filter(([x, z]) => x >= minX && x <= maxX && z >= minZ && z <= maxZ)
+    .map(([x, z]) => ({ x, z }));
+  return pts.length ? pts : null;
+}
+/* Zone confiance MOYENNE (search_zone.confidence==="medium") : meilleur
+   effort — les vrais points du camp cité (campPointsForZone, réutilise
+   showHighlight, la même primitive « surligner les N points » que la fiche
+   camp) quand la jointure marche, sinon repli honnête sur le même cercle
+   deviné qu'une zone confiance haute mais visuellement plus prudent
+   (drawGoalZone estimate:true) — jamais un contour inventé de toutes pièces,
+   jamais présenté avec la même autorité qu'une zone étayée par une vraie
+   preuve de drop/farm (voir  zone_confidence). */
+function drawEstimatedZone(sz) {
+  const pts = campPointsForZone(sz);
+  if (pts) { clearGoalZone(); showHighlight(pts, CATS.quest.hex); return; }
+  clearHighlight();
+  drawGoalZone(sz, { estimate: true });
+}
+function zoneViewBtn(zi, isEstimate) {
+  const label = isEstimate ? tr('viewEstimatedZoneBtn') : tr('viewZoneBtn');
+  return `<button class="goto" data-act="goal-zone-view" data-zi="${zi}">${GOTO_ICON}<span>${esc(label)}</span></button>`;
 }
 /* Zone(s) de monstre sur la carte (bestiaire / fiche « Voir la zone ») :
    dessine les VRAIS polygones de région (S.zonesGeo, propre à Kwalat) résolus
@@ -1109,9 +1173,15 @@ function viewMonsterZone(key) {
    (voir .pos-region dans style.css, dé-italique seulement). */
 function dynamicPosBadge(t, regionHint) {
   const sz = t && t.search_zone;
-  if (sz && sz.confidence === 'high') {
+  if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
     const zi = currentGoalZones.push(sz) - 1;
-    return `<span class="pos-dynamic">${esc(tr('posDynamicZone'))}</span>${zoneViewBtn(zi)}`;
+    // Confiance MOYENNE = proximité seule, jamais une preuve de spawn (voir
+    //  zone_confidence) : libellé + bouton distincts de la
+    // confiance haute (posEstimatedZone/viewEstimatedZoneBtn), jamais
+    // "Spawn zone"/"View zone" pour un simple calcul de voisinage.
+    const isEstimate = sz.confidence === 'medium';
+    const label = isEstimate ? tr('posEstimatedZone') : tr('posDynamicZone');
+    return `<span class="pos-dynamic">${esc(label)}</span>${zoneViewBtn(zi, isEstimate)}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
     return `<span class="pos-dynamic">${esc(tr('posUncatalogued'))}</span>`;
@@ -1362,7 +1432,28 @@ function questItemRow(qi, regionHint) {
   const label = cat
     ? `<span class="fr-label link" data-act="fiche-item" data-id="${esc(qi.key)}">${esc(name)}</span>`
     : `<span class="fr-label">${esc(name)}</span>`;
-  const posBit = (qi.x != null || qi.searchZone)
+  // craft:true (geo.py's craft-only pre-check, propagated onto this exact
+  // item row by import_quests.py -- e.g. no_witnesses_to_glory's "Savory
+  // mushroom soup"): this goal is fulfilled by CRAFTING, never a spawn --
+  // said explicitly here too (same goalCraftLabel wording as
+  // goalTargetChip), and NEVER a position line, even on the off chance
+  // x/searchZone ended up attached (they never do in practice, see geo.py's
+  // craft pre-check) -- the flag wins regardless, a fabricated position is
+  // exactly what this whole pass exists to prevent.
+  const craftBit = qi.craft ? `<span class="muted">${esc(tr('goalCraftLabel'))}</span>` : '';
+  // givenBy (import_quests.py, geo.py's given_by_giver): this exact item is
+  // handed over by the quest's own giver (dialogue/turn-in grant), never
+  // found in the world -- named + linked to the giver's fiche when
+  // resolvable on the active map (same npcIndexByName lookup as
+  // goalTargetChip's own given_by_giver branch), plain text otherwise
+  // (never a guessed link).
+  const ni = qi.givenBy ? npcIndexByName(qi.givenBy) : -1;
+  const givenByBit = qi.givenBy
+    ? (ni >= 0
+      ? `<span class="muted link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('goalGivenByLabel'))} ${esc(qi.givenBy)}</span>`
+      : `<span class="muted">${esc(tr('goalGivenByLabel'))} ${esc(qi.givenBy)}</span>`)
+    : '';
+  const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
     ? (qi.x != null ? gotoBtn(qi.x, qi.z, name) : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint))
     : '';
   return `<div class="frow">
@@ -1370,6 +1461,8 @@ function questItemRow(qi, regionHint) {
     <span class="k-chip" style="--chip-c:${badgeHex}">${badgeLabel}</span>
     ${label}
     ${bits.length ? `<span class="muted">${bits.join(' · ')}</span>` : ''}
+    ${craftBit}
+    ${givenByBit}
     ${posBit}
   </div>`;
 }
@@ -1461,6 +1554,21 @@ function goalTargetChip(t, label, regionHint) {
     // interne non nettoyé, ex. "Quest item removed start quest troll head",
     // quand aucun `key` catalogue ne résout) + sa position à 3 niveaux.
     const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem) || '';
+    // craft:true (geo.py's craft-only pre-check, e.g. construction_lesson's
+    // "Recipe: Immuno-Stimulating Implant"): items.json proves this item is
+    // produced_by_recipes/craftable with ZERO world drop/farm evidence -- the
+    // goal is fulfilled by CRAFTING, never a spawn. Relation row says so
+    // explicitly (goalCraftLabel); the item chip above is already the link to
+    // its fiche/recipe (goalTargetItemRow), no separate link needed here --
+    // and NEVER a position line: `posRow` would otherwise fall to
+    // dynamicPosBadge's generic "Dynamic position" text for a target that was
+    // never a world spawn at all (t.x/t.search_zone are never set alongside
+    // craft:true, see  resolve_goal_item's craft pre-check) --
+    // exactly the fabricated-position bug this branch fixes.
+    if (t.craft) {
+      const craftRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalCraftLabel'))}</span></div>`;
+      return `<div class="goal-target">${itemRow}${craftRow}</div>`;
+    }
     return `<div class="goal-target">${itemRow}${posRow}</div>`;
   }
 
@@ -1545,6 +1653,29 @@ function goalTargetChip(t, label, regionHint) {
   }
 
   if (t.kind === 'npc') {
+    // Quest-granted item (geo.py's given_by_giver, e.g. eight_legged_freaks'
+    // "Time of Death" handed over in Ophelia Voss's own dialog, already
+    // listed in this quest's own reward table): item chip first (identity,
+    // clickable to its fiche) + an explicit "given by <giver>" relation row
+    // -- never a spawn zone, this was never a world spawn (see geo.py
+    // resolve_goal_item's craft/given_by_giver pre-check). `t.label` here IS
+    // the giver's real name (unlike the plain npc branch below, whose only
+    // reliable name source is the objective sentence `label` -- see its own
+    // comment) -- resolved through the same npcIndexByName lookup so the
+    // giver's name is clickable to their fiche when known on the active map.
+    // `posRow` (shared, computed above) still renders correctly here: t.x/z
+    // are the giver's own position when known (see geo.py's `given["x"]`),
+    // never a fabricated one.
+    if (t.given_by_giver) {
+      const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
+      const ni = t.label ? npcIndexByName(t.label) : -1;
+      const giverSpan = (ni >= 0)
+        ? `<span class="goal-target-name link" data-act="fiche-npc" data-id="npc:${ni}">${esc(t.label)}</span>`
+        : (t.label ? `<span class="goal-target-name">${esc(t.label)}</span>` : '');
+      const relRow = giverSpan
+        ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverSpan}</div>` : '';
+      return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+    }
     // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) : ce
     // branch n'affichait avant QUE le bouton de position, zéro identité --
     // même défaut "juste un tag vide" que les autres branches avant cette
@@ -2184,10 +2315,19 @@ function drawInvestigation(q) {
   S.investLayer = g.addTo(map);
 }
 
-/* Accès délégué (main.js) aux zones d'objectif de la fiche quête ouverte. */
+/* Accès délégué (main.js) aux zones d'objectif de la fiche quête ouverte.
+   Confiance MOYENNE -> meilleur effort camp réel/repli cercle prudent
+   (drawEstimatedZone) ; confiance HAUTE -> cercle confirmé inchangé
+   (drawGoalZone). `clearHighlight()` avant le cercle confirmé : un clic
+   précédent sur une zone MOYENNE a pu laisser la couche de points réels
+   (showHighlight) affichée -- jamais deux visualisations de zone superposées
+   sur la carte, quel que soit l'ordre de clic entre étapes. */
 function viewGoalZone(zi) {
   const sz = currentGoalZones[+zi];
-  if (sz) drawGoalZone(sz);
+  if (!sz) return;
+  if (sz.confidence === 'medium') { drawEstimatedZone(sz); return; }
+  clearHighlight();
+  drawGoalZone(sz);
 }
 /* Vol vers la zone de quête surlignée (bouton « Voir la zone »). */
 function flyToQuestZone(slug) {

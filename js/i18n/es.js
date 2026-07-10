@@ -98,6 +98,12 @@ export default {
       posUnknown: 'posición no especificada',
       posDynamic: 'Posición dinámica',
       posDynamicZone: 'Zona de aparición',
+      // Confianza "media" (pase de cableado por lotes, solo proximidad — ver
+      //  zone_confidence): texto distinto de posDynamicZone
+      // arriba — un campamento cercano no prueba que el objeto realmente
+      // aparezca ahí, nunca presentado con la misma autoridad que una zona
+      // respaldada por evidencia.
+      posEstimatedZone: 'Zona estimada',
       posUncatalogued: 'Posición no catalogada — verificar en el juego',
       // Subtítulo de la fila de resultado de búsqueda para una MISIÓN
       // entera sin posición extraída (el dador/actores no tienen x/z — p.
@@ -124,6 +130,14 @@ export default {
       // nombre (que queda como span cliqueable aparte, ver goalTargetChip).
       goalDroppedByLabel: 'soltado por',
       goalObtainedHereLabel: 'obtenido aquí',
+      // Mismo vocabulario de fila de relación, pase de cableado por lotes: un
+      // objeto entregado por quien da la misión (given_by_giver, p. ej.
+      // "Time of Death" de eight_legged_freaks) y un objeto solo crafteable
+      // (craft:true, p. ej. el implante de construction_lesson) — ninguno de
+      // los dos es una aparición en el mundo, así que nunca llevan posición
+      // ni zona.
+      goalGivenByLabel: 'entregado por',
+      goalCraftLabel: 'a craftear',
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
       howToTitle: 'Cómo hacerlo',
@@ -131,6 +145,12 @@ export default {
       questItemsN: n => `Objetos de misión (${n})`,
       viewGiverBtn: 'Ver a quien la da',
       viewZoneBtn: 'Ver la zona',
+      // Contraparte de confianza "media" (pase de cableado por lotes, ver
+      // posEstimatedZone arriba): dibuja los puntos reales del campamento
+      // citado cuando el mapa activo los tiene cargados, si no recurre al
+      // mismo círculo estimado que viewZoneBtn — nunca el mismo texto, para
+      // no confundirlo con una zona confirmada.
+      viewEstimatedZoneBtn: 'Ver estimación',
       onMapTitle: 'En el mapa',
       dialogsN: n => `Diálogos (${n})`,
       dialogueFicheKind: 'Diálogo de PNJ',

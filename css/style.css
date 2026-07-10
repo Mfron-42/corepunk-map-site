@@ -1694,6 +1694,11 @@ button.rar-pill:hover {
 /* ── Fiche camp / dialogues de quête ─────────────────────────── */
 .frow .fr-icon { width: 28px; height: 28px; object-fit: contain; flex: none; border-radius: 5px; font-size: .6rem; }
 .frow .muted { color: var(--muted); font-size: .72rem; flex: none; }
+/* Bit "given by <giver>" clickable (questItemRow, batch-wiring pass) — same
+   affordance as .frow .fr-label.link just below, scoped to .muted since this
+   annotation stays visually secondary (not the row's own name/label). */
+.frow .muted.link { cursor: pointer; }
+.frow .muted.link:hover { color: var(--accent); }
 .pop-mobs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .pop-mobs .chip {
   display: inline-flex; align-items: center; gap: 4px;

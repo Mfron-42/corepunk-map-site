@@ -97,6 +97,11 @@ export default {
       posUnknown: 'position non précisée',
       posDynamic: 'Position dynamique',
       posDynamicZone: 'Zone de spawn',
+      // Confiance "moyenne" (passe de câblage batch, simple proximité — voir
+      //  zone_confidence) : libellé distinct de posDynamicZone
+      // ci-dessus — un camp proche n'est pas une preuve que l'objet y apparaît
+      // vraiment, jamais présenté avec la même autorité qu'une zone étayée.
+      posEstimatedZone: 'Zone estimée',
       posUncatalogued: 'Position non cataloguée — à vérifier en jeu',
       // Sous-libellé de la ligne de résultat de recherche pour une QUÊTE
       // entière sans position extraite (giver/acteurs tous sans x/z — ex.
@@ -123,6 +128,13 @@ export default {
       // le nom (celui-ci reste un span cliquable séparé, voir goalTargetChip).
       goalDroppedByLabel: 'lâché par',
       goalObtainedHereLabel: 'obtenu ici',
+      // Même vocabulaire de ligne de relation, passe de câblage batch : un
+      // item donné par le donneur de quête (given_by_giver, ex. "Time of
+      // Death" d'eight_legged_freaks) et un item à fabriquer uniquement
+      // (craft:true, ex. l'implant de construction_lesson) — ni l'un ni
+      // l'autre n'est un spawn dans le monde, donc jamais de position/zone.
+      goalGivenByLabel: 'donné par',
+      goalCraftLabel: 'à fabriquer',
       objectivesN: n => `Objectifs (${n})`,
       objectivesTitle: 'Objectifs',
       howToTitle: 'Comment faire',
@@ -130,6 +142,12 @@ export default {
       questItemsN: n => `Items de quête (${n})`,
       viewGiverBtn: 'Voir le donneur',
       viewZoneBtn: 'Voir la zone',
+      // Pendant confiance "moyenne" (passe de câblage batch, voir
+      // posEstimatedZone ci-dessus) : dessine les vrais points du camp cité
+      // quand la carte active les a chargés, sinon repli sur le même cercle
+      // deviné que viewZoneBtn — jamais le même libellé, pour ne jamais le
+      // confondre avec une zone confirmée.
+      viewEstimatedZoneBtn: "Voir l'estimation",
       onMapTitle: 'Sur la carte',
       dialogsN: n => `Dialogues (${n})`,
       dialogueFicheKind: 'Dialogue PNJ',
