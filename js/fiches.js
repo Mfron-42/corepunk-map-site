@@ -880,18 +880,13 @@ function openMonsterFiche(key) {
       : `<p class="hint">${esc(tr('noAbilitiesKnown'))}</p>`
   }</div>`;
 
-  const campsHtml = `<div class="fiche-section"><h3>${esc(tr('monsterCampsN', m.camps?.length || 0))}</h3>${
-    m.camps?.length
-      ? m.camps.map(c => `<div class="frow">
-          <span class="fr-icon icon-broken" data-fb="📍"></span>
-          <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
-          ${gotoBtn(c.x, c.z, c.name)}
-        </div>`).join('')
-      // Pastille "unknown" (unknown_states_DESIGN.md #10, task #67) : la
-      // couverture camps.json ne référence qu'environ 25 % des monstres --
-      // un vrai trou de jointure, jamais "ce monstre n'a pas de camp du tout".
-      : `<p class="hint">${stateChip('unknown')} ${esc(tr('noCampsKnown'))}</p>`
-  }</div>`;
+  // Jointure camp -> vrai nuage de points + bouton "voir tous les spawns"
+  // (monsterCampsHtml ci-dessous, réutilise farmCampRow/farmUnjoinedRow/
+  // allCampGroupsFlat de farmSectionHtml -- "où sont les imps bleus ?" doit
+  // dessiner l'union réelle de tous les camps du monstre, jamais une poignée
+  // de points). Pastille "unknown" (unknown_states_DESIGN.md #10, task #67)
+  // toujours au même endroit quand m.camps est vide -- comportement inchangé.
+  const campsHtml = monsterCampsHtml(m);
 
   const loreIdx = loreIndexFor(key);
   const loreHtml = loreIdx != null ? `<div class="fiche-section"><h3>${esc(tr('loreEntryTitle'))}</h3>
@@ -2505,12 +2500,21 @@ function isGenericFarmPoolItem(drops) {
    bornes -- même primitive/même libellé que le bouton de la fiche camp
    (data-n porte le compte BRUT, jamais formaté : main.js reconstruit ce même
    libellé au toggle-off via +b.dataset.n, un texte initial formaté
-   différemment du texte de reset aurait clignoté au premier clic). */
-function farmCampRow(key, g) {
+   différemment du texte de reset aurait clignoté au premier clic).
+   `displayName` (facultatif) : repli fiche monstre (openMonsterFiche/
+   monsterCampsHtml, "voir tous les spawns" July 2026) -- réutilise CETTE
+   ligne telle quelle plutôt que d'en dupliquer une variante, mais le nom déjà
+   COOK dans m.camps[].name (localisé, correctement casé -- ex.
+   "Monsters-Imp-Windreach-Woods") vaut mieux que campDisplayName(key), dont
+   le repli pretty() sur une clé non typée (kind monstre, jamais
+   destroyable/searchable/reactive) ne remet en forme QUE la première lettre
+   ("Monsters imp windreach woods") -- une régression de lisibilité pour ce
+   contexte précis. Sans 2ᵉ argument (fiche objet), comportement inchangé. */
+function farmCampRow(key, g, displayName = campDisplayName(key)) {
   const n = g.pts.length;
   return `<div class="frow">
     <span class="rar-dot" style="background:${CAMP_COLORS[g.kind] || '#999'}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(key)}">${esc(campDisplayName(key))}</span>
+    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(key)}">${esc(displayName)}</span>
     <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
   </div>`;
 }
@@ -2543,6 +2547,13 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
   return shown + more;
 }
 
+/* Camps aplatis depuis S.camps (une entrée par camp distinct, tous kinds
+   confondus) : jointure PARTAGÉE par farmSectionHtml (fiche objet) et
+   monsterCampsHtml (fiche monstre, "voir tous les spawns" July 2026) --
+   même lookup que openCampFiche/campPointsForZone/le handler camp-highlight
+   de main.js, calculée une fois par site d'appel plutôt que dupliquée. */
+function allCampGroupsFlat() { return Object.values(S.camps).flatMap(st => st.groups); }
+
 function farmSectionHtml(it) {
   if (!it.farm?.length) {
     // Repli honnête : des taux de drop catalogués mais AUCUN camp connu
@@ -2559,10 +2570,10 @@ function farmSectionHtml(it) {
     return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>
       <p class="hint">${esc(tr('farmGenericPoolNote', it.farm.length))}</p></div>`;
   }
-  // Jointure camp -> vrai nuage de points : même lookup que openCampFiche/
-  // campPointsForZone/le handler camp-highlight de main.js, construite UNE
-  // fois ici plutôt qu'une fois par ligne (it.farm va jusqu'à 24 entrées).
-  const allCampGroups = Object.values(S.camps).flatMap(st => st.groups);
+  // Jointure camp -> vrai nuage de points (allCampGroupsFlat ci-dessus),
+  // construite UNE fois ici plutôt qu'une fois par ligne (it.farm va jusqu'à
+  // 24 entrées).
+  const allCampGroups = allCampGroupsFlat();
   const byKind = new Map();
   const unjoined = [];
   for (const c of it.farm) {
@@ -2605,6 +2616,50 @@ function farmSectionHtml(it) {
       </div>` : '';
 
   return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>${groupsHtml}${unjoinedHtml}</div>`;
+}
+
+/* Section « Apparaît dans » de la fiche monstre (openMonsterFiche) : même
+   jointure camp -> vrai nuage de points que farmSectionHtml ci-dessus
+   (allCampGroupsFlat), + un bouton de groupe qui UNIT tous les camps joints
+   du monstre en un seul surlignage (data-ids CSV, handler camp-highlight de
+   main.js) -- la demande d'origine ("où sont les imps bleus ?") attend
+   l'UNION des nuages réels de TOUS les camps de la créature (4 camps ≈ 900+
+   points pour les imps), jamais une poignée de points choisis à la main.
+   m.camps[] porte déjà {camp, name, x, z} PAR CAMP (name pré-localisé côté
+   pipeline) -- une forme strictement identique à it.farm[], donc les MÊMES
+   lignes sont réutilisées telles quelles : farmCampRow (camp joint, avec son
+   3ᵉ argument pour garder le nom déjà cuit dans m.camps plutôt que le repli
+   pretty() de campDisplayName, voir sa doc) et farmUnjoinedRow (camp d'une
+   autre carte, préfixe ffm-island-* -- 449 refs réelles sur le catalogue
+   monstre expédié, jamais un compte fabriqué). Bouton de groupe omis à ≤1
+   camp joint (ferait doublon exact du bouton de sa propre ligne, même
+   convention que highlightAllBtn/farmSectionHtml ci-dessus) ; 0 camp DU TOUT
+   retombe sur la pastille "unknown" déjà en place (unknown_states_DESIGN.md
+   #10, task #67 -- comportement inchangé). */
+function monsterCampsHtml(m) {
+  const camps = m.camps || [];
+  const title = esc(tr('monsterCampsN', camps.length));
+  if (!camps.length) {
+    return `<div class="fiche-section"><h3>${title}</h3>
+      <p class="hint">${stateChip('unknown')} ${esc(tr('noCampsKnown'))}</p></div>`;
+  }
+  const allCampGroups = allCampGroupsFlat();
+  const joined = [], unjoined = [];
+  for (const c of camps) {
+    const g = allCampGroups.find(x => x.k === c.camp);
+    if (g) joined.push({ c, g }); else unjoined.push(c);
+  }
+  joined.sort((a, b) => b.g.pts.length - a.g.pts.length);
+  const totalPts = joined.reduce((s, r) => s + r.g.pts.length, 0);
+  const highlightAllBtn = joined.length > 1
+    ? `<div class="pop-actions"><button class="act ghost" data-act="camp-highlight" data-ids="${esc(joined.map(r => r.c.camp).join(','))}" data-n="${totalPts}" data-color="${MONSTER_HEX}">${esc(tr('monsterHighlightAllSpawns', joined.length, totalPts))}</button></div>`
+    : '';
+  const rowsHtml = farmCapRows(
+    [...joined.map(r => ({ row: r, joined: true })), ...unjoined.map(c => ({ row: c, joined: false }))],
+    x => x.joined ? farmCampRow(x.row.c.camp, x.row.g, x.row.c.name) : farmUnjoinedRow(x.row),
+    n => tr('farmMoreCampsN', n),
+  );
+  return `<div class="fiche-section"><h3>${title}</h3>${highlightAllBtn}${rowsHtml}</div>`;
 }
 
 function openItemFiche(key) {

@@ -271,6 +271,14 @@ export default {
       variantsNote: n => ` · +${n} variants`,
       monsterAbilitiesN: n => `Abilities (${n})`,
       monsterCampsN: n => `Spawns in (${n})`,
+      // Group-level "highlight everything" button (monster fiche, July 2026):
+      // camp-level binding only — draws the union of all camp point clouds
+      // this monster spawns in, never a claim about which exact point spawns
+      // which variant (see camp-highlight handler, main.js). Wording says
+      // "in these camps" on purpose, distinct from the quest-step "View
+      // estimate" (viewEstimatedZoneBtn), which draws a different dataset
+      // (quest-OBJECT camp points).
+      monsterHighlightAllSpawns: (camps, pts) => `Highlight all spawns in these camps (${camps} camp${camps > 1 ? 's' : ''} · ${pts} points)`,
       noLootCatalogued: 'No catalogued loot for this monster.',
       noAbilitiesKnown: 'No known abilities for this monster.',
       noCampsKnown: 'No known camp for this monster.',

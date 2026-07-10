@@ -263,6 +263,15 @@ export default {
       variantsNote: n => ` · +${n} variantes`,
       monsterAbilitiesN: n => `Capacités (${n})`,
       monsterCampsN: n => `Apparaît dans (${n})`,
+      // Bouton de groupe « tout surligner » (fiche monstre, juillet 2026) :
+      // liaison au niveau CAMP uniquement — dessine l'union des nuages de
+      // points de tous les camps où ce monstre apparaît, jamais une
+      // affirmation sur quel point précis fait spawn quelle variante (voir
+      // le handler camp-highlight, main.js). Libellé « dans ces camps »
+      // volontaire, distinct du « Voir l'estimation » de l'étape de quête
+      // (viewEstimatedZoneBtn), qui dessine un autre jeu de données (points de
+      // camp de l'OBJET de quête).
+      monsterHighlightAllSpawns: (camps, pts) => `Voir tous les spawns dans ces camps (${camps} camp${camps > 1 ? 's' : ''} · ${pts} points)`,
       noLootCatalogued: 'Butin non catalogué pour ce monstre.',
       noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
       noCampsKnown: 'Aucun camp connu pour ce monstre.',

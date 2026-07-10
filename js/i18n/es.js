@@ -263,6 +263,15 @@ export default {
       variantsNote: n => ` · +${n} variantes`,
       monsterAbilitiesN: n => `Habilidades (${n})`,
       monsterCampsN: n => `Aparece en (${n})`,
+      // Botón de grupo "resaltar todo" (ficha de monstruo, julio 2026):
+      // vínculo solo a nivel de CAMPAMENTO — dibuja la unión de las nubes de
+      // puntos de todos los campamentos donde aparece este monstruo, nunca
+      // una afirmación sobre qué punto exacto genera qué variante (ver el
+      // manejador camp-highlight, main.js). Texto "en estos campamentos"
+      // deliberado, distinto de "Ver estimación" del paso de misión
+      // (viewEstimatedZoneBtn), que dibuja otro conjunto de datos (puntos de
+      // campamento del OBJETO de misión).
+      monsterHighlightAllSpawns: (camps, pts) => `Resaltar todos los spawns en estos campamentos (${camps} campamento${camps > 1 ? 's' : ''} · ${pts} puntos)`,
       noLootCatalogued: 'Botín no catalogado para este monstruo.',
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
       noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
