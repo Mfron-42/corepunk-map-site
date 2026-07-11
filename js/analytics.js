@@ -18,7 +18,7 @@
     (Node, sans DOM ni `location`) : ne
    lit RIEN de global, uniquement la chaîne passée en argument. Priorité
    (une seule pseudo-page à la fois, mêmes clés que urlstate.js carryKeys) :
-   q > i > mon > npc > camp > map (absent ⇒ Kwalat, cf. readHash). Jamais de
+   q > i > mon > fam > npc > camp > map (absent ⇒ Kwalat, cf. readHash). Jamais de
    querystring, jamais `lang`, jamais x/z/zm — le pan/zoom ne doit JAMAIS
    compter une visite (voir dédoublonnage de l'effet de bord plus bas). */
 export function hashToPseudoPath(hash) {
@@ -26,6 +26,7 @@ export function hashToPseudoPath(hash) {
   if (p.has('q')) return '/quest/' + encodeURIComponent(p.get('q'));
   if (p.has('i')) return '/item/' + encodeURIComponent(p.get('i'));
   if (p.has('mon')) return '/monster/' + encodeURIComponent(p.get('mon'));
+  if (p.has('fam')) return '/family/' + encodeURIComponent(p.get('fam'));
   if (p.has('npc')) return '/npc/' + encodeURIComponent(p.get('npc'));
   if (p.has('camp')) return '/camp/' + encodeURIComponent(p.get('camp'));
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');

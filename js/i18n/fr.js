@@ -432,6 +432,14 @@ export default {
       // absente si vide (jamais un bloc vide fabriqué).
       monsterQuestItemsTitle: 'Objets de quête',
       familyMonstersTitle: n => `Monstres de cette famille (${n})`,
+      // Fiche FAMILLE de monstres (#82 chunk (e), fiches.js openFamilyFiche) :
+      // page tiroir d'une famille (Wolf/Imp/Spider…) — ses espèces membres,
+      // fourchette de niveau et les quêtes qui visent tout le groupe. Le NOM
+      // de famille reste un jeton de jeu brut (GLOSSARY-PENDING #86), jamais
+      // traduit ; seul ce chrome est localisé.
+      familyFicheKind: 'Famille de monstres',
+      familyMembersTitle: n => `Espèces (${n})`,
+      familyQuestsN: n => `Quêtes pour cette famille (${n})`,
       abilityLabel: 'Capacité',
       harvestTitle: 'Dépeçage',
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',

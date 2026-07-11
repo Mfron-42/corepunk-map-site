@@ -1,0 +1,54 @@
+/* Kwalat — fiche FAMILLE de monstres (js/fiches.js openFamilyFiche, #82
+   chunk (e)). N'ajoute QUE ce que les classes de fiche monstre existantes ne
+   donnent pas déjà : le reste de la fiche réutilise tel quel .fiche-head /
+   .fiche-section / .frow / .fr-* / .show-entity-btn / .pop-actions
+   (css/style.css). Deux besoins neufs seulement :
+   1. une MOSAÏQUE de portraits en en-tête (à la place de l'avatar unique —
+      une famille n'a pas UN portrait mais N espèces membres) ;
+   2. le repli propre du bouton « Afficher · N pts » d'une ligne membre sous
+      son nom quand la largeur manque (mobile). */
+
+/* Mosaïque : même empreinte que .fiche-head .fiche-avatar (54×54, coin
+   arrondi, fond panneau — voir style.css), garnie de jusqu'à 6 vignettes
+   rondes des membres qui ont un portrait. Repli honnête (aucun membre avec
+   portrait) : la fiche pose à la place un .fiche-avatar glyphe 🐾 standard,
+   jamais cette mosaïque vide. */
+.fiche-head .fam-mosaic {
+  width: 54px;
+  height: 54px;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: var(--radius-m);
+  background: var(--panel-3);
+  border: 1px solid var(--line-soft);
+  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 2px;
+  overflow: hidden;
+}
+/* Un seul portrait -> occupe toute l'empreinte (pas une pastille perdue dans
+   un coin) ; 2+ -> la grille 3 colonnes les tuile. */
+.fiche-head .fam-mosaic:has(.fam-mosaic-cell:only-child) {
+  grid-template-columns: 1fr;
+}
+.fam-mosaic-cell {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  font-size: .5rem;
+  background: var(--panel-2);
+}
+
+/* Ligne membre : c'est une .frow standard ; on autorise seulement le repli du
+   bouton « Afficher · N pts » (fam-member-show) sur sa propre ligne quand la
+   largeur manque, plutôt que de comprimer le nom/niveau. */
+.frow.fam-member {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.fam-member-show {
+  flex-basis: 100%;
+}

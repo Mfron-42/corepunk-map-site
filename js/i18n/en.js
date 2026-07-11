@@ -433,6 +433,14 @@ export default {
       // empty (never an empty fabricated block).
       monsterQuestItemsTitle: 'Quest items',
       familyMonstersTitle: n => `Monsters of this family (${n})`,
+      // Monster FAMILY fiche (#82 chunk (e), fiches.js openFamilyFiche): a
+      // right-drawer page for a monster family (Wolf/Imp/Spider…) — its member
+      // species, level span, and the quests that target the whole group.
+      // Family NAMES themselves are raw game tokens (GLOSSARY-PENDING #86,
+      // pretty()'d), never translated; only this chrome is localized.
+      familyFicheKind: 'Monster family',
+      familyMembersTitle: n => `Species (${n})`,
+      familyQuestsN: n => `Quests for this family (${n})`,
       abilityLabel: 'Ability',
       harvestTitle: 'Harvesting',
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',

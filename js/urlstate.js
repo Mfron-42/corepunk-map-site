@@ -84,7 +84,7 @@ function buildHash() {
   // écrits ci-dessus depuis S.locator et les reporter aussi les dupliquerait.
   const p = new URLSearchParams(location.hash.slice(1));
   const carry = new URLSearchParams();
-  const carryKeys = S.locator ? ['q', 'camp', 'i', 'npc', 'mon'] : ['q', 'camp', 'i', 'npc', 'mon', 'at', 'atl'];
+  const carryKeys = S.locator ? ['q', 'camp', 'i', 'npc', 'mon', 'fam'] : ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'at', 'atl'];
   for (const k of carryKeys) if (p.has(k)) carry.set(k, p.get(k));
   if ([...carry.keys()].length) h += '&' + carry.toString().replace(/%2C/g, ',');
   return h;
@@ -170,7 +170,7 @@ function readHash() {
   return {
     view, onSet, fltFamilies, fltSpeciesOff,
     quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
-    npc: p.get('npc'), monster: p.get('mon'), at, atl: p.get('atl') || null,
+    npc: p.get('npc'), monster: p.get('mon'), family: p.get('fam'), at, atl: p.get('atl') || null,
     map: p.get('map') || 'Kwalat',   // absent ⇒ Kwalat (rétro-compat des liens existants)
   };
 }

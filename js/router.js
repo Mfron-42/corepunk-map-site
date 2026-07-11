@@ -10,7 +10,7 @@ import { map, toLL, worldBounds, denseRenderers, toggleZones } from './mapview.j
 import { setLocator, clearLocator } from './pins.js';
 import {
   closeFiche, openQuestFiche, openItemFiche, openNpcFiche,
-  openCampFiche, openMonsterFiche,
+  openCampFiche, openMonsterFiche, openFamilyFiche,
 } from './fiches.js';
 import { buildFilters } from './sidebar.js';
 import { whenDeferred, deferredReady } from './data.js';
@@ -33,7 +33,7 @@ import { applySpeciesTokens, setFamilyOn } from './specieslayer.js';
    appuis Précédent/Suivant rapprochés (mobile notamment). */
 async function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
+  const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, family, at, atl, map: mapId } = readHash();
 
   // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
   // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
@@ -163,8 +163,12 @@ async function applyLocationState() {
   else whenDeferred(() => {
     // openCampFiche n'exige plus de fiche détaillée (contenants typés sans
     // camp_details) : il vérifie lui-même que le camp existe sur la carte.
+    // Fiche FAMILLE (#82 chunk (e), lien profond `fam=`) : différée comme
+    // camp/monster (ses membres viennent de species.bin, chargé au différé) ;
+    // openFamilyFiche est no-op si le jeton famille n'a aucun membre catalogue.
     if (camp) openCampFiche(camp);
     else if (monster && S.monsters[monster]) openMonsterFiche(monster);
+    else if (family) openFamilyFiche(family);
   });
 
   // Réticule (drapeaux utilisateur #84 : PAS dans le hash, voir pins.js --

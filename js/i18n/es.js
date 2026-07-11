@@ -413,6 +413,14 @@ export default {
       // fabricado).
       monsterQuestItemsTitle: 'Objetos de misión',
       familyMonstersTitle: n => `Monstruos de esta familia (${n})`,
+      // Ficha de FAMILIA de monstruos (#82 chunk (e), fiches.js
+      // openFamilyFiche): página lateral de una familia (Wolf/Imp/Spider…) —
+      // sus especies, rango de nivel y las misiones dirigidas a todo el grupo.
+      // El NOMBRE de familia es un token de juego en bruto (GLOSSARY-PENDING
+      // #86), nunca traducido; solo se localiza este texto de interfaz.
+      familyFicheKind: 'Familia de monstruos',
+      familyMembersTitle: n => `Especies (${n})`,
+      familyQuestsN: n => `Misiones para esta familia (${n})`,
       abilityLabel: 'Habilidad',
       harvestTitle: 'Recolección',
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',

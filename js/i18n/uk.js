@@ -398,6 +398,14 @@ export default {
       // відсутня, якщо порожньо (ніколи не вигаданий порожній блок).
       monsterQuestItemsTitle: 'Квестові предмети',
       familyMonstersTitle: n => `Монстри цього виду (${n})`,
+      // Картка РОДИНИ монстрів (#82 chunk (e), fiches.js openFamilyFiche):
+      // сторінка у правій панелі для родини (Wolf/Imp/Spider…) — її види,
+      // діапазон рівнів і завдання на всю групу. НАЗВА родини — сирий ігровий
+      // токен (GLOSSARY-PENDING #86), не перекладається; локалізується лише
+      // цей інтерфейсний текст.
+      familyFicheKind: 'Родина монстрів',
+      familyMembersTitle: n => `Види (${n})`,
+      familyQuestsN: n => `Завдання для цієї родини (${n})`,
       abilityLabel: 'Здібність',
       harvestTitle: 'Здобич',
       noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',

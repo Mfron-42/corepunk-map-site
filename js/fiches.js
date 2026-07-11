@@ -20,7 +20,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js'
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
-import { campGroupByKey, speciesPoints } from './pointsets.js';
+import { campGroupByKey, speciesPoints, familyPoints } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
@@ -1102,6 +1102,123 @@ function openMonsterFiche(key) {
   setFicheHash('monster', key);
 }
 
+/* ── Fiche FAMILLE de monstres (#82 chunk (e), « l'arbre EST le bestiaire »)
+   ───── La créature au grain FAMILLE (post-alias familyKey — robo/robot
+   fusionnés) : l'unité que visent les buts de quête à portée famille (« Tuer
+   des araignées », bound_units.scope="family"/"families") et les lignes
+   famille de la recherche/de l'arbre. Entièrement DÉRIVÉE côté client des
+   bundles déjà chargés (AUCUNE donnée nouvelle cuite — un nom de famille est
+   un jeton de jeu brut, identique dans les 5 langues, GLOSSARY-PENDING #86 ;
+   membres/niveaux/portraits vivent déjà dans species.bin ; points via le
+   résolveur UNIQUE ; quêtes par jointure inverse sur S.quests, chargé au
+   critique). Membres cliquables -> fiche espèce (fiche-monster, clic-double-
+   effet du délégué) + leur propre « Afficher · N pts » (species-layer).
+   « Afficher la famille sur la carte » = activation des lignes famille de
+   l'arbre (family-layer, cascade — familyLayerActivateBtn, même modèle que
+   les chips de quête). Repli honnête : une famille sans AUCUN membre
+   catalogue (jeton inconnu) n'ouvre pas de fiche (jamais une page vide). */
+function familyMembers(fam) {
+  const f = familyKey(fam);
+  return Object.entries(S.species || {})
+    .filter(([, sp]) => !isHiddenTest(sp) && familyKey(sp.family || 'other') === f)
+    .map(([id, sp]) => ({ id, sp }))
+    // MÊME ordre que l'arbre (sidebar.js speciesByFamily) : niveau min puis nom.
+    .sort((a, b) => (a.sp.levelMin ?? 99) - (b.sp.levelMin ?? 99) || a.sp.name.localeCompare(b.sp.name));
+}
+/* Existe-t-il ≥1 espèce catalogue dans cette famille ? (garde de lien : un
+   jeton famille sans membre n'ouvre pas de fiche — jamais un lien mort.) */
+function familyHasMembers(fam) {
+  const f = familyKey(fam);
+  for (const sp of Object.values(S.species || {})) {
+    if (!isHiddenTest(sp) && familyKey(sp.family || 'other') === f) return true;
+  }
+  return false;
+}
+/* Clé de spawn REPRÉSENTATIVE ouvrable d'une espèce (canonicalSiteKey sinon
+   premier spawn) — null si elle ne résout pas dans S.monsters (openMonsterFiche
+   exige une clé présente ; à défaut la ligne membre reste non cliquable,
+   jamais un lien mort). */
+function speciesRepKey(sp) {
+  const k = sp.canonicalSiteKey || (sp.spawns && sp.spawns[0] && sp.spawns[0].siteKey) || null;
+  return k && S.monsters[k] ? k : null;
+}
+/* Quêtes ciblant CETTE famille (jointure inverse client, aucune donnée cuite) :
+   un but à portée famille (bound_units.scope family/families) dont les
+   `families` (post-alias) contiennent `fam`. Balayage honnête de S.quests
+   (gate dev isHiddenTest, dédup par slug — une quête n'apparaît qu'une fois
+   même si plusieurs de ses buts visent la famille). */
+function familyScopeQuestRows(fam) {
+  const seen = new Set();
+  const rows = [];
+  for (const [slug, q] of S.quests) {
+    if (isHiddenTest(q)) continue;
+    for (const g of q.goals || []) {
+      const bu = g.target?.bound_units;
+      if (!bu || !bu.scope || bu.scope === 'species') continue;
+      if (!(bu.families || []).map(familyKey).includes(fam)) continue;
+      seen.add(slug);
+      rows.push(`<div class="frow">
+        <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+      </div>`);
+      break;
+    }
+  }
+  if (!rows.length) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('familyQuestsN', seen.size))}</h3>${rows.join('')}</div>`;
+}
+function openFamilyFiche(famKey) {
+  const fam = familyKey(famKey);
+  const members = familyMembers(fam);
+  if (!members.length) return;
+  S.openFiche = { kind: 'family', id: fam };
+  const lvls = members.flatMap(({ sp }) => [sp.levelMin, sp.levelMax]).filter(v => v != null);
+  const lvlSpan = lvls.length
+    ? (Math.min(...lvls) === Math.max(...lvls) ? tr('levelAbbrev', Math.min(...lvls)) : tr('levelRangeAbbrev', Math.min(...lvls), Math.max(...lvls)))
+    : '';
+  const kindLine = [tr('familyFicheKind'), lvlSpan].filter(Boolean).join(' · ');
+  // Mosaïque de portraits (membres qui en ont un, jusqu'à 6) — repli glyphe
+  // honnête (🐾) quand AUCUN membre n'a de portrait (146/224 espèces sans
+  // art, voir search.js) : jamais une case vide ni un portrait inventé.
+  const withPortraits = members.filter(({ sp }) => sp.portrait);
+  const head = withPortraits.length
+    ? `<div class="fam-mosaic">${withPortraits.slice(0, 6).map(({ sp }) => iconTag(`icons/${sp.portrait}`, 'fam-mosaic-cell', initials(sp.name))).join('')}</div>`
+    : `<span class="fiche-avatar icon-broken" data-fb="🐾"></span>`;
+  // « Afficher la famille sur la carte » : même action que la ligne famille
+  // de l'arbre (family-layer, cascade) ; n'apparaît que quand la famille a
+  // RÉELLEMENT des points sur la carte active (familyPoints), jamais un
+  // bouton qui n'allumerait rien.
+  const famBtn = familyLayerActivateBtn([fam]);
+  const mapSection = famBtn ? `<div class="fiche-section"><div class="pop-actions">${famBtn}</div></div>` : '';
+  // Membres : portrait/glyphe + nom cliquable -> fiche espèce + fourchette
+  // niveau muette + son propre « Afficher · N pts » (species-layer).
+  const memberRows = members.map(({ id, sp }) => {
+    const repKey = speciesRepKey(sp);
+    const icon = sp.portrait ? `icons/${sp.portrait}` : null;
+    const nameHtml = repKey
+      ? `<span class="fr-label link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(repKey)}">${esc(sp.name)}</span>`
+      : `<span class="fr-label"${ecAttr(MONSTER_HEX, 'monster')}>${esc(sp.name)}</span>`;
+    const mLvl = sp.levelMin != null
+      ? (sp.levelMax != null && sp.levelMax !== sp.levelMin ? tr('levelRangeAbbrev', sp.levelMin, sp.levelMax) : tr('levelAbbrev', sp.levelMin))
+      : '';
+    const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+    const showBtn = monsterSpawnHighlightBtn({ species: id, name: sp.name });
+    return `<div class="frow fam-member">
+      ${iconTag(icon, 'fr-icon', initials(sp.name))}
+      ${nameHtml}${devMark}
+      ${mLvl ? `<span class="muted">${esc(mLvl)}</span>` : ''}
+      ${showBtn ? `<span class="fam-member-show">${showBtn}</span>` : ''}
+    </div>`;
+  }).join('');
+  openFiche(`
+    <div class="fiche-head">${head}
+      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}</div>
+      <h2>${esc(pretty(fam))}</h2></div></div>
+    ${mapSection}
+    <div class="fiche-section"><h3>${esc(tr('familyMembersTitle', members.length))}</h3>${memberRows}</div>
+    ${familyScopeQuestRows(fam)}`);
+  setFicheHash('family', fam);
+}
+
 /* Fiche bestiaire/lore (MapMarkers.xml) : titre, nature (Ville/Bestiaire/
    Ressource…), description, bouton carte si une position est connue (38/208
    depuis un pin _ip), monstres de la même famille cliquables vers leur
@@ -1204,11 +1321,12 @@ function openFiche(html) {
    fiche et canGoBackLocally()/unfocus() ne fonctionneraient plus jamais. */
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon');
+  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam');
   if (kind === 'quest') p.set('q', id);
   else if (kind === 'item') p.set('i', id);
   else if (kind === 'npc') p.set('npc', id);
   else if (kind === 'monster') p.set('mon', id);
+  else if (kind === 'family') p.set('fam', id);
   else if (kind) p.set('camp', id);
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
@@ -2189,15 +2307,30 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // ci-dessus) ; `levelHint` supprimé du 3ᵉ argument (voir plus haut).
     const mk = isFamilyScope ? null : monsterKeyFor(t.key || null, nameLbl, null);
     const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
-    // Portée FAMILLE (#82 chunk (d), modèle « l'arbre EST le bestiaire ») :
-    // pas de fiche famille (chunk (e)) mais le clic n'est plus mort — il
-    // coche la/les lignes FAMILLE de l'arbre (data-act="family-layer",
-    // délégué main.js, tokens post-alias familyKey) : le bon barreau de
-    // l'échelle de précision (le trigger accepte tout le groupe, jamais une
-    // espèce nommée à sa place).
-    const famTokens = isFamilyScope ? (bu.families || []).map(familyKey).filter(Boolean) : [];
+    // Portée FAMILLE (#82 chunk (e), modèle « l'arbre EST le bestiaire ») :
+    // le nom de CHAQUE famille est désormais un LIEN vers sa fiche FAMILLE
+    // (data-act="fiche-family", délégué main.js — openFamilyFiche) : le
+    // trigger accepte tout le groupe, on ouvre donc la PAGE de ce groupe,
+    // jamais une espèce nommée à sa place (échelle de précision, jamais plus
+    // précis que prouvable). L'ACTIVATION carte (cocher les lignes famille de
+    // l'arbre) reste une affordance SÉPARÉE (familyLayerActivateBtn / spawnRow
+    // ci-dessous, même modèle « Afficher · N pts » que les espèces) — les
+    // deux gestes que l'utilisateur veut distincts : le lien focuse la fiche,
+    // la bulle allume la carte. Jetons post-alias familyKey, dédupliqués
+    // (robo/robot fusionnés). scope "families" (plusieurs familles) -> un lien
+    // par famille, joints par « / ».
+    const famTokens = isFamilyScope
+      ? [...new Set((bu.families || []).map(familyKey).filter(Boolean))]
+      : [];
+    // Un jeton famille n'est LIÉ que s'il a vraiment une fiche (membres
+    // catalogue) — sinon libellé nu, jamais un lien mort.
+    const famNameSpan = f => familyHasMembers(f)
+      ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-family" data-id="${esc(f)}">${esc(pretty(f))}</span>`
+      : `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(pretty(f))}</span>`;
     const nameSpan = isFamilyScope
-      ? (famLabel ? `<span class="goal-target-name${famTokens.length ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${famTokens.length ? ` data-act="family-layer" data-family="${esc(famTokens.join(','))}"` : ''}>${esc(famLabel)}</span>` : '')
+      ? (famTokens.length
+        ? famTokens.map(famNameSpan).join(' / ')
+        : (famLabel ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(famLabel)}</span>` : ''))
       : mk
         ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
         : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
@@ -2228,7 +2361,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // null) ou espèce sans AUCUN camp joint -> chaîne vide, jamais un bouton
     // qui n'allumerait rien.
     const spawnBtn = mk ? monsterSpawnHighlightBtn(S.monsters[mk]) : '';
-    const spawnRow = spawnBtn ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn}</div>` : '';
+    // Affordance carte à portée FAMILLE (la « bulle » de la demande
+    // utilisateur, DISTINCTE du lien de nom vers la fiche ci-dessus) : bouton
+    // d'activation dédié, même modèle « Afficher · N pts » que les espèces
+    // (familyLayerActivateBtn — vide si la famille n'a aucun point ici).
+    const familyBtn = (isFamilyScope && famTokens.length) ? familyLayerActivateBtn(famTokens) : '';
+    const spawnRow = (spawnBtn || familyBtn) ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn || familyBtn}</div>` : '';
     // SCOPE ADDITION (2026-07-11, retour utilisateur : « quand je cherche tel
     // monstre, il me montre toujours des points au pif — il devrait activer
     // un de ces points [filtres] dont on vient de parler ») : `posRow`
@@ -2249,13 +2387,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // pour une espèce à 0 camp joint sur la carte active (mobs de donjon/
     // Île-prison) : monsterSpawnHighlightBtn rend '' et la case n'allume
     // rien — les barreaux 3/4 de l'échelle étaient perdus. La condition
-    // devient « la couche a RÉELLEMENT des points » : spawnBtn non vide
-    // (l'espèce a des camps ici) ou portée famille (famTokens — la ligne
-    // famille de l'arbre existe toujours). Sinon posRow revit (goto/
-    // cross-map/zone estimée), le repli honnête du barreau 4.
-    // Objets/monde/dynamique (autres branches de cette fonction) gardent
-    // `posRow` inchangé — seule cette branche monstre est concernée.
-    const hasLayerResolution = !!spawnBtn || (isFamilyScope && famTokens.length > 0);
+    // devient « la couche a RÉELLEMENT des points » : un BOUTON d'activation
+    // non vide existe (spawnBtn pour l'espèce, familyBtn pour la famille —
+    // #82 chunk (e)). ÉTENDU aux familles : une famille SANS camp joint sur la
+    // carte active (ex. ghoul/hyena/swarm sur Kwalat) n'a plus de familyBtn,
+    // donc posRow REVIT (goto/cross-map/zone estimée, barreau 4 honnête) au
+    // lieu d'être supprimé « parce que c'est une famille » comme avant — même
+    // correctif que pour les espèces 0-camp (le lien de nom vers la fiche
+    // famille reste, lui, toujours présent). Objets/monde/dynamique (autres
+    // branches) gardent `posRow` inchangé — seule cette branche monstre est
+    // concernée.
+    const hasLayerResolution = !!spawnBtn || !!familyBtn;
     const monsterPosRow = hasLayerResolution ? '' : posRow;
     return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}${spawnRow}</div>`;
   }
@@ -2994,6 +3136,27 @@ function monsterSpawnHighlightBtn(m) {
   return `<button class="act ghost show-entity-btn" data-act="species-layer" data-species="${esc(spId)}" data-n="${res.nPts}" aria-pressed="${S.monsp[spId]?.on ? 'true' : 'false'}">${esc(tr('showEntityBtn'))} <span class="chip-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(spName)}</span> · ${esc(tr('entityPtsN', res.nPts.toLocaleString(numberLocale())))}</button>`;
 }
 
+/* « Afficher la famille sur la carte » — miroir FAMILLE de monsterSpawnHighlightBtn
+   (task #79/#82 chunk (d)/(e)) : coche la/les ligne(s) FAMILLE de l'arbre
+   (data-act="family-layer", délégué main.js — activateFamilyLayers, cascade de
+   toutes les espèces). Compte = union des points via le résolveur UNIQUE
+   (familyPoints par famille, sommés — jamais re-dérivé). Repli honnête :
+   aucune famille avec un camp joint sur la carte active -> chaîne vide (jamais
+   un bouton qui n'allumerait rien). `fams` = jetons post-alias familyKey. */
+function familyLayerActivateBtn(fams) {
+  const toks = [...new Set((fams || []).map(familyKey).filter(Boolean))];
+  if (!toks.length) return '';
+  let nPts = 0, any = false, on = false;
+  for (const f of toks) {
+    const res = familyPoints(f);
+    if (res) { nPts += res.nPts; any = true; }
+    if (S.monfam[f]?.on) on = true;
+  }
+  if (!any) return '';
+  const label = toks.map(pretty).join(' / ');
+  return `<button class="act ghost show-entity-btn" data-act="family-layer" data-family="${esc(toks.join(','))}" data-n="${nPts}" aria-pressed="${on ? 'true' : 'false'}">${esc(tr('showEntityBtn'))} <span class="chip-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(label)}</span> · ${esc(tr('entityPtsN', nPts.toLocaleString(numberLocale())))}</button>`;
+}
+
 function farmSectionHtml(it) {
   if (!it.farm?.length) {
     // Repli honnête : des taux de drop catalogués mais AUCUN camp connu
@@ -3677,6 +3840,6 @@ function flyToQuestZone(slug) {
 
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
-  openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
+  openMonsterFiche, openFamilyFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
   openChestFiche, openSearchableChestFiche, openRecipeFiche, openNodeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 };

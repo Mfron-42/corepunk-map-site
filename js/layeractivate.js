@@ -57,4 +57,67 @@ function activateFamilyLayers(fams) {
   revealMonsterNode('family', first);
 }
 
-export { activateSpeciesLayer, activateFamilyLayers };
+/* Nœud GÉNÉRIQUE de l'arbre de filtres (mission "search categories"
+   2026-07-11c — kind de camp/décor/type de POI/bucket Interactables…) :
+   contrairement à activateSpeciesLayer/activateFamilyLayers ci-dessus (qui
+   mutent l'état S.* directement puis republient l'arbre), CE geste-ci
+   réutilise la case RÉELLE de la ligne — `.click()` NATIF sur son <input>,
+   jamais un `checked=true` + Event('change') fabriqué à la main : ça
+   déclenche la cascade EXACTE d'un clic utilisateur (toggle de couche,
+   cascade de sous-groupe/famille, scheduleRedraw, syncHash, republication
+   de l'arbre) sans qu'AUCUNE règle de cascade ne soit réimplémentée ici —
+   toute la machinerie reste dans sidebar.js, intacte.
+
+   `kind`: 'row' (ligne filterRow simple, sélecteur par data-fkey) ou
+   'bucket' (sous-groupe à pastille — POI/Coffres/Destructibles/…,
+   sélecteur par data-subgroup + .subgrp-check). Résolu PAR CLÉ AU MOMENT
+   DU CLIC — jamais une référence DOM capturée à l'indexation (sidebar.js
+   peut avoir reconstruit l'arbre entretemps, ex. arrivée de camps.bin ou
+   changement de langue) : même exigence documentée que sidebar.js
+   activeTagInput()/buildTagEl() pour le bandeau de légende — ces deux
+   sélecteurs (2 lignes) sont dupliqués ici À L'IDENTIQUE plutôt que
+   d'exporter cette fonction privée d'un fichier verrouillé (sidebar.js,
+   propriété d'une autre mission en cours) ; data-fkey/data-subgroup/
+   .subgrp-check sont le contrat DOM stable déjà documenté par filterRow/
+   buildSubGroup elles-mêmes, aucune logique métier n'est dupliquée.
+
+   ENSURE-only (jamais un toggle, même discipline qu'activateSpeciesLayer) :
+   re-cliquer un résultat déjà coché re-révèle simplement la ligne. */
+function resolveCategoryInput(kind, key) {
+  return kind === 'bucket'
+    ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] .subgrp-check`)
+    : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] input`);
+}
+/* Révèle la ligne/le bucket fraîchement (re)ciblé : ouvre tout <details>
+   ancêtre fermé (groupe racine + bucket lui-même), flash, scroll — même
+   idiome que sidebar.js revealMonsterNode (non réutilisable telle quelle :
+   ses deux sélecteurs sont câblés sur data-species/data-fam, pas sur un
+   fkey/subgroup arbitraire), y compris la même garantie « l'ouverture
+   programmatique de <details> déclenche le 'toggle' natif, donc
+   subOpen/localStorage restent synchrones côté sidebar.js ». Aucun
+   mouvement caméra (le geste caméra reste goto/zone, inchangé). */
+function revealCategoryNode(kind, key) {
+  const target = kind === 'bucket'
+    ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] summary`)
+    : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] .filter-row`);
+  if (!target) return;
+  for (let el = target.parentElement; el; el = el.parentElement) {
+    if (el.tagName === 'DETAILS' && !el.open) el.open = true;
+  }
+  target.classList.add('node-flash');
+  setTimeout(() => target.classList.remove('node-flash'), 1600);
+  target.scrollIntoView({ block: 'nearest' });
+}
+function activateCategoryNode(kind, key) {
+  const input = resolveCategoryInput(kind, key);
+  if (!input) return;
+  // .click() natif (pas .checked=true + dispatchEvent) : simule un VRAI
+  // clic utilisateur -- toggle + 'change' + tout listener 'click' propre à
+  // la ligne (ex. wireParentCheck's stopPropagation d'un bucket) se
+  // déclenchent exactement comme si l'utilisateur avait cliqué la case
+  // lui-même. Sauté si déjà coché (ENSURE-only, jamais un dé-cochage).
+  if (!input.checked) input.click();
+  revealCategoryNode(kind, key);
+}
+
+export { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode };

@@ -20,7 +20,7 @@ import { startUpdateWatcher, refreshUpdateBannerI18n } from './updatecheck.js';
 import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
-  openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
+  openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
   openSearchableChestFiche, openRecipeFiche, openNodeFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
@@ -115,7 +115,7 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'fiche-node', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-family', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'fiche-node', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
@@ -132,6 +132,13 @@ document.addEventListener('click', e => {
     openMonsterFiche(id);
     if (spId) activateSpeciesLayer(spId);
   }
+  // Fiche FAMILLE (#82 chunk (e)) : le LIEN de nom d'une famille (étape de
+  // quête à portée famille, recherche à venir, membres de la fiche famille)
+  // ouvre sa page — SANS activer la carte : l'activation est une affordance
+  // SÉPARÉE (bouton family-layer « Afficher · N pts »), les deux gestes que
+  // l'utilisateur veut distincts (lien = fiche, bulle = carte). Pas de
+  // clic-double-effet ici, contrairement à fiche-monster.
+  else if (b.dataset.act === 'fiche-family') openFamilyFiche(id);
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
   else if (b.dataset.act === 'fiche-chest') openChestFiche(+id.split(':')[1]);
@@ -468,6 +475,11 @@ function buildDevToggle() {
       // rafraîchir republie les pastilles avec le contenu qui vient d'être
       // montré/masqué, sans perdre la variante actuellement affichée.
       if (S.openFiche?.kind === 'monster') openMonsterFiche(S.openFiche.id);
+      // Fiche FAMILLE (#82 chunk (e)) : même republication que la fiche
+      // monstre — ses membres/quêtes dépendent de S.species/S.quests fraîchement
+      // rechargés dans la nouvelle langue (le libellé de famille lui-même reste
+      // un jeton brut, mais les noms d'espèces/quêtes se retraduisent).
+      else if (S.openFiche?.kind === 'family') openFamilyFiche(S.openFiche.id);
     });
     foot.appendChild(btn);
   }

@@ -24,7 +24,7 @@ import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
 import { buildFilters } from './sidebar.js';
 import { speciesPoints, monsterFamilies } from './pointsets.js';
-import { activateSpeciesLayer, activateFamilyLayers } from './layeractivate.js';
+import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
 
 /* ── Recherche ──────────────────────────────────────────────── */
 /* Bruit technique (abilities/effets/talents internes, jamais des objets
@@ -60,8 +60,21 @@ const CAT_GLYPH = {
   // (searchCatLabel, "Famille"/"Family"…) porte l'essentiel de la
   // distinction visuelle (voir buildFamilySearchIndex/renderSearch).
   family: '🧬',
+  // Nœud GÉNÉRIQUE de l'arbre de filtres (mission "search categories"
+  // 2026-07-11c — kind de camp/décor/type de POI/bucket Interactables…) :
+  // AUCUNE clé i18n searchCat.catnode n'existe (et n'en ajoute pas ici,
+  // consigne "no new i18n strings" — un nœud d'arbre n'a de toute façon
+  // pas de nom de catégorie unique traduit : Bois/Coffres/Destructibles…
+  // sont chacun un LIBELLÉ DE LIGNE, pas une catégorie). Ce glyphe sert à
+  // la fois d'icône de repli (voir iconWithRing) et de repli de PUCE (voir
+  // searchCatLabel juste en dessous) — jamais un mot anglais codé en dur.
+  catnode: '🗂',
 };
-const searchCatLabel = key => tbl('searchCat', key) || key;
+/* Repli glyphe (jamais le jeton brut de catégorie — c'est exactement le
+   relic sweep "chest —" documenté plus haut dans ce fichier) : chaque cat
+   déjà existante a sa traduction dans les 5 dictionnaires (vérifié), donc
+   ce repli ne joue QUE pour 'catnode' ci-dessus. */
+const searchCatLabel = key => tbl('searchCat', key) || CAT_GLYPH[key] || key;
 let searchIndex = [];
 /* `body` (optionnel) : corpus de texte supplémentaire au-delà du libellé —
    une quête reste trouvable par un mot de son déroulé (objectif, texte de
@@ -77,9 +90,21 @@ let searchIndex = [];
    clic bascule d'abord dessus (voir renderSearch). `ref` = clé stable (slug de
    quête…) pour dédoublonner rich-index vs index cross-carte. Les catalogues
    globaux (objets/monstres/…) sont réindexés sur CHAQUE carte donc leur `map`
-   = carte active : jamais de badge ni de bascule pour eux, toujours dispo. */
+   = carte active : jamais de badge ni de bascule pour eux, toujours dispo.
+   `keyTokens` (facultatif, mission "search categories" 2026-07-11c) : mots
+   supplémentaires unis au libellé DANS `n`/`words` eux-mêmes (le corpus de
+   matching PREMIER NIVEAU déjà utilisé pour le titre) plutôt que poussés via
+   `body` (corpus SECONDAIRE, toujours pénalisé +1000 et donc noyé dès qu'une
+   requête a ≥24 meilleurs matches ailleurs — vérifié : la clé moteur brute
+   d'un nœud d'arbre (ex. `logging`/alias "wood") n'est pas du texte
+   accessoire, c'est un AUTRE NOM de la même ligne, au même titre que son
+   libellé affiché — jamais affiché nulle part (n'apparaît dans aucun champ
+   RENDU de l'entrée), seulement dans le corpus de correspondance. Aucun
+   changement pour tout appelant existant (keyTokens absent = comportement
+   identique à avant cette option, un simple fold(label)). */
 function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, body, opts) {
-  const n = fold(label);
+  const keyTokens = (opts && opts.keyTokens) || null;
+  const n = keyTokens && keyTokens.length ? fold([label, ...keyTokens].join(' ')) : fold(label);
   const entry = {
     label, n, words: n.split(' '), cat, hex, x, z, open,
     icon: icon || null, sub: sub || null,
@@ -243,6 +268,14 @@ function buildSearch() {
   // ce même lot) — voir buildFamilySearchIndex/buildWildSpeciesSearchIndex.
   whenDeferred(buildFamilySearchIndex);
   whenDeferred(buildWildSpeciesSearchIndex);
+  // Nœuds de l'arbre de filtres (mission "search categories" 2026-07-11c) :
+  // même garde deferredReady que les builders ci-dessus (le DOM des
+  // groupes Harvesting/Interactables/Monsters n'est complet qu'une fois
+  // camps.bin arrivé, voir sidebar.js rebuildAllGroups) — sa propre
+  // whenDeferred() entre TOUJOURS après celle de buildFilters() (appelé
+  // avant buildSearch() partout, voir main.js), donc le DOM est déjà à
+  // jour au moment de ce scan (voir buildCategorySearchIndex's doc).
+  whenDeferred(buildCategorySearchIndex);
   whenDeferred(buildLocationSearchIndex);
   whenDeferred(buildAbilitySearchIndex);
   whenDeferred(buildEventSearchIndex);
@@ -605,6 +638,99 @@ function buildWildSpeciesSearchIndex() {
   }
 }
 
+/* Alias explicites de jeton moteur -> mots anglais courants qui ne
+   s'épellent PAS dans le slug brut (mission "search categories"
+   2026-07-11c, exigence explicite du harnais : taper "wood" doit trouver
+   "Bois" en FR via la clé — le kind moteur RÉEL est `logging`
+   (campKind.logging), jamais `wood`, voir config.js/i18n campKind). Table
+   TECHNIQUE À LA MAIN, jamais affichée nulle part (nourrit seulement le
+   corpus `body` ci-dessous, même mécanisme que les alias `namesAll` des
+   monstres plus haut) — PAS une chaîne i18n (aucune traduction nouvelle,
+   aucun texte montré à l'écran). Étendre si un autre jeton s'avère aussi
+   opaque (revu par la prochaine passe de tri/score, SCOPE GUARD
+   2026-07-11c — cette table n'est qu'une SOURCE de jetons pour elle). */
+const KIND_TOKEN_ALIASES = { logging: ['wood', 'timber'] };
+// (Revu au fil de la vérification : ces jetons sont fournis à pushSearchEntry
+// via `opts.keyTokens` — corpus PREMIER NIVEAU (n/words, même tier que le
+// libellé), PAS `body` — voir la doc de pushSearchEntry plus haut. Une clé
+// moteur passée en `body` serait pénalisée +1000 et noyée dès qu'une requête
+// a ≥24 meilleurs matches ailleurs (vérifié empiriquement sur "wood" : ~24
+// entités "Wooden"/"Woods" non-liées remplissaient déjà le quota avant que
+// l'alias body-only n'ait sa chance).
+/* Jetons du SLUG moteur brut d'une clé de nœud (fkey `camp:logging` /
+   clé de sous-groupe `inter-chests`…) — découpage naïf sur les séparateurs
+   structurels, jamais un mot traduit : couvre déjà gratuitement les cas où
+   le slug est LUI-MÊME un mot anglais courant (ex. taper "chest" en FR
+   retrouve le bucket "inter-chests" via son propre jeton "chests", sans
+   alias à la main) ; KIND_TOKEN_ALIASES ci-dessus ne couvre que les rares
+   cas où ça ne suffit pas. */
+function slugTokens(key) {
+  return key.split(/[:._-]/).filter(Boolean);
+}
+function catNodeKeyTokens(key) {
+  const toks = new Set(slugTokens(key));
+  for (const t of [...toks]) for (const alias of (KIND_TOKEN_ALIASES[t] || [])) toks.add(alias);
+  return [...toks];
+}
+/* Nœuds COCHABLES de l'arbre de filtres (mission "search categories"
+   2026-07-11c) : indexe CHAQUE ligne/bucket du panneau gauche — kind de
+   camp (harvest/world/other), famille décor, type de POI, bucket
+   Interactables/Coffres/POI à pastille — comme un résultat de recherche
+   activable au clic (layeractivate.js activateCategoryNode, `.click()`
+   natif sur la case RÉELLE de la ligne — même cascade EXACTE qu'un clic
+   utilisateur, AUCUNE règle de cascade réimplémentée ici).
+
+   SAUF : lignes FAMILLE (data-fam — déjà indexées par
+   buildFamilySearchIndex ci-dessus avec leur propre contexte camps/pts et
+   leur propre activation setFamilyOn, jamais dédoublées ici) et lignes
+   ESPÈCE (data-species — catalogue GLOBAL déjà couvert par
+   buildMonsterSearchIndex/buildWildSpeciesSearchIndex, pas seulement ce
+   qui est actuellement rendu dans l'arbre).
+
+   Scan APRÈS que l'arbre soit rendu : mis en file par whenDeferred (voir
+   buildSearch ci-dessous) — buildFilters() est TOUJOURS appelé avant
+   buildSearch() à chaque cycle de vie partagé (boot/setLang/bascule
+   carte/dev-toggle, voir main.js), son whenDeferred(rebuildAllGroups)
+   entre donc TOUJOURS en tête de la même file FIFO (data.js
+   onDeferredReady) — le DOM est déjà complet au moment de CE scan. Le
+   `key` (fkey/clé de sous-groupe) est RETENU pour l'activation (résolu à
+   nouveau par sélecteur au clic, voir layeractivate.js) — jamais une
+   référence DOM capturée ici, qui deviendrait caduque au premier rebuild
+   de l'arbre (langue, carte, cascade d'un bucket…).
+
+   Libellé = texte RENDU (.flabel), déjà localisé par sidebar.js — aucune
+   nouvelle clé i18n ici. Sous-libellé = le compte RENDU (.fcount, un
+   nombre nu déjà affiché tel quel dans l'arbre — pas un mot à traduire).
+   Couleur = la VRAIE couleur de la ligne/du bucket (.swatch / --dot),
+   jamais une teinte générique — voir iconWithRing pour la puce ronde
+   assortie (mission : "the row's colored dot if recoverable"). */
+function buildCategorySearchIndex() {
+  const filters = document.getElementById('filters');
+  if (!filters) return;
+  filters.querySelectorAll('li[data-fkey]').forEach(li => {
+    if (li.dataset.fam) return;   // ligne famille : buildFamilySearchIndex ci-dessus
+    const key = li.dataset.fkey;
+    const label = li.querySelector('.flabel')?.textContent.trim();
+    if (!label) return;
+    const hex = li.querySelector('.swatch')?.style.background || '#888';
+    const sub = li.querySelector('.fcount')?.textContent.trim() || null;
+    pushSearchEntry(label, 'catnode', hex, null, null,
+      () => activateCategoryNode('row', key), null, sub, null, 0,
+      null, { ref: 'catnode:row:' + key, keyTokens: catNodeKeyTokens(key) });
+  });
+  filters.querySelectorAll('details.decor-group[data-subgroup]').forEach(det => {
+    const key = det.dataset.subgroup;
+    const summary = det.querySelector(':scope > summary');
+    const label = summary?.querySelector('.flabel')?.textContent.trim();
+    if (!label) return;
+    const hex = summary.querySelector('.subgrp-check')?.style.getPropertyValue('--dot').trim() || '#888';
+    const sub = summary.querySelector('.fcount')?.textContent.trim() || null;
+    pushSearchEntry(label, 'catnode', hex, null, null,
+      () => activateCategoryNode('bucket', key), null, sub, null, 0,
+      null, { ref: 'catnode:sub:' + key, keyTokens: catNodeKeyTokens(key) });
+  });
+}
+
 /* Bestiaire/lore (MapMarkers.xml) : index = clé de fiche (S.locations est un
    tableau, pas un objet). Sous-libellé = nature (Ville/Bestiaire/Ressource…) ;
    position quand connue (38/208 depuis un pin _ip, le reste sans coordonnée
@@ -791,6 +917,13 @@ function variantLayers(it) {
    active pas côté CSS (voir style.css .sr-var) -- rien ne change pour qui ne
    survole/active jamais la ligne. */
 function iconWithRing(it) {
+  // Nœud d'arbre (mission "search categories" 2026-07-11c) : pas d'icône
+  // d'entité — une puce RONDE de la VRAIE couleur de la ligne/du bucket
+  // (mission : "the row's colored dot if recoverable"), même recette
+  // visuelle que .swatch/.atag-dot (voir style.css .sr-cat-dot) plutôt
+  // qu'un glyphe qui redirait la même chose que la puce de catégorie
+  // juste à côté (celle-ci montre déjà le glyphe neutre, voir CAT_GLYPH).
+  if (it.cat === 'catnode') return `<span class="sr-icon sr-cat-dot" style="background:${it.hex};--c:${it.hex}"></span>`;
   const img = iconTag(it.icon, 'sr-icon', it.glyph);
   if (!it.ring || it.ring.length < 2) return img;
   const title = it.ring.map(s => rarityLabel(s.rarity)).join(' · ');
