@@ -2,68 +2,72 @@
    Précédent/Suivant (pushFocusState/unfocus). Bas niveau : ne restaure
    rien lui-même (voir router.js pour applyLocationState). */
 import { S } from './state.js';
-import { CATS } from './config.js';
+import { CATS, familyKey } from './config.js';
 import { map, toWorld } from './mapview.js';
 
 /* ── URL (hash) ─────────────────────────────────────────────── */
+/* HYGIÈNE DE HASH (2026-07-11, demande utilisateur : « le hash a perdu son
+   économie » — 8 jetons poi.* sérialisés alors que tout-ON est le défaut).
+   SCHÉMA (écrivain STRICT, lecteur LIBÉRAL) :
+   - L'écrivain n'émet plus `on=` (énumération complète de l'état) mais
+     `flt=` : UNIQUEMENT les DELTAS par rapport à l'état PAR DÉFAUT. Une
+     couche à son défaut (ON ou OFF) n'écrit RIEN ; la vue par défaut donne
+     un hash minimal `#x=…&z=…&zm=…&lang=…`.
+   - Grammaire `flt=` : mêmes jetons que `on=` (npc, camp.<kind>,
+     decor.<fam>, poi.<type>, monfam.<f>, monsp.<id>, zones, devcontent) ;
+     préfixe `-` = négation (couche par-défaut-ON éteinte). Repli complet :
+     `-poi` = les 8 sous-types POI éteints (l'inverse, tout-ON, est le
+     défaut et n'écrit rien).
+   - REPLI PARENT familles (« l'arbre est le bestiaire ») : une famille
+     cochée s'écrit `monfam.<f>` SEUL — la restauration rejoue la cascade
+     (setFamilyOn, router.js) qui recoche toutes ses espèces ; plus jamais N
+     jetons monsp.*. Une espèce décochée SOUS une famille cochée s'écrit en
+     exclusion `-monsp.<id>` (appliquée APRÈS la cascade) ; une espèce
+     cochée SANS sa famille s'écrit explicitement `monsp.<id>`. (Avant
+     l'arrivée des données différées, S.species est vide : l'écrivain émet
+     alors les jetons monfam/monsp tels quels — aucun état partiel ne peut
+     encore exister, la dégradation est sûre.)
+   - COMPAT LECTURE : un lien LEGACY `on=…` (énumération complète) se lit
+     exactement comme avant (branche `on` de readHash, intacte) — l'écrivain
+     seul devient strict. Un hash sans `on=` ni `flt=` = défauts (inchangé).
+   Vérifié par harnais : aller-retour état→hash→reload→état identique, hash
+   minimal en vue par défaut, repli poi/famille, exclusion d'espèce
+   ( §hash). */
+const CATS_DEFAULT_ON = Object.fromEntries(Object.entries(CATS).map(([k, v]) => [k, !!v.on]));
+function fltTokens() {
+  const t = [];
+  for (const [k, v] of Object.entries(CATS)) {
+    // quest/poi : entrées mortes (hex seul), jamais sérialisées — voir les
+    // notes legacy de l'ancien writer, conservées dans readHash ci-dessous.
+    if (k === 'quest' || k === 'poi') continue;
+    if (!!v.on !== CATS_DEFAULT_ON[k]) t.push(v.on ? k : '-' + k);
+  }
+  const poiKeys = Object.keys(S.poiTypes);
+  const poiOff = poiKeys.filter(k => !S.poiTypes[k].on);
+  if (poiKeys.length && poiOff.length === poiKeys.length) t.push('-poi');
+  else for (const k of poiOff) t.push('-poi.' + k);
+  for (const [k, v] of Object.entries(S.camps)) if (v.on && k !== 'quest') t.push('camp.' + k);
+  for (const [k, v] of Object.entries(S.decor)) if (v.on) t.push('decor.' + k);
+  for (const [f, v] of Object.entries(S.monfam)) if (v.on) t.push('monfam.' + f);
+  for (const [id, v] of Object.entries(S.monsp)) {
+    const sp = (S.species || {})[id];
+    const famOn = sp ? !!S.monfam[familyKey(sp.family || 'other')]?.on : false;
+    if (v.on && !famOn) t.push('monsp.' + id);
+    else if (!v.on && famOn) t.push('-monsp.' + id);
+  }
+  if (S.zonesOn) t.push('zones');
+  if (S.devOn) t.push('devcontent');
+  return t;
+}
 function buildHash() {
   const c = toWorld(map.getCenter());
-  const on = [
-    // `quest` (config.js CATS.quest) is excluded here on purpose: its own
-    // filter row + map dot layer were removed (2026-07-11, "NPCs hold their
-    // quests" -- see main.js registerAllDenseRenderers/sidebar.js
-    // buildGroupQuests) but the CATS entry itself stays, only for its
-    // `.hex` (the quest-violet color, reused by chips/links all over
-    // fiches.js/popups.js/search.js and by the tracked-list). Its `.on`
-    // therefore no longer drives anything -- serializing it here would just
-    // bake a phantom, permanently-true token into every freshly-built
-    // share link (nothing to toggle it off from, since there is no more
-    // row). readHash() below still tolerates a LEGACY `on=quest` token from
-    // an old shared link without crashing (Object.keys(CATS) still finds
-    // the key, sets its dead `.on` -- a genuine no-op, nothing reads it).
-    // 'poi' (config.js CATS.poi) also excluded here, same reasoning as 'quest'
-    // just above: its single on/off flag was replaced by 8 granular
-    // `poiTypes.<type>` tokens (job pass 2026-07-11b, poiType sub-rows under
-    // World — see sidebar.js buildPoiSubGroup). CATS.poi.on is no longer
-    // written by any checkbox (only `.hex` is still read, by chips/popups
-    // that need the POI color) -- serializing its stale value here would
-    // bake a redundant/wrong bare `poi` token into every fresh share link.
-    // readHash() below still tolerates a LEGACY bare `on=...,poi,...` token
-    // (pre-split shared link) as "all 8 sub-types ON" — see router.js.
-    ...Object.entries(CATS).filter(([k, v]) => v.on && k !== 'quest' && k !== 'poi').map(([k]) => k),
-    // Sous-catégories POI (S.poiTypes, job pass 2026-07-11b) : même principe
-    // que decor.*/camp.* ci-dessous — un jeton `poi.<type>` par sous-ligne
-    // actuellement ON (toutes ON par défaut, contrairement à decor/camp).
-    ...Object.entries(S.poiTypes).filter(([, v]) => v.on).map(([k]) => 'poi.' + k),
-    // 'quest' excluded here too (camp:quest row retired 2026-07-11 — see
-    // sidebar.js buildGroupQuests/router.js applyCampFilters): S.camps.quest
-    // is now locked to `on:false` forever (router.js never flips it back on
-    // from a legacy hash), so this filter would never emit it anyway — kept
-    // explicit for the same self-documenting reason as the CATS.quest
-    // exclusion just above, not because it's currently reachable.
-    ...Object.entries(S.camps).filter(([k, v]) => v.on && k !== 'quest').map(([k]) => 'camp.' + k),
-    // Sous-filtre "Décor" (S.decor, décoché par défaut) — même principe
-    // camp.* ci-dessus : chaque famille actuellement cochée est listée
-    // telle quelle, voir sidebar.js buildDecorGroup/data.js buildDecorGroups.
-    ...Object.entries(S.decor).filter(([, v]) => v.on).map(([k]) => 'decor.' + k),
-    // Sous-couches « Par famille » (#82 chunk (b), S.monfam — token famille
-    // post-alias, jamais le libellé affiché) : même principe camp.*/decor.*
-    // ci-dessus. Sérialisées même si la carte active n'a aucun camp joint
-    // pour la famille (l'état survit à la bascule de carte, la ligne/le
-    // rendu se résolvent par carte — voir js/pointsets.js familyCampSet).
-    ...Object.entries(S.monfam).filter(([, v]) => v.on).map(([k]) => 'monfam.' + k),
-    // Couches ESPÈCE (#82 chunk (d), S.monsp — id d'espèce moteur, stable
-    // ×langues/cartes) : même sérialisation que monfam.* ; la restauration
-    // est en revanche ENSURE-only (jamais un décochage par restauration —
-    // voir js/specieslayer.js applySpeciesTokens + router.js).
-    ...Object.entries(S.monsp).filter(([, v]) => v.on).map(([k]) => 'monsp.' + k),
-    ...(S.zonesOn ? ['zones'] : []),
-    // Contenu dev révélé (feature #13, tag en bas du panneau — voir
-    // main.js buildDevToggle) : même idiome que `zones` ci-dessus, un
-    // simple jeton dans `on=` plutôt qu'un paramètre dédié.
-    ...(S.devOn ? ['devcontent'] : []),
-  ];
-  let h = `#x=${Math.round(c.x)}&z=${Math.round(c.z)}&zm=${map.getZoom().toFixed(2)}&on=${on.join(',')}&lang=${S.lang}`;
+  /* (L'ancien inventaire complet `on=` — un jeton par couche ON, quel que
+     soit le défaut — est REMPLACÉ par les deltas fltTokens() ci-dessus. Ses
+     exclusions historiques quest/poi et leurs raisons restent documentées
+     dans readHash, qui continue de LIRE `on=` pour les liens legacy. Le
+     paramètre `on=` n'est plus JAMAIS écrit.) */
+  const flt = fltTokens();
+  let h = `#x=${Math.round(c.x)}&z=${Math.round(c.z)}&zm=${map.getZoom().toFixed(2)}${flt.length ? '&flt=' + flt.join(',') : ''}&lang=${S.lang}`;
   // `map=` n'est ajouté QUE hors Kwalat : les liens Kwalat existants restent
   // byte-identiques (rétro-compat — absence de map= ⇒ Kwalat, cf. readHash).
   if (S.map && S.map !== 'Kwalat') h += `&map=${S.map}`;
@@ -100,8 +104,39 @@ map.on('moveend', syncHash);
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   const view = p.has('x') ? { x: +p.get('x'), z: +p.get('z'), zm: +p.get('zm') || 2 } : null;
-  let onSet = null;
-  if (p.has('on')) {
+  let onSet = null, fltFamilies = null, fltSpeciesOff = null;
+  if (p.has('flt')) {
+    // Nouveau schéma DELTA (voir l'en-tête hygiène de hash) : reconstruire
+    // l'ÉTAT COMPLET équivalent (le même Set de jetons « ON » que produisait
+    // un `on=` legacy) à partir des défauts + deltas — tout le code aval
+    // (application CATS/zones/dev ci-dessous, router.js) reste identique
+    // pour les deux formes. Particularités :
+    // - `monfam.<f>` note aussi la famille dans fltFamilies : router.js
+    //   rejoue la CASCADE (setFamilyOn) à l'arrivée des espèces — le repli
+    //   parent recoche toutes les espèces de la famille ;
+    // - `-monsp.<id>` (exclusion sous famille cochée) va dans fltSpeciesOff,
+    //   appliqué APRÈS la cascade (router.js).
+    onSet = new Set(Object.entries(CATS_DEFAULT_ON)
+      .filter(([k, d]) => d && k !== 'quest' && k !== 'poi').map(([k]) => k));
+    for (const t of Object.keys(S.poiTypes)) onSet.add('poi.' + t);
+    fltFamilies = []; fltSpeciesOff = [];
+    for (const raw of p.get('flt').split(',').filter(Boolean)) {
+      const neg = raw.startsWith('-');
+      const tok = neg ? raw.slice(1) : raw;
+      if (tok === 'poi') {   // repli complet : les 8 sous-types d'un coup
+        for (const t of Object.keys(S.poiTypes)) neg ? onSet.delete('poi.' + t) : onSet.add('poi.' + t);
+        continue;
+      }
+      if (neg && tok.startsWith('monsp.')) { fltSpeciesOff.push(tok.slice(6)); continue; }
+      if (!neg && tok.startsWith('monfam.')) fltFamilies.push(tok.slice(7));
+      neg ? onSet.delete(tok) : onSet.add(tok);
+    }
+    for (const k of Object.keys(CATS)) CATS[k].on = onSet.has(k);
+    S.zonesOn = onSet.has('zones');
+    S.devOn = onSet.has('devcontent');
+  } else if (p.has('on')) {
+    // Forme LEGACY (liens partagés avant l'hygiène de hash) : énumération
+    // complète de l'état — lecture inchangée, le lecteur reste libéral.
     onSet = new Set(p.get('on').split(',').filter(Boolean));
     // A legacy link's `on=...,quest,...` token (from before the quest dot
     // layer/filter row were removed, see buildHash() above) is tolerated
@@ -133,7 +168,8 @@ function readHash() {
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {
-    view, onSet, quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
+    view, onSet, fltFamilies, fltSpeciesOff,
+    quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
     npc: p.get('npc'), monster: p.get('mon'), at, atl: p.get('atl') || null,
     map: p.get('map') || 'Kwalat',   // absent ⇒ Kwalat (rétro-compat des liens existants)
   };

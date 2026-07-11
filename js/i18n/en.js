@@ -48,7 +48,7 @@ export default {
       // at all — see interactives_taxonomy_INVESTIGATION.md §5); the honest
       // "unidentified spawns" row for kind camps with NO species binding
       // (its count is exactly what the layer draws, see pointsets.js
-      // KIND_REST_ONLY; now serves ALL THREE Monsters/Creeps/Wildlife root
+      // kindRestPoints (règle rest-only universelle, data-dérivée); now serves ALL THREE Monsters/Creeps/Wildlife root
       // groups symmetrically — the old monsterCampsRow "Monster camps"
       // coarse toggle is retired); and the "(camps)" disambiguation of the
       // dynamic-spawn kinds sitting next to PLACED decor props inside the
@@ -86,7 +86,7 @@ export default {
       filterHiddenTooltip: n => `${n} without a known position`,
       // (decorFamiliesTitle removed 2026-07-11 with the dissolved "Decor"
       // group — its family rows now live inside the Interactables buckets,
-      // see js/sidebar.js DECOR_BUCKET. decorGroupLabel below stays: still
+      // see js/sidebar.js decorFamsOfCategory (catégorie cuite des records — l’ancienne table DECOR_BUCKET est supprimée, ontology chunk 2). decorGroupLabel below stays: still
       // used by config.js chestKindLabel for fiche/popup kind lines.)
       // "By family" sub-group under Monsters & wildlife (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup). familyCampsN: honest camp

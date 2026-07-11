@@ -171,13 +171,12 @@ function campPopup(p, n) {
   // affiche au minimum les points de spawn + le butin probable des
   // contenants typés — voir openCampFiche).
   const ficheBtn = `<div class="pop-actions"><button class="act primary" data-act="fiche-camp" data-id="${esc(g.k)}">${esc(tr('campFicheBtn'))}</button></div>`;
-  // Titre : nom EXPÉDIÉ (g.name, pipeline pass 2026-07-11b — kind token
-  // retiré, vocabulaire ffm-* splitté côté pipeline) via campLabel (config.js
-  // — les kinds interactables typés gardent campDisplayName, seul à extraire
-  // le sous-type tonneau/sac/…), + chip qualificatif (— Patrouille /
+  // Titre : nom EXPÉDIÉ (g.name) + SOUS-TYPE CUIT (g.subtype — ontology
+  // chunk 2) via campLabel (config.js — LE formateur unique, qui lit les
+  // champs de classification du record), + chip qualificatif (— Patrouille /
   // — Renforcé (PvP)) quand le camp en porte un.
   return `<div class="pop">
-    <h3>${esc(campLabel(g.k, g.kind, g.name))}${campQualifierChip(g.qualifier)}</h3>
+    <h3>${esc(campLabel(g.k, g.kind, g.name, g.subtype))}${campQualifierChip(g.qualifier)}</h3>
     <div class="pop-cat" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}${n > 1 ? esc(tr('pointsHereSuffix', n)) : ''}</div>
     <span class="pop-coords">${fmtCoord(p.x, p.z)} · ${esc(tr('spawnsTotal', g.pts.length))}</span>
     ${extra}${ficheBtn}</div>`;

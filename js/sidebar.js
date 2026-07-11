@@ -146,37 +146,19 @@ function catStats(key) {
 /* ── Le groupe « Décor » est DISSOUS (IA finale, décision utilisateur
    2026-07-11 : « c'est soit interactives soit destroyable, et tu as
    chest ») : ses 7 familles (S.decor, données INCHANGÉES — data.js
-   buildDecorGroups, couches decor:<fam>, hash decor.*) sont re-rangées
-   D'AFFICHAGE dans les sous-groupes du groupe Interactables, chacune selon
-   sa nature (voir DECOR_BUCKET ci-dessous). Toujours toutes décochées par
-   défaut (DATA_CONTRACT.md §1/§3.1) et pleinement recherchables
-   (search.js buildChestSearchIndex ne filtre jamais sur l'état on/off).
-
-   INTERIM — replaced by pipeline-level canonical classification (see
-    enforcement plan); delete this map when records ship
-   category/subtype fields.
-
-   Jugement par famille (affichage SEUL, la donnée ne bouge pas) :
-   - legacy    → chests        (coffre-trésor hérité : prop skinné COFFRE)
-   - barrel    → destroyable   (tonneaux : prop cassable — même vocabulaire
-                                que les camps destroyable « explosive barrels »)
-   - boxes     → destroyable   (caisses : prop cassable, même famille de
-                                vocabulaire que les crates destroyable)
-   - furniture → interactives  (mobilier — armoires/frigos/étagères : on
-                                l'OUVRE/fouille, prop ambiant, jamais cassé)
-   - corpse    → interactives  (cadavres : fouille par interaction — même
-                                nature que les camps searchable « corpses »)
-   - books     → interactives  (livres/papiers : prop ambiant consultable)
-   - misc      → other         (divers : nature indéterminable depuis les
-                                données — rangé honnêtement en « Autres ») */
-const DECOR_BUCKET = {
-  legacy: 'chests',
-  barrel: 'destroyable', boxes: 'destroyable',
-  furniture: 'interactives', corpse: 'interactives', books: 'interactives',
-  misc: 'other',
-};
-const decorFamsOf = bucket =>
-  DECOR_FAMILIES.filter(f => DECOR_BUCKET[f] === bucket && S.decor[f]);
+   buildDecorGroups, couches decor:<fam>, hash decor.*) se rangent dans les
+   sous-groupes du groupe Interactables selon leur `category` CUITE
+   (ontology chunk 2 — data/SCHEMA.md « Chest/decor placements » :
+   legacy→interactable.chests, barrel/boxes→interactable.destroyable,
+   furniture/corpse/books→interactable.reactive, misc→interactable.other).
+   L'ancienne table d'affichage DECOR_BUCKET (le même rangement, jugé côté
+   front) est SUPPRIMÉE : le front LIT la classification, il ne re-juge
+   plus. Toujours toutes décochées par défaut (DATA_CONTRACT.md §1/§3.1) et
+   pleinement recherchables (search.js buildChestSearchIndex ne filtre
+   jamais sur l'état on/off). Ordre d'affichage intra-bucket =
+   DECOR_FAMILIES (présentation, config.js). */
+const decorFamsOfCategory = cat =>
+  DECOR_FAMILIES.filter(f => S.decor[f] && (S.decor[f].category || 'interactable.other') === cat);
 /* Ligne de filtre d'UNE famille décor (ex-sous-ligne du groupe Décor —
    mêmes couche/hash/état, seule la position dans l'arbre change). */
 function decorRow(fam, extraClass = 'filter-row-sub') {
@@ -269,6 +251,20 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
     // Une espèce (dé)cochée fait basculer l'état partiel/coché de sa ligne
     // famille et des parents au-dessus (cascade, IA finale).
     refreshParentChecks();
+  });
+  // Ergonomie de ligne (demande utilisateur 2026-07-11) : TOUTE la ligne
+  // bascule la case — méta « N camps · M pts », padding, espace vide —
+  // SAUF le NOM (lien fiche, data-act, géré par le délégué global main.js)
+  // et la pastille .sp-check elle-même (label natif : il bascule déjà —
+  // re-basculer ici l'annulerait). Les lignes filterRow classiques sont des
+  // <label> englobants (déjà toute-la-ligne) ; seule cette ligne espèce,
+  // structurée en <div> pour séparer nom-lien et case, avait des zones
+  // mortes.
+  li.querySelector('.species-row').addEventListener('click', e => {
+    if (e.target.closest('.sp-check') || e.target.closest('[data-act]')) return;
+    const input = li.querySelector('input');
+    input.checked = !input.checked;
+    input.dispatchEvent(new Event('change'));
   });
   return li;
 }
@@ -375,11 +371,13 @@ function familyRowLi(fam, f, hex, withNode) {
 }
 /* Dernière ligne d'un groupe Monsters/Creeps/Wildlife : les camps du kind
    SANS aucune espèce jointe (« Spawns non identifiés » — compte honnête
-   kindRestPoints = exactement ce que la couche kind dessine, tous ces kinds
-   étant rest-only, voir pointsets.js KIND_REST_ONLY). Symétrie des trois
-   groupes (correction structure 2026-07-11) : lignes espèce/famille
-   d'abord, UNE ligne honnête « non identifiés » en dernier. Token de hash
-   camp.<kind> inchangé. */
+   kindRestPoints = exactement ce que la couche kind dessine : la règle
+   rest-only est UNIVERSELLE et dérivée de la donnée — un camp joint à une
+   espèce n'est jamais dessiné par sa ligne kind, voir pointsets.js
+   kindRestPoints/main.js compositeCampPoints ; l'ancien set front
+   KIND_REST_ONLY est supprimé). Symétrie des trois groupes (correction
+   structure 2026-07-11) : lignes espèce/famille d'abord, UNE ligne honnête
+   « non identifiés » en dernier. Token de hash camp.<kind> inchangé. */
 function appendKindRestRow(ul, kind) {
   const st = S.camps[kind];
   if (!st) return;
@@ -402,7 +400,7 @@ function appendKindRestRow(ul, kind) {
                         est RETIRÉE, jugée inutile — la cascade des lignes
                         suffit) + dernière ligne honnête « Spawns non
                         identifiés » (camps monsters sans espèce jointe,
-                        rest-only — voir appendKindRestRow/KIND_REST_ONLY)
+                        rest-only — voir appendKindRestRow/kindRestPoints)
      3. Creeps        — familles jointes rat/ratmutant (copies MIROIR,
                         présence DOUBLE assumée : le moteur les spawne sous
                         les 2 kinds) + espèces wild (turkey/rabbit/fox/
@@ -413,27 +411,49 @@ function appendKindRestRow(ul, kind) {
                         « 0 camp connu ») + « Spawns non identifiés »
      5. Harvesting    — Herbalism · Logging · Mining (inchangé)
      6. Interactables — Chests · Destroyable · Interactives · Other
-                        (le groupe Décor y est dissous, voir DECOR_BUCKET)
+                        (le groupe Décor y est dissous par sa `category`
+                        cuite, voir decorFamsOfCategory)
    Les trois groupes 2-4 sont SYMÉTRIQUES : espèces/familles d'abord, une
    ligne « non identifiés » en dernier. MÊMES lignes (filterRow/hiddenBadge),
-   MÊME hash `on=`/`camp.*`/`decor.*`/`monfam.*`/`monsp.*`/`poi.*`
-   (urlstate.js lit l'ÉTAT, jamais une position DOM).
+   MÊME hash `camp.*`/`decor.*`/`monfam.*`/`monsp.*`/`poi.*` (urlstate.js
+   lit l'ÉTAT, jamais une position DOM).
 
-   INTERIM — replaced by pipeline-level canonical classification (see
-    enforcement plan); delete this map when records ship
-   category/subtype fields. (Rangement kind→groupe/sous-groupe d'AFFICHAGE,
-   même dette que DECOR_BUCKET ci-dessus.) */
-const KIND_PLACEMENT = {
-  world: ['shrines', 'soulkeeper', 'guards'],   // + guards : libellé honnête, voir buildGroupWorld
-  worldOthers: ['other'],                       // sous-groupe « Others » (la ligne camp:other — les familles
-                                                // d'icônes POI ont leur PROPRE sous-groupe, buildPoiSubGroup)
-  // (monstersKind/kindSubGroups RETIRÉS — correction de structure
-  // utilisateur 2026-07-11 : Monsters/Creeps/Wildlife sont désormais trois
-  // GROUPES RACINE symétriques, voir buildGroupMonsters/buildKindGroup.)
-  harvest: ['herbalism', 'logging', 'mining'],
-  interDestroyable: ['destroyable'],
-  interInteractives: ['reactive', 'searchable'],
+   Rangement kind→groupe DÉRIVÉ DE LA DONNÉE (ontology chunk 2) : chaque
+   groupe de camp expédie sa `category` canonique (data/SCHEMA.md « Camp
+   category » — world.* / harvest.* / interactable.* / monsters / creeps /
+   wildlife / quest.pool / event.pool / unclassified, kind→category vérifié
+   1:1 par carte) ; l'ancienne table d'affichage KIND_PLACEMENT est
+   SUPPRIMÉE, le panneau LIT la catégorie. quest.pool/event.pool sont des
+   catégories HONNÊTEMENT hors-panneau (pools dynamiques consommés par les
+   fiches quête/événements — l'IA finale a retiré leurs lignes) : jamais de
+   ligne, jamais un silence accidentel. `unclassified` (kinds hors arbre :
+   abandoned/extraction/bg/other) va au sous-groupe World > Others.
+   ORDRE des lignes (présentation ◇, pas une classification) : world.* par
+   points décroissants ; harvest.* et interactable.* par catégorie
+   (alphabétique) — les deux reproduisent l'ordre historique sur toutes les
+   cartes expédiées (vérifié avant bascule). */
+function campKindEntries() {
+  return Object.entries(S.camps)
+    .filter(([, st]) => st.groups.length)
+    .map(([kind, st]) => ({ kind, cat: st.groups[0].category || 'unclassified', pts: st.points.length }));
+}
+function kindsOfCategory(pred, byPtsDesc = false) {
+  const hit = campKindEntries().filter(e => pred(e.cat));
+  hit.sort(byPtsDesc
+    ? (a, b) => b.pts - a.pts || a.kind.localeCompare(b.kind)
+    : (a, b) => a.cat.localeCompare(b.cat) || a.kind.localeCompare(b.kind));
+  return hit.map(e => e.kind);
+}
+/* Surcharges d'AFFICHAGE par kind (libellés i18n, jamais une
+   classification) : gardes honnêtes, désambiguïsation « (camps) » des kinds
+   dynamiques rangés à côté de props placés — voir buildGroupContainers. */
+const CAMP_ROW_LABEL_KEY = {
+  guards: 'guardsRowLabel',
+  destroyable: 'destroyableCampsRow',
+  reactive: 'reactiveCampsRow',
+  searchable: 'searchSpotsRow',
 };
+const campRowLabel = kind => CAMP_ROW_LABEL_KEY[kind] ? tr(CAMP_ROW_LABEL_KEY[kind]) : null;
 
 /* Ligne de filtre CATS (npc/poi/qao/workshop/searchable_chest/camp_chest) --
    même corps que l'ancienne boucle Object.entries(CATS) de buildFilters(),
@@ -526,7 +546,7 @@ const catLeaf = key => ({ get: () => !!CATS[key].on, set: on => { CATS[key].on =
 const campLeaf = kind => ({ get: () => !!S.camps[kind]?.on, set: on => { if (S.camps[kind]) S.camps[kind].on = on; } });
 const decorLeaf = fam => ({ get: () => !!S.decor[fam]?.on, set: on => { if (S.decor[fam]) S.decor[fam].on = on; } });
 const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
-const decorLeavesOfBucket = bucket => decorFamsOf(bucket).map(decorLeaf);
+const decorLeavesOfCategory = cat => decorFamsOfCategory(cat).map(decorLeaf);
 /* Familles (arbre) jointes à ≥1 camp d'un kind donné ici — lignes famille
    MIROIR du groupe Creeps (rat/ratmutant : le moteur les spawne sous
    monsters ET creeps, présence double assumée — même état S.monfam, même
@@ -536,10 +556,14 @@ function famsOfKind(kind) {
     .map((f, i) => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyHexByRank(i) }))
     .filter(f => [...f.campKeys].some(k => campGroupByKey(k)?.kind === kind));
 }
-const chestsLeaves = () => [catLeaf('searchable_chest'), catLeaf('camp_chest'), ...decorLeavesOfBucket('chests')];
-const destroyableLeaves = () => [...campLeavesOf(KIND_PLACEMENT.interDestroyable), ...decorLeavesOfBucket('destroyable')];
-const interactivesLeaves = () => [...campLeavesOf(KIND_PLACEMENT.interInteractives), ...decorLeavesOfBucket('interactives')];
-const interOtherLeaves = () => [catLeaf('qao'), ...decorLeavesOfBucket('other')];
+/* Kinds de camp de chaque bucket Interactables — DÉRIVÉS de la catégorie
+   cuite (voir kindsOfCategory ci-dessus), plus jamais une liste front. */
+const destroyableKinds = () => kindsOfCategory(c => c === 'interactable.destroyable');
+const interactivesKinds = () => kindsOfCategory(c => c === 'interactable.reactive' || c === 'interactable.searchable');
+const chestsLeaves = () => [catLeaf('searchable_chest'), catLeaf('camp_chest'), ...decorLeavesOfCategory('interactable.chests')];
+const destroyableLeaves = () => [...campLeavesOf(destroyableKinds()), ...decorLeavesOfCategory('interactable.destroyable')];
+const interactivesLeaves = () => [...campLeavesOf(interactivesKinds()), ...decorLeavesOfCategory('interactable.reactive')];
+const interOtherLeaves = () => [catLeaf('qao'), ...decorLeavesOfCategory('interactable.other')];
 
 /* Registre des pastilles parent de sous-groupe (reconstruites à chaque
    rebuild de l'arbre). (L'ancien registre STATIQUE des groupes racine —
@@ -691,16 +715,23 @@ function buildGroupWorld() {
   buildPoiSubGroup(ul);
   ul.appendChild(catRow('workshop'));
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
-  for (const kind of KIND_PLACEMENT.world) {
-    const li = campRow(kind, kind === 'guards' ? tr('guardsRowLabel') : null);
+  // Lignes camp du groupe World : les kinds de catégorie cuite `world.*`
+  // (shrines/soulkeeper/guards aujourd'hui — data/SCHEMA.md), points
+  // décroissants (présentation, voir l'en-tête « Arbre de couches »).
+  for (const kind of kindsOfCategory(c => c.startsWith('world.'), true)) {
+    const li = campRow(kind, campRowLabel(kind));
     if (li) ul.appendChild(li);
   }
-  const otherRow = campRow('other', null, 'filter-row-sub');
-  if (otherRow) {
-    const st = S.camps.other;
+  // Sous-groupe « Others » : les kinds `unclassified` (hors-arbre honnête —
+  // abandoned/extraction/bg, repliés en kind `other` par le pipeline).
+  // quest.pool/event.pool restent hors panneau (voir l'en-tête).
+  const otherKinds = kindsOfCategory(c => c === 'unclassified');
+  const otherRows = otherKinds.map(k => campRow(k, null, 'filter-row-sub')).filter(Boolean);
+  if (otherRows.length) {
+    const total = otherKinds.reduce((s, k) => s + (S.camps[k]?.points.length || 0), 0);
     const grp = buildSubGroup('world-others', tr('subWorldOthers'), CAMP_COLORS.other,
-      () => campLeavesOf(KIND_PLACEMENT.worldOthers), st.points.length);
-    grp.ul.appendChild(otherRow);
+      () => campLeavesOf(otherKinds), total);
+    for (const r of otherRows) grp.ul.appendChild(r);
     ul.appendChild(grp.li);
   }
 }
@@ -718,8 +749,9 @@ function buildGroupWorld() {
    cascade des pastilles couvre tout-cocher/tout-décocher). Dernière ligne :
    « Spawns non identifiés » (camps monsters SANS espèce jointe, rest-only —
    remplace l'ancienne bascule grossière « Camps de monstres », dont le
-   compte incluait des camps déjà couverts par les familles ; 'monsters' a
-   rejoint KIND_REST_ONLY, la couche dessine EXACTEMENT ce compte).
+   compte incluait des camps déjà couverts par les familles ; la règle
+   rest-only est universelle et data-dérivée, la couche dessine EXACTEMENT
+   ce compte — voir main.js compositeCampPoints).
    GLOSSARY-PENDING : le nom affiché d'une famille est son token moteur
    prettifié (pretty(f.family) — « Boarmammoth », « Ratmutant »…) : AUCUNE
    table de localisation des familles n'existe dans les données expédiées ;
@@ -776,12 +808,17 @@ function buildKindGroup(listId, kind, withZeroWildlife = false) {
 }
 const buildGroupCreeps = () => buildKindGroup('#group-creeps-list', 'creeps');
 const buildGroupWildlife = () => buildKindGroup('#group-wildlife-list', 'wildlife', true);
-/* ── Groupe « Harvesting » : les 3 métiers de camp:<kind>, inchangé. */
+/* ── Groupe « Harvesting » : les kinds de catégorie cuite `harvest.*`
+   (herbalism/logging/mining — ordre alphabétique de catégorie, identique à
+   l'ancien ordre fixe sur toutes les cartes). */
 function buildGroupHarvest() {
   const ul = $('#group-harvest-list');
   ul.innerHTML = '';
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
-  for (const kind of KIND_PLACEMENT.harvest) { const li = campRow(kind); if (li) ul.appendChild(li); }
+  for (const kind of kindsOfCategory(c => c.startsWith('harvest.'))) {
+    const li = campRow(kind);
+    if (li) ul.appendChild(li);
+  }
 }
 /* Somme HONNÊTE d'un bucket Interactables (sources DISJOINTES prouvées :
    couches CATS ≠ familles décor ≠ camps dynamiques, voir 
@@ -796,52 +833,53 @@ function bucketStats(cats, decorFams, kinds) {
   return { count, hidden };
 }
 /* ── Groupe « Interactables » : 4 sous-groupes (Chests · Destroyable ·
-   Interactives · Other), le groupe Décor y est DISSOUS (DECOR_BUCKET,
-   affichage seul). Libellés désambiguïsés — plus jamais quatre choses
+   Interactives · Other) — la composition de chaque bucket est DÉRIVÉE de la
+   `category` cuite des records (kinds de camp : interactable.destroyable/
+   reactive/searchable ; familles décor dissoutes : interactable.chests/
+   destroyable/reactive/other — voir decorFamsOfCategory/kindsOfCategory,
+   ontology chunk 2). Libellés désambiguïsés — plus jamais quatre choses
    nommées « fouillable » : « Coffres fouillables » (searchable_chest, la
    vraie couche coffre à recette) garde son terme ; le kind camp
    `searchable` devient « Points de fouille (camps) » (searchSpotsRow,
    GLOSSARY-PENDING) ; les kinds destroyable/reactive prennent un suffixe
-   « (camps) » (spawns dynamiques serveur) pour ne pas se confondre avec
-   les props PLACÉS (décor) rangés dans le même bucket. Défauts inchangés :
-   les 2 couches coffres ON ; destroyable/reactive/searchable/décor/qao OFF
-   (palier bruit — verdict investigation §6.2, 0 table de butin canonique). */
+   « (camps) » (spawns dynamiques serveur, campRowLabel) pour ne pas se
+   confondre avec les props PLACÉS (décor) rangés dans le même bucket.
+   Défauts inchangés : les 2 couches coffres ON ; destroyable/reactive/
+   searchable/décor/qao OFF (palier bruit — verdict investigation §6.2,
+   0 table de butin canonique). */
 function buildGroupContainers() {
   const ul = $('#group-containers-list');
   ul.innerHTML = '';
+  const fillKindsAndDecor = (kindsFn, decorCat) => u => {
+    for (const kind of (deferredReady ? kindsFn() : [])) {
+      const c = campRow(kind, campRowLabel(kind), 'filter-row-sub');
+      if (c) u.appendChild(c);
+    }
+    for (const f of decorFamsOfCategory(decorCat)) { const li = decorRow(f); if (li) u.appendChild(li); }
+  };
   const BUCKETS = [
     ['inter-chests', 'subChests', CATS.searchable_chest.hex, chestsLeaves,
-      ['searchable_chest', 'camp_chest'], 'chests', [],
+      ['searchable_chest', 'camp_chest'], 'interactable.chests', () => [],
       u => {
         u.appendChild(catRow('searchable_chest', 'filter-row-sub'));
         u.appendChild(catRow('camp_chest', 'filter-row-sub'));
-        for (const f of decorFamsOf('chests')) { const li = decorRow(f); if (li) u.appendChild(li); }
+        for (const f of decorFamsOfCategory('interactable.chests')) { const li = decorRow(f); if (li) u.appendChild(li); }
       }],
     ['inter-destroyable', 'subDestroyable', CAMP_COLORS.destroyable, destroyableLeaves,
-      [], 'destroyable', KIND_PLACEMENT.interDestroyable,
-      u => {
-        const c = campRow('destroyable', tr('destroyableCampsRow'), 'filter-row-sub');
-        if (c) u.appendChild(c);
-        for (const f of decorFamsOf('destroyable')) { const li = decorRow(f); if (li) u.appendChild(li); }
-      }],
+      [], 'interactable.destroyable', destroyableKinds,
+      fillKindsAndDecor(destroyableKinds, 'interactable.destroyable')],
     ['inter-interactives', 'subInteractives', CAMP_COLORS.reactive, interactivesLeaves,
-      [], 'interactives', KIND_PLACEMENT.interInteractives,
-      u => {
-        const r = campRow('reactive', tr('reactiveCampsRow'), 'filter-row-sub');
-        if (r) u.appendChild(r);
-        const s = campRow('searchable', tr('searchSpotsRow'), 'filter-row-sub');
-        if (s) u.appendChild(s);
-        for (const f of decorFamsOf('interactives')) { const li = decorRow(f); if (li) u.appendChild(li); }
-      }],
+      [], 'interactable.reactive', interactivesKinds,
+      fillKindsAndDecor(interactivesKinds, 'interactable.reactive')],
     ['inter-other', 'subOther', CAMP_COLORS.other, interOtherLeaves,
-      ['qao'], 'other', [],
+      ['qao'], 'interactable.other', () => [],
       u => {
         u.appendChild(catRow('qao', 'filter-row-sub'));
-        for (const f of decorFamsOf('other')) { const li = decorRow(f); if (li) u.appendChild(li); }
+        for (const f of decorFamsOfCategory('interactable.other')) { const li = decorRow(f); if (li) u.appendChild(li); }
       }],
   ];
-  for (const [key, labelKey, hex, leavesFn, cats, decorBucket, kinds, fill] of BUCKETS) {
-    const { count, hidden } = bucketStats(cats, decorFamsOf(decorBucket), deferredReady ? kinds : []);
+  for (const [key, labelKey, hex, leavesFn, cats, decorCat, kindsFn, fill] of BUCKETS) {
+    const { count, hidden } = bucketStats(cats, decorFamsOfCategory(decorCat), deferredReady ? kindsFn() : []);
     const grp = buildSubGroup(key, tr(labelKey), hex, leavesFn, count, hidden);
     fill(grp.ul);
     if (grp.ul.children.length) ul.appendChild(grp.li);

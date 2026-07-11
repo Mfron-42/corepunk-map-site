@@ -26,7 +26,7 @@ import {
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
-  campGroupByKey, monsterFamilies, speciesPoints, KIND_REST_ONLY, kindBoundCampKeys,
+  campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys,
 } from './pointsets.js';
 import {
   ensureSpeciesOn, toggleSpecies, speciesCampWinner, setFamilyOn,
@@ -163,24 +163,20 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-recipe') openRecipeFiche(id);
   else if (b.dataset.act === 'fiche-node') openNodeFiche(id);
   else if (b.dataset.act === 'camp-highlight') {
-    // « Montre-moi TOUS les points de ce contenant » — toggle : un second
-    // clic efface le surlignage sans fermer la fiche. `data-ids` (farm_spot_UX
-    // : bouton « Surligner tout » d'un groupe de camps, fiches.js openItemFiche)
-    // union les points de PLUSIEURS camps ; sans lui, comportement inchangé
-    // (un seul camp, `data-id`, exactement l'ancien code de la fiche camp).
-    const ids = b.dataset.ids ? b.dataset.ids.split(',') : (id ? [id] : []);
-    const pts = [];
-    let color = b.dataset.color || null;
-    for (const k of ids) {
-      // Résolveur unique (#82 chunk (b), js/pointsets.js) : même index
-      // camp→groupe que fiches.js/le compositeur — remplace l'ancien
-      // flatMap+find O(n) par clé, comportement identique.
-      const g = campGroupByKey(k);
-      if (!g) continue;
-      if (!color) color = CAMP_COLORS[g.kind] || '#888';
-      pts.push(...g.pts.map(([x, z]) => ({ x, z })));
-    }
-    applyPointHighlight(b, pts, color);
+    // « Montre-moi TOUS les points de CE camp » — toggle : un second clic
+    // efface le surlignage sans fermer la fiche. SEUL usage restant : le
+    // bouton de la FICHE CAMP elle-même (openCampFiche — une fiche camp qui
+    // surligne ses propres points est cohérente, exception documentée). Les
+    // anciens boutons PAR CAMP des fiches monstre/objet (farmCampRow) et le
+    // « Surligner tout » d'union `data-ids` (farmSectionHtml) sont RETIRÉS
+    // (règle canonique 2026-07-11 : toute action carte = une référence à un
+    // toggle de l'arbre de gauche — l'action de section est le toggle
+    // ESPÈCE data-act="species-layer" ; un camp individuel n'a pas de nœud
+    // d'arbre → sa ligne devient informative). Le support data-ids est
+    // supprimé avec ses appelants.
+    const g = id ? campGroupByKey(id) : null;
+    if (!g) return;
+    applyPointHighlight(b, g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
   }
   else if (b.dataset.act === 'chest-layer-highlight') {
     // Ligne « Coffre fouillable » d'un groupe de contenants (#65,
@@ -407,16 +403,19 @@ function compositeCampPoints() {
   const winner = new Map();      // objet groupe -> hex gagnant
   for (const [kind, st] of Object.entries(S.camps)) {
     const kindHex = st.on ? (CAMP_COLORS[kind] || '#888') : null;
-    // Kinds « reste seulement » (creeps/wildlife — IA finale, miroir des
-    // kinds moteur) : leur ligne de panneau est « Spawns non identifiés »
-    // (compte = camps non joints à une espèce, js/pointsets.js
-    // kindRestPoints) — la couche kind ne dessine donc QUE ces camps-là,
-    // pour que le nombre affiché soit exactement ce qui s'allume (discipline
-    // honest-counter). Les camps JOINTS s'allument par leurs lignes
-    // espèce/famille (priorité espèce > famille inchangée). Voir la note
-    // INTERIM de KIND_REST_ONLY (pointsets.js) pour la dérive assumée des
-    // liens legacy camp.creeps/camp.wildlife.
-    const bound = kindHex && KIND_REST_ONLY.has(kind) ? kindBoundCampKeys(kind) : null;
+    // Règle « reste seulement » UNIVERSELLE et dérivée de la donnée
+    // (ontology chunk 2 — l'ancien set front KIND_REST_ONLY est supprimé) :
+    // la couche kind ne dessine JAMAIS un camp joint à une espèce — sa
+    // ligne de panneau « Spawns non identifiés » compte exactement ce qui
+    // s'allume (js/pointsets.js kindRestPoints, discipline honest-counter) ;
+    // les camps joints s'allument par leurs lignes espèce/famille (priorité
+    // espèce > famille inchangée). Pour les kinds sans liaison espèce
+    // possible (récolte/sanctuaires/contenants…), l'ensemble lié est VIDE
+    // → la couche dessine tout, strictement comme avant (vérifié : seuls
+    // monsters/creeps/wildlife portent des liaisons, toutes cartes). Voir
+    // pointsets.js kindRestPoints pour la dérive assumée des liens legacy
+    // camp.creeps/camp.wildlife/camp.monsters.
+    const bound = kindHex ? kindBoundCampKeys(kind) : null;
     for (const g of st.groups) {
       const hex = spWinner.get(g.k) || famWinner.get(g.k)
         || (bound && bound.has(g.k) ? null : kindHex);

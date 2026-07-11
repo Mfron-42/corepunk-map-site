@@ -103,7 +103,15 @@ function editLe(a, b, maxD) {
 /* Nettoyage d'AFFICHAGE des libellés issus du client : suffixe technique
    « TEXTURING » et préfixe « QItem » (artefacts d'assets, jamais du contenu
    joueur — vus sur les acteurs/objets de quête). Les clés et l'index de
-   recherche gardent la donnée brute. */
-const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '');
+   recherche gardent la donnée brute.
+   + GARDE GÉNÉRIQUE anti-jeton moteur (audit quêtes 2026-07-11, classe E :
+   « Barrel_of_water », « Spot_without_light_1 », « use_ability »… rendus
+   tels quels dans les fiches) : un mot à underscores est TOUJOURS un
+   identifiant moteur, jamais un texte joueur (vérifié : aucun nom
+   d'affichage du client n'en porte) — les underscores deviennent des
+   espaces à l'AFFICHAGE (prettification honnête, jamais un nom inventé) ;
+   la donnée brute reste intacte partout ailleurs. */
+const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '')
+  .replace(/\b[\w]+(?:_[\w]+)+\b/g, m => m.replace(/_+/g, ' '));
 
 export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, reduceMotion, fold, editLe, cleanLabel };

@@ -19,7 +19,10 @@ const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', sections: 'cpmap_sect
 function initialDevOn() {
   try {
     const p = new URLSearchParams(location.hash.replace(/^#/, ''));
-    return (p.get('on') || '').split(',').includes('devcontent');
+    // `flt=` (schéma delta, hygiène de hash 2026-07-11) OU `on=` legacy —
+    // même jeton `devcontent` dans les deux formes (voir urlstate.js).
+    return (p.get('flt') || '').split(',').includes('devcontent')
+      || (p.get('on') || '').split(',').includes('devcontent');
   } catch (e) { return false; }
 }
 

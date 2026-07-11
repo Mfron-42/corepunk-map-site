@@ -3,6 +3,7 @@
    libellé localisé via tbl()). Aucun état mutable ici. */
 import { tbl, tr } from './i18n/index.js';
 import { pretty } from './utils.js';
+import { gameLabel } from './classlabels.js';
 
 /* ── Constantes ─────────────────────────────────────────────── */
 /* Multi-cartes (vague C) : la carte ACTIVE porte toute la géométrie (dims,
@@ -239,88 +240,71 @@ function prettyMapId(id) {
 }
 const mapName = id => tbl('mapName', id) || prettyMapId(id);
 
-/* ── Types de contenants (camps cassables/fouillables/interactifs) ──────
-   Le TYPE de prop (tonneau explosif, caisse de maïs, cercueil, champignons,
-   pot urbain…) n'est jamais un champ dédié des données : il n'existe que
-   comme SOUS-CHAÎNE de la clé de camp (et une partie de ces camps ont même
-   leur `kind` canonique posé à "poi" plutôt que destroyable/searchable).
-   Détection sur la clé elle-même, traduite en libellé localisé (campType).
-   Étendu aux camps `reactive` (interactifs : champignons, bouteilles, pots,
-   feuilles, légumes, props urbains) — même principe, mêmes données. */
-const CAMP_TYPE_RULES = [
-  [/explosive.?barrels?/, 'barrels'],
-  [/corn.?sack/, 'sackCorn'],
-  [/wheat.?sack/, 'sackWheat'],
-  [/container.?corn\b/, 'crateCorn'],
-  [/container.?cabbage/, 'crateCabbage'],
-  [/container.?carrot/, 'crateCarrot'],
-  [/container.?onion/, 'crateOnion'],
-  [/container.?eggplant/, 'crateEggplant'],
-  [/container.?berries/, 'crateBerries'],
-  [/\bsacks?\b/, 'sacks'],
-  [/\bbags?\b/, 'sacks'],
-  [/tombstones?/, 'tombstones'],
-  [/coffins?/, 'coffins'],
-  [/searchable.?chest|\bchest\b/, 'chests'],
-  [/corpses/, 'corpses'],
-  [/mushrooms?/, 'mushrooms'],
-  [/urban.?bottles/, 'bottles'],
-  [/urban.?pots/, 'pots'],
-  [/urban.?wooden/, 'wooden'],
-  [/leaf.?trash/, 'leafTrash'],
-  [/vegetables/, 'vegetables'],
-  [/\burban\b/, 'urban'],
-];
-const TYPED_CAMP_RE = /destroyable|searchable|reactive/;
-/* Préfixes de VOCABULAIRE de manager encore présents dans certaines clés de
-   camp expédiées (les clés Kwalat arrivent déjà strippées de
-   `fulfillment-manager-` par le pipeline ; celles des îles d'Extraction et
-   des arènes BG ne le sont PAS — voir 
-   island_camp_labels_INVESTIGATION.md §1 : « Ffm-Island-Monster-… » leak).
-   Strip d'AFFICHAGE uniquement, en UN endroit partagé — les clés de
-   jointure (g.k, m.camps[].camp) restent brutes partout. À retirer quand le
-   pipeline expédiera des `name` propres (le vrai fix délègue au parseur
-   multi-vocabulaire côté pipeline, voir l'investigation §4). */
+/* ── Types de contenants — CLASSIFICATION CUITE (ontology chunk 2) ──────
+   Le sous-type de prop (tonneau explosif, caisse de maïs, cercueil,
+   champignons…) est désormais un CHAMP EXPÉDIÉ (`subtype`, ◇ byte-dérivé —
+    CAMP_SUBTYPE_RULES, data/SCHEMA.md « Canonical
+   classification ») : les tables de re-détection front (CAMP_TYPE_RULES /
+   TYPED_CAMP_RE, regex sur la clé) sont SUPPRIMÉES — le front ne
+   re-classifie plus jamais, il lit `subtype`/`category` sur le record.
+   Vérifié byte-identique à l'ancienne détection sur les 302 groupes de
+   camps expédiés (toutes cartes) avant suppression. */
+const campTypeLabel = key => tbl('campType', key) || pretty(key);
+/* Préfixes de VOCABULAIRE de manager — conservé UNIQUEMENT comme repli pour
+   une clé brute retardataire (un record sans `name`/`subtype` expédiés, une
+   future carte pas encore repassée par le pipeline) : les surfaces normales
+   lisent les champs cuits, jamais ce strip. Marqué tel quel (chunk 2). */
 const CAMP_KEY_VOCAB_PREFIX_RE = /^(fulfillment-manager-|ffm-island-|ffm-bg-arena-)/;
-/* Nom d'affichage d'un camp (popup, fiche, recherche) : type localisé +
-   reste de clé prettifié ("Caisse de maïs — Goldenfield town"). Les camps
-   sans type encodé (monstres, minerai…) gardent le pretty(clé) historique
-   — préfixe de vocabulaire strippé d'abord (voir ci-dessus). */
+/* RÉSIDU DE FORMATAGE (INTERIM, marqué — chunk 2) : le `name` expédié d'un
+   camp typé contient encore les mots du prop (« Mushrooms Windreach Woods »,
+   data/SCHEMA.md « raw split ») et AUCUN champ « reste » (la partie région
+   de la clé) n'est expédié. Pour afficher « Champignons — Windreach woods »
+   (byte-identique à l'existant), les mots de vocabulaire prop/kind sont
+   retirés de la CLÉ ici. Ce n'est PAS une re-classification (le type vient
+   du champ `subtype` cuit) : un dictionnaire PLAT de mots d'affichage à
+   retirer, vérifié byte-exact contre l'ancien rendu sur toutes les clés
+   expédiées. À SUPPRIMER quand le pipeline expédiera le reste propre (gap
+   remonté au rapport chunk 2 — le pipeline possède le fix). */
+const CAMP_KEY_PROP_WORDS_RE = /\b(explosive|barrels?|corn|wheat|cabbage|carrot|onion|eggplant|berries|container|sacks?|bags?|tombstones?|coffins?|chests?|corpses|mushrooms?|urban|bottles|pots|wooden|leaf|trash|vegetables)\b/g;
+const CAMP_KEY_KIND_WORDS_RE = /\b(poi|destroyable|searchable|reactive)\b/g;
+function campKeyRest(rawKey, dropProps) {
+  let k = (rawKey || '').replace(CAMP_KEY_VOCAB_PREFIX_RE, '').replace(CAMP_KEY_KIND_WORDS_RE, '');
+  if (dropProps) k = k.replace(CAMP_KEY_PROP_WORDS_RE, '');
+  return pretty(k.replace(/[-_]+/g, ' ').trim());
+}
+/* REPLI pour clé brute retardataire SEULEMENT (record sans `name` cuit) —
+   l'ancienne extraction de type par regex est retirée, voir l'en-tête. */
 function campDisplayName(rawKey) {
-  const k = (rawKey || '').replace(CAMP_KEY_VOCAB_PREFIX_RE, '');
-  if (!TYPED_CAMP_RE.test(k)) return pretty(k);
-  let type = null, rest = k;
-  for (const [re, key] of CAMP_TYPE_RULES) {
-    const m = re.exec(k);
-    if (m) { type = key; rest = k.slice(0, m.index) + k.slice(m.index + m[0].length); break; }
-  }
-  const typeLabel = type ? tbl('campType', type)
-    : campKindLabel(k.includes('searchable') ? 'searchable' : k.includes('reactive') ? 'reactive' : 'destroyable');
-  rest = rest.replace(/\b(poi|destroyable|searchable|reactive)\b/g, '').replace(/[-_]+/g, ' ').trim();
-  return rest ? `${typeLabel} — ${pretty(rest)}` : typeLabel;
+  return pretty((rawKey || '').replace(CAMP_KEY_VOCAB_PREFIX_RE, ''));
 }
 
-/* Nom d'affichage RÉEL d'un camp de référence (pass pipeline 2026-07-11b,
-   island_camp_labels_INVESTIGATION.md) : les groupes de camps (camps.bin) et
-   toute référence à un camp (m.camps[]/item.farm[] rows) expédient désormais
-   un `name` PROPRE côté pipeline (splitter espèce/qualificatif, kind token
-   retiré) -- ce nom remplace l'ancien repli pretty(clé) de campDisplayName()
-   ci-dessus pour les kinds "faune"/récolte (monsters/creeps/wildlife/
-   herbalism/logging/mining/shrines/soulkeeper/guards/quest/event/other) :
-   AVANT cette passe, pretty() ne capitalisait QUE la 1re lettre de la chaîne
-   entière et laissait le token de kind dedans (vérifié : campDisplayName(
-   "creeps-turkey-windreach-woods") -> "Creeps turkey windreach woods",
-   campDisplayName("ffm-island-monster-camp-ghouls-patrol") -> "Monster camp
-   ghouls patrol" -- un vrai défaut visible, jamais l'ambition du design).
-   Les kinds INTERACTABLES typés (destroyable/searchable/reactive) gardent
-   campDisplayName(key) : SEUL lui sait extraire le VRAI sous-type (tonneau
-   explosif, sac de maïs…) via CAMP_TYPE_RULES -- le `name` expédié pour ces
-   camps-là n'est qu'un simple split brut ("Destroyable Windreach Woods"),
-   moins informatif. UNE seule implémentation, consommée par fiches.js
-   (openCampFiche/farmCampRow/farmUnjoinedRow) ET popups.js (campPopup) ET
-   search.js (campSearchLabel) -- jamais re-dérivée par surface. */
-function campLabel(key, kind, shippedName) {
-  if (kind === 'destroyable' || kind === 'searchable' || kind === 'reactive') return campDisplayName(key);
+/* Nom d'affichage d'un camp de référence — UNE seule implémentation,
+   consommée par fiches.js (openCampFiche/farmCampRow/farmUnjoinedRow) ET
+   popups.js (campPopup) ET search.js (campSearchLabel), jamais re-dérivée
+   par surface. Lit les champs CUITS du record (ontology chunk 2) :
+   - `subtype` présent (prop typé — caisse de maïs, champignons…) : libellé
+     campType localisé + reste de clé (résidu de formatage, voir ci-dessus) ;
+   - kind interactable typé SANS subtype (15-85 % des camps typés, absence
+     honnête — ONTOLOGY.md #25) : libellé du kind + reste de clé ;
+   - sinon : le `name` PROPRE expédié (splitter pipeline), repli
+     campDisplayName pour une clé retardataire sans name. */
+function campLabel(key, kind, shippedName, subtype) {
+  // Sous-type SANS libellé localisé (jeton fraîchement cuit par le pipeline,
+  // pas encore dans les tables campType — ex. `doors`, apparu en cours de
+  // route) : composer « Pretty(jeton) — reste » n'apporterait RIEN sur le
+  // `name` expédié (et le résidu de formatage ne connaît pas ses mots →
+  // doublon « Doors — Abandoned doors ») — repli honnête sur le name,
+  // l'affichage se met à niveau tout seul quand la passe i18n ajoute le
+  // jeton. Les 21 sous-types connus ont tous leur entrée ×5 locales
+  // (byte-parité vérifiée).
+  if (subtype && tbl('campType', subtype)) {
+    const rest = campKeyRest(key, true);
+    return rest ? `${campTypeLabel(subtype)} — ${rest}` : campTypeLabel(subtype);
+  }
+  if (kind === 'destroyable' || kind === 'searchable' || kind === 'reactive') {
+    const rest = campKeyRest(key, false);
+    return rest ? `${campKindLabel(kind)} — ${rest}` : campKindLabel(kind);
+  }
   return shippedName || campDisplayName(key);
 }
 /* Qualificatif de camp (patrol|buffed -- jeton NEUTRE côté moteur, poids par
@@ -351,9 +335,18 @@ const campModeLabel = key => tbl('campMode', key) || pretty(key);
    juste son propre libellé localisé, même principe que campKindLabel/
    monsterAttackLabel ci-dessus. Pas de déduction depuis le nom de prop ici :
    ce champ existe déjà sur r.type (voir data/SCHEMA.md "Chest loot + type" /
-   "Activable type"). */
-const chestTypeLabel = key => tbl('chestType', key) || pretty(key);
-const activableTypeLabel = key => tbl('activableType', key) || pretty(key);
+   "Activable type").
+   Overlay ⚑ (ontology chunk 2) : quand class_labels.bin porte le mot
+   OFFICIEL du client pour le jeton (src:"game", Interactive.xml byte-matché
+   — ex. Chest→« Coffre »/« Сундук »), il PRIME sur notre libellé ◇. Les 5
+   locales expédiées sont déjà byte-alignées (zéro changement visible
+   aujourd'hui) ; jamais de src:"game_tooltip_mt" ici (voir classlabels.js,
+   qui l'interdit à la source). campType/decorFamily restent ◇ : leurs
+   libellés portent des qualificatifs byte-dérivés/du pluriel de couche que
+   le nom de classe du jeu appauvrirait — décision documentée dans
+   classlabels.js + le rapport chunk 2. */
+const chestTypeLabel = key => gameLabel('chestType', key) || tbl('chestType', key) || pretty(key);
+const activableTypeLabel = key => gameLabel('activableType', key) || tbl('activableType', key) || pretty(key);
 
 /* Nom d'affichage d'un coffre placé (popup, fiche, recherche) : le NOM brut
    (r.name, ex. "Chest barrel elenian 02 blood") est un identifiant d'ASSET
@@ -418,31 +411,14 @@ function prettyRegion(region) {
    n'importe quel lien de table nommée), donc pas de chestHex() ici. */
 const LOOT_TABLE_HEX = '#c9a66b';
 
-/* Table de butin PROBABLE d'un camp cassable/fouillable : le client ne
-   fournit PAS le lien prop → table ; on n'associe que les cas où le TYPE
-   encodé dans la clé correspond exactement au nom d'une table de butin du
-   catalogue (Farmsacks Corn ↔ container-corn…). Jamais de mapping pour les
-   clés génériques (searchable-<région>…) — plusieurs tables candidates
-   (générique/Hard/Kbg), on n'invente pas. Affiché avec une mention
-   « associée par type » honnête (voir openCampFiche). */
-const CAMP_LOOT_TABLE_RULES = [
-  [/container.?corn\b|corn.?sack/, 'Destroyable Farmsacks Corn'],
-  [/container.?cabbage/, 'Destroyable Farmsacks Cabbage'],
-  [/container.?carrot/, 'Destroyable Farmsacks Carrot'],
-  [/container.?onion/, 'Destroyable Farmsacks Onion'],
-  [/container.?eggplant/, 'Destroyable Farmsacks Eggplant'],
-  [/container.?berries/, 'Destroyable Farmsacks Berrys'],
-  [/wheat.?sack/, 'Destroyable Farmsacks Wheat Seeds'],
-  [/coffins?/, 'Destroyable Coffins'],
-  [/quest.?corpses/, 'Searchable Corpse Quest'],
-  [/corpses/, 'Searchable Corpse'],
-  [/searchable.?chest/, 'Searchable Chest'],
-];
-function campLootTableName(k) {
-  if (!TYPED_CAMP_RE.test(k)) return null;
-  for (const [re, label] of CAMP_LOOT_TABLE_RULES) if (re.test(k)) return label;
-  return null;
-}
+/* Table de butin PROBABLE d'un camp cassable/fouillable : CHAMP CUIT
+   `probableLoot` du record (ontology chunk 2 — l'ancienne table front
+   CAMP_LOOT_TABLE_RULES est SUPPRIMÉE, portée en pipeline
+   dataset_helpers.camp_probable_loot ; vérifié byte-identique — 0 écart sur
+   les 302 groupes expédiés, gating « la table existe dans ce build »
+   compris). Le client ne fournit toujours PAS le lien prop → table :
+   l'association reste « par correspondance exacte de type », la mention
+   honnête d'openCampFiche est conservée telle quelle. */
 
 /* Alias de familles de monstres : le client fragmente quelques tokens de
    famille (« robo » vs « robot »…) — regroupés à l'affichage du bestiaire.
@@ -517,8 +493,8 @@ export {
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName, ecAttr,
-  campDisplayName, campLabel, campQualifierLabel, campQualifierChip, campModeLabel,
-  chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
+  campDisplayName, campLabel, campTypeLabel, campQualifierLabel, campQualifierChip, campModeLabel,
+  chestTypeLabel, activableTypeLabel, chestDisplayName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,
   prettyRegion, LOOT_TABLE_HEX,
 };

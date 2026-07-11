@@ -6,6 +6,7 @@ import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
 import { DECOR_FAMILIES } from './config.js';
+import { setClassLabels } from './classlabels.js';
 import { positionCounts, isHiddenTest } from './devcontent.js';
 
 /* ── Version stamp (cache-busting) ──────────────────────────────────────
@@ -104,7 +105,17 @@ function buildDecorGroups(chests, prevOn = {}) {
     // dev), `hidden` = décor réel mais sans position connue (voir
     // devcontent.js::positionCounts, jamais un isTest -- déjà exclu des deux).
     const { shown, hidden } = positionCounts(byFam[fam]);
-    next[fam] = { on: fam in prevOn ? prevOn[fam] : false, count: shown, hidden };
+    // `category` : la classification CUITE des records (ontology chunk 2,
+    // data/SCHEMA.md « Chest/decor placements » — interactable.chests/
+    // destroyable/reactive/other), homogène par famille (vérifié 1:1 sur
+    // toutes cartes). C'est elle qui range la famille dans son bucket
+    // Interactables du panneau (sidebar.js decorFamsOfCategory) — l'ancienne
+    // table d'affichage DECOR_BUCKET est SUPPRIMÉE. Repli honnête
+    // interactable.other pour un record retardataire sans champ.
+    next[fam] = {
+      on: fam in prevOn ? prevOn[fam] : false, count: shown, hidden,
+      category: byFam[fam][0].category || 'interactable.other',
+    };
   }
   return next;
 }
@@ -161,7 +172,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies, classLabels] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -209,7 +220,17 @@ async function loadDeferred() {
     // groupe Wildlife (les 19 espèces sans camp restent listées, "0 camp").
     // 404-tolérant comme le reste de ce lot différé.
     fetchJson(dataPath('wildlife_species.bin')).catch(() => ({})),
+    // Libellés ⚑ officiels des jetons de classification (class_labels.bin,
+    // pipeline chunk 1 — voir data/SCHEMA.md « ⚑ label source » et
+    // js/classlabels.js pour le contrat de provenance game/game_tooltip_mt).
+    // Différé comme le reste : consommé par les résolveurs de libellés
+    // (config.js chestTypeLabel/activableTypeLabel) — avant l'arrivée du
+    // fichier ils rendent le libellé ◇ du site, identique à avant. Scopé
+    // LANGUE (jamais par carte) : rechargé par setLang via ce même load.
+    // 404-tolérant -> null (les libellés ◇ restent, jamais un plantage).
+    fetchJson(dataPath('class_labels.bin')).catch(() => null),
   ]);
+  setClassLabels(classLabels);
   S.campDetails = campDetails;
   S.recipes = recipes;
   S.vendors = vendors;
@@ -292,6 +313,12 @@ function buildMonsterNameIdx() {
 function monsterKeyFor(key, name, levelHint) {
   if (key && S.monsters[key]) return key;
   if (!monsterNameIdx) buildMonsterNameIdx();
+  // (Audit quêtes 2026-07-11, classe C : un repli SINGULIER — « Turtles » →
+  // « Turtle » — a été essayé ici puis RETIRÉ après scan complet : 0 des 6
+  // libellés en défaut ne correspond à une espèce du registre sous AUCUNE
+  // forme (« Turtles »/« Hyena Faidens » n'existent qu'en faune sauvage ou
+  // pas du tout) — la classe C est un fix PIPELINE (labels), pas front ;
+  // fold() couvre déjà parenthèses/casse.)
   const n = fold(name || '');
   const sp = S.species[speciesNameIdx.get(n)];
   if (sp) {
@@ -311,11 +338,19 @@ function monsterKeyFor(key, name, levelHint) {
   }
   return monsterNameIdx.get(n) || null;
 }
-/* PNJ par nom exact → index de fiche (carte ACTIVE uniquement : les données
-   vendeurs/acteurs citent des noms, pas des index). -1 si inconnu ici. */
+/* PNJ par nom → index de fiche (carte ACTIVE uniquement : les données
+   vendeurs/acteurs citent des noms, pas des index). Exact d'abord, puis
+   repli par égalité REPLIÉE (fold — casse/accents/ponctuation, audit quêtes
+   2026-07-11 classe A : les `t.label` des cibles de but divergent parfois
+   du catalogue par la casse seule) — jamais un match flou au-delà. -1 si
+   inconnu ici. */
 function npcIndexByName(name) {
   if (!name) return -1;
-  return (S.data.npc || []).findIndex(n => n.name === name);
+  const arr = S.data.npc || [];
+  const exact = arr.findIndex(n => n.name === name);
+  if (exact >= 0) return exact;
+  const f = fold(name);
+  return f ? arr.findIndex(n => fold(n.name) === f) : -1;
 }
 /* Entrée de bestiaire/lore d'un monstre (S.locations, MapMarkers.xml) :
    index inverse paresseux clé de monstre → index de fiche lore — 105 des

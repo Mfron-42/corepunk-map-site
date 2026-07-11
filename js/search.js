@@ -360,20 +360,19 @@ function buildSearchableChestSearchIndex() {
 }
 
 /* Libellé de recherche d'un camp : nom d'affichage partagé (campLabel,
-   js/config.js — nom EXPÉDIÉ propre pour les camps de faune/récolte
-   (pipeline pass 2026-07-11b), formateur campDisplayName conservé pour les
-   kinds interactables typés : type de contenant localisé + reste de clé
-   prettifié, pour que "carotte"/"tonneau"/"pot"/"champignon" trouvent
-   quelque chose) + suffixe qualificatif TEXTE (— Patrouille / — Renforcé
-   (PvP)) quand le groupe en porte un (l'entrée de recherche est du texte
-   plat, pas un chip HTML — même contenu, autre support). Seule spécificité
-   recherche : les 5 camps "for-delete-*" (restes de dev) sont exclus de
-   l'index entièrement (exclusion morte pour les bins racine — le pipeline
-   ne les expédie plus — mais gardée en défense, la donnée canonique les
-   garde et un futur bundle pourrait fuiter). */
+   js/config.js — LE formateur unique : nom EXPÉDIÉ propre + sous-type CUIT
+   g.subtype (ontology chunk 2 — type de contenant localisé + reste de clé,
+   pour que "carotte"/"tonneau"/"pot"/"champignon" trouvent quelque chose))
+   + suffixe qualificatif TEXTE (— Patrouille / — Renforcé (PvP)) quand le
+   groupe en porte un (l'entrée de recherche est du texte plat, pas un chip
+   HTML — même contenu, autre support). Seule spécificité recherche : les 5
+   camps "for-delete-*" (restes de dev) sont exclus de l'index entièrement
+   (exclusion morte pour les bins racine — le pipeline ne les expédie plus —
+   mais gardée en défense, la donnée canonique les garde et un futur bundle
+   pourrait fuiter). */
 function campSearchLabel(g) {
   if (g.k.includes('for-delete')) return null;   // reste de dev — exclu de la recherche
-  const base = campLabel(g.k, g.kind, g.name);
+  const base = campLabel(g.k, g.kind, g.name, g.subtype);
   return g.qualifier ? `${base} — ${campQualifierLabel(g.qualifier)}` : base;
 }
 

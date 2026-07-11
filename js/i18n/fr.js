@@ -52,7 +52,7 @@ export default {
       // interactives_taxonomy_INVESTIGATION.md §5) ; la ligne honnête
       // « Spawns non identifiés » (camps sans espèce jointe — compte =
       // exactement ce que la couche dessine, voir pointsets.js
-      // KIND_REST_ONLY ; sert désormais les TROIS groupes
+      // kindRestPoints (règle rest-only universelle, data-dérivée) ; sert désormais les TROIS groupes
       // Monsters/Creeps/Wildlife, symétrie — l'ancienne monsterCampsRow
       // « Camps de monstres » est retirée avec la bascule grossière) ; et la
       // désambiguïsation « (camps) » des kinds dynamiques rangés à côté de
@@ -92,7 +92,7 @@ export default {
       filterHiddenTooltip: n => `${n} sans position connue`,
       // (decorFamiliesTitle retirée 2026-07-11 avec le groupe « Décor »
       // dissous — ses lignes famille vivent dans les buckets Interactables,
-      // voir js/sidebar.js DECOR_BUCKET. decorGroupLabel ci-dessous reste :
+      // voir js/sidebar.js decorFamsOfCategory (catégorie cuite des records — l’ancienne table DECOR_BUCKET est supprimée, ontology chunk 2). decorGroupLabel ci-dessous reste :
       // toujours utilisée par config.js chestKindLabel pour les lignes de
       // kind des fiches/popups.)
       // Sous-groupe « Par famille » sous Monstres & faune (#82 chunk (b),

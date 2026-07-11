@@ -41,7 +41,7 @@ export default {
       // честная подпись стражей (2 лагеря/12 точек, НЕТ никакой привязки
       // вида/НПС/добычи); честная строка «неопознанные спавны» (пулы без
       // привязанного вида — счётчик равен ровно тому, что рисует слой, см.
-      // pointsets.js KIND_REST_ONLY); и суффикс «(лагеря)» динамических
+      // pointsets.js kindRestPoints (règle rest-only universelle, data-dérivée)); и суффикс «(лагеря)» динамических
       // kinds, стоящих рядом с РАЗМЕЩЁННЫМИ пропсами в бакетах
       // интерактивных объектов. GLOSSARY-PENDING.
       guardsRowLabel: 'Стражи (неопознанный юнит)',
@@ -76,7 +76,7 @@ export default {
       filterHiddenTooltip: n => `${n} без известной позиции`,
       // (decorFamiliesTitle удалена 2026-07-11 вместе с распущенной группой
       // «Декор» — её строки живут в бакетах интерактивных объектов, см.
-      // js/sidebar.js DECOR_BUCKET. decorGroupLabel остаётся: используется
+      // js/sidebar.js decorFamsOfCategory (catégorie cuite des records — l’ancienne table DECOR_BUCKET est supprimée, ontology chunk 2). decorGroupLabel остаётся: используется
       // config.js chestKindLabel.)
       // Подгруппа «По семействам» в разделе «Монстры и фауна» (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup) — точки семейства = точки

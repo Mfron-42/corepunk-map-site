@@ -14,7 +14,7 @@ import {
 } from './fiches.js';
 import { buildFilters } from './sidebar.js';
 import { whenDeferred, deferredReady } from './data.js';
-import { applySpeciesTokens } from './specieslayer.js';
+import { applySpeciesTokens, setFamilyOn } from './specieslayer.js';
 
 /* ── Restauration d'état (chargement ET popstate) ──────────────
    Fonction UNIQUE qui relit le hash et republie l'UI : caméra, fiche
@@ -33,7 +33,7 @@ import { applySpeciesTokens } from './specieslayer.js';
    appuis Précédent/Suivant rapprochés (mobile notamment). */
 async function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
+  const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
 
   // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
   // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
@@ -133,6 +133,21 @@ async function applyLocationState() {
     // assumée : décocher puis Précédent RE-coche (l'entrée ancienne porte
     // le token). Voir js/specieslayer.js applySpeciesTokens.
     applySpeciesTokens(onSet);
+  }
+  // Repli PARENT du schéma delta `flt=` (hygiène de hash, urlstate.js) :
+  // un jeton `monfam.<f>` restaure la CASCADE complète (setFamilyOn recoche
+  // toutes les espèces de la famille — exactement le geste de la case de
+  // l'arbre), puis les exclusions explicites `-monsp.<id>` décochent les
+  // espèces retirées sous une famille cochée. Sous whenDeferred : la
+  // cascade a besoin du catalogue d'espèces (chargement différé) —
+  // synchrone si déjà prêt, même discipline qu'applyCampFilters ci-dessus.
+  if (fltFamilies?.length || fltSpeciesOff?.length) {
+    whenDeferred(() => {
+      for (const f of fltFamilies || []) setFamilyOn(f, true);
+      for (const id of fltSpeciesOff || []) if (S.monsp[id]) S.monsp[id].on = false;
+      denseRenderers.forEach(fn => fn());
+      buildFilters();
+    });
   }
   denseRenderers.forEach(fn => fn());
   buildFilters();

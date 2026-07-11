@@ -41,7 +41,7 @@ export default {
       // чесний підпис стражів (2 табори/12 точок, ЖОДНОЇ прив'язки виду/
       // НПС/здобичі); чесний рядок «неідентифіковані спавни» (пули без
       // прив'язаного виду — лічильник дорівнює рівно тому, що малює шар,
-      // див. pointsets.js KIND_REST_ONLY); та суфікс «(табори)» динамічних
+      // див. pointsets.js kindRestPoints (règle rest-only universelle, data-dérivée)); та суфікс «(табори)» динамічних
       // kinds поруч із РОЗМІЩЕНИМИ пропсами у бакетах інтерактивних
       // об'єктів. GLOSSARY-PENDING.
       guardsRowLabel: 'Стражі (неідентифікований юніт)',
@@ -75,7 +75,7 @@ export default {
       filterHiddenTooltip: n => `${n} без відомої позиції`,
       // (decorFamiliesTitle вилучена 2026-07-11 разом із розпущеною групою
       // «Декор» — її рядки живуть у бакетах інтерактивних об'єктів, див.
-      // js/sidebar.js DECOR_BUCKET. decorGroupLabel лишається: використовує
+      // js/sidebar.js decorFamsOfCategory (catégorie cuite des records — l’ancienne table DECOR_BUCKET est supprimée, ontology chunk 2). decorGroupLabel лишається: використовує
       // config.js chestKindLabel.)
       // Підгрупа «За родинами» в розділі «Монстри та фауна» (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup) — точки родини = точки

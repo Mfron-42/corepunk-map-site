@@ -210,10 +210,22 @@ function zeroCampWildlifeSpecies() {
 }
 /* Camps d'un kind joints à AU MOINS une espèce (catalogue ou wild). */
 function kindBoundCampKeys(kind) { return kindJoinTable().get(kind)?.bound || new Set(); }
-/* Camps d'un kind SANS aucune espèce jointe + leur volume de points —
-   la ligne « Spawns non identifiés » (compte honnête : exactement ce que la
-   couche kind dessine pour les kinds « reste seulement », voir
-   KIND_REST_ONLY). */
+/* Camps d'un kind SANS aucune espèce jointe + leur volume de points — la
+   ligne « Spawns non identifiés » (compte honnête : exactement ce que la
+   couche kind dessine). La règle « rest-only » est UNIVERSELLE et dérivée
+   de la donnée (ontology chunk 2 — l'ancien set front KIND_REST_ONLY
+   {monsters, creeps, wildlife} est SUPPRIMÉ) : un camp est « non
+   identifié » quand AUCUNE espèce ne s'y lie (kindBoundCampKeys ci-dessus,
+   jointures species.bin/camp_details wild) — la couche kind ne dessine que
+   ceux-là, pour TOUT kind (compositeur main.js). Pour les kinds sans
+   aucune liaison espèce possible (récolte, sanctuaires, contenants…),
+   l'ensemble lié est VIDE et la couche dessine tout : strictement
+   l'ancien comportement, vérifié sur la donnée expédiée (les seuls kinds
+   liés à une espèce sont monsters/creeps/wildlife, toutes cartes).
+   Conséquence assumée/documentée (inchangée) : un lien LEGACY
+   `on=camp.creeps`/`camp.wildlife`/`camp.monsters` dessine le sous-ensemble
+   non joint au lieu du kind entier — le reste s'allume par les lignes
+   espèce/famille, jamais perdu. */
 function kindRestPoints(kind) {
   const st = S.camps[kind];
   if (!st) return { nCamps: 0, nPts: 0 };
@@ -225,22 +237,6 @@ function kindRestPoints(kind) {
   }
   return { nCamps, nPts };
 }
-/* INTERIM — replaced by pipeline-level canonical classification (see
-    enforcement plan); delete this map when records ship
-   category/subtype fields. Kinds dont la ligne de panneau est « Spawns non
-   identifiés » (compte = camps non joints) : leur couche kind ne dessine
-   QUE ces camps-là (compositeur main.js) — les camps joints s'allument par
-   leurs lignes espèce/famille. 'monsters' a rejoint le lot (correction de
-   structure utilisateur 2026-07-11 : Monsters/Creeps/Wildlife = trois
-   groupes racine SYMÉTRIQUES, chacun terminé par une ligne honnête
-   « Spawns non identifiés » — l'ancienne bascule grossière « Camps de
-   monstres », dont le compte recouvrait des camps déjà couverts par les
-   lignes famille, est remplacée par le même compte rest-only que les deux
-   autres). Conséquence assumée/documentée : un lien LEGACY
-   `on=camp.creeps`/`camp.wildlife`/`camp.monsters` dessine désormais le
-   sous-ensemble non joint au lieu du kind entier — le reste s'allume par
-   les lignes espèce/famille, jamais perdu. */
-const KIND_REST_ONLY = new Set(['monsters', 'creeps', 'wildlife']);
 
 /* ── Objets de quête (qao) → placements ─────────────────────────
    sel = {keys:[qaoKey…]} | {type:'Document'} — placements S.data.qao
@@ -266,6 +262,6 @@ function qaoPoints(sel) {
 export {
   campGroupByKey, speciesCampSet, speciesPoints,
   familyCampSet, familyPoints, monsterFamilies,
-  wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints, KIND_REST_ONLY,
+  wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints,
   qaoPoints,
 };

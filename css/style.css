@@ -41,6 +41,18 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
+/* Coquille d'app à VIEWPORT FIXE — la racine ne défile JAMAIS (bug réel,
+   2026-07-11 : page entière bleu nuit uni). `overflow: clip` sur html
+   interdit tout défilement du document, y compris PROGRAMMATIQUE (focus
+   natif, scrollIntoView, scrollTo) — contrairement à `hidden`, qui ne
+   retire que barres/molette mais laisse le navigateur défiler la racine en
+   douce. Le body garde son overflow:hidden historique : avec html ≠
+   visible, il ne se propage plus au viewport et CLIPPE réellement le body
+   (neutralise aussi le débordement horizontal du drawer #detail translaté à
+   102 %). Repli navigateurs sans `clip` : déclaration ignorée →
+   comportement d'avant, couvert par le fix racine
+   .filter-row{position:relative} plus bas. */
+html { overflow: clip; }
 body {
   font-family: var(--font-body);
   background: #080c12;
@@ -417,6 +429,24 @@ body {
    anciens #filter-list/#camp-list, fusionnés en groupes side-sec, voir
    js/sidebar.js buildFilters()). */
 .layer-list, #tracked-list { list-style: none; margin: 0; padding: 0; }
+/* Plafond de hauteur PARTAGÉ du contenu d'un groupe racine (demande
+   utilisateur 2026-07-11 : la longue liste de familles du groupe Monsters
+   masquait tout ce qui suit). UNE classe générique, posée UNIFORMÉMENT sur
+   le conteneur de contenu de CHAQUE groupe racine (index.html — un groupe
+   plus court que le plafond ne défile simplement pas) ; nommée générique
+   exprès pour que les listes longues des panneaux de droite (task #85) la
+   réutilisent telle quelle. Barre fine, même vocabulaire que #panel/#detail. */
+.layer-scroll {
+  max-height: 42vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+}
+.layer-scroll::-webkit-scrollbar { width: 7px; }
+.layer-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
+.layer-scroll::-webkit-scrollbar-thumb:hover { background: #2a3852; background-clip: padding-box; }
+.layer-scroll::-webkit-scrollbar-track { background: transparent; }
 
 .filter-row {
   display: flex; align-items: center; gap: 10px;
@@ -425,6 +455,18 @@ body {
   cursor: pointer;
   user-select: none;
   transition: background var(--dur) var(--ease);
+  /* ROOT-CAUSE FIX du « page entière bleu nuit » (2026-07-11) : les <input>
+     de ligne sont en position:absolute (masqués, la pastille .swatch est la
+     case visible). SANS ancêtre positionné, leur bloc conteneur était le
+     viewport lui-même : ils ÉCHAPPAIENT au clip/scroll du #panel et
+     étendaient le débordement défilable de la RACINE jusqu'au bas de
+     l'arbre déplié (~2 600 px). Cliquer le <label> d'une ligne basse
+     focalisait son input, et le navigateur faisait défiler la RACINE (pas
+     le panneau) pour l'y amener → l'app entière (100vh) sortait de l'écran.
+     position:relative ré-ancre chaque input dans SA ligne : le focus
+     défile le #panel, comme attendu. (+ défense en profondeur :
+     html{overflow:clip} tout en haut de ce fichier.) */
+  position: relative;
 }
 .filter-row:hover { background: var(--panel-3); }
 .filter-row input { position: absolute; opacity: 0; }

@@ -10,7 +10,7 @@ import {
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, campLootTableName, chestDisplayName,
+  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
 } from './config.js';
@@ -30,8 +30,8 @@ import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
    contenants cassables/fouillables n'y sont jamais) : points de spawn +
    bouton carte au minimum, et pour un contenant TYPÉ (caisse de maïs,
    cercueil, corps, coffre fouillable…) la table de butin associée PAR TYPE
-   (voir campLootTableName — mention honnête, le lien prop→table n'est pas
-   publié par le jeu). */
+   (champ cuit g.probableLoot — mention honnête, le lien prop→table n'est
+   pas publié par le jeu). */
 /* Kinds "monster-ish" ( -- même classement, tokens
    raw "monsters"/"monster"/"creeps"/"wild"/"peaceful" normalisés en kinds
    site "monsters"/"creeps"/"wildlife", voir build_site_data.py
@@ -60,13 +60,12 @@ function openCampFiche(key) {
   const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === key);
   if (!g) return;
   S.openFiche = { kind: 'camp', id: key };
-  // Nom EXPÉDIÉ (g.name, pipeline pass 2026-07-11b) via campLabel — les
-  // kinds interactables typés (destroyable/searchable/reactive) gardent le
-  // formateur campDisplayName (sous-type tonneau/sac/… extrait de la clé),
-  // voir config.js. Le chip qualificatif (patrol/buffed) s'ajoute au TITRE
-  // (h2 ci-dessous), jamais fusionné dans `name` (name sert aussi de
-  // data-label de goto, texte brut).
-  const name = campLabel(key, g.kind, g.name);
+  // Nom EXPÉDIÉ (g.name) + SOUS-TYPE CUIT (g.subtype, ontology chunk 2) via
+  // campLabel — le formateur unique lit les champs de classification du
+  // record (plus aucune regex de re-détection, voir config.js). Le chip
+  // qualificatif (patrol/buffed) s'ajoute au TITRE (h2 ci-dessous), jamais
+  // fusionné dans `name` (name sert aussi de data-label de goto, texte brut).
+  const name = campLabel(key, g.kind, g.name, g.subtype);
   const qualChip = campQualifierChip(g.qualifier);
   const mobs = (det?.mobs || []).map(m => `
     <div class="frow">
@@ -96,7 +95,12 @@ function openCampFiche(key) {
   // det était null pour ces camps) est conservé à l'identique.
   const drops = (det && (det.mobs?.length || det.drops?.length))
     ? `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(det.drops, 'noLootCatalogued')}</div>` : '';
-  const tableName = campLootTableName(key);
+  // Table de butin PROBABLE : champ CUIT `probableLoot` du record (ontology
+  // chunk 2 — association « par correspondance exacte de type » faite côté
+  // pipeline, le client n'a toujours PAS de lien prop→table ; la mention
+  // honnête probableLootNote reste). L'ancienne table front
+  // CAMP_LOOT_TABLE_RULES est supprimée (config.js).
+  const tableName = g.probableLoot || null;
   const tableRows = tableName ? lootTableItems(tableName) : null;
   const tableHtml = tableRows ? `<div class="fiche-section"><h3>${esc(tr('probableLootTitle'))}</h3>
     <p class="hint">${esc(tr('probableLootNote', tableName))}</p>
@@ -1983,7 +1987,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // même correctif qu'actorRows/« Voir le donneur » ci-dessus (voir
   // npc_dual_identity_INVESTIGATION.md §2/§3). N'invente JAMAIS un bouton là
   // où il n'y en avait pas (t.x == null garde `dynamicPosBadge` inchangé).
-  const npcNi = (t.kind === 'npc' && t.x != null && label) ? npcIndexByName(label) : -1;
+  // SOURCE DU NOM (audit quêtes 2026-07-11, classe A) : le pipeline expédie
+  // le PNJ RÉSOLU dans `t.label` (geo.py _npc_pos_target, help/talk) — la
+  // phrase d'objectif (`label`) n'est qu'un repli, plus jamais la source
+  // primaire (elle ne matche le catalogue que par accident).
+  const npcName = t.kind === 'npc' ? (t.label || label) : null;
+  const npcNi = (t.kind === 'npc' && t.x != null && npcName) ? npcIndexByName(npcName) : -1;
   const npcPin = npcNi >= 0 ? S.data.npc[npcNi] : null;
   const posX = npcPin && npcPin.x != null ? npcPin.x : t.x;
   const posZ = npcPin && npcPin.x != null ? npcPin.z : t.z;
@@ -2095,7 +2104,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         ? `<div class="goal-target-row goal-target-row-rel">
             <span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('containerBadge'))}</span>
             <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
-            <span class="goal-target-name">${esc(t.label)}</span>
+            <span class="goal-target-name">${esc(cleanLabel(t.label))}</span>
           </div>`
         : `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
     }
@@ -2224,15 +2233,21 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // data-act="fiche-monster"/"family-layer") ET spawnRow (quand l'espèce
     // est résolue) routent DÉJÀ vers la même couche points de l'arbre
     // (species-layer, #82 chunk (d) — famille : activateFamilyLayers,
-    // main.js). Sur une cible monstre RÉSOLUE (espèce mk, ou famille via
-    // famTokens), `posRow` disparaît donc purement et simplement — la seule
+    // main.js). Sur une cible monstre RÉSOLUE, `posRow` disparaît — la seule
     // affordance qui reste est la vraie (points, jamais un cercle deviné).
-    // Gardé UNIQUEMENT quand rien n'est résolu (mk absent ET famille sans
-    // token) : là, aucune autre route n'existe vers une couche carte, posRow
-    // reste le seul repli honnête. Objets/monde/dynamique (autres branches
-    // de cette fonction) gardent `posRow` inchangé — seule cette branche
-    // monstre est concernée.
-    const hasLayerResolution = !!mk || (isFamilyScope && famTokens.length > 0);
+    // CORRIGÉ (audit quêtes 2026-07-11, classe D : 25 buts sans PLUS AUCUNE
+    // affordance carte, dont 9 avec une vraie search_zone perdue) : la
+    // suppression supposait « espèce résolue ⇒ point-set existe » — FAUX
+    // pour une espèce à 0 camp joint sur la carte active (mobs de donjon/
+    // Île-prison) : monsterSpawnHighlightBtn rend '' et la case n'allume
+    // rien — les barreaux 3/4 de l'échelle étaient perdus. La condition
+    // devient « la couche a RÉELLEMENT des points » : spawnBtn non vide
+    // (l'espèce a des camps ici) ou portée famille (famTokens — la ligne
+    // famille de l'arbre existe toujours). Sinon posRow revit (goto/
+    // cross-map/zone estimée), le repli honnête du barreau 4.
+    // Objets/monde/dynamique (autres branches de cette fonction) gardent
+    // `posRow` inchangé — seule cette branche monstre est concernée.
+    const hasLayerResolution = !!spawnBtn || (isFamilyScope && famTokens.length > 0);
     const monsterPosRow = hasLayerResolution ? '' : posRow;
     return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}${spawnRow}</div>`;
   }
@@ -2276,17 +2291,23 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverSpan}</div>` : '';
       return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
     }
-    // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) : ce
-    // branch n'affichait avant QUE le bouton de position, zéro identité --
-    // même défaut "juste un tag vide" que les autres branches avant cette
-    // passe. `label` est la seule source de nom fiable ici (les cibles npc
-    // ne portent jamais leur propre `t.label`, voir audit ci-dessus) ; repli
-    // texte simple si le PNJ n'est pas trouvé sur la carte active (jamais un
-    // lien deviné).
-    const ni = label ? npcIndexByName(label) : -1;
+    // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) —
+    // CORRIGÉ (audit quêtes 2026-07-11, classe A : 88 buts « talk/help »
+    // rendus SANS lien) : l'ancien commentaire « les cibles npc ne portent
+    // jamais leur propre t.label » était PÉRIMÉ — la passe mechanism-decode
+    // du pipeline expédie le PNJ résolu dans `t.label` (+ `t.key: "npc:*"`
+    // sur 62 des 88) ; résoudre/afficher la PHRASE d'objectif (« Help
+    // Jennifer Davyna ») ne matchait le catalogue que quand la phrase se
+    // trouvait être exactement le nom (204/292), et dupliquait la phrase en
+    // pseudo-chip de nom sous elle-même. Source : t.label d'abord (le NOM),
+    // phrase en repli (`npcName`, calculé en tête de fonction avec le join
+    // de pin) ; repli texte simple si le PNJ n'est pas sur la carte active
+    // (jamais un lien deviné).
+    const ni = npcName ? npcIndexByName(npcName) : -1;
+    const nameText = esc(cleanLabel(npcName || ''));
     const nameRow = (ni >= 0)
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${lbl}</span></div>`
-      : (label ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${lbl}</span></div>` : '');
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${nameText}</span></div>`
+      : (npcName ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${nameText}</span></div>` : '');
     return `<div class="goal-target">${nameRow}${posRow}</div>`;
   }
 
@@ -2304,7 +2325,10 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // has no location concept (unlike a harvest node or a zone), so `posRow`
     // is deliberately NOT rendered here -- same "never a fabricated position
     // for a non-world target" rule as the craft branch above.
-    const abLabel = t.label ? cleanLabel(t.label) : null;
+    // cleanLabel porte désormais la garde générique anti-jeton moteur
+    // (underscores → espaces, audit classe E : « use_ability »,
+    // « activate_qao_… ») ; première lettre capitalisée pour le chip.
+    const abLabel = t.label ? cleanLabel(t.label).replace(/^./, c => c.toUpperCase()) : null;
     if (!abLabel) return '';
     return `<div class="goal-target">
       <div class="goal-target-row goal-target-item">
@@ -2851,25 +2875,24 @@ function isGenericFarmPoolItem(drops) {
 
 /* Ligne de camp JOINT (g trouvé dans S.camps) : pastille couleur de kind
    (même teinte que la fiche camp/les couches carte -- CAMP_COLORS), nom
-   d'affichage EXPÉDIÉ (g.name — pipeline pass 2026-07-11b, splitter
-   espèce/qualificatif partagé côté pipeline : kind token retiré, vocabulaire
-   ffm-* strippé à la source ; campLabel (config.js) garde le formateur
-   campDisplayName pour les seuls kinds interactables typés, dont le
-   sous-type tonneau/sac/… n'existe que dans la clé) + chip qualificatif
-   (— Patrouille / — Renforcé (PvP), tbl('campQualifier')) quand le camp en
-   porte un, cliquable vers la fiche camp complète (inchangé), et un bouton
-   « Surligner » qui dessine le VRAI nuage de points de CE camp + vole à ses
-   bornes -- même primitive/même libellé que le bouton de la fiche camp
-   (data-n porte le compte BRUT, jamais formaté : main.js reconstruit ce
-   même libellé au toggle-off via +b.dataset.n, un texte initial formaté
-   différemment du texte de reset aurait clignoté au premier clic). */
+   d'affichage EXPÉDIÉ (g.name + g.subtype cuit — campLabel, LE formateur
+   unique, ontology chunk 2) + chip qualificatif (— Patrouille / — Renforcé
+   (PvP), tbl('campQualifier')) quand le camp en porte un, cliquable vers la
+   fiche camp complète (inchangé), + le compte de points en méta muette.
+   Le bouton « Surligner » PAR CAMP est RETIRÉ (règle canonique 2026-07-11 :
+   toute action carte = une référence à un toggle de l'arbre de gauche — un
+   camp individuel n'a AUCUN nœud d'arbre, la ligne est donc informative ;
+   l'action carte de la section est le toggle ESPÈCE
+   monsterSpawnHighlightBtn/species-layer, déjà en place, et la fiche camp
+   elle-même garde son propre bouton de surlignage — l'exception cohérente,
+   voir main.js camp-highlight). */
 function farmCampRow(key, g) {
   const n = g.pts.length;
   const campHex = CAMP_COLORS[g.kind] || '#999';
   return `<div class="frow">
     <span class="rar-dot" style="background:${campHex}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campLabel(key, g.kind, g.name))}${campQualifierChip(g.qualifier)}</span>
-    <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
+    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campLabel(key, g.kind, g.name, g.subtype))}${campQualifierChip(g.qualifier)}</span>
+    <span class="muted">${esc(tr('entityPtsN', n.toLocaleString(numberLocale())))}</span>
   </div>`;
 }
 
@@ -2894,7 +2917,10 @@ function farmCampRow(key, g) {
    loadDeferred() (même mécanisme que la course it.questSource/S.monsters
    documentée plus haut). */
 function farmUnjoinedRow(c) {
-  const label = campLabel(c.camp, c.kind, c.name);
+  // c.subtype : absent des lignes m.camps[]/it.farm[] actuelles (le
+  // pipeline ne le cuit que sur les GROUPES camps.bin) — repli honnête sur
+  // le `name`/kind expédiés, jamais une re-détection front.
+  const label = campLabel(c.camp, c.kind, c.name, c.subtype);
   const mid = (c.map && c.map !== S.map) ? c.map : null;
   const btn = (mid && S.maps[mid] && c.x != null)
     ? crossMapBtn(mid, c.x, c.z, label)
@@ -2990,16 +3016,15 @@ function farmSectionHtml(it) {
   }).sort((a, b) => b.totalPts - a.totalPts);
 
   const groupsHtml = groups.map(grp => {
-    // Bouton « Surligner tout » de groupe : n'a d'intérêt qu'à >1 camp --
-    // avec un seul, il ferait doublon exact du bouton de sa propre ligne.
-    const highlightAllBtn = grp.rows.length > 1
-      ? `<button class="act ghost" data-act="camp-highlight" data-ids="${esc(grp.rows.map(r => r.key).join(','))}" data-n="${grp.totalPts}" data-color="${CAMP_COLORS[grp.kind] || '#888'}">${esc(tr('highlightPointsBtn', grp.totalPts))}</button>`
-      : '';
+    // (L'ancien bouton « Surligner tout » d'union de groupe — camp-highlight
+    // data-ids — est RETIRÉ, règle canonique 2026-07-11 : toute action carte
+    // référence un toggle de l'arbre. Un groupe de camps par kind n'a pas de
+    // nœud d'arbre dédié ; le résumé « N camps · M pts » reste, et chaque
+    // ligne mène à sa fiche camp — qui garde SON bouton de surlignage.)
     return `<div class="farm-group">
       <div class="farm-group-head">
         <span class="farm-group-label" style="color:${CAMP_COLORS[grp.kind] || '#999'}">${esc(campKindLabel(grp.kind))}</span>
         <span class="muted">${esc(tr('farmGroupSummary', grp.rows.length, grp.totalPts.toLocaleString(numberLocale())))}</span>
-        ${highlightAllBtn}
       </div>
       ${farmCapRows(grp.rows, r => farmCampRow(r.key, r.g), n => tr('farmMoreCampsN', n))}
     </div>`;
@@ -3042,7 +3067,12 @@ function harvestedOnHtml(it) {
        client, voir openSearchableChestFiche's own note) -- surligner ne peut
        donc honnêtement allumer que la couche ENTIÈRE, jamais un sous-
        ensemble par rareté fabriqué (data-act="chest-layer-highlight",
-       main.js -- même bookkeeping de toggle que camp-highlight). */
+       main.js -- même bookkeeping de toggle que camp-highlight).
+       CONSERVÉ par la purge des surlignages par camp (2026-07-11) : ce
+       bouton n'est PAS un surlignage par camp — il montre la couche
+       ENTIÈRE des 487 placements (celle du nœud d'arbre Interactables >
+       Chests > Coffres fouillables, ON par défaut), choix jugé cohérent
+       avec la règle « action carte = référence à un toggle de gauche ». */
 function containerChanceText(ch) {
   const pct = ch * 100;
   if (pct < 1) return tr('containerChanceBelowOne');
@@ -3081,11 +3111,15 @@ function containersSectionHtml(it) {
 
 /* Section « Apparaît dans » de la fiche monstre (openMonsterFiche) : même
    jointure camp -> vrai nuage de points que farmSectionHtml ci-dessus
-   (campGroupByKey, résolveur unique js/pointsets.js), + un bouton de groupe qui UNIT tous les camps joints
-   du monstre en un seul surlignage (data-ids CSV, handler camp-highlight de
-   main.js) -- la demande d'origine ("où sont les imps bleus ?") attend
-   l'UNION des nuages réels de TOUS les camps de la créature (4 camps ≈ 900+
-   points pour les imps), jamais une poignée de points choisis à la main.
+   (campGroupByKey, résolveur unique js/pointsets.js), + LE toggle ESPÈCE
+   (monsterSpawnHighlightBtn, data-act="species-layer" — la case de l'arbre
+   de gauche, persistante) comme SEULE action carte de la section -- la
+   demande d'origine ("où sont les imps bleus ?") attend l'UNION des nuages
+   réels de TOUS les camps de la créature (4 camps ≈ 900+ points pour les
+   imps) : c'est exactement ce que la couche espèce allume. Les lignes de
+   camp en dessous sont INFORMATIVES (nom + « N pts » + lien fiche camp,
+   farmCampRow — leurs boutons de surlignage éphémère par camp sont retirés,
+   règle canonique 2026-07-11, voir farmCampRow).
    m.camps[] porte {camp, name, qualifier?, map, kind, x, z} PAR CAMP
    (pipeline pass 2026-07-11b) -- une forme strictement identique à
    it.farm[], donc les MÊMES lignes sont réutilisées telles quelles :

@@ -39,7 +39,7 @@ export default {
       // etiqueta honesta (2 campamentos/12 pts, sin NINGÚN vínculo de
       // especie/PNJ/botín); «apariciones sin identificar» (pools sin especie
       // vinculada — el recuento es exactamente lo que dibuja la capa, ver
-      // pointsets.js KIND_REST_ONLY); y el sufijo «(campamentos)» de los
+      // pointsets.js kindRestPoints (règle rest-only universelle, data-dérivée)); y el sufijo «(campamentos)» de los
       // kinds dinámicos colocados junto a props FIJOS en los buckets de
       // Interactuables. GLOSSARY-PENDING.
       guardsRowLabel: 'Guardias (unidad sin identificar)',
@@ -74,7 +74,7 @@ export default {
       filterHiddenTooltip: n => `${n} sin posición conocida`,
       // (decorFamiliesTitle retirada 2026-07-11 con el grupo «Decoración»
       // disuelto — sus filas viven en los buckets de Interactuables, ver
-      // js/sidebar.js DECOR_BUCKET. decorGroupLabel sigue en uso:
+      // js/sidebar.js decorFamsOfCategory (catégorie cuite des records — l’ancienne table DECOR_BUCKET est supprimée, ontology chunk 2). decorGroupLabel sigue en uso:
       // config.js chestKindLabel.)
       // Subgrupo "Por familia" bajo Monstruos y fauna (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup) — los puntos de una familia
