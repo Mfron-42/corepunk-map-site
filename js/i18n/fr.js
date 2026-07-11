@@ -383,6 +383,19 @@ export default {
       // la branche qs.via === 'reward_of' d'openItemFiche).
       obtainViaRewardOfQuest: name => `quête ${name}`,
       obtainViaWorld: 'Trouvé en accomplissant cette quête',
+      // Ligne d'obtention honnête (items-obtain audit §B2) : affichée quand
+      // un objet n'a AUCUN canal d'obtention — une ligne explicite plutôt
+      // qu'un vide silencieux. La formulation dit ce que les DONNÉES disent
+      // ou ne disent pas, jamais « inobtenable » (affirmation invérifiable).
+      obtainStatusUnknown: 'Aucune source d\'obtention référencée dans les données actuelles du jeu.',
+      obtainStatusQuestOrphan: 'Objet de quête — aucune quête des données actuelles du jeu n\'y fait référence (contenu probablement inutilisé ou retiré).',
+      obtainStatusCosmetic: 'Élément d\'apparence (skin) — aucune source d\'obtention référencée dans les données actuelles du jeu.',
+      obtainStatusLobby: 'Équipement de lobby d\'arène — aucune source d\'obtention référencée hors des matchs d\'arène.',
+      obtainStatusInternal: 'Donnée interne du jeu (effet/capacité) — pas un objet obtenable par le joueur.',
+      // Badge « Interne » (audit §B3) : pseudo-items techniques masqués du
+      // listage comme le contenu dev, toujours ouvrables via leurs jointures.
+      internalBadge: 'Interne',
+      internalBadgeTitle: 'Donnée technique du jeu (effet/capacité/talent) présente dans le client mais jamais détenue comme objet par le joueur.',
       moreMerchants: n => `+ ${n} autres marchands`,
       merchantPosUnknown: 'Position du marchand non précisée.',
       recipeTitle: 'Recette',

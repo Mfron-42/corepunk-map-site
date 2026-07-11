@@ -3463,7 +3463,15 @@ function openItemFiche(key) {
   // Contenu dev (feature #13) : marqueur explicite sur un item isTest ouvert
   // (toujours ouvrable par lien profond direct, jamais un 404 silencieux —
   // seule sa présence dans la RECHERCHE dépend de S.devOn, voir search.js).
-  const devMark = it.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+  // isInternal (items-obtain audit §B3) : même principe pour un pseudo-item
+  // interne (charge de capacité/effet — masqué du listage par devcontent.js,
+  // jamais retiré des données) — badge « Interne » distinct du badge Test,
+  // toujours ouvrable via ses jointures (chips de quête/butin, lien profond).
+  const devMark = it.isTest
+    ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>`
+    : it.isInternal
+      ? `<span class="dev-mark" title="${esc(tr('internalBadgeTitle'))}">${esc(tr('internalBadge'))}</span>`
+      : '';
 
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
@@ -3693,6 +3701,33 @@ function openItemFiche(key) {
         </div>`;
       }).join('')}</div>` : '';
 
+  // Ligne d'obtention honnête (items-obtain audit §B2) : le pipeline stampe
+  // `obtainStatus` (enum fermé, build_site_data.py::_obtain_status_of) sur
+  // toute entrée SANS AUCUN canal d'obtention — plutôt qu'un vide silencieux,
+  // la fiche énonce ce que les données disent (« aucune source référencée »,
+  // jamais « inobtenable » : une affirmation sur le JEU qu'on ne peut pas
+  // prouver). Rendue uniquement quand aucune section d'obtention n'a
+  // effectivement rien produit ci-dessus (ceinture-bretelles : un canal baké
+  // peut rendre vide, ex. soldBy vers un vendeur absent du bundle) — jamais
+  // en doublon d'une vraie source. Le mapping statut→clé i18n est FERMÉ ;
+  // un statut inconnu (drift futur) retombe sur la formulation générique,
+  // jamais sur une clé brute affichée.
+  let obtainStatusHtml = '';
+  if (it.obtainStatus && !questSourceHtml && !vendorsHtml && !dropsHtml
+      && !farmHtml && !harvestedOnHtmlBlock && !containersHtml
+      && !recipeHtml && !questsHtml) {
+    const OBTAIN_STATUS_KEY = {
+      unknown: 'obtainStatusUnknown',
+      questOrphan: 'obtainStatusQuestOrphan',
+      cosmetic: 'obtainStatusCosmetic',
+      lobby: 'obtainStatusLobby',
+      internal: 'obtainStatusInternal',
+    };
+    const k18 = OBTAIN_STATUS_KEY[it.obtainStatus] || 'obtainStatusUnknown';
+    obtainStatusHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
+      <p class="hint">${esc(tr(k18))}</p></div>`;
+  }
+
   const weaponLine = weaponTypeLine(it.weapon);
   // Titre désambiguïsé (fix UX) : un item de quête lié à une quête par le
   // résolveur (it.questSource — jamais inventé côté front, voir
@@ -3766,6 +3801,7 @@ function openItemFiche(key) {
     ${raritySelectHtml}
     ${descHtml}
     ${questSourceHtml}
+    ${obtainStatusHtml}
     ${vendorsHtml}
     ${dropsHtml}
     ${farmHtml}

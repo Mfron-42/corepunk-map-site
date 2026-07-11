@@ -8,7 +8,7 @@ import {
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
   locationKindLabel, mapName,
 } from './config.js';
-import { $, esc, fmtCoord, fold, editLe, iconTag, initials, itemGlyph, pretty } from './utils.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty } from './utils.js';
 import { tr, tbl, numberLocale } from './i18n/index.js';
 import { map, toLL, toggleZones, showHighlight } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
@@ -75,7 +75,76 @@ const CAT_GLYPH = {
    déjà existante a sa traduction dans les 5 dictionnaires (vérifié), donc
    ce repli ne joue QUE pour 'catnode' ci-dessus. */
 const searchCatLabel = key => tbl('searchCat', key) || CAT_GLYPH[key] || key;
+
+/* Poids de CHAMP du corpus secondaire (`body`, mission "search quality"
+   2026-07-11d) : remplace l'ancien plancher binaire unique (+1000, "titre ou
+   +1000") par deux paliers explicites, appliqués UNIFORMÉMENT à toute
+   catégorie (quêtes ET objets, plus les corpus déjà existants -- alias de
+   monstre/type de coffre/digest cross-carte de quête, tous re-classés ALIAS
+   ci-dessous puisqu'ils sont chacun un NOM ALTERNATIF, jamais un texte
+   descriptif) :
+     ALIAS (80)  -- un autre NOM/LIBELLÉ pour la même entité : donneur de
+                    quête (q.giver), libellé de but court (q.goalTexts, ex.
+                    "Return to Furr"), archétype d'objet (it.archetype, ex.
+                    "Brain Imp Executioner" -- clé de désambiguïsation entre
+                    objets de quête homonymes, data/SCHEMA.md), mot de type de
+                    coffre, alias de monstre (species.namesAll), digest de
+                    quête cross-carte (déjà surtout des libellés, voir
+                    pipeline's _quest_search_terms).
+     PROSE (400) -- texte descriptif/narratif LIBRE : objectif de quête
+                    (q.objectives), résumé de journal (q.journal), texte de
+                    saveur d'objet (it.desc). Moins spécifique qu'un alias
+                    (un mot y apparaît "en passant", pas comme LE nom de la
+                    chose), donc pénalisé davantage.
+   Les deux paliers restent TOUJOURS pires que le pire score de titre
+   plausible (biais max 2.4×5=12 + ~4 par jeton flou, très en dessous de 80
+   même avec plusieurs jetons) -- un match de TITRE bat toujours un match de
+   corpus secondaire, quel que soit son champ (règle de tri inchangée,
+   vérifiée par _verify_search_quality.mjs "ranking sanity"). */
+const BODY_WEIGHT = { ALIAS: 80, PROSE: 400 };
+
+/* Jetons-TYPE de requête (mission "search quality" 2026-07-11d, demande #3) :
+   quand le TOUT PREMIER jeton d'une requête à ≥2 mots nomme exactement une
+   catégorie (quest/quête, item/objet, monster/monstre, npc/pnj, zone, camp,
+   recipe/recette, family/famille -- alias FR/EN garantis, RU/UK/ES en
+   best-effort, même table technique JAMAIS AFFICHÉE que KIND_TOKEN_ALIASES
+   ci-dessous), ce jeton est CONSOMMÉ (retiré des jetons qui matchent un nom
+   d'entité, jamais flou-matché lui-même) et sert seulement à BOOSTER cette
+   catégorie dans le tri des résultats du reste de la requête -- "quest
+   scrag" fait remonter les QUÊTES mentionnant "scrag" avant tout objet/
+   monstre qui matcherait aussi "scrag", sans pour autant les faire
+   disparaître (boost, pas filtre dur -- voir runSearch's BOOST_PARTITION).
+   Requête à un seul mot ("quest" tapé seul) : PAS de consommation (garde
+   left tokens.length>1 dans runSearch) -- aucun risque de régression sur une
+   recherche littérale existante d'un mot qui se trouve aussi être un jeton-
+   type (ex. "camp" tout seul reste une recherche plein-texte normale, comme
+   avant cette passe). Match EXACT requis sur le jeton lui-même (jamais flou/
+   préfixe) : "monst" en cours de frappe ne déclenche rien tant que
+   "monster"/"monstre" n'est pas complet, aucun faux déclenchement. */
+const KIND_QUERY_ALIASES = {
+  quest: ['quest', 'quete', 'quête', 'квест', 'mision', 'misión'],
+  item: ['item', 'objet', 'предмет', 'objeto'],
+  monster: ['monster', 'monstre', 'монстр', 'monstruo'],
+  npc: ['npc', 'pnj', 'нпс'],
+  zone: ['zone', 'зона', 'zona'],
+  camp: ['camp', 'лагерь', 'табір', 'campamento'],
+  recipe: ['recipe', 'recette', 'рецепт', 'receta'],
+  family: ['family', 'famille', 'семья', "сімя", 'familia'],
+};
+const KIND_QUERY_TOKEN_TO_CAT = new Map();
+for (const [cat, words] of Object.entries(KIND_QUERY_ALIASES))
+  for (const w of words) KIND_QUERY_TOKEN_TO_CAT.set(fold(w), cat);
+
 let searchIndex = [];
+/* Compteur de version (mission "search quality" 2026-07-11d) : bumpé à
+   chaque pushSearchEntry -- sert à invalider paresseusement l'index de
+   candidats flous (ensureFuzzyBuckets) sans le reconstruire à CHAQUE frappe,
+   seulement quand l'index change réellement (nouveau lot différé, bascule
+   de carte/langue). Compteur monotone -- jamais réinitialisé, même quand
+   `searchIndex = []` repart de zéro (buildSearch) : un futur rebuild qui
+   retomberait par coïncidence sur le même NOMBRE final d'entrées ne serait
+   donc jamais pris pour "déjà à jour". */
+let searchIndexVersion = 0;
 /* `body` (optionnel) : corpus de texte supplémentaire au-delà du libellé —
    une quête reste trouvable par un mot de son déroulé (objectif, texte de
    but) et pas seulement son titre. Générique et non localisé en dur : le
@@ -136,10 +205,25 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
     // ci-dessous ; null partout ailleurs, aucun changement visuel pour eux.
     ctx: (opts && opts.ctx) || null,
   };
+  // `body[i]` accepte soit une chaîne brute (repli historique -- coffres/
+  // alias de monstre/digest de quête cross-carte, voir BODY_WEIGHT plus bas :
+  // ce sont tous des SYNONYMES/NOMS alternatifs, jamais de la prose, d'où le
+  // repli au palier ALIAS), soit `{text, weight}` explicite (quêtes/objets,
+  // mission "search quality" 2026-07-11d -- palier de champ choisi par
+  // l'appelant, voir questSearchBody/itemSearchBody). `weight` remplace
+  // l'ancien plancher fixe +1000 : un score de corpus secondaire est
+  // désormais `weight + score-de-jetons`, jamais confondu avec le palier
+  // TITRE (n/words, poids 0) quel que soit le champ -- voir runSearch.
   if (body && body.length) {
-    entry.body = body.filter(Boolean).map(s => { const bn = fold(s); return { text: s, n: bn, words: bn.split(' ') }; });
+    entry.body = body.filter(Boolean).map(s => {
+      const text = typeof s === 'string' ? s : s.text;
+      const weight = typeof s === 'string' ? BODY_WEIGHT.ALIAS : s.weight;
+      const bn = fold(text);
+      return { text, n: bn, words: bn.split(' '), weight };
+    });
   }
   searchIndex.push(entry);
+  searchIndexVersion++;
   return entry;
 }
 /* Clé de dédoublonnage rich-index ⨯ index cross-carte : une quête présente à
@@ -151,7 +235,32 @@ const searchDedupKey = e => `${e.cat}|${e.ref || e.n || fold(e.label)}`;
    + résumé de journal. Purement additif au titre, jamais affiché tel quel
    (voir renderSearch pour l'indice ponctuel). */
 function questSearchBody(q) {
-  return [...(q.objectives || []), ...(q.goalTexts || []), ...(q.journal ? [q.journal] : [])];
+  const out = [];
+  // Donneur (q.giver) : jamais indexé pour la quête avant cette passe (mission
+  // "search quality" 2026-07-11d, field-weighted scoring) -- chercher le nom
+  // du PNJ qui donne une quête trouve maintenant aussi la quête elle-même,
+  // pas seulement l'entrée PNJ séparée.
+  if (q.giver) out.push({ text: q.giver, weight: BODY_WEIGHT.ALIAS });
+  for (const t of (q.goalTexts || [])) out.push({ text: t, weight: BODY_WEIGHT.ALIAS });
+  for (const t of (q.objectives || [])) out.push({ text: t, weight: BODY_WEIGHT.PROSE });
+  if (q.journal) out.push({ text: q.journal, weight: BODY_WEIGHT.PROSE });
+  return out;
+}
+/* Corpus secondaire d'un OBJET (mission "search quality" 2026-07-11d) :
+   archétype (it.archetype -- clé de désambiguïsation entre objets de quête
+   homonymes, ex. "Brain Imp Executioner" pour un "Imp Brain" parmi 3, voir
+   data/SCHEMA.md/pipeline build_site_data.py) et texte de saveur
+   (it.desc). AUCUN des deux n'était indexé du tout avant cette passe (le
+   push d'objet plus bas passait toujours `body=null`) -- 459/6542 objets ont
+   un archétype, 357/6542 une description (mesuré sur items.bin EN). Même
+   distinction ALIAS/PROSE que questSearchBody ci-dessus : l'archétype est un
+   NOM alternatif court (même nature qu'un alias de monstre), la description
+   un texte de saveur libre. */
+function itemSearchBody(it) {
+  const out = [];
+  if (it.archetype) out.push({ text: it.archetype, weight: BODY_WEIGHT.ALIAS });
+  if (it.desc) out.push({ text: it.desc, weight: BODY_WEIGHT.PROSE });
+  return out;
 }
 function buildSearch() {
   searchIndex = [];
@@ -248,7 +357,7 @@ function buildSearch() {
     const ring = grp ? rarityGroupSwatches(grp) : null;
     push(it.name, 'item', ring ? 'var(--muted)' : itemColor(it), null, null, () => openItemFiche(key),
       it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub, devSub].filter(Boolean).join(' · '),
-      itemGlyph(it), itemBias(key, it), null, ring ? { ring } : null);
+      itemGlyph(it), itemBias(key, it), itemSearchBody(it), ring ? { ring } : null);
   });
   // Régions nommées (zonesGeo, chargé au critique — voir loadCritical),
   // coffres placés (S.data.chest, idem) et coffres fouillables réels
@@ -777,29 +886,175 @@ function buildNodeSearchIndex() {
   });
 }
 
-/* Score d'un jeton de requête contre une entrée (plus bas = meilleur) :
+/* Distance d'édition bornée AVEC TRANSPOSITION ADJACENTE (Damerau-Levenshtein
+   restreint / "optimal string alignment", bande de largeur maxD, abandon dès
+   que la ligne dépasse maxD -- mission "search quality" 2026-07-11d).
+   Insertion/suppression/substitution ET l'inversion de deux lettres voisines
+   comptent chacune pour 1 -- une Levenshtein classique compte une inversion
+   comme 2 (deux substitutions), ce qui ratait exactement la classe de faute
+   la plus commune (« scarg »→« scrag », « exectuioner »→« executioner » :
+   les DEUX ancres de vérification de cette mission sont des lettres
+   inversées). Même API/forme que l'ancien editLe (site/js/utils.js, encore
+   utilisé nulle part ailleurs -- gardé intact là-bas, ce fichier a sa PROPRE
+   copie pour ne pas toucher un utilitaire partagé hors du périmètre confié
+   à cette mission). */
+function editDist(a, b, maxD) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > maxD) return maxD + 1;
+  const INF = maxD + 1;
+  let rowM2 = new Array(lb + 1).fill(INF);   // d[i-2][*] -- lu seulement dès i>=2
+  let rowM1 = new Array(lb + 1);
+  for (let j = 0; j <= lb; j++) rowM1[j] = j;   // d[0][*] (cas de base)
+  let rowCur = new Array(lb + 1);
+  for (let i = 1; i <= la; i++) {
+    rowCur[0] = i;
+    const from = Math.max(1, i - maxD), to = Math.min(lb, i + maxD);
+    let rowMin = i;
+    for (let j = 1; j <= lb; j++) {
+      if (j < from || j > to) { rowCur[j] = INF; continue; }
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(rowM1[j] + 1, rowCur[j - 1] + 1, rowM1[j - 1] + cost);
+      if (i >= 2 && j >= 2 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, rowM2[j - 2] + 1);
+      rowCur[j] = v;
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > maxD) return INF;
+    const tmp = rowM2; rowM2 = rowM1; rowM1 = rowCur; rowCur = tmp;
+  }
+  return rowM1[lb];
+}
+/* Mémoïsation (jeton, mot, maxD) -> distance, réinitialisée à CHAQUE appel de
+   runSearch (voir plus bas) : un même mot de titre ("Scrag", "Wolf"…) revient
+   dans des dizaines/centaines d'entrées différentes -- sans ce cache,
+   editDist serait rejoué à l'identique autant de fois. Coût O(1) par accès
+   Map, négligeable devant le DP lui-même. */
+let editMemo = null;
+function cachedEditDist(tok, w, maxD) {
+  const key = tok + '\u0001' + w + '\u0001' + maxD;
+  let d = editMemo.get(key);
+  if (d === undefined) { d = editDist(tok, w, maxD); editMemo.set(key, d); }
+  return d;
+}
+
+/* Index de CANDIDATS flous (mission "search quality" 2026-07-11d) : sacs
+   d'entrées par (PREMIÈRE LETTRE, LONGUEUR) de chacun de leurs mots de TITRE
+   (n/words -- jamais le corpus `body`, bien plus restreint et déjà limité
+   aux entrées dont le titre a échoué, voir bodyMatch/tokenScore plus bas).
+   Reconstruit PARESSEUSEMENT (versionné par searchIndexVersion, jamais à
+   chaque frappe -- seulement quand l'index a réellement changé, ex. arrivée
+   d'un lot différé ou bascule carte/langue) : le coût de construction (un
+   passage sur toutes les entrées) est payé une poignée de fois par session,
+   jamais par keystroke.
+   POURQUOI la longueur EN PLUS de la lettre (mesuré, pas théorique) : sur
+   l'index Kwalat EN (7237 entrées), un sac par SEULE première lettre est
+   bien trop grossier -- 's'/'c'/'b' contiennent chacun >2000 entrées (mots
+   anglais courants très inégalement répartis), et RÉUNIR juste deux tels
+   sacs pour construire l'ensemble de candidats coûtait à lui seul plusieurs
+   ms/jeton avant même le premier appel à editDist (mesuré : "chest" ~3.5ms,
+   "steppe" ~9.8ms). Composer la longueur du mot dans la clé exploite une
+   propriété EXACTE de la distance d'édition bornée (aucune perte de rappel,
+   contrairement à un filtre heuristique) : un mot à distance ≤maxD de `tok`
+   a nécessairement une longueur dans [tok.length-maxD, tok.length+maxD] --
+   c'est la MÊME borne déjà vérifiée à l'intérieur d'editDist, simplement
+   appliquée en amont pour réduire le sac consulté au lieu du sac entier
+   d'une lettre. Coupe la taille moyenne d'un sac consulté d'un facteur
+   ~10-15 (mots répartis sur une dizaine de longueurs plausibles),
+   ramenant le pire cas mesuré à <2ms/jeton (voir _debugFuzzyTime).
+   Mots de 1-2 lettres exclus des sacs : la plus petite cible plausible pour
+   un jeton flou (≥4 lettres, maxD=1 minimum) a 3 lettres (4-1) -- aucun mot
+   plus court n'est jamais candidat, quel que soit le jeton. */
+const bucketKey = (c, len) => c + '#' + len;
+let fuzzyBucketVersion = -1;
+let entriesByBucket = new Map();
+function ensureFuzzyBuckets() {
+  if (fuzzyBucketVersion === searchIndexVersion) return;
+  entriesByBucket = new Map();
+  for (const e of searchIndex) {
+    const seen = new Set();
+    for (const w of e.words) {
+      if (w.length < 3) continue;
+      const k = bucketKey(w[0], w.length);
+      if (seen.has(k)) continue;
+      seen.add(k);
+      let arr = entriesByBucket.get(k);
+      if (!arr) entriesByBucket.set(k, arr = []);
+      arr.push(e);
+    }
+  }
+  fuzzyBucketVersion = searchIndexVersion;
+}
+/* Pour UN jeton (déjà réduit au flou -- maxD>0), calcule le meilleur score
+   flou (2+d) par ENTRÉE candidate -- Map<entry, score>, calculée UNE FOIS par
+   jeton (pas par entrée visitée dans runSearch, voir plus bas). Sacs
+   consultés : (première lettre DU jeton, chaque longueur plausible dans
+   [tok.length-maxD, tok.length+maxD]) ET la MÊME combinaison avec la
+   SECONDE lettre du jeton (tolère une lettre EN TROP en tête de la requête,
+   ex. jeton "xwolf" pour "wolf" -- sans ce second sac, seule la première
+   lettre du jeton compterait et une faute EN DÉBUT de mot resterait
+   invisible). Limite connue, assumée : une faute qui altère la toute
+   première lettre d'un mot (jamais la 2e) reste hors du filet de CE filtre
+   bon marché -- même limite que la plupart des moteurs de recherche flous à
+   préfixe (ex. Elasticsearch fuzzy par défaut), aucune des deux ancres de
+   vérification de cette mission ("scarg", "exectuioner") n'en dépend (leur
+   première lettre est intacte). */
+function fuzzyEntryScores(tok, maxD) {
+  const out = new Map();
+  if (!maxD) return out;
+  const cands = new Set();
+  const lenMin = Math.max(3, tok.length - maxD), lenMax = tok.length + maxD;
+  for (const c of [tok[0], tok.length > 1 ? tok[1] : null]) {
+    if (c == null) continue;
+    for (let len = lenMin; len <= lenMax; len++) {
+      const arr = entriesByBucket.get(bucketKey(c, len));
+      if (arr) for (const e of arr) cands.add(e);
+    }
+  }
+  for (const e of cands) {
+    let best = Infinity;
+    for (const w of e.words) {
+      let d = cachedEditDist(tok, w, maxD);
+      if (tok.length < w.length) d = Math.min(d, cachedEditDist(tok, w.slice(0, tok.length + maxD), maxD));
+      if (d <= maxD && 2 + d < best) best = 2 + d;
+    }
+    if (best !== Infinity) out.set(e, best);
+  }
+  return out;
+}
+
+/* Score d'un jeton de requête contre une entrée/segment (plus bas = meilleur) :
    0 mot exact · 1 préfixe de mot · 2 sous-chaîne · 3 ≈1 faute · 4 ≈2 fautes
-   (tolérance activée dès 4 lettres, 2 fautes dès 7) ; Infinity = pas trouvé.
-   Le préfixe flou couvre la frappe en cours (« steelhar » → Steelheart). */
-function tokenScore(tok, entry) {
-  let best = Infinity;
+   (tolérance activée dès 4 lettres, 2 fautes dès 8 -- seuils alignés sur la
+   mission "search quality" 2026-07-11d) ; Infinity = pas trouvé. Le préfixe
+   flou couvre la frappe en cours (« steelhar » → Steelheart).
+   `fuzzyMap` (Map<entry,score> précalculée par fuzzyEntryScores pour CE
+   jeton -- voir runSearch) : SEULE source du palier flou, jamais recalculée
+   ici. Absent (bodyMatch ci-dessous, corpus secondaire -- objectifs/journal
+   de quête, description d'objet…) : la tolérance aux fautes s'ARRÊTE au
+   palier exact/préfixe/sous-chaîne, PAS de repli flou mot-à-mot sur ce
+   corpus. Décision de perf délibérée (mission "search quality"
+   2026-07-11d, budget p95<15ms) : une phrase d'objectif/description a 10-20
+   MOTS -- lui appliquer le même repli flou qu'un titre (2-5 mots) aurait
+   multiplié le nombre d'appels editDist par corpus secondaire entier
+   (mesuré : p95 passait de <15ms à >20ms rien qu'avec ~800 objets ayant
+   désormais un `body` archétype/description, voir le rapport de mission).
+   La tolérance aux fautes reste néanmoins le cœur de la demande #1
+   ("smart search" sur les NOMS d'entité) -- le corpus secondaire, lui,
+   gagne la recherche exacte/sous-chaîne qu'il n'avait pas avant sur
+   archétype/description (demande #2), jamais perdu, simplement pas
+   flou-toléré. */
+function tokenScore(tok, entry, fuzzyMap) {
   if (entry.n.includes(tok)) {
-    best = 2;
+    let best = 2;
     for (const w of entry.words) {
       if (w === tok) return 0;
       if (w.startsWith(tok)) best = 1;
     }
     return best;
   }
-  const maxD = tok.length >= 7 ? 2 : tok.length >= 4 ? 1 : 0;
+  if (!fuzzyMap) return Infinity;
+  const maxD = tok.length >= 8 ? 2 : tok.length >= 4 ? 1 : 0;
   if (!maxD) return Infinity;
-  for (const w of entry.words) {
-    let d = editLe(tok, w, maxD);
-    if (tok.length < w.length) d = Math.min(d, editLe(tok, w.slice(0, tok.length + maxD), maxD));
-    if (d <= maxD) best = Math.min(best, 2 + d);
-    if (best === 3) break;
-  }
-  return best;
+  return fuzzyMap.has(entry) ? fuzzyMap.get(entry) : Infinity;
 }
 
 /* Repli « texte de déroulé » quand le titre ne matche pas : un même segment
@@ -807,7 +1062,10 @@ function tokenScore(tok, entry) {
    du corpus, sinon deux mots sans rapport dans deux phrases différentes
    produiraient un faux positif. Tolère UN jeton absent (mot parasite —
    « voir » dans « Return voir Slick ») dès 3 jetons ; en dessous, exact.
-   `null` si aucun segment n'atteint ce seuil. */
+   `null` si aucun segment n'atteint ce seuil. Paliers de champ (mission
+   "search quality" 2026-07-11d) : à nombre de jetons touchés égal, préfère
+   le segment du poids le PLUS FAIBLE (BODY_WEIGHT.ALIAS avant .PROSE) --
+   voir pushSearchEntry/BODY_WEIGHT. */
 function bodyMatch(tokens, body) {
   const required = tokens.length <= 2 ? tokens.length : tokens.length - 1;
   let best = null;
@@ -818,34 +1076,76 @@ function bodyMatch(tokens, body) {
       if (s !== Infinity) { hits++; score += s; } else { score += 6; }
     }
     if (hits < required) continue;
-    if (!best || hits > best.hits || (hits === best.hits && score < best.score)) best = { seg, hits, score };
+    if (!best || hits > best.hits ||
+      (hits === best.hits && (seg.weight < best.seg.weight || (seg.weight === best.seg.weight && score < best.score)))) {
+      best = { seg, hits, score };
+    }
   }
-  return best;
+  return best ? { seg: best.seg, hits: best.hits, score: best.score, weight: best.seg.weight } : null;
 }
+
+/* Pénalité de partition du jeton-type (KIND_QUERY_ALIASES ci-dessus) : assez
+   grande pour placer TOUTE entrée hors de la catégorie boostée après TOUTE
+   entrée de la catégorie boostée, quel que soit son propre palier (titre le
+   pire ≈12+quelques jetons flous, corpus secondaire le pire 400+4/jeton --
+   5000 domine confortablement les deux). Boost, jamais un filtre dur : une
+   entrée hors catégorie reste dans `scored`, simplement repoussée après --
+   voir runSearch. Choix délibéré (pas d'exception "match exact ailleurs") :
+   le jeton-type exprime une intention explicite de l'utilisateur ("je veux
+   des QUÊTES"), donc une préférence de catégorie inconditionnelle reste la
+   règle la plus prévisible -- un match exact ailleurs peut encore apparaître,
+   juste après, jamais masqué (seul le plafond de 24 résultats peut
+   l'évincer, exactement comme n'importe quelle autre entrée moins bien
+   classée). */
+const BOOST_PARTITION = 5000;
 
 function runSearch(raw) {
   const q = fold(raw);
   if (!q) return [];
-  const tokens = q.split(' ');
+  let tokens = q.split(' ');
+  // Jeton-type en tête (mission "search quality" 2026-07-11d, demande #3) :
+  // consommé seulement si la requête a AU MOINS un second mot (voir la doc
+  // de KIND_QUERY_ALIASES ci-dessus -- aucune régression sur une recherche
+  // mono-mot existante).
+  let boostCat = null;
+  if (tokens.length > 1) {
+    const kind = KIND_QUERY_TOKEN_TO_CAT.get(tokens[0]);
+    if (kind) { boostCat = kind; tokens = tokens.slice(1); }
+  }
+  const qRest = tokens.join(' ');   // requête SANS le jeton-type consommé -- sert au bonus "départ exact" ci-dessous
+  ensureFuzzyBuckets();
+  editMemo = new Map();
+  // Précalcul PAR JETON (pas par entrée) des candidats flous -- voir
+  // fuzzyEntryScores. `tokenScore` y pioche ensuite en O(1) au lieu de
+  // rejouer editDist sur chaque entrée visitée.
+  const fuzzyMaps = tokens.map(tok => {
+    const maxD = tok.length >= 8 ? 2 : tok.length >= 4 ? 1 : 0;
+    return maxD ? fuzzyEntryScores(tok, maxD) : null;
+  });
   const scored = [];
   for (const it of searchIndex) {
-    let score = it.bias * 5;
+    let titleScore = 0;
     let ok = true;
-    for (const tok of tokens) {
-      const s = tokenScore(tok, it);
+    for (let ti = 0; ti < tokens.length; ti++) {
+      const s = tokenScore(tokens[ti], it, fuzzyMaps[ti]);
       if (s === Infinity) { ok = false; break; }
-      score += s;
+      titleScore += s;
     }
-    let bodyHit = null;
-    if (!ok && it.body) {
-      // Le titre ne matche pas : essaie le corpus étendu (objectifs/texte de
-      // quête). Toujours moins prioritaire qu'un match de titre, quel que
-      // soit le nombre/la finesse des jetons (+1000 de plancher).
+    let score, bodyHit = null;
+    if (ok) {
+      score = it.bias * 5 + titleScore;
+    } else if (it.body) {
+      // Le titre ne matche pas : essaie le corpus étendu (donneur/but/
+      // objectif/journal de quête, archétype/description d'objet…), au
+      // palier de poids du champ qui a matché (BODY_WEIGHT, voir
+      // bodyMatch) -- toujours moins prioritaire qu'un match de titre, quel
+      // que soit le champ.
       const bm = bodyMatch(tokens, it.body);
-      if (bm) { ok = true; score = 1000 + bm.score; bodyHit = bm.seg.text; }
+      if (bm) { ok = true; score = bm.weight + bm.score; bodyHit = bm.seg.text; }
     }
     if (!ok) continue;
-    if (!bodyHit && it.n.startsWith(q)) score -= 0.5;   // départ exact de libellé (titre uniquement)
+    if (!bodyHit && it.n.startsWith(qRest)) score -= 0.5;   // départ exact de libellé (titre uniquement)
+    if (boostCat && it.cat !== boostCat) score += BOOST_PARTITION;
     scored.push({ it, score, len: it.n.length, bodyHit });
   }
   scored.sort((a, b) => a.score - b.score || a.len - b.len);
@@ -1020,4 +1320,12 @@ document.addEventListener('click', e => {
 /* Masque la liste de résultats (bascule de carte, changement de langue). */
 function hideSearchResults() { resBox.hidden = true; }
 
-export { buildSearch, hideSearchResults };
+/* `runSearch`/`searchIndexSize` (mission "search quality" 2026-07-11d) :
+   exportés UNIQUEMENT pour le harnais de vérification headless
+   (_verify_search_quality.mjs, `await import('./js/search.js')` -- même
+   idiome que les autres _verify_*.mjs qui importent déjà state.js/config.js
+   directement) ; aucun autre appelant applicatif (main.js n'importe que
+   buildSearch/hideSearchResults, inchangé ci-dessus) -- runSearch reste
+   piloté par la frappe utilisateur (renderSearch) partout ailleurs. */
+const searchIndexSize = () => searchIndex.length;
+export { buildSearch, hideSearchResults, runSearch, searchIndexSize, editDist };

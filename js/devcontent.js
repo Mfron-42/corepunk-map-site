@@ -24,9 +24,19 @@ import { S } from './state.js';
    propre garde « toujours inclure la clé activement affichée » (voir
    js/fiches.js speciesVariantSpawns) : ce module ne fait que répondre à la
    question « faut-il le lister ? », pas « peut-on l'ouvrir ? » (jamais de
-   404 silencieux ailleurs sur ce site, même principe ici). */
+   404 silencieux ailleurs sur ce site, même principe ici).
+
+   isInternal (items-obtain audit §B3, loi « toujours garder les données ») :
+   les pseudo-items internes (charges de capacité/effet/talent/dialogue,
+   préfixes ab_/ef_/tal_/do_… — la même classe que NOISE_KEY_RE dans
+   search.js) portent `isInternal: true` côté pipeline et passent par CE même
+   interrupteur : masqués du listage par défaut, révélés par le tag
+   « Contenu dev », JAMAIS retirés des données — chaque jointure qu'ils
+   adossent (ligne de butin, ref de recette, objectif de quête) reste
+   résolvable, et leur fiche reste ouvrable par lien profond/chip (badge
+   « Interne » explicite, voir fiches.js openItemFiche). */
 function isHiddenTest(rec) {
-  return !!(rec && rec.isTest && !S.devOn);
+  return !!(rec && (rec.isTest || rec.isInternal) && !S.devOn);
 }
 
 /* Slugs from an NPC's `quests` list (site npcs.json — quest-giver links)
@@ -52,7 +62,9 @@ function visibleQuestSlugs(slugs) {
    libellé de bouton rejoué à l'arrivée des données/au changement de langue. */
 function devContentCounts() {
   const monsters = Object.values(S.monsters || {}).filter(m => m.isTest).length;
-  const items = Object.values(S.items || {}).filter(it => it.isTest).length;
+  // items : isTest OU isInternal — les deux classes que le tag révèle (même
+  // périmètre que isHiddenTest ci-dessus, jamais deux règles qui divergent).
+  const items = Object.values(S.items || {}).filter(it => it.isTest || it.isInternal).length;
   const qao = (S.data.qao || []).filter(o => o.isTest).length;
   const quests = (S.data.quest || []).filter(q => q.isTest).length;
   return { monsters, items, qao, quests, total: monsters + items + qao + quests };

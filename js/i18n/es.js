@@ -355,6 +355,19 @@ export default {
       // rama qs.via === 'reward_of' de openItemFiche).
       obtainViaRewardOfQuest: name => `misión ${name}`,
       obtainViaWorld: 'Se encuentra al completar esta misión',
+      // Línea honesta de obtención (items-obtain audit §B2): se muestra
+      // cuando un objeto NO tiene ningún canal de obtención — una línea
+      // explícita en lugar de un vacío silencioso. El texto habla de los
+      // DATOS, nunca «inobtenible» (afirmación indemostrable sobre el juego).
+      obtainStatusUnknown: 'Sin fuente de obtención registrada en los datos actuales del juego.',
+      obtainStatusQuestOrphan: 'Objeto de misión — ninguna misión de los datos actuales del juego hace referencia a él (contenido probablemente sin usar o eliminado).',
+      obtainStatusCosmetic: 'Elemento de apariencia (skin) — sin fuente de obtención registrada en los datos actuales del juego.',
+      obtainStatusLobby: 'Equipo del lobby de arena — sin fuente de obtención registrada fuera de las partidas de arena.',
+      obtainStatusInternal: 'Registro interno del juego (datos de efecto/habilidad) — no es un objeto obtenible por el jugador.',
+      // Insignia «Interno» (audit §B3): pseudoobjetos técnicos ocultos de los
+      // listados como el contenido dev, siempre abribles por sus enlaces.
+      internalBadge: 'Interno',
+      internalBadgeTitle: 'Registro técnico del juego (efecto/habilidad/talento) presente en el cliente pero que el jugador nunca posee como objeto.',
       moreMerchants: n => `+ ${n} comerciantes más`,
       merchantPosUnknown: 'Posición del comerciante no especificada.',
       recipeTitle: 'Receta',

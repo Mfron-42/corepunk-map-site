@@ -107,6 +107,60 @@ tileLayer.addTo(map);
   map.getContainer().appendChild(vignette);
 })();
 
+/* Robustesse anti-course « conteneur/taille » au boot (bug intermittent
+   remonté par un joueur, 2026-07-11 : « la carte ne prend que la moitié
+   supérieure de l'écran », signalé comme aléatoire) — REPRODUIT en Playwright
+   (halfmap_repro harness, scratch) : le cache interne de Leaflet (`map._size`,
+   posé une fois pour toutes à `getSize()` et jamais relu tout seul hors
+   resize) se désynchronise du conteneur RÉEL quand un redimensionnement
+   survient PENDANT que le boot est encore async (loadCritical/loadMapManifest/
+   applyLocationState -- main.js -- tournent encore) ou pendant qu'un onglet
+   resté en arrière-plan a son rAF throttlé par le navigateur -- la propre
+   gestion resize de Leaflet (listener `window resize` interne, débounce par
+   rAF) ne rattrape alors PAS de façon fiable : mesuré jusqu'à ~17px d'écart
+   résiduel après la fin du boot (resize tardif en cours de chargement), et un
+   onglet resté masqué toute la séquence gardait `_size` figé à sa taille
+   PRÉ-resize (375×667 au lieu de 1440×900 mesurés) tant qu'aucun geste
+   utilisateur (zoom/pan, qui force un repaint) ne le corrigeait. Le
+   conteneur DOM (#map, `position:absolute;inset:0` dans #map-wrap flex:1 —
+   voir css/style.css) est bien PLEIN ÉCRAN dans les deux cas : c'est le cache
+   de taille de Leaflet qui ment, donc les tuiles/couches ne sont rendues que
+   pour l'ancienne (plus petite) fraction du conteneur -- le reste reste la
+   couleur de fond #map (#080c12) -- exactement le symptôme rapporté.
+   Fix, DEUX mécanismes complémentaires :
+   (1) ResizeObserver sur le conteneur LUI-MÊME (jamais un élément qu'on mute
+       depuis son propre callback -- voir sidebar.js pour le piège
+       "ResizeObserver loop" évité là pour #active-dots -- ici sans risque de
+       boucle : invalidateSize() ne change JAMAIS la taille de #map, seulement
+       les panes internes qu'il contient). Callback enveloppé dans un DOUBLE
+       rAF (recommandation standard pour ce pattern) + un garde-fou anti-
+       réentrance : élimine tout risque de l'avertissement console
+       "ResizeObserver loop completed with undelivered notifications" --
+       la porte de boot ( exige zéro erreur console.
+   (2) Resync IMMÉDIAT sur `visibilitychange` (onglet qui redevient visible) :
+       couvre précisément le cas « onglet en arrière-plan » ci-dessus, sans
+       attendre le prochain tick rAF (throttlé pendant tout le temps où
+       l'onglet restait masqué).
+   `{ pan: false }` : ne recentre/déplace JAMAIS la vue, corrige uniquement le
+   cache de taille -- un simple resize de fenêtre ne doit jamais faire sauter
+   la caméra. invalidateSize() est un no-op tant que la vue n'est pas encore
+   posée (`!map._loaded`, voir router.js applyLocationState -- setView/
+   fitBounds arrivent plus tard dans le boot) : sans risque à observer dès la
+   construction de la carte, avant qu'aucune vue n'existe. */
+(function installResizeGuard() {
+  let queued = false;
+  const resync = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      queued = false;
+      map.invalidateSize({ pan: false });
+    }));
+  };
+  new ResizeObserver(resync).observe(map.getContainer());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resync(); });
+})();
+
 const canvasR = L.canvas({ padding: 0.35 });
 /* ── Marqueurs ──────────────────────────────────────────────── */
 const layers = {};   // cat -> L.LayerGroup

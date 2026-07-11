@@ -384,6 +384,22 @@ export default {
       // openItemFiche's qs.via === 'reward_of' branch).
       obtainViaRewardOfQuest: name => `quest ${name}`,
       obtainViaWorld: 'Found while completing this quest',
+      // Honest obtain-status line (items-obtain audit §B2): shown when an
+      // item ships NO obtain channel at all — one explicit line instead of
+      // silent blank space. Wording states what the DATA does or doesn't
+      // say, never "unobtainable" (a claim about the game we can't prove).
+      // Enum baked by build_site_data.py::_obtain_status_of, mapped in
+      // fiches.js openItemFiche (OBTAIN_STATUS_KEY).
+      obtainStatusUnknown: 'Not referenced as obtainable in the current game data.',
+      obtainStatusQuestOrphan: 'Quest item — no quest in the current game data references it (likely unused or removed content).',
+      obtainStatusCosmetic: 'Appearance/skin asset — not referenced as obtainable in the current game data.',
+      obtainStatusLobby: 'Arena-lobby equipment — not referenced as obtainable outside arena matches.',
+      obtainStatusInternal: 'Internal game record (effect/ability data) — not a player-obtainable item.',
+      // "Internal" badge (items-obtain audit §B3): pseudo-item records
+      // (ability/effect payloads) display-gated like dev content, still
+      // openable through their joins — the badge says what it is.
+      internalBadge: 'Internal',
+      internalBadgeTitle: 'Technical game record (effect/ability/talent data) the game ships but players never hold as an item.',
       moreMerchants: n => `+ ${n} more merchants`,
       merchantPosUnknown: 'Merchant position not specified.',
       recipeTitle: 'Recipe',

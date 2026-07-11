@@ -29,7 +29,8 @@ import {
   campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys,
 } from './pointsets.js';
 import { toggleSpecies, speciesCampWinner } from './specieslayer.js';
-import { activateSpeciesLayer, activateFamilyLayers } from './layeractivate.js';
+import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
+import { initMapRefDelegation } from './mapref.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import {
   buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
@@ -224,6 +225,51 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'family-layer') {
     activateFamilyLayers((b.dataset.family || '').split(',').filter(Boolean));
   }
+});
+
+/* ── EntityRef (◇) : l'UNIQUE délégué du composant js/mapref.js ──────────────
+   Deux gestes sémantiques (`ref-open` libellé→fiche, `ref-draw` pastille→tracé)
+   remplacent à terme le zoo de data-act ci-dessus (§5.3). VAGUE 0 : on branche
+   le délégué et on route vers les openers/activateurs DÉJÀ importés ici — les
+   sites d'appel existants (fiche-*, species-layer…) restent intacts (aucune
+   migration en vague 0). Même niveau que le délégué data-act ci-dessus ;
+   `main.js` n'a toujours aucune logique métier propre, il ne fait que router.
+   Les switches migreront vers router.openRef/layeractivate.drawRef (fichiers
+   d'autres missions) dans les vagues suivantes. */
+initMapRefDelegation(document, {
+  open(info) {
+    pushFocusState();                       // une entrée d'historique par geste (modèle existant)
+    switch (info.kind) {
+      case 'species': openMonsterFiche(info.key); break;
+      case 'family': openFamilyFiche(info.key); break;
+      case 'item': case 'quest_item': openItemFiche(info.key); break;
+      case 'recipe': openRecipeFiche(info.key); break;
+      case 'npc': openNpcFiche(+String(info.key).split(':').pop()); break;
+      case 'camp': openCampFiche(info.key); break;
+      case 'quest': openQuestFiche(info.key); break;
+      case 'node': openNodeFiche(info.key); break;
+      case 'location': openLocationFiche(+info.key); break;
+      case 'loot': openLootTableFiche(info.key); break;
+      case 'chest': openChestFiche(+String(info.key).split(':').pop()); break;
+      case 'searchable_chest': openSearchableChestFiche(info.key); break;
+      // ability (GAP, vague 1) / zone (fiche région, vague R) : openers pas
+      // encore branchés ici — le libellé rend un span non-souligné honnête
+      // (mapref.js hasFiche=false), donc aucun ref-open n'est émis d'ici.
+    }
+  },
+  draw(info) {
+    switch (info.kind) {
+      case 'species': activateSpeciesLayer(info.key); break;
+      case 'family': activateFamilyLayers((info.family || info.key || '').split(',').filter(Boolean)); break;
+      case 'position': case 'zone':
+        if (info.x != null) goTo(info.x, info.z, undefined, info.label);
+        break;
+      default:
+        // Catégorie (mode C) : bascule le VRAI nœud d'arbre (même orchestration
+        // partagée que les chips/recherche, jamais une seconde sémantique).
+        if (info.mode === 'C' && info.fkey) activateCategoryNode('row', info.fkey);
+    }
+  },
 });
 /* ── Lecture des coordonnées ────────────────────────────────── */
 /* Un mousemove tire à chaque pixel pendant un déplacement de souris ; on ne
