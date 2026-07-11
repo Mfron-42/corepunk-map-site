@@ -2829,10 +2829,14 @@ function seriesTargetChips(members, kind, regionHint) {
     : kind === 'monster' ? 'species'
       : kind === 'npc' ? 'npc' : 'position';
   const icon = kind === 'object' ? `<span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>` : '';
+  // `key` = l'identité de SLOT du membre (a.label, unique par acteur) : deux
+  // membres placés au MÊME point (posters 02/03, coordonnées identiques dans
+  // la donnée) gardent chacun LEUR pin — cliquer l'un n'allume plus l'autre
+  // (retour user 2026-07-11 soir ; locateRefKey préfère data-key aux coords).
   return `<div class="goal-target-series">${members.map(a => `
     <div class="goal-target goal-target-compact">
       ${icon}
-      ${ref({ kind: refKind, mode: a.x != null ? 'L' : 'N', hasFiche: false, pos: a.x != null ? { x: a.x, z: a.z } : undefined, label: cleanLabel(a.label) })}
+      ${ref({ kind: refKind, mode: a.x != null ? 'L' : 'N', hasFiche: false, key: a.label || null, pos: a.x != null ? { x: a.x, z: a.z } : undefined, label: cleanLabel(a.label) })}
       ${a.x != null ? '' : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
     </div>`).join('')}</div>`;
 }
