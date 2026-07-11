@@ -11,10 +11,13 @@ export default {
       searchPlaceholder: 'Найти НПС, задание, предмет, монстра…',
       searchAriaLabel: 'Поиск',
       filtersAriaLabel: 'Фильтры',
-      // Полоса активных слоёв (цветные точки под поиском,
-      // js/sidebar.js renderActiveDots).
+      // Полоса активных слоёв (именованные съёмные ТЕГИ под поиском — полоса
+      // одновременно служит легендой карты, js/sidebar.js renderActiveTags).
+      // activeTagsMoreAria: тег «+N» переполнения (потолок в 2 ряда),
+      // разворачивающий полосу.
       activeDotsLabel: 'Активные слои',
-      activeDotHide: name => `${name} — нажмите, чтобы скрыть`,
+      activeTagRemove: name => `${name} — убрать`,
+      activeTagsMoreAria: n => `Ещё ${n} ${pluralSlavic(n, 'слой', 'слоя', 'слоёв')} — показать`,
       legend: 'Легенда',
       campsTitle: 'Лагеря и ресурсы',
       // ФИНАЛЬНАЯ структура боковой панели (2026-07-11): 4 фиксированные

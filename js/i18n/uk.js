@@ -11,10 +11,13 @@ export default {
       searchPlaceholder: 'Знайти НПС, квест, предмет, монстра…',
       searchAriaLabel: 'Пошук',
       filtersAriaLabel: 'Фільтри',
-      // Смуга активних шарів (кольорові крапки під пошуком,
-      // js/sidebar.js renderActiveDots).
+      // Смуга активних шарів (іменовані знімні ТЕГИ під пошуком — смуга
+      // одночасно слугує легендою карти, js/sidebar.js renderActiveTags).
+      // activeTagsMoreAria: тег «+N» переповнення (стеля у 2 рядки), що
+      // розгортає смугу.
       activeDotsLabel: 'Активні шари',
-      activeDotHide: name => `${name} — натисніть, щоб приховати`,
+      activeTagRemove: name => `${name} — прибрати`,
+      activeTagsMoreAria: n => `Ще ${n} ${pluralSlavic(n, 'шар', 'шари', 'шарів')} — показати`,
       legend: 'Легенда',
       campsTitle: 'Табори та ресурси',
       // ФІНАЛЬНА структура бічної панелі (2026-07-11): 4 фіксовані групи —

@@ -10,11 +10,16 @@ export default {
       searchPlaceholder: 'Search an NPC, a quest, an item, a monster…',
       searchAriaLabel: 'Search',
       filtersAriaLabel: 'Filters',
-      // Active-layers strip (colored dots under the search box,
-      // js/sidebar.js renderActiveDots): group label + per-dot tooltip
-      // (hover = layer name, click = hide).
+      // Active-layers strip (named, removable TAG chips under the search
+      // box — the strip doubles as a map legend, js/sidebar.js
+      // renderActiveTags): group label + per-tag remove aria-label (the
+      // chip itself already shows the ✕ affordance visually, so the
+      // truncated name's `title` fallback carries the plain name, not this
+      // action phrase — see sidebar.js). activeTagsMoreAria: the "+N"
+      // overflow chip (2-row cap) that expands the strip.
       activeDotsLabel: 'Active layers',
-      activeDotHide: name => `${name} — click to hide`,
+      activeTagRemove: name => `${name} — remove`,
+      activeTagsMoreAria: n => `${n} more active layer${n === 1 ? '' : 's'} — show`,
       legend: 'Legend',
       campsTitle: 'Camps & resources',
       // Layer tree — FINAL sidebar IA (2026-07-11, COORDINATION.md §IA

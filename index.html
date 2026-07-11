@@ -94,18 +94,19 @@
 
   <main id="map-wrap">
     <!-- Barre de recherche flottante, haut-centre (repositionnement
-         2026-07-11, hors du panneau gauche) : #topbar est un conteneur de
+         2026-07-11, hors du panneau gauche ; élargie 2026-07-11e — voir
+         css/style.css .search-wrap) : #topbar est un conteneur de
          CENTRAGE pur (aucun fond, pointer-events:none — voir css/style.css),
          centré sur #map-wrap (LA CARTE, pas le viewport entier) donc suit le
          panneau quand il se masque/réapparaît. .search-wrap (barre + son
-         dropdown) et #active-dots (bandeau des couches actives, juste
-         dessous) gardent EXACTEMENT les mêmes id/classes qu'avant dans le
-         panneau : js/search.js et js/sidebar.js n'ont pas une ligne à
+         dropdown) et #active-dots (bandeau-légende des couches actives,
+         juste dessous) gardent EXACTEMENT les mêmes id/classes qu'avant dans
+         le panneau : js/search.js et js/sidebar.js n'ont pas une ligne à
          changer, seul l'emplacement bouge. La barre et #active-dots forment
          UNE SEULE unité (exigence utilisateur 2026-07-11c, ferme) : on
          AJOUTE une couche via un résultat de recherche (clic-double-effet,
-         js/layeractivate.js) et on la RETIRE en cliquant sa pastille juste
-         en dessous. Raccourci « / » (hors saisie) et Échap (ferme les
+         js/layeractivate.js) et on la RETIRE en cliquant sa TAG juste en
+         dessous. Raccourci « / » (hors saisie) et Échap (ferme les
          résultats/quitte le focus) : voir js/search.js. -->
     <div id="topbar">
       <div class="search-wrap">
@@ -115,11 +116,14 @@
         <kbd class="search-kbd" aria-hidden="true">/</kbd>
         <ul id="search-results" hidden></ul>
       </div>
-      <!-- Pastilles « couches actives » (demande utilisateur 2026-07-11) : un
-           point coloré par couche qui peint des pins en ce moment — survol =
-           nom, clic = masquer sans re-parcourir l'arbre. Rempli/rejoué par
-           js/sidebar.js renderActiveDots() (dérivé du DOM de l'arbre, jamais
-           un état parallèle) ; masqué par CSS quand vide (:empty).
+      <!-- Bandeau-LÉGENDE « couches actives » (demande utilisateur
+           2026-07-11, reprise "tags" 2026-07-11d) : une TAG nommée par
+           couche qui peint des pins en ce moment — [pastille couleur] Nom
+           [✕], toute la tag cliquable = masquer sans re-parcourir l'arbre.
+           Rempli/rejoué par js/sidebar.js renderActiveTags() (dérivé du DOM
+           de l'arbre, jamais un état parallèle) ; masqué par CSS quand vide
+           (:empty). Plafonné à 2 rangées (tag « +N » de débordement,
+           dépliage temporaire — voir sidebar.js/style.css).
            Repositionné SOUS la barre flottante (2026-07-11b, mission "search
            bar top-center") — même id/comportement, seul l'emplacement change. -->
       <div id="active-dots" role="group" aria-label="Couches actives"

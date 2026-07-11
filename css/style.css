@@ -33,12 +33,14 @@
   --radius-m: 10px;
   --ease: cubic-bezier(.4, 0, .2, 1);
   --dur: .18s;
-  /* Barres de défilement (unifiées, demande utilisateur 2026-07-11) : pilule
-     claire translucide — teinte de --ink, jamais un gris opaque — visible sur
-     les panneaux bleu-nuit mais intégrée. Une seule paire de tokens pour TOUT
-     le site (voir le bloc global *::-webkit-scrollbar plus bas). */
-  --sb-thumb: rgba(236, 228, 210, .22);
-  --sb-thumb-hover: rgba(236, 228, 210, .42);
+  /* Barres de défilement (unifiées, demande utilisateur 2026-07-11 ;
+     affinées 2026-07-11f — plus discrètes) : pilule claire translucide —
+     teinte de --ink, jamais un gris opaque — visible sur les panneaux
+     bleu-nuit mais intégrée. Une seule paire de tokens pour TOUT le site
+     (voir le bloc global *::-webkit-scrollbar plus bas). Repos plus faible
+     qu'avant (.22→.18) : la pilule doit se deviner, pas s'imposer. */
+  --sb-thumb: rgba(236, 228, 210, .18);
+  --sb-thumb-hover: rgba(236, 228, 210, .4);
 
   --font-display: 'Bahnschrift', 'Franklin Gothic Medium', 'Arial Narrow', sans-serif;
   --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -71,19 +73,34 @@ body {
    Remplace les 5 recettes locales dispersées (#panel, #detail, .layer-scroll,
    .fiche-scroll, .pop-desc) qui divergeaient (7/8/9 px, thumb --panel-4
    sombre presque invisible) ET couvre les zones qui n'avaient RIEN
-   (#search-results → barre native grise). Pilule fine entièrement arrondie :
-   gouttière de 8 px, liseré transparent de 2 px → trait visible de 4 px,
-   clair (--sb-thumb, teinte de --ink) sur les panneaux bleu-nuit, plus
-   franc au survol. Firefox : scrollbar-width/color posés au même niveau. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--sb-thumb) transparent;
+   (#search-results → barre native grise).
+   BUG RACINE corrigé ici (2026-07-11f, retour utilisateur "trop carrée/trop
+   épaisse") : Chromium 121+ DÉSACTIVE tout `::-webkit-scrollbar-*` sur un
+   élément qui porte AUSSI `scrollbar-width`/`scrollbar-color` (les
+   propriétés standard gagnent dès qu'elles sont posées, même via `*`) —
+   la recette pilule ci-dessous était donc MORTE dans Chrome réel depuis sa
+   pose initiale : l'utilisateur voyait la barre native fine mais CARRÉE de
+   `scrollbar-width:thin`, jamais le rendu arrondi (masqué en probe headless,
+   qui utilise des scrollbars overlay et ne montre jamais le problème).
+   Fix : les propriétés standard sont désormais SCOPÉES à Firefox seul (via
+   `@supports (-moz-appearance: none)`, détection fiable — seul Firefox la
+   supporte, et Firefox ne sait de toute façon pas dessiner de pilule custom,
+   `thin` + couleur translucide est déjà son meilleur rendu). Chromium/WebKit
+   ne voient donc plus JAMAIS scrollbar-width/-color et gardent la main sur
+   `::-webkit-scrollbar-*`, affinée ici : gouttière 10px + liseré transparent
+   3px → trait visible ~4px (plus de marge autour = plus discret qu'avant),
+   toujours entièrement arrondie, plus franche au survol. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--sb-thumb) transparent;
+  }
 }
-*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb {
   background: var(--sb-thumb);
   border-radius: 999px;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); background-clip: padding-box; }
@@ -259,7 +276,7 @@ body {
    avec la barre (exigence utilisateur 2026-07-11c, ferme) : on AJOUTE une
    couche en cliquant un résultat espèce/famille (le clic-double-effet
    existant coche déjà le nœud de l'arbre, voir js/layeractivate.js) et on
-   la RETIRE en cliquant sa pastille juste sous la barre (renderActiveDots,
+   la RETIRE en cliquant sa TAG juste sous la barre (renderActiveTags,
    js/sidebar.js) — jamais deux widgets qui cohabitent par hasard, voir la
    recette --glass PARTAGÉE de #active-dots plus bas.
    Habillage réutilise le vocabulaire chrome flottant EXISTANT (--glass +
@@ -272,7 +289,15 @@ body {
    jamais recouverte). ≤760px, le tiroir passe plein écran (règle
    existante) : la barre s'efface plutôt que de flotter sur le titre/✕ de
    la fiche, aucun espace libre n'existe alors (voir media queries plus
-   bas). */
+   bas).
+   Gabarit ÉLARGI (2026-07-11e, demande utilisateur « plus centrale à
+   l'appli ») : 520→640px, input plus haut (~46px, padding vertical 13px),
+   police +1.3px (.9rem→.98rem) — présence discrète en hausse, jamais une
+   bannière hero (mêmes jetons --glass/--line/--radius-m, aucun nouveau
+   vocabulaire de couleur). Le bandeau de tags (#active-dots plus bas) et le
+   dropdown de résultats reprennent la MÊME largeur de référence (640px) —
+   le dropdown garde un léger surplus (680px) pour respirer, jamais moins
+   large que la barre elle-même. */
 #topbar {
   position: absolute;
   top: 14px; left: 16px; right: 16px;
@@ -286,10 +311,10 @@ body {
 }
 #topbar > * { pointer-events: auto; }
 
-.search-wrap { position: relative; width: min(520px, 100%); }
+.search-wrap { position: relative; width: min(640px, 100%); }
 #search {
   width: 100%;
-  padding: 11px 40px 11px 14px;
+  padding: 12px 44px 12px 16px;
   background: var(--glass);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -297,7 +322,7 @@ body {
   border-radius: var(--radius-m);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: .9rem;
+  font-size: .98rem;
   box-shadow: var(--shadow);
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
@@ -311,14 +336,14 @@ body {
    (aria-hidden) : l'input porte déjà son propre aria-label +
    aria-keyshortcuts, un lecteur d'écran n'a pas besoin de ce doublon. */
 .search-kbd {
-  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
   font-family: var(--font-mono);
-  font-size: .68rem;
+  font-size: .72rem;
   color: var(--muted);
   background: var(--panel-3);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-s);
-  padding: 1px 6px;
+  padding: 1px 7px;
   pointer-events: none;
   transition: opacity var(--dur) var(--ease);
 }
@@ -329,12 +354,14 @@ body {
    mission — les lignes riches, portraits/lignes famille/chips, respirent),
    centré sur .search-wrap (son ancêtre positionné) plutôt que calé sur ses
    bords — peut donc déborder légèrement de la barre des deux côtés, sans
-   jamais être clippé (aucun ancêtre ici ne pose overflow:hidden). */
+   jamais être clippé (aucun ancêtre ici ne pose overflow:hidden). Bump
+   2026-07-11e : 640→680px, en phase avec la barre élargie à 640px
+   (.search-wrap) — garde le même léger surplus relatif. */
 #search-results {
   position: absolute;
   left: 50%; top: calc(100% + 8px);
   transform: translateX(-50%);
-  width: min(640px, 92vw);
+  width: min(680px, 92vw);
   margin: 0; padding: 5px;
   list-style: none;
   background: var(--glass);
@@ -515,33 +542,51 @@ body {
 .no-results-main { font-size: .85rem; color: var(--ink); }
 .no-results-hint { font-size: .76rem; color: var(--muted); }
 
-/* ── Pastilles « couches actives » (attachée SOUS la barre flottante) ───
-   Un point coloré par couche qui peint des pins en ce moment (rempli par
-   js/sidebar.js renderActiveDots) : même recette visuelle que les .swatch
-   de l'arbre (liseré sombre + halo de sa propre teinte) pour se lire comme
-   la même famille d'objet. Survol : léger agrandissement + ✕ sombre au
-   centre (affordance « masquer ») ; demi-teinte .partial = même vocabulaire
-   que l'état partiel des lignes famille. Vide → masqué (:empty), le bandeau
-   ne réserve jamais d'espace pour rien.
+/* ── Bandeau-LÉGENDE « couches actives » en TAGS (attaché SOUS la barre
+   flottante, demande utilisateur 2026-07-11, reprise "tags" 2026-07-11d) ──
+   Remplace l'ancien bandeau de pastilles nues (.adot) : chaque couche
+   dessinée est désormais une TAG nommée -- [pastille couleur] Nom [✕] --
+   rendue par js/sidebar.js renderActiveTags(). Le bandeau se lit comme une
+   vraie LÉGENDE de la carte, pas seulement un motif décoratif. Recette
+   visuelle EXPRÈS voisine de .chip (mêmes tons panel-3/line-soft, même
+   famille de silhouette) mais dérivée séparément ici : une tag porte une
+   pastille de couche (.atag-dot, même liseré sombre + halo que .swatch de
+   l'arbre) et un ✕ TOUJOURS visible (l'affordance de retrait doit se voir
+   sans survol, contrairement à .chip qui est un simple lien d'info) --
+   TOUTE la tag est cliquable (bouton plein), le ✕ n'est qu'une indication
+   visuelle (aria-hidden côté HTML).
+   Demi-teinte .partial : SUR LA PASTILLE SEULE (.atag.partial .atag-dot),
+   jamais sur le nom entier -- une tag partielle doit rester aussi lisible
+   qu'une tag pleine, même vocabulaire visuel que l'état partiel des lignes
+   famille de l'arbre.
+   Nom tronqué à ~18ch (.atag-label, ellipsis) -- voir `title` posé en JS
+   (nom complet, tooltip de repli).
    BOUCLE canonique (exigence utilisateur 2026-07-11c, ferme) : on AJOUTE
    une couche via la recherche (résultat espèce/famille -> activateSpeciesLayer/
    activateFamilyLayers, js/layeractivate.js -- déjà branché, buildFilters()
-   republie ce bandeau) et on la RETIRE en cliquant sa pastille ici -- la
-   barre et ce bandeau sont donc UNE SEULE unité fonctionnelle (ajout en
-   haut, retrait juste en dessous), pas deux widgets qui cohabitent par
-   hasard. Rendu visuel EXPRÈS pareil à #search (même recette --glass +
-   flou + --line + --radius-m que la barre juste au-dessus, gap réduit à
-   8px entre les deux dans #topbar) : les deux lisent comme LA MÊME carte
-   à deux rangées, jamais deux éléments flottants indépendants. Centré +
-   plafonné à la même largeur que le dropdown de résultats. */
+   republie ce bandeau) et on la RETIRE en cliquant sa tag ici -- la barre
+   et ce bandeau sont donc UNE SEULE unité fonctionnelle (ajout en haut,
+   retrait juste en dessous), pas deux widgets qui cohabitent par hasard.
+   Rendu visuel EXPRÈS pareil à #search (même recette --glass + flou +
+   --line + --radius-m que la barre juste au-dessus, gap réduit à 8px entre
+   les deux dans #topbar) : les deux lisent comme LA MÊME carte à deux
+   rangées, jamais deux éléments flottants indépendants. Centré + plafonné à
+   la même largeur de référence que la barre/le dropdown de résultats
+   (640px, bump 2026-07-11e).
+   DÉBORDEMENT (2026-07-11d) : jamais un max-height/overflow:hidden qui
+   clipperait une tag à moitié -- js/sidebar.js ne POSE jamais plus de 2
+   rangées dans le DOM (une tag « +N » remplace l'excédent). `.expanded`
+   (dépliage temporaire, clic sur « +N ») est le SEUL endroit où une
+   contrainte de hauteur + défilement interne existe : garde-fou pour ne
+   jamais couvrir un grand pan de la carte même avec beaucoup de couches. */
 #active-dots {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   max-width: min(640px, 92vw);
-  padding: 7px 12px;
+  padding: 7px 10px;
   background: var(--glass);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -550,31 +595,62 @@ body {
   box-shadow: var(--shadow);
 }
 #active-dots:empty { display: none; padding: 0; border: none; background: none; box-shadow: none; }
-.adot {
-  position: relative;
+#active-dots.expanded {
+  max-height: min(46vh, 340px);
+  overflow-y: auto;
+  align-content: flex-start;
+}
+.atag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   flex: none;
-  width: 15px; height: 15px;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(8, 12, 18, .7);
-  background: var(--c, var(--accent));
-  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px var(--c, var(--accent));
+  padding: 4px 8px 4px 6px;
+  background: var(--panel-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-s);
+  color: var(--ink-dim);
+  font-family: var(--font-body);
+  font-size: .74rem;
+  line-height: 1.2;
   cursor: pointer;
-  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.adot:hover { transform: scale(1.3); box-shadow: 0 0 0 1px rgba(233, 226, 208, .45), 0 0 10px -1px var(--c, var(--accent)); }
-.adot::after {
-  content: '✕';
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 8px; line-height: 1; font-weight: 700;
-  color: rgba(8, 12, 18, .92);
-  opacity: 0;
-  transition: opacity var(--dur) var(--ease);
+.atag:hover { border-color: var(--accent); color: var(--ink); background: var(--accent-soft); }
+.atag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.atag-dot {
+  flex: none;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgba(8, 12, 18, .7);
+  background: var(--c, var(--accent));
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 6px -1px var(--c, var(--accent));
 }
-.adot:hover::after, .adot:focus-visible::after { opacity: 1; }
-.adot.partial { opacity: .55; }
-.adot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.atag.partial .atag-dot { opacity: .5; box-shadow: none; }
+.atag-label {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.atag-x {
+  flex: none;
+  font-size: .64rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--muted);
+  transition: color var(--dur) var(--ease);
+}
+.atag:hover .atag-x, .atag:focus-visible .atag-x { color: var(--danger); }
+/* Tag « +N » de débordement : teinte accent (elle DÉPLIE, ne retire rien —
+   distincte au premier coup d'œil des tags de couche neutres). */
+.atag-more {
+  color: var(--accent);
+  font-weight: 600;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line-soft));
+  background: var(--accent-soft);
+}
+.atag-more:hover { color: var(--accent-hi); border-color: var(--accent); background: var(--accent-soft-2); }
 
 /* ── Filtres ── */
 #filters, #tracked-section { padding: 10px 16px 2px; }
@@ -2457,14 +2533,14 @@ button.rar-pill:hover {
    viewport figé, voir captures drawer ouvert/fermé). */
 @media (min-width: 761px) {
   #map-wrap:has(#detail.open) #topbar { padding-right: 392px; }
-  /* Le dropdown de résultats (normalement plus large que la barre, 640px)
+  /* Le dropdown de résultats (normalement plus large que la barre, 680px)
      ne doit pas non plus déborder sur le tiroir ouvert à une largeur
      resserrée (ex. 1280px + tiroir) -- calé en plus sur .search-wrap (déjà
      réduite par le padding-right ci-dessus) via ce 3e terme, jamais plus
      large que l'espace réellement libre quand celui-ci est le facteur
-     limitant. Sans effet quand l'espace libre dépasse déjà 640px (le
+     limitant. Sans effet quand l'espace libre dépasse déjà 680px (le
      premier terme du min() gagne alors, comportement de base inchangé). */
-  #map-wrap:has(#detail.open) #search-results { width: min(640px, 92vw, 100%); }
+  #map-wrap:has(#detail.open) #search-results { width: min(680px, 92vw, 100%); }
 }
 
 /* ── Téléphone (≤ 520 px) : le site doit rester utilisable en jeu ──────

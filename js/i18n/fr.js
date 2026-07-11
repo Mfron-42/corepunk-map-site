@@ -10,11 +10,16 @@ export default {
       searchPlaceholder: 'Chercher un PNJ, une quête, un objet, un monstre…',
       searchAriaLabel: 'Recherche',
       filtersAriaLabel: 'Filtres',
-      // Bandeau des couches actives (points colorés sous la recherche,
-      // js/sidebar.js renderActiveDots) : libellé du groupe + tooltip d'un
-      // point (survol = nom de la couche, clic = masquer).
+      // Bandeau des couches actives (tags NOMMÉES et retirables sous la
+      // recherche — le bandeau double de LÉGENDE de la carte, js/sidebar.js
+      // renderActiveTags) : libellé du groupe + aria-label de retrait d'une
+      // tag (le ✕ visible sur la tag porte déjà l'affordance à l'œil ; le
+      // `title` de repli pour un nom tronqué reste le nom brut, voir
+      // sidebar.js). activeTagsMoreAria : la tag « +N » de débordement
+      // (plafond 2 rangées) qui déplie le bandeau.
       activeDotsLabel: 'Couches actives',
-      activeDotHide: name => `${name} — cliquer pour masquer`,
+      activeTagRemove: name => `${name} — retirer`,
+      activeTagsMoreAria: n => `${n} couche${n > 1 ? 's' : ''} active${n > 1 ? 's' : ''} de plus — afficher`,
       legend: 'Légende',
       campsTitle: 'Camps & ressources',
       // Arbre de couches — IA FINALE de la sidebar (2026-07-11,

@@ -2114,7 +2114,15 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // honnête qu'on ait pour nommer cet objet, plutôt qu'une icône+badge sans
     // aucun texte (le "ressemble à un tag mais y'a rien dedans" d'origine).
     if (!itemRow) {
-      itemRow = `<div class="goal-target-row goal-target-item">
+      // Objet activable SANS clé catalogue (ex. « soplo » = l'aéronef d'Inspect
+      // the aircraft) : la ligne d'identité n'a pas de fiche à ouvrir, mais
+      // quand une position est connue (t.x, placement qao byte-joint) elle
+      // devient un PING cliquable vers ce point (data-act="goto", MÊME geste
+      // que le bouton Carte de posRow) au lieu d'un libellé mort — le retour
+      // « activable n'est plus cliquable ». Sans position, reste un libellé
+      // simple (honnête : rien à viser). posRow garde le bouton Carte explicite.
+      const canPing = t.x != null;
+      itemRow = `<div class="goal-target-row goal-target-item${canPing ? ' link' : ''}"${canPing ? ` data-act="goto" data-x="${t.x}" data-z="${t.z}" data-label="${lbl}"` : ''}>
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
         <span class="goal-target-item-label">${lbl}</span>
         ${activableBadge}
@@ -2348,8 +2356,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // Couleur d'entité (task #77) : ZONE_HEX, même teinte que la ligne "Zones
     // (régions)" du panneau/de la recherche -- ce n'est ni un PNJ ni un
     // monstre, une zone nommée est une entité de carte à part entière.
+    // Ping cliquable (retour utilisateur « activable n'est plus cliquable ») :
+    // quand le pipeline a joint le centroïde du polygone de zone décodé (t.x,
+    // geo.py zone_geo — trigger enter_zone sans slot placé), le NOM devient un
+    // goto vers ce centre au lieu d'un libellé mort. La zone reste le bon
+    // barreau d'échelle (une AIRE, pas un objet placé) : le clic centre la
+    // carte dessus, et la fiche offre en plus « Voir la zone » (contour
+    // complet, S.zonesQuest). Sans centroïde (zone sans géométrie décodée :
+    // « Around wreck », honnête trou), reste un libellé simple.
+    const canPing = t.x != null;
     const nameRow = zLabel
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(ZONE_HEX, 'zone')}>${esc(zLabel)}</span></div>` : '';
+      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name${canPing ? ' link' : ''}"${ecAttr(ZONE_HEX, 'zone')}${canPing ? ` data-act="goto" data-x="${t.x}" data-z="${t.z}" data-label="${esc(zLabel)}"` : ''}>${esc(zLabel)}</span></div>` : '';
     return `<div class="goal-target">${nameRow}${posRow}</div>`;
   }
 

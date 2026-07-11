@@ -101,7 +101,7 @@ function hiddenBadge(hidden) {
 function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') {
   const li = document.createElement('li');
   // Clé de couche stampée sur le <li> : identité stable pour le bandeau des
-  // couches actives (renderActiveDots — dédup des copies miroir Creeps,
+  // couches actives (renderActiveTags — dédup des copies miroir Creeps,
   // résolution de l'<input> par clé au moment du clic).
   li.dataset.fkey = key;
   li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
@@ -636,40 +636,68 @@ function refreshParentChecks() {
   // couche passe par refreshParentChecks (écouteurs filterRow/espèce directs,
   // cascades wireParentCheck → buildFilters → rebuildAllGroups, restaurations
   // layeractivate/router/urlstate → buildFilters).
-  renderActiveDots();
+  renderActiveTags();
 }
 
-/* ── Pastilles « couches actives » (bandeau sous la recherche, demande
-   utilisateur 2026-07-11) : un point coloré par couche qui PEINT des pins en
-   ce moment — survol = nom (tooltip localisée), clic = masquer — sans
-   re-parcourir tout l'arbre. DÉRIVÉ du DOM de l'arbre (source de vérité
-   unique, jamais un état parallèle), en ORDRE d'arbre (un seul
-   querySelectorAll multi-sélecteur = ordre document) :
-   - sous-groupe à pastille (POI, coffres…) → UN point pour tout le bucket,
+/* ── Bandeau « couches actives » — LÉGENDE en tags (sous la recherche,
+   demande utilisateur 2026-07-11, reprise "tags" 2026-07-11d) : chaque
+   couche actuellement dessinée est une TAG — [● pastille couleur] Nom [✕] —
+   au lieu d'un simple point nu ; le bandeau se lit comme une vraie légende
+   de ce qui est affiché sur la carte, pas juste un motif décoratif. La
+   COLLECTE (quelles couches, quel nom, quelle couleur, dédoublonnage) est
+   INCHANGÉE par rapport à l'ancien renderActiveDots — seul le RENDU change :
+   - sous-groupe à pastille (POI, coffres…) → UNE tag pour tout le bucket,
      partiel compris (il peint des pins) — ses lignes internes ne sont jamais
      doublées ;
-   - ligne filterRow cochée hors bucket (zones/npc/familles/kinds/…) → un
-     point chacune, dédupliquée par clé (copies miroir Creeps) ; famille
-     PARTIELLE incluse en demi-teinte (ses espèces peignent), même
-     vocabulaire .partial que l'arbre ;
-   - ligne ESPÈCE de niveau racine (Wildlife/Creeps) → un point ; les
-     sous-lignes espèce d'une famille sont représentées par leur famille
-     (et leur sublist est de toute façon rendue paresseusement).
-   Clic : l'<input> est résolu par CLÉ AU MOMENT du clic (l'arbre se
-   reconstruit souvent — jamais une référence capturée), décoché puis
-   change → le flux normal de la ligne fait tout le reste (toggle de couche,
-   syncHash, refreshParentChecks → ce bandeau se republie seul). */
-function activeDotInput(d) {
+   - ligne filterRow cochée hors bucket (zones/npc/familles/kinds/…) → une
+     tag chacune, dédupliquée par clé (copies miroir Creeps) ; famille
+     PARTIELLE incluse en demi-teinte — demi-teinte SUR LA PASTILLE SEULE
+     (.atag.partial .atag-dot), jamais sur le nom entier : le nom doit rester
+     aussi lisible qu'une tag pleine ;
+   - ligne ESPÈCE de niveau racine (Wildlife/Creeps) → une tag ; les
+     sous-lignes espèce d'une famille sont représentées par leur famille.
+   Nom : libellé localisé de la ligne (déjà dans l'arbre), tronqué à ~18ch
+   par CSS (.atag-label, ellipsis) ; `title` = nom COMPLET en repli (tooltip
+   native pour le texte coupé) — jamais la phrase de retrait ici, le ✕
+   visible sur la tag porte déjà cette affordance à l'œil. `aria-label` (state
+   séparé) reste la phrase d'action localisée pour les lecteurs d'écran
+   (activeTagRemove : "<nom> — retirer"/"remove"/…).
+   Clic : TOUTE la tag est cliquable (bouton plein, pas seulement le ✕) —
+   l'<input> est résolu par CLÉ AU MOMENT du clic (l'arbre se reconstruit
+   souvent — jamais une référence capturée), décoché puis change → le flux
+   normal de la ligne fait tout le reste (toggle de couche, syncHash,
+   refreshParentChecks → ce bandeau se republie seul).
+   DÉBORDEMENT (plafond 2 rangées, demande utilisateur 2026-07-11d) : jamais
+   un clip CSS qui laisserait deviner une tag coupée à moitié — on ne POSE
+   JAMAIS plus de 2 rangées de tags dans le DOM. buildTagLayout ci-dessous
+   mesure les rangées réelles (offsetTop de chaque tag une fois toutes
+   posées) et, si une 3ᵉ apparaît, retire des tags de la fin jusqu'à ce
+   qu'une tag « +N » (activeTagsMoreAria) tienne à la place sur la 2ᵉ rangée.
+   Clic sur « +N » : bascule `dotsExpanded` (état de SESSION seule, même
+   discipline que expandedFams/subOpen) — republie TOUTES les tags,
+   bandeau autorisé à grandir (`.expanded` : max-height + défilement interne,
+   jamais plus qu'un petit pan de la carte, voir style.css). Un clic HORS du
+   bandeau (écouteur pointerdown en capture, posé/déposé avec l'état
+   déplié), ou un retrait qui repasse sous 2 rangées, replie automatiquement.
+   Recalcul de mise en page : un redimensionnement de fenêtre (debounce) ou
+   la fin de la transition `padding-right` de #topbar (ouverture/fermeture du
+   tiroir #detail, qui rétrécit l'espace disponible — voir style.css) rejoue
+   le layout ; PAS de ResizeObserver ici (observer #active-dots lui-même
+   alors qu'on mute ses propres enfants dans le callback est le piège connu
+   "ResizeObserver loop" — un événement CSS ciblé est strictement suffisant
+   et sans risque de boucle). */
+let dotsExpanded = false;
+let dotsOutsideHandler = null;
+
+function activeTagInput(d) {
   if (d.sub) return document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(d.key)}"] .subgrp-check`);
   if (d.sp) return document.querySelector(`#filters li[data-species="${CSS.escape(d.key)}"] input`);
   return document.querySelector(`#filters li[data-fkey="${CSS.escape(d.key)}"] input`);
 }
-function renderActiveDots() {
-  const host = document.getElementById('active-dots');
-  if (!host) return;
-  const dots = [];
+function collectActiveTags() {
+  const tags = [];
   const seen = new Set();
-  const push = d => { const id = (d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); dots.push(d); } };
+  const push = d => { const id = (d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); tags.push(d); } };
   for (const el of document.querySelectorAll('#filters details.decor-group, #filters li[data-fkey], #filters li[data-species]')) {
     if (el.matches('details.decor-group')) {
       const input = el.querySelector(':scope > summary .subgrp-check');
@@ -681,7 +709,7 @@ function renderActiveDots() {
         partial: input.indeterminate,
       });
     } else if (el.dataset.fkey) {
-      if (el.closest('details.decor-group')) continue;   // représentée par le point de son bucket
+      if (el.closest('details.decor-group')) continue;   // représentée par la tag de son bucket
       const input = el.querySelector(':scope > .filter-row input');
       if (!input || (!input.checked && !input.indeterminate)) continue;
       push({
@@ -701,25 +729,113 @@ function renderActiveDots() {
       });
     }
   }
-  host.innerHTML = '';
-  for (const d of dots) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'adot' + (d.partial ? ' partial' : '');
-    b.style.setProperty('--c', d.hex);
-    const tip = tr('activeDotHide', d.label);
-    b.title = tip;
-    b.setAttribute('aria-label', tip);
-    b.addEventListener('click', () => {
-      const input = activeDotInput(d);
-      if (!input) return;
-      input.checked = false;
-      input.indeterminate = false;
-      input.dispatchEvent(new Event('change'));
-    });
-    host.appendChild(b);
-  }
+  return tags;
 }
+/* Une tag = un <button> plein : pastille (couleur de couche, demi-teinte si
+   partiel) + nom (ellipsis 18ch, title = nom complet) + ✕ décoratif
+   (aria-hidden, l'affordance réelle est le clic sur tout le bouton). */
+function buildTagEl(d) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'atag' + (d.partial ? ' partial' : '');
+  const dot = document.createElement('span');
+  dot.className = 'atag-dot';
+  dot.style.setProperty('--c', d.hex);
+  const label = document.createElement('span');
+  label.className = 'atag-label';
+  label.textContent = d.label;
+  const x = document.createElement('span');
+  x.className = 'atag-x';
+  x.setAttribute('aria-hidden', 'true');
+  x.textContent = '✕';
+  b.append(dot, label, x);
+  b.title = d.label;
+  b.setAttribute('aria-label', tr('activeTagRemove', d.label));
+  b.addEventListener('click', () => {
+    const input = activeTagInput(d);
+    if (!input) return;
+    input.checked = false;
+    input.indeterminate = false;
+    input.dispatchEvent(new Event('change'));
+  });
+  return b;
+}
+/* Tag « +N » de débordement : même anatomie de bouton (mêmes dimensions,
+   nécessaire pour que la mesure de rangée reste valide — voir
+   buildTagLayout), teinte accent plutôt que la pastille neutre. Clic :
+   déplie (état de session), jamais un lien vers l'arbre. */
+function buildMoreChip(n) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'atag atag-more';
+  b.textContent = `+${n}`;
+  const aria = tr('activeTagsMoreAria', n);
+  b.title = aria;
+  b.setAttribute('aria-label', aria);
+  b.addEventListener('click', e => {
+    e.stopPropagation();
+    dotsExpanded = true;
+    renderActiveTags();
+  });
+  return b;
+}
+/* Replie le bandeau déplié sur tout clic HORS de lui (pointerdown en
+   CAPTURE : observe seul, jamais de preventDefault/stopPropagation — le
+   clic réel de l'utilisateur, où qu'il tombe, continue son cours normal).
+   Écouteur reposé à chaque rendu (le précédent est retiré d'abord) : pas de
+   fuite, pas de doublon. */
+function collapseDotsOnOutsideClick(host) {
+  if (dotsOutsideHandler) document.removeEventListener('pointerdown', dotsOutsideHandler, true);
+  dotsOutsideHandler = e => {
+    if (dotsExpanded && !host.contains(e.target)) {
+      dotsExpanded = false;
+      renderActiveTags();
+    }
+  };
+  document.addEventListener('pointerdown', dotsOutsideHandler, true);
+}
+function renderActiveTags() {
+  const host = document.getElementById('active-dots');
+  if (!host) return;
+  host.classList.remove('expanded');
+  const tags = collectActiveTags();
+  if (!tags.length) { host.replaceChildren(); return; }
+  const els = tags.map(buildTagEl);
+  host.replaceChildren(...els);   // pose TOUT d'abord : mesure de rangée fiable
+  const rowTops = [...new Set(els.map(el => el.offsetTop))];
+  if (rowTops.length <= 2) {
+    dotsExpanded = false;   // tient déjà sur 2 rangées : rien à replier/déplier
+  } else if (dotsExpanded) {
+    host.classList.add('expanded');
+  } else {
+    const row2Top = rowTops[1];
+    let visible = els.filter(el => el.offsetTop <= row2Top);
+    // Rétrécit jusqu'à ce que la tag « +N » elle-même tienne sur la 2ᵉ
+    // rangée (jamais une tag « +N » qui déborderait sur une 3ᵉ).
+    while (visible.length) {
+      const more = buildMoreChip(els.length - visible.length);
+      host.replaceChildren(...visible, more);
+      if (more.offsetTop <= row2Top) break;
+      visible = visible.slice(0, -1);
+    }
+    if (!visible.length) host.replaceChildren(buildMoreChip(els.length));
+  }
+  collapseDotsOnOutsideClick(host);
+}
+/* Recalcul de mise en page sur redimensionnement (debounce léger — un
+   battement de resize spamme sinon l'événement). */
+let _dotsResizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_dotsResizeTimer);
+  _dotsResizeTimer = setTimeout(renderActiveTags, 120);
+});
+/* Recalcul sur l'ouverture/fermeture du tiroir #detail : #topbar rétrécit
+   via un padding-right transitionné (voir style.css) quand #detail.open
+   apparaît/disparaît — écouté ici plutôt que dans le code qui bascule cette
+   classe (ailleurs, hors-scope) : générique, ne dépend d'aucun appelant. */
+document.getElementById('topbar')?.addEventListener('transitionend', e => {
+  if (e.propertyName === 'padding-right') renderActiveTags();
+});
 
 /* État d'ouverture des sous-groupes (session seule, même discipline que
    expandedFams — le localStorage ne persiste que les groupes side-sec). */

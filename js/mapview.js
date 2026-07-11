@@ -51,16 +51,61 @@ const Tiles = L.TileLayer.extend({
   getTileUrl: c => `${TILE_BASE}/${activeMap.tile_path}${c.z}/${c.x}_${c.y}.webp`,
 });
 let tileLayer = null;
+/* Edge-fade task (2026-07-11) : la pyramide de tuiles couvre une bounding box
+   RECTANGULAIRE plus grande que le contour réel de chaque carte (îlot Kwalat
+   irrégulier dans une boîte 9600x8320, arènes dont le fragment déborde
+   légèrement le terrain jouable) --  a réécrit
+   CHAQUE tuile de bordure (fond plat de remplissage -> dégradé alpha vers la
+   transparence + désaturation vers CETTE MÊME couleur de fond -- voir
+   css/style.css #map background: #080c12 -- et tuile réelle en bord de trou
+   -> léger fondu directionnel, jamais son contenu masqué). `bounds` élargi à
+   worldBounds.pad(0.12) -- IDENTIQUE au pad de setMaxBounds ci-dessus, pas une
+   nouvelle valeur inventée -- pour que Leaflet redemande/affiche cette bande
+   nouvellement dégradée jusqu'à la même limite que la caméra peut atteindre,
+   au lieu de la couper net à l'ancienne bbox jouable (w x h) : sans ça, la
+   moitié de la fonte serait présente sur disque mais jamais requêtée. Au-delà
+   de cette bordure élargie -- ou pour toute tuile vraiment absente (404) --
+   errorTileUrl (1x1 transparent) laisse voir le fond #map, déjà la même
+   teinte que la fonte : les deux mécanismes (tuile dégradée, puis vide) se
+   raccordent sans coupure visible, à n'importe quel zoom. */
 function makeTileLayer() {
   return new Tiles('', {
     tileSize: 512, minNativeZoom: 0, maxNativeZoom: activeMap.tile_max_zoom,
     minZoom: -1, maxZoom: 5, noWrap: true, keepBuffer: 3,
-    bounds: worldBounds, className: 'map-tiles',
+    bounds: worldBounds.pad(0.12), className: 'map-tiles',
     errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
   });
 }
 tileLayer = makeTileLayer();
 tileLayer.addTo(map);
+
+/* Vignette de cadrage (polish front, edge-fade task) : assombrit très
+   légèrement les coins/bords du VIEWPORT (pas du monde -- un cadre d'écran,
+   comme une table de cartographe sous une lampe, cohérent avec la direction
+   déjà posée par css/style.css : "instrument moderne"), pour que la fonte au
+   niveau tuile (ci-dessus) se prolonge visuellement jusqu'au bord de l'écran
+   même quand la zone dégradée réelle est petite à l'écran (zoom arrière,
+   petite arène). Injecté ici (jamais dans css/style.css, propriété d'un autre
+   chantier en cours) : <style> pour la classe, DOM ajouté après tuiles/couches
+   -- non interactif (pointer-events:none), reste sous TOUTE couche de
+   données -- z-index 350, entre tilePane (200) et overlayPane (400, où
+   vit canvasR ci-dessus) -- pour ne jamais assombrir un point canvas, un
+   pin DOM (markerPane 600) ou un popup (700), seulement les tuiles. */
+(function injectEdgeVignette() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .map-edge-vignette {
+      position: absolute; inset: 0; z-index: 350;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center,
+        rgba(8,12,18,0) 55%, rgba(8,12,18,.10) 78%, rgba(8,12,18,.30) 100%);
+      mix-blend-mode: normal;
+    }`;
+  document.head.appendChild(style);
+  const vignette = document.createElement('div');
+  vignette.className = 'map-edge-vignette';
+  map.getContainer().appendChild(vignette);
+})();
 
 const canvasR = L.canvas({ padding: 0.35 });
 /* ── Marqueurs ──────────────────────────────────────────────── */

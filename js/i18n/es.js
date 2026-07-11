@@ -10,10 +10,13 @@ export default {
       searchPlaceholder: 'Buscar un PNJ, una misión, un objeto, un monstruo…',
       searchAriaLabel: 'Búsqueda',
       filtersAriaLabel: 'Filtros',
-      // Franja de capas activas (puntos de color bajo la búsqueda,
-      // js/sidebar.js renderActiveDots).
+      // Franja de capas activas (chips ETIQUETA nombradas y eliminables bajo
+      // la búsqueda — la franja funciona también como leyenda del mapa,
+      // js/sidebar.js renderActiveTags). activeTagsMoreAria: el chip
+      // "+N" de desbordamiento (tope de 2 filas) que despliega la franja.
       activeDotsLabel: 'Capas activas',
-      activeDotHide: name => `${name} — clic para ocultar`,
+      activeTagRemove: name => `${name} — quitar`,
+      activeTagsMoreAria: n => `${n} capa${n === 1 ? '' : 's'} activa${n === 1 ? '' : 's'} más — mostrar`,
       legend: 'Leyenda',
       campsTitle: 'Campamentos y recursos',
       // IA FINAL de la barra lateral (2026-07-11): 4 grupos fijos —
