@@ -12,6 +12,21 @@ export default {
       filtersAriaLabel: 'Filtres',
       legend: 'Légende',
       campsTitle: 'Camps & ressources',
+      // Arbre de couches (#82 chunk (a),  unified_layers_DESIGN.md
+      // §2/§11/§12(a)) : les 6 groupes fixes de la sidebar remplacent
+      // Légende/Camps & ressources ci-dessus (clés gardées, plus référencées
+      // par aucun data-i18n -- voir index.html) + le futur emplacement
+      // "Filtres épinglés" (#82 chunk (d), structurel seulement ici,
+      // toujours masqué). Libellés = wording EXACT du design (§2 mock),
+      // vocabulaire déjà tranché par COORDINATION.md §0 pour
+      // "Filtres épinglés" -- aucun GLOSSARY-PENDING sur cette langue.
+      groupPoi: "Points d'intérêt",
+      groupMonsters: 'Monstres & faune',
+      groupHarvest: 'Récolte',
+      groupContainers: 'Contenants & interactifs',
+      groupQuests: 'Quêtes',
+      groupWorld: 'Monde',
+      pinFiltersTitle: 'Filtres épinglés',
       trackedTitle: 'Suivis',
       trackedEmptyHint: 'Épinglez un marqueur avec « Suivre » pour le retrouver ici.',
       footerNote: 'Données extraites du client du jeu · non affilié à Artificial Core.',
@@ -251,10 +266,13 @@ export default {
       usedInTitle: 'Utilisé dans',
       rewardBadge: 'Récompense',
       requiredBadge: 'Requis',
-      pingTitle: 'Ping',
-      copyLinkBtn: 'Copier le lien',
-      linkCopied: 'Lien copié ✓',
       locatorTitle: 'Repère',
+      // Drapeau utilisateur (#84, clic droit) -- volontairement PAS "pin"/
+      // "épingle" : distinct du futur "filtre épinglé" du panneau gauche
+      // (#82, glyphe épingle) et de locatorTitle ci-dessus (réticule goto).
+      // Voir pins.js + COORDINATION.md §Vocabulaire.
+      userFlagTitle: 'Drapeau',
+      clearAllFlagsBtn: 'Effacer tous les drapeaux',
       mapDownload9600: 'Carte 9600px',
       mapDownload4800: 'Carte 4800px',
       loadErrorPrefix: msg => `Impossible de charger les données (${msg})`,
@@ -333,6 +351,7 @@ export default {
       choiceGroupTitle: n => `Choix ${n}`,
       orWord: ' ou ',
       xpAbbrev: n => `${n} XP`,
+      weaponXpAbbrev: n => `${n} XP d'arme`,
       goldAbbrev: n => `${n} or`,
       // Sélecteur de rareté (variantes même-nom, voir js/rarity.js) + indice
       // de recherche « N raretés » sur le résultat regroupé.

@@ -12,6 +12,22 @@ export default {
       filtersAriaLabel: 'Filtros',
       legend: 'Leyenda',
       campsTitle: 'Campamentos y recursos',
+      // Árbol de capas (#82 tramo (a),  unified_layers_DESIGN.md
+      // §2/§11/§12(a)): los 6 grupos fijos de la barra lateral sustituyen a
+      // Leyenda/Campamentos y recursos de arriba (claves conservadas, ya no
+      // referenciadas por ningún data-i18n -- ver index.html) + el futuro
+      // hueco "Filtros anclados" (#82 tramo (d), solo estructural aquí,
+      // siempre oculto). GLOSSARY-PENDING: el diseño solo fija el texto en
+      // FR (mock §2) -- estas cadenas ES son una traducción directa a la
+      // espera del pase de extracción de glosario (#86, ver
+      // COORDINATION.md); revisar aquí cuando llegue.
+      groupPoi: 'Puntos de interés',
+      groupMonsters: 'Monstruos y fauna',
+      groupHarvest: 'Recolección',
+      groupContainers: 'Contenedores e interactivos',
+      groupQuests: 'Misiones',
+      groupWorld: 'Mundo',
+      pinFiltersTitle: 'Filtros anclados',
       trackedTitle: 'Seguimiento',
       trackedEmptyHint: 'Fija un marcador con «Seguir» para encontrarlo aquí.',
       footerNote: 'Datos extraídos del cliente del juego · no afiliado con Artificial Core.',
@@ -250,10 +266,13 @@ export default {
       usedInTitle: 'Se usa en',
       rewardBadge: 'Recompensa',
       requiredBadge: 'Requerido',
-      pingTitle: 'Ping',
-      copyLinkBtn: 'Copiar enlace',
-      linkCopied: 'Enlace copiado ✓',
       locatorTitle: 'Marcador',
+      // Bandera de usuario (#84, clic derecho) -- deliberadamente NO "pin":
+      // distinta del futuro "filtro fijado" del panel izquierdo (#82,
+      // icono de chincheta) y de locatorTitle arriba (retícula goto).
+      // Ver pins.js.
+      userFlagTitle: 'Bandera',
+      clearAllFlagsBtn: 'Quitar todas las banderas',
       mapDownload9600: 'Mapa 9600px',
       mapDownload4800: 'Mapa 4800px',
       loadErrorPrefix: msg => `No se pudieron cargar los datos (${msg})`,
@@ -327,6 +346,7 @@ export default {
       choiceGroupTitle: n => `Elección ${n}`,
       orWord: ' o ',
       xpAbbrev: n => `${n} XP`,
+      weaponXpAbbrev: n => `${n} XP de arma`,
       goldAbbrev: n => `${n} de oro`,
       // Selector de rareza (variantes con el mismo nombre, ver js/rarity.js)
       // + pista de búsqueda «N rarezas» en el resultado agrupado.

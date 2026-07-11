@@ -12,6 +12,21 @@ export default {
       filtersAriaLabel: 'Filters',
       legend: 'Legend',
       campsTitle: 'Camps & resources',
+      // Layer tree (#82 chunk (a),  unified_layers_DESIGN.md
+      // §2/§11/§12(a)): the sidebar's 6 fixed groups replace Legend/Camps &
+      // resources above (keys kept, no longer referenced by any data-i18n --
+      // see index.html) + the future "Pinned filters" slot (#82 chunk (d),
+      // structural only here, always hidden). GLOSSARY-PENDING: the design
+      // doc only fixes the FR wording (§2 mock) -- these EN strings are a
+      // straightforward translation pending the glossary-extraction pass
+      // (#86) mentioned in COORDINATION.md; sweep here when it lands.
+      groupPoi: 'Points of interest',
+      groupMonsters: 'Monsters & wildlife',
+      groupHarvest: 'Harvesting',
+      groupContainers: 'Containers & interactables',
+      groupQuests: 'Quests',
+      groupWorld: 'World',
+      pinFiltersTitle: 'Pinned filters',
       trackedTitle: 'Tracked',
       trackedEmptyHint: 'Pin a marker with “Track” to find it here.',
       footerNote: 'Data extracted from the game client · not affiliated with Artificial Core.',
@@ -262,10 +277,12 @@ export default {
       usedInTitle: 'Used in',
       rewardBadge: 'Reward',
       requiredBadge: 'Required',
-      pingTitle: 'Ping',
-      copyLinkBtn: 'Copy link',
-      linkCopied: 'Link copied ✓',
       locatorTitle: 'Marker',
+      // User flag (#84, right-click on the map) -- deliberately NOT "pin":
+      // distinct from the future sidebar "pinned filter" (#82, pin glyph)
+      // and from locatorTitle above (the goto reticle). See pins.js.
+      userFlagTitle: 'Flag',
+      clearAllFlagsBtn: 'Clear all flags',
       mapDownload9600: 'Map 9600px',
       mapDownload4800: 'Map 4800px',
       loadErrorPrefix: msg => `Could not load data (${msg})`,
@@ -333,6 +350,7 @@ export default {
       choiceGroupTitle: n => `Choice ${n}`,
       orWord: ' or ',
       xpAbbrev: n => `${n} XP`,
+      weaponXpAbbrev: n => `${n} weapon XP`,
       goldAbbrev: n => `${n} gold`,
       // Rarity selector (same-name variants, see js/rarity.js) + grouped-
       // result search hint "N rarities".

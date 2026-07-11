@@ -27,8 +27,8 @@ import {
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } from './sidebar.js';
-import { buildHash, syncHash, pushFocusState, unfocus } from './urlstate.js';
-import { goTo, clearPing, clearLocator } from './pins.js';
+import { syncHash, pushFocusState, unfocus } from './urlstate.js';
+import { goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags } from './pins.js';
 import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
 
@@ -122,12 +122,12 @@ document.addEventListener('click', e => {
     switchMap(b.dataset.map, { keepView: true });
   }
   // (Ex-second délégué, fusionné : un seul écouteur global data-act.)
-  else if (b.dataset.act === 'copy-ping' && S.ping) {
-    navigator.clipboard?.writeText(location.href.split('#')[0] + buildHash());
-    b.textContent = tr('linkCopied');
-  }
-  else if (b.dataset.act === 'clear-ping') unfocus(clearPing);
   else if (b.dataset.act === 'clear-locator') unfocus(clearLocator);
+  // Drapeaux utilisateur (#84) : PAS de pushFocusState/unfocus ici -- ils
+  // vivent hors du modèle "focus"/historique (voir pins.js), une suppression
+  // est donc toujours immédiate, jamais un Précédent/Suivant.
+  else if (b.dataset.act === 'remove-user-flag') removeUserFlag(b.dataset.id);
+  else if (b.dataset.act === 'clear-user-flags') clearAllUserFlags();
 });
 /* ── Lecture des coordonnées ────────────────────────────────── */
 /* Un mousemove tire à chaque pixel pendant un déplacement de souris ; on ne
@@ -376,6 +376,7 @@ async function setLang(code) {
     buildSearch();
     buildBestiary();    // filtre par-carte du bestiaire (m.maps ⨯ carte active) — voir sidebar.js
     buildDevToggle();   // compte qao/quête isTest propre à la carte qui vient d'être chargée
+    renderUserFlags();  // drapeaux utilisateur (#84) : scopés par carte, S.map vient de changer
   });
 
   buildFilters();
@@ -410,6 +411,15 @@ async function setLang(code) {
   // await : un lien profond map=<id> doit avoir basculé la carte avant qu'on
   // masque le voile de chargement (sinon flash de Kwalat puis bascule).
   await applyLocationState();
+  // Drapeaux utilisateur (#84) : appel explicite ICI en plus du hook
+  // onMapSwitch ci-dessus -- un boot SANS bascule de carte (pas de `map=`
+  // dans le hash, Kwalat déjà actif par défaut) ne déclenche jamais
+  // onMapSwitch (switchMap() renvoie tôt quand mid === S.map, voir
+  // multimap.js), donc rien n'afficherait les drapeaux de Kwalat au tout
+  // premier chargement sans cet appel. Idempotent si applyLocationState a
+  // effectivement basculé de carte (renderUserFlags reconstruit sa couche
+  // à chaque appel).
+  renderUserFlags();
   $('#loading').classList.add('gone');
 
   // Surveillance "données mises à jour" (js/updatecheck.js) : démarrée une

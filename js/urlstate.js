@@ -25,7 +25,8 @@ function buildHash() {
   // `map=` n'est ajouté QUE hors Kwalat : les liens Kwalat existants restent
   // byte-identiques (rétro-compat — absence de map= ⇒ Kwalat, cf. readHash).
   if (S.map && S.map !== 'Kwalat') h += `&map=${S.map}`;
-  if (S.ping) h += `&ping=${Math.round(S.ping.x)},${Math.round(S.ping.z)}`;
+  // Drapeaux utilisateur (#84, clic droit) : PAS de champ hash -- localStorage
+  // par carte uniquement (pins.js), jamais partagés via lien (voir COORDINATION.md).
   if (S.locator) h += `&at=${Math.round(S.locator.x)},${Math.round(S.locator.z)}`;
   if (S.locator?.label) h += `&atl=${encodeURIComponent(S.locator.label)}`;
   // Report carry-over : ré-encodé via URLSearchParams (pas de concaténation
@@ -76,7 +77,7 @@ function readHash() {
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {
-    view, onSet, ping: p.get('ping'), quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
+    view, onSet, quest: p.get('q'), camp: p.get('camp'), item: p.get('i'),
     npc: p.get('npc'), monster: p.get('mon'), at, atl: p.get('atl') || null,
     map: p.get('map') || 'Kwalat',   // absent ⇒ Kwalat (rétro-compat des liens existants)
   };
@@ -84,15 +85,17 @@ function readHash() {
 
 /* ── Historique de navigation (Précédent/Suivant) ──────────────
    Modèle : une entrée d'historique = un instantané COMPLET de l'état focalisé
-   (fiche + réticule + ping + filtres + caméra), jamais un diff — restauré par
+   (fiche + réticule + filtres + caméra), jamais un diff — restauré par
    applyLocationState() (définie près de init(), plus bas), appelée aussi bien
-   au chargement qu'à chaque popstate.
+   au chargement qu'à chaque popstate. Les drapeaux utilisateur (#84, clic
+   droit) sont volontairement HORS de ce modèle (localStorage par carte, voir
+   pins.js) : ils ne poussent/ne lisent jamais d'entrée d'historique.
 
    pushFocusState() est appelé UNE fois, EN DÉBUT de chaque geste utilisateur
    de haut niveau — AVANT ses mutations, pas après (voir les points d'appel :
-   clic délégué, résultat de recherche, clic suivi, clic droit/ping). C'est
+   clic délégué, résultat de recherche, clic suivi). C'est
    l'inverse de ce qu'on ferait naïvement : les fonctions bas niveau
-   (setFicheHash/syncHash derrière openXFiche/goTo/setPing) ne font QUE
+   (setFicheHash/syncHash derrière openXFiche/goTo) ne font QUE
    replaceState sur l'entrée COURANTE — si on poussait après coup, ce
    replaceState aurait déjà réécrit l'entrée qu'on s'apprête à quitter avec
    le nouvel état, et « Précédent » retomberait sur un doublon de l'état

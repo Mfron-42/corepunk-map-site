@@ -2279,9 +2279,9 @@ function hintBox(q) {
   </div>`;
 }
 
-/* Récompenses de quête : distingue TOUJOURS DONNÉ (xp/or + items à
+/* Récompenses de quête : distingue TOUJOURS DONNÉ (xp/xp d'arme/or + items à
    choice_group null,  restructure ça en
-   {fixed, choices, xp?, gold?}) des groupes de CHOIX mutuellement
+   {fixed, choices, xp?, gold?, weapon_xp?}) des groupes de CHOIX mutuellement
    exclusifs (un par choice_group réel, index affiché = ordre du tableau,
    déjà trié par le pipeline). Jamais une liste à plat comme avant : un
    joueur doit voir sans ambiguïté ce qui est garanti et ce qui s'exclut
@@ -2289,6 +2289,11 @@ function hintBox(q) {
    "choisissez 1 parmi N"). qtyItemChip/qtyChipList (section recette
    ci-dessus) gèrent déjà la forme {key,count} — réutilisées telles quelles
    ici.
+   weapon_xp = XP de maîtrise d'arme par quête (QuestRewardsTable ints[3],
+   ex-extra_raw : identifié par l'observation joueur "≈20% de l'XP" + la
+   distribution du champ, ratio 0.167-0.267 sur 283/322 quêtes — voir
+   build_dataset.parse_rewards_table). Le pipeline n'expédie la clé que
+   quand la valeur est non nulle, donc pas de ligne "0 XP d'arme".
    BUG FIX (regression, was `q.rewards?.length ? ... : ''`): q.rewards is the
    structured object {fixed, choices, xp?, gold?}, not an array — `.length`
    on that object is always undefined, so the old code produced the empty
@@ -2297,10 +2302,12 @@ function hintBox(q) {
 function questRewardsSection(q) {
   const r = q.rewards;
   if (!r) return '';
-  const hasFixed = r.fixed?.length || r.xp != null || r.gold != null;
+  const hasFixed = r.fixed?.length || r.xp != null || r.gold != null || r.weapon_xp != null;
   const hasChoices = r.choices?.length;
   if (!hasFixed && !hasChoices) return '';
-  const xpGold = [r.xp != null ? tr('xpAbbrev', r.xp) : null, r.gold != null ? tr('goldAbbrev', r.gold) : null]
+  const xpGold = [r.xp != null ? tr('xpAbbrev', r.xp) : null,
+                  r.weapon_xp != null ? tr('weaponXpAbbrev', r.weapon_xp) : null,
+                  r.gold != null ? tr('goldAbbrev', r.gold) : null]
     .filter(Boolean).join(' · ');
   const fixedHtml = hasFixed ? `
     <h4 class="fiche-sub">${esc(tr('alwaysGrantedTitle'))}</h4>

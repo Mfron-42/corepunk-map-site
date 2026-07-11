@@ -34,7 +34,6 @@ const S = {
                             // -> {on, count} — sous-couches "Décor" (chests.bin group="decor"|
                             // "legacy_chest", toutes OFF par défaut), voir data.js
                             // buildDecorGroups() et js/sidebar.js buildDecorGroup()
-  ping: null,
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}
   lootTableContents: {},    // libellé de table -> [{key,name,icon,w,c,g,ch}], table COMPLÈTE

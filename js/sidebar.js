@@ -54,6 +54,15 @@ function renderTracked() {
   const ul = $('#tracked-list');
   ul.innerHTML = '';
   $('#tracked-empty').style.display = S.tracked.length ? 'none' : '';
+  // Suivis replié par défaut (design §9.3) : un compteur dans le sommaire,
+  // sinon rien ne dirait combien d'items s'y trouvent tant que replié --
+  // même idiome que .fcount, posé en SIBLING du <h2 data-i18n> (jamais
+  // dedans : applyStaticI18n() écrase le textContent complet d'un élément
+  // data-i18n à chaque bascule de langue, voir main.js). Toujours appelé
+  // APRÈS applyStaticI18n() dans les 2 flux (setLang/init, voir main.js),
+  // donc jamais écrasé par elle.
+  const countEl = $('#tracked-count');
+  if (countEl) countEl.textContent = S.tracked.length ? `(${S.tracked.length})` : '';
   S.tracked.forEach(t => {
     const li = document.createElement('li');
     if (S.done.has(t.id)) li.className = 'done';
@@ -197,45 +206,153 @@ function refreshDecorRows(sub, entries) {
   });
 }
 
-function buildFilters() {
-  const ul = $('#filter-list');
+/* ── Arbre de couches (#82 chunk (a) — refacto de PRÉSENTATION seulement) ──
+   Les anciens conteneurs #filter-list (7 CATS + Zones + groupe Décor) et
+   #camp-list (14 kinds de camp à plat) fusionnent en 6 groupes fixes
+   side-sec (voir index.html +  unified_layers_DESIGN.md §2/§12(a)) :
+   MÊMES lignes (filterRow/hiddenBadge/buildDecorGroup réutilisés tels
+   quels), MÊME hash `on=`/`camp.*`/`decor.*` (urlstate.js lit CATS/S.camps/
+   S.decor/S.zonesOn directement -- jamais une position DOM) -- zéro
+   nouvelle couche, zéro nouveau point-set. L'ordre des kinds par groupe est
+   FIXE (celui du mock du design, pas un tri par volume) ; un kind absent de
+   la carte active n'affiche simplement pas sa ligne -- même garde que
+   l'ancien buildCampFilters, qui n'itérait déjà que sur Object.entries
+   (S.camps). Le sous-groupe « Par famille » (Monstres & faune) et le
+   découpage qao par type (Quêtes) sont hors scope ici (chunk (b)/(c)). */
+const CAMP_KIND_GROUPS = {
+  monsters: ['monsters', 'creeps', 'wildlife'],
+  harvest: ['herbalism', 'logging', 'mining'],
+  containers: ['destroyable', 'searchable', 'reactive'],
+  quests: ['quest'],
+  world: ['shrines', 'soulkeeper', 'guards', 'other'],
+};
+
+/* Ligne de filtre CATS (npc/poi/quest/qao/workshop/searchable_chest/
+   camp_chest) -- même corps que l'ancienne boucle Object.entries(CATS) de
+   buildFilters(), extrait pour être appelable PAR CLÉ depuis chaque groupe. */
+function catRow(key) {
+  const c = CATS[key];
+  const { shown, hidden } = catStats(key);
+  return filterRow(key, catLabel(key), c.hex, shown, hidden, c.on, on => {
+    c.on = on;
+    if (c.dense) scheduleRedraw();
+    else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
+  });
+}
+/* Ligne de filtre camp:<kind> -- même corps que l'ancien buildCampFilters,
+   par kind (null si ce kind n'existe pas sur la carte active : S.camps ne
+   contient QUE les kinds présents, voir data.js loadDeferred/loadMapData). */
+function campRow(kind) {
+  const st = S.camps[kind];
+  if (!st) return null;
+  // st.points vient directement de g.pts (data.js/multimap.js loadMapData) :
+  // chaque entrée a TOUJOURS x/z, jamais de gap position -- hidden fixé à 0.
+  return filterRow('camp:' + kind, campKindLabel(kind), CAMP_COLORS[kind] || '#888',
+    st.points.length, 0, st.on, on => { st.on = on; scheduleRedraw(); });
+}
+function appendCampRows(ul, kinds) {
+  for (const kind of kinds) { const li = campRow(kind); if (li) ul.appendChild(li); }
+}
+function loadingHintLi() {
+  const li = document.createElement('li');
+  li.className = 'hint camp-loading';
+  li.textContent = tr('campLoading');
+  return li;
+}
+
+/* Groupe « Points d'intérêt » : npc/poi/workshop (CATS, critique -- dispo
+   dès le premier rendu) + Zones (régions). Rien ici ne dépend de camps.bin
+   (différé) : un seul appel suffit, jamais rejoué par whenDeferred. */
+function buildGroupPoi() {
+  const ul = $('#group-poi-list');
   ul.innerHTML = '';
-  for (const [key, c] of Object.entries(CATS)) {
-    const { shown, hidden } = catStats(key);
-    const li = filterRow(key, catLabel(key), c.hex, shown, hidden, c.on, on => {
-      c.on = on;
-      if (c.dense) scheduleRedraw();
-      else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
-    });
-    ul.appendChild(li);
-  }
+  ul.appendChild(catRow('npc'));
+  ul.appendChild(catRow('poi'));
+  ul.appendChild(catRow('workshop'));
   if (S.zonesGeo.length) {
     // Pas de notion de "sans position" pour une région (zones_geo est déjà
     // 100% ce qui est dessiné) : hidden fixé à 0, jamais de badge ici.
-    ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX,
-      S.zonesGeo.length, 0, S.zonesOn, toggleZones));
+    ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX, S.zonesGeo.length, 0, S.zonesOn, toggleZones));
   }
+}
+/* Groupe « Monstres & faune » : 3 lignes camp:<kind> à plat (le sous-groupe
+   « Par famille » est chunk (b), design §4 -- hors scope ici). */
+function buildGroupMonsters() {
+  const ul = $('#group-monsters-list');
+  ul.innerHTML = '';
+  if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
+  appendCampRows(ul, CAMP_KIND_GROUPS.monsters);
+}
+/* Groupe « Récolte » : les 3 métiers de camp:<kind>. */
+function buildGroupHarvest() {
+  const ul = $('#group-harvest-list');
+  ul.innerHTML = '';
+  if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
+  appendCampRows(ul, CAMP_KIND_GROUPS.harvest);
+}
+/* Groupe « Contenants & interactifs » : les 2 vraies couches de coffres
+   (CATS, critique) + 3 camp:<kind> (différé) + le groupe repliable Décor
+   (S.decor -- lui aussi critique, voir data.js buildDecorGroups appelé
+   depuis loadCritical, JAMAIS loadDeferred) EN DERNIER, même ordre que le
+   mock du design (§2). Reconstruit en entier à chaque appel (avant ET
+   après l'arrivée du différé) pour ne jamais insérer les lignes camp AVANT
+   les 2 lignes CATS ni APRÈS le groupe Décor. */
+function buildGroupContainers() {
+  const ul = $('#group-containers-list');
+  ul.innerHTML = '';
+  ul.appendChild(catRow('searchable_chest'));
+  ul.appendChild(catRow('camp_chest'));
+  if (!deferredReady) ul.appendChild(loadingHintLi());
+  else appendCampRows(ul, CAMP_KIND_GROUPS.containers);
   const decorLi = buildDecorGroup();
   if (decorLi) ul.appendChild(decorLi);
-  const cl = $('#camp-list');
-  if (!deferredReady) {
-    cl.innerHTML = `<li class="hint camp-loading">${esc(tr('campLoading'))}</li>`;
-  }
-  whenDeferred(buildCampFilters);
+}
+/* Groupe « Quêtes » : quest/qao (CATS, critique) + camp:quest (différé,
+   "Camps d'objets de quête" -- déménagé ici depuis l'ancienne section Camps
+   à plat, voir design §5). qao reste une SEULE ligne pour cette tranche
+   (chunk (c) la scindera en sous-lignes par type d'activable, voir design
+   §5) -- GLOSSARY-PENDING : catLabel('qao') ("Objets de quête"/"Quest
+   objects", table i18n `cat`) réutilisé tel quel, aucun nouveau libellé
+   introduit ici. */
+function buildGroupQuests() {
+  const ul = $('#group-quests-list');
+  ul.innerHTML = '';
+  ul.appendChild(catRow('quest'));
+  ul.appendChild(catRow('qao'));
+  if (!deferredReady) ul.appendChild(loadingHintLi());
+  else appendCampRows(ul, CAMP_KIND_GROUPS.quests);
+}
+/* Groupe « Monde » : sanctuaires/soulkeepers/gardes/autres camps. */
+function buildGroupWorld() {
+  const ul = $('#group-world-list');
+  ul.innerHTML = '';
+  if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
+  appendCampRows(ul, CAMP_KIND_GROUPS.world);
 }
 
-/* Liste des camps (sidebar) — reconstruite une fois camps.json arrivé
-   (chargement différé, voir loadDeferred). */
-function buildCampFilters() {
-  const cl = $('#camp-list');
-  cl.innerHTML = '';
-  const kinds = Object.entries(S.camps).sort((a, b) => b[1].points.length - a[1].points.length);
-  for (const [kind, st] of kinds) {
-    // st.points vient directement de g.pts (data.js/multimap.js loadMapData) :
-    // chaque entrée a TOUJOURS x/z, jamais de gap position -- hidden fixé à 0.
-    cl.appendChild(filterRow('camp:' + kind, campKindLabel(kind), CAMP_COLORS[kind] || '#888',
-      st.points.length, 0, st.on, on => { st.on = on; scheduleRedraw(); }));
-  }
+/* Point d'entrée unique (remplace l'ancien couple buildFilters+
+   buildCampFilters) -- nom CONSERVÉ pour ne pas toucher main.js/router.js/
+   search.js, qui appellent tous buildFilters() tel quel à chaque cycle de
+   vie (boot, bascule langue/carte, toggle dev-content, toggle zones). */
+function buildFilters() {
+  buildGroupPoi();
+  buildGroupContainers();
+  buildGroupQuests();
+  buildGroupMonsters();
+  buildGroupHarvest();
+  buildGroupWorld();
+  // Rejoue les 5 groupes dépendants de camps.bin une fois arrivé
+  // (whenDeferred : synchrone si déjà prêt -- chaque appel post-boot de
+  // buildFilters() les reconstruit donc deux fois de suite sans effet
+  // visible, idempotent -- même dégénérescence que l'ancien
+  // whenDeferred(buildCampFilters)).
+  whenDeferred(() => {
+    buildGroupContainers();
+    buildGroupQuests();
+    buildGroupMonsters();
+    buildGroupHarvest();
+    buildGroupWorld();
+  });
 }
 /* ── Bestiaire (sidebar) ─────────────────────────────────────
    ESPÈCES du catalogue GLOBAL (site/data/<lang>/species.bin, task #80 —

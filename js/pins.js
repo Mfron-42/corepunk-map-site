@@ -1,11 +1,19 @@
-/* Kwalat — repères de navigation : goTo (vol + réticule ambré persistant),
-   vague éphémère (pulse) et ping rouge de clic droit. Tous partageables via
-   le hash (S.locator / S.ping, lus par urlstate.buildHash). */
+/* Kwalat — repères de navigation (goTo : vol + réticule ambré persistant,
+   vague éphémère pulse -- partageables via le hash, S.locator, lu par
+   urlstate.buildHash) ET drapeaux utilisateur (clic droit, #84) : repères
+   MULTIPLES posés à la main par le joueur, persistants en localStorage PAR
+   CARTE (jamais dans le hash -- ce ne sont pas des cibles de navigation
+   "focus" comme le réticule goto, voir la section dédiée en bas de fichier).
+   Vocabulaire/glyphe volontairement DISTINCTS du réticule goto (ambré,
+   single-slot, cf. locatorTitle -- "Marker"/"Repère" déjà pris) ET du futur
+   "filtre épinglé" du panneau gauche (#82, glyphe épingle ⚲, mot "pin"/
+   "épingle") -- ici un petit DRAPEAU teinte --core planté au point exact,
+   jamais le mot pin/épingle dans l'UI (voir COORDINATION.md §Vocabulaire). */
 import { S } from './state.js';
 import { esc, fmtCoord, reduceMotion } from './utils.js';
 import { tr } from './i18n/index.js';
 import { map, toLL, toWorld, activeMap, findRenderedMarker, refreshIconLayer } from './mapview.js';
-import { syncHash, pushFocusState } from './urlstate.js';
+import { syncHash } from './urlstate.js';
 
 /* `pinRef` (facultatif, {cat}) : le caller a déjà résolu la cible à une
    entité CONNUE dont un marqueur peut déjà être affiché sur la carte (PNJ,
@@ -110,11 +118,13 @@ function pulse(ll) {
 /* Repère persistant : chaque « aller à » (résultat de recherche, bouton
    carte, suivi) pose un réticule ambré qui RESTE à l'endroit exact —
    remplacé par le goTo suivant, retiré via son popup. Complète la vague
-   éphémère (pulse) jugée trop discrète. Distinct du ping rouge (clic droit) :
-   le réticule suit un geste de navigation explicite plutôt qu'un repère posé
-   à la main — mais les deux sont désormais partageables/historisés dans le
-   hash (S.locator miroir plat, lu par buildHash() ; voir aussi
-   pushFocusState()/applyLocationState() pour l'historique Précédent/Suivant). */
+   éphémère (pulse) jugée trop discrète. Distinct des drapeaux utilisateur
+   (clic droit, plus bas) : le réticule suit un geste de navigation explicite
+   (single-slot, jamais cumulé) plutôt qu'un repère posé à la main que le
+   joueur veut garder -- partageable/historisé dans le hash (S.locator
+   miroir plat, lu par buildHash() ; voir aussi pushFocusState()/
+   applyLocationState() pour l'historique Précédent/Suivant), contrairement
+   aux drapeaux qui vivent en dehors de ce modèle (localStorage, jamais le hash). */
 let locMk = null;
 function setLocator(x, z, label) {
   clearLocator();
@@ -138,33 +148,90 @@ function clearLocator() {
   S.locator = null;
   syncHash();
 }
-/* ── Ping (clic droit) ──────────────────────────────────────── */
-function setPing(x, z, fly) {
-  clearPing();
-  const icon = L.divIcon({
-    className: 'ping-marker',
-    html: '<div class="ping-wave"></div><div class="ping-core"></div>',
-    iconSize: [0, 0],
-  });
-  S.ping = { x, z, mk: L.marker(toLL(x, z), { icon, zIndexOffset: 1000 }).addTo(map) };
-  S.ping.mk.bindPopup(`<div class="pop"><h3>${esc(tr('pingTitle'))}</h3>
+/* ── Drapeaux utilisateur (clic droit) ── #84 ──────────────────
+   Remplace l'ancien "ping" (setPing/clearPing ci-dessus dans les versions
+   précédentes de ce fichier) : un marqueur SINGLE-SLOT partagé avec le même
+   modèle "focus" que le réticule goto (hash S.ping, remis à zéro par
+   applyLocationState()/closeFiche()/tout nouveau clic droit) -- exactement
+   le bug rapporté ("les repères disparaissent quand j'en pose un nouveau").
+   Les drapeaux sont un système INDÉPENDANT : illimités, jamais touchés par
+   pushFocusState/applyLocationState/closeFiche/goTo, persistés en
+   localStorage PAR CARTE (clé = S.map), restaurés au chargement et à chaque
+   bascule de carte (renderUserFlags, appelée par main.js au boot et à
+   chaque hook onMapSwitch -- jamais dans le hash partageable : ce ne sont
+   pas des cibles de navigation mais des annotations personnelles). */
+const USERFLAGS_LS_KEY = 'cpmap_userflags';
+function loadAllUserFlags() {
+  try { return JSON.parse(localStorage.getItem(USERFLAGS_LS_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function saveAllUserFlags(all) {
+  try { localStorage.setItem(USERFLAGS_LS_KEY, JSON.stringify(all)); }
+  catch (e) { /* quota / navigation privée -- le drapeau reste visible pour la session, non persisté */ }
+}
+function userFlagPopupHtml(id, x, z) {
+  return `<div class="pop">
+    <h3>${esc(tr('userFlagTitle'))}</h3>
+    <div class="pop-cat" style="color:var(--core)">${esc(tr('userFlagTitle'))}</div>
     <span class="pop-coords">${fmtCoord(x, z)}</span>
     <div class="pop-actions">
-      <button class="act primary" data-act="copy-ping">${esc(tr('copyLinkBtn'))}</button>
-      <button class="act ghost" data-act="clear-ping">${esc(tr('removeBtn'))}</button>
-    </div></div>`);
-  if (fly) goTo(x, z);
-  syncHash();
+      <button class="act ghost" data-act="remove-user-flag" data-id="${esc(id)}">${esc(tr('removeBtn'))}</button>
+      <button class="act ghost" data-act="clear-user-flags">${esc(tr('clearAllFlagsBtn'))}</button>
+    </div>
+  </div>`;
 }
-function clearPing() {
-  if (S.ping) { map.removeLayer(S.ping.mk); S.ping = null; syncHash(); }
+let userFlagLayer = null;            // L.layerGroup monté SEULEMENT pour S.map courante
+const userFlagMarkers = new Map();   // id -> L.marker, carte courante uniquement (vidée à chaque renderUserFlags)
+function mountUserFlag(id, x, z) {
+  if (!userFlagLayer) userFlagLayer = L.layerGroup().addTo(map);
+  const mk = L.marker(toLL(x, z), {
+    icon: L.divIcon({
+      className: 'user-flag-marker',
+      html: '<div class="flag-pole"></div><div class="flag-pennant"></div><div class="flag-base"></div>',
+      iconSize: [0, 0],
+    }),
+    zIndexOffset: 890,
+  });
+  mk.bindPopup(userFlagPopupHtml(id, x, z));
+  mk.addTo(userFlagLayer);
+  userFlagMarkers.set(id, mk);
+  return mk;
+}
+/* (Re)pose tous les drapeaux de la carte ACTIVE depuis localStorage --
+   appelée au boot et à chaque bascule de carte (main.js onMapSwitch) : les
+   drapeaux sont scopés par carte, jamais affichés hors de la leur. */
+function renderUserFlags() {
+  if (userFlagLayer) { map.removeLayer(userFlagLayer); userFlagLayer = null; }
+  userFlagMarkers.clear();
+  const list = loadAllUserFlags()[S.map] || [];
+  list.forEach(p => mountUserFlag(p.id, p.x, p.z));
+}
+function addUserFlag(x, z) {
+  const all = loadAllUserFlags();
+  const list = all[S.map] || (all[S.map] = []);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  list.push({ id, x, z });
+  saveAllUserFlags(all);
+  mountUserFlag(id, x, z).openPopup();
+  pulse(toLL(x, z));   // même vague de confirmation ponctuelle qu'un goTo, voir plus haut
+}
+function removeUserFlag(id) {
+  const all = loadAllUserFlags();
+  if (all[S.map]) { all[S.map] = all[S.map].filter(p => p.id !== id); saveAllUserFlags(all); }
+  const mk = userFlagMarkers.get(id);
+  if (mk) { userFlagLayer?.removeLayer(mk); userFlagMarkers.delete(id); }
+}
+function clearAllUserFlags() {
+  const all = loadAllUserFlags();
+  delete all[S.map];
+  saveAllUserFlags(all);
+  if (userFlagLayer) { map.removeLayer(userFlagLayer); userFlagLayer = null; }
+  userFlagMarkers.clear();
 }
 map.on('contextmenu', e => {
   const w = toWorld(e.latlng);
   if (w.x < 0 || w.z < 0 || w.x > activeMap.w || w.z > activeMap.h) return;
-  pushFocusState();   // avant mutation — voir pushFocusState()'s doc
-  setPing(w.x, w.z);
-  S.ping.mk.openPopup();
+  addUserFlag(w.x, w.z);
 });
 
-export { goTo, setLocator, clearLocator, setPing, clearPing };
+export { goTo, setLocator, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags };

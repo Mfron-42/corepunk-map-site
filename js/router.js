@@ -1,11 +1,13 @@
 /* Kwalat — restauration d'état (chargement initial ET popstate) : relit le
    hash et republie l'UI complète — carte active, caméra, filtres, fiche,
-   réticule, ping. Seul module « orchestrateur » avec main.js. */
+   réticule. Seul module « orchestrateur » avec main.js. Les drapeaux
+   utilisateur (#84, clic droit) ne vivent PAS ici : localStorage par carte,
+   restaurés par main.js (renderUserFlags), pas d'état de hash à relire. */
 import { S } from './state.js';
 import { readHash } from './urlstate.js';
 import { switchMap } from './multimap.js';
 import { map, toLL, worldBounds, denseRenderers, toggleZones } from './mapview.js';
-import { setLocator, clearLocator, setPing, clearPing } from './pins.js';
+import { setLocator, clearLocator } from './pins.js';
 import {
   closeFiche, openQuestFiche, openItemFiche, openNpcFiche,
   openCampFiche, openMonsterFiche,
@@ -30,7 +32,7 @@ import { whenDeferred, deferredReady } from './data.js';
    appuis Précédent/Suivant rapprochés (mobile notamment). */
 async function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, ping, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
+  const { view, onSet, quest, camp, item, npc, monster, at, atl, map: mapId } = readHash();
 
   // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
   // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
@@ -96,10 +98,9 @@ async function applyLocationState() {
     else if (monster && S.monsters[monster]) openMonsterFiche(monster);
   });
 
-  // Réticule + ping.
+  // Réticule (drapeaux utilisateur #84 : PAS dans le hash, voir pins.js --
+  // scopés par carte, restaurés par main.js renderUserFlags()/onMapSwitch).
   if (at) setLocator(at.x, at.z, atl); else clearLocator();
-  if (ping) { const [px, pz] = ping.split(',').map(Number); if (!isNaN(px)) setPing(px, pz); }
-  else clearPing();
 
   S.restoring = false;
 }

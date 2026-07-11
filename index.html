@@ -34,25 +34,54 @@
     </div>
 
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
-      <details class="side-sec" data-sec="legend" open>
-        <summary><h2 data-i18n="legend">Légende</h2></summary>
-        <ul id="filter-list"></ul>
+      <!-- Filtres épinglés (#82 chunk (d), pas encore implémenté) : simple
+           emplacement STRUCTUREL pour l'instant -- masqué (hidden), sans
+           lignes, sans compteur. La tranche (d) posera S.pinFilters, le
+           bloc `pf=` et retirera `hidden` ; rien à faire ici avant elle
+           (voir  unified_layers_DESIGN.md §6/§12(d)). -->
+      <details class="side-sec" data-sec="pinfilters" id="pinfilters-sec" hidden>
+        <summary><h2 data-i18n="pinFiltersTitle">Filtres épinglés</h2></summary>
+        <ul id="pinfilters-list" class="layer-list"></ul>
       </details>
-      <details class="side-sec" data-sec="camps" open>
-        <summary><h2 id="camps-title" data-i18n="campsTitle">Camps &amp; ressources</h2></summary>
-        <ul id="camp-list"></ul>
+      <details class="side-sec" data-sec="group-poi" open>
+        <summary><h2 data-i18n="groupPoi">Points d'intérêt</h2></summary>
+        <ul id="group-poi-list" class="layer-list"></ul>
       </details>
+      <details class="side-sec" data-sec="group-monsters" open>
+        <summary><h2 data-i18n="groupMonsters">Monstres &amp; faune</h2></summary>
+        <ul id="group-monsters-list" class="layer-list"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-harvest" open>
+        <summary><h2 data-i18n="groupHarvest">Récolte</h2></summary>
+        <ul id="group-harvest-list" class="layer-list"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-containers" open>
+        <summary><h2 data-i18n="groupContainers">Contenants &amp; interactifs</h2></summary>
+        <ul id="group-containers-list" class="layer-list"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-quests" open>
+        <summary><h2 data-i18n="groupQuests">Quêtes</h2></summary>
+        <ul id="group-quests-list" class="layer-list"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-world" open>
+        <summary><h2 data-i18n="groupWorld">Monde</h2></summary>
+        <ul id="group-world-list" class="layer-list"></ul>
+      </details>
+      <!-- Bestiaire : reste à gauche pour cette tranche (son remplacement,
+           la fiche "famille" au drawer droit, est chunk (e) -- pas encore
+           livré). Inchangé (buildBestiary()/#bestiary-list intacts), juste
+           déplacé après les 6 groupes. -->
       <details class="side-sec" data-sec="bestiary" open>
         <summary><h2 id="bestiary-title" data-i18n="bestiaryTitle">Bestiaire</h2></summary>
         <div id="bestiary-list"></div>
       </details>
     </nav>
 
-    <section id="tracked-section">
-      <h2 data-i18n="trackedTitle">Suivis</h2>
+    <details class="side-sec" data-sec="tracked" id="tracked-section">
+      <summary><h2 data-i18n="trackedTitle">Suivis</h2><span id="tracked-count" class="side-sec-count"></span></summary>
       <ul id="tracked-list"></ul>
       <p id="tracked-empty" class="hint" data-i18n="trackedEmptyHint">Épinglez un marqueur avec « Suivre » pour le retrouver ici.</p>
-    </section>
+    </details>
 
     <footer class="panel-foot">
       <p data-i18n="footerNote">Données extraites du client du jeu · non affilié à Artificial Core.</p>
