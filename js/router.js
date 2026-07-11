@@ -80,6 +80,22 @@ async function applyLocationState() {
   // fait partie du chemin critique / de la bascule de carte ci-dessus,
   // jamais du chargement différé) — pas de garde whenDeferred.
   if (onSet) for (const f of Object.keys(S.decor)) S.decor[f].on = onSet.has('decor.' + f);
+  // Sous-couches « Par famille » (#82 chunk (b), S.monfam) : application
+  // IMMÉDIATE de l'ÉTAT (design §10) — un token `monfam.<f>` CRÉE son
+  // entrée même si species/camps (différés) ne sont pas encore là : le
+  // rendu composite (main.js compositeCampPoints) et la ligne du panneau
+  // se résolvent d'eux-mêmes à l'arrivée des données (denseRenderers
+  // rejoués par applyCampFilters/loadDeferred().then, groupes reconstruits
+  // par buildFilters() via whenDeferred). Les entrées déjà connues et
+  // absentes du hash repassent à off — même sémantique que camp.*/decor.*.
+  if (onSet) {
+    for (const k of Object.keys(S.monfam)) S.monfam[k].on = onSet.has('monfam.' + k);
+    for (const t of onSet) {
+      if (!t.startsWith('monfam.')) continue;
+      const f = t.slice(7);
+      if (f) (S.monfam[f] || (S.monfam[f] = { on: false })).on = true;
+    }
+  }
   denseRenderers.forEach(fn => fn());
   buildFilters();
 

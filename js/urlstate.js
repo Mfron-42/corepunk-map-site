@@ -9,12 +9,30 @@ import { map, toWorld } from './mapview.js';
 function buildHash() {
   const c = toWorld(map.getCenter());
   const on = [
-    ...Object.entries(CATS).filter(([, v]) => v.on).map(([k]) => k),
+    // `quest` (config.js CATS.quest) is excluded here on purpose: its own
+    // filter row + map dot layer were removed (2026-07-11, "NPCs hold their
+    // quests" -- see main.js registerAllDenseRenderers/sidebar.js
+    // buildGroupQuests) but the CATS entry itself stays, only for its
+    // `.hex` (the quest-violet color, reused by chips/links all over
+    // fiches.js/popups.js/search.js and by the tracked-list). Its `.on`
+    // therefore no longer drives anything -- serializing it here would just
+    // bake a phantom, permanently-true token into every freshly-built
+    // share link (nothing to toggle it off from, since there is no more
+    // row). readHash() below still tolerates a LEGACY `on=quest` token from
+    // an old shared link without crashing (Object.keys(CATS) still finds
+    // the key, sets its dead `.on` -- a genuine no-op, nothing reads it).
+    ...Object.entries(CATS).filter(([k, v]) => v.on && k !== 'quest').map(([k]) => k),
     ...Object.entries(S.camps).filter(([, v]) => v.on).map(([k]) => 'camp.' + k),
     // Sous-filtre "Décor" (S.decor, décoché par défaut) — même principe
     // camp.* ci-dessus : chaque famille actuellement cochée est listée
     // telle quelle, voir sidebar.js buildDecorGroup/data.js buildDecorGroups.
     ...Object.entries(S.decor).filter(([, v]) => v.on).map(([k]) => 'decor.' + k),
+    // Sous-couches « Par famille » (#82 chunk (b), S.monfam — token famille
+    // post-alias, jamais le libellé affiché) : même principe camp.*/decor.*
+    // ci-dessus. Sérialisées même si la carte active n'a aucun camp joint
+    // pour la famille (l'état survit à la bascule de carte, la ligne/le
+    // rendu se résolvent par carte — voir js/pointsets.js familyCampSet).
+    ...Object.entries(S.monfam).filter(([, v]) => v.on).map(([k]) => 'monfam.' + k),
     ...(S.zonesOn ? ['zones'] : []),
     // Contenu dev révélé (feature #13, tag en bas du panneau — voir
     // main.js buildDevToggle) : même idiome que `zones` ci-dessus, un
@@ -61,6 +79,12 @@ function readHash() {
   let onSet = null;
   if (p.has('on')) {
     onSet = new Set(p.get('on').split(',').filter(Boolean));
+    // A legacy link's `on=...,quest,...` token (from before the quest dot
+    // layer/filter row were removed, see buildHash() above) is tolerated
+    // here as a pure no-op: Object.keys(CATS) still includes 'quest' (kept
+    // for its `.hex` only), so this just sets its now-unread `.on` flag --
+    // it drives no renderer and no filter row, and buildHash() never bakes
+    // it back into the hash on the next sync. Never crashes either way.
     for (const k of Object.keys(CATS)) CATS[k].on = onSet.has(k);
     S.zonesOn = onSet.has('zones');
     // Contenu dev (feature #13) : état initial déjà résolu au chargement du

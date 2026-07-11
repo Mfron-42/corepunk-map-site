@@ -48,6 +48,18 @@ const TILE_BASE = 'https://mfron-42.github.io/corepunk-map-tiles';
    par camp_chest/décor/legacy pour le suivi ("Suivre"/"Fait") et la fiche
    (fiche-chest) — seule la couleur/le libellé affichés varient désormais
    selon le VRAI group/family du point, jamais un CATS.chest générique. */
+/* `quest` (2026-07-11, "NPCs hold their quests" -- user decision: quests
+   are not their own map layer, a quest reads on its giver's NPC pin/fiche
+   instead) : its filter row (sidebar.js buildGroupQuests) and its canvas
+   dot layer (main.js registerAllDenseRenderers, one violet point per quest
+   at the giver's position -- an exact duplicate of the NPC pin since the
+   giver-pos-snap, verified on all 319 positioned quests) were both removed.
+   The entry stays here ONLY so `.hex` keeps resolving for the many chips/
+   links/highlights that reuse the quest-violet color elsewhere (fiches.js,
+   popups.js, search.js, sidebar.js's tracked-list) -- `.on`/`.dense` are
+   now dead weight (no renderer, no filter row reads them); urlstate.js
+   explicitly excludes this key from the `on=` hash it builds so a phantom,
+   permanently-true token doesn't get baked into every fresh share link. */
 const CATS = {
   npc:      { hex: '#e0a23f', on: true,  dense: true },
   poi:      { hex: '#8fb4c9', on: true,  dense: true },
@@ -361,6 +373,25 @@ function campLootTableName(k) {
 const FAMILY_ALIAS = { robo: 'robot' };
 const familyKey = f => FAMILY_ALIAS[f] || f;
 
+/* Teintes des sous-couches « Par famille » (#82 chunk (b), design §4.3) :
+   un petit cycle DÉTERMINISTE de 8 teintes dérivées de CAMP_COLORS.monsters
+   (#ef476f, teinte ≈347°) par rotations de teinte successives de +40°
+   (40°, 80°, … 320°) à saturation/luminosité fixes (70 %/58 %) — la teinte
+   de base elle-même est volontairement EXCLUE du cycle pour qu'aucune
+   famille ne se confonde avec la ligne kind « Camps de monstres » quand les
+   deux sont cochées (le compositeur donne la priorité à la famille, sa
+   couleur doit rester distinguable du kind qu'elle recouvre). Jamais de
+   hasard par session : la teinte d'une famille = cycle[rang % 8], où le
+   rang est l'index de la famille dans la liste triée par points
+   décroissants (js/pointsets.js monsterFamilies()) — stable tant que les
+   données le sont ; à >8 familles le cycle se répète (assumé : 20 familles
+   sur Kwalat, les rangs lointains pèsent peu de points). */
+const MONSTER_FAMILY_HEX_CYCLE = [
+  '#df8c49', '#cddf49', '#69df49', '#49df8c',
+  '#49cddf', '#4969df', '#8c49df', '#df49cd',
+];
+const familyHexByRank = i => MONSTER_FAMILY_HEX_CYCLE[((i % 8) + 8) % 8];
+
 /* ── Accent d'entité (task #77, entity-color coherence) ──────────────────
    UNE convention pour tout chip/lien qui référence une AUTRE fiche (PNJ,
    objet, quête, monstre, camp, recette…) : la couleur vient TOUJOURS de la
@@ -380,7 +411,7 @@ function ecAttr(hex, kind) {
 }
 
 export {
-  KWALAT_DEFAULTS, TILE_BASE, familyKey,
+  KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,

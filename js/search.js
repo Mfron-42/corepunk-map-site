@@ -19,7 +19,7 @@ import {
   openMonsterFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
   openRecipeFiche,
 } from './fiches.js';
-import { isDeprecatedItem, rarityGroupFor } from './rarity.js';
+import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
 import { buildFilters } from './sidebar.js';
@@ -85,6 +85,13 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
     // voir buildCampSearchIndex/buildChestSearchIndex qui ont chacun leur
     // propre mécanisme de surlignage, pas un pin unique adressable ici).
     pinCat: (opts && opts.pinCat) || null,
+    // `ring` (facultatif) : pastilles [{rarity,hex}] d'un groupe multi-rareté
+    // (voir rarity.js rarityGroupSwatches, poussé uniquement par l'entrée
+    // "item" représentante d'un groupe ci-dessous) -- consommé par
+    // renderSearch()'s iconWithRing() pour dessiner l'anneau conique autour
+    // de l'icône ; null partout ailleurs (objet à rareté unique ou toute
+    // autre catégorie), aucun changement visuel pour eux.
+    ring: (opts && opts.ring) || null,
   };
   if (body && body.length) {
     entry.body = body.filter(Boolean).map(s => { const bn = fold(s); return { text: s, n: bn, words: bn.split(' ') }; });
@@ -188,9 +195,17 @@ function buildSearch() {
     // Item isTest révélé (S.devOn) : marqué explicitement dans le
     // sous-libellé, jamais confondu avec un vrai objet joueur.
     const devSub = it.isTest ? tr('devBadge') : '';
-    push(it.name, 'item', itemColor(it), null, null, () => openItemFiche(key),
+    // Anneau multi-rareté (design pass, multi-rarity search rows) : un groupe
+    // n'a pas UNE couleur, il en a N -- la puce catégorie (chip-c) ne peut en
+    // porter qu'une seule à la fois, donc elle redevient neutre (comme un
+    // objet sans rareté connue, itemColor's propre repli) plutôt que de
+    // continuer à montrer la rareté du seul représentant comme si elle
+    // suffisait à décrire tout le groupe. Les N vraies couleurs vivent sur
+    // l'anneau autour de l'icône (renderSearch's iconWithRing) à la place.
+    const ring = grp ? rarityGroupSwatches(grp) : null;
+    push(it.name, 'item', ring ? 'var(--muted)' : itemColor(it), null, null, () => openItemFiche(key),
       it.icon ? `icons/${it.icon}` : null, [kindSub, wtSub, grpSub, devSub].filter(Boolean).join(' · '),
-      itemGlyph(it), itemBias(key, it));
+      itemGlyph(it), itemBias(key, it), null, ring ? { ring } : null);
   });
   // Régions nommées (zonesGeo, chargé au critique — voir loadCritical),
   // coffres placés (S.data.chest, idem) et coffres fouillables réels
@@ -559,6 +574,65 @@ function runSearch(raw) {
   return out;
 }
 
+/* Anneau conique multi-rareté (design pass, multi-rarity search rows) : un
+   camembert CSS pur (aucun timer/boucle JS) des N couleurs RÉELLES
+   (rarityGroupSwatches, ordre canonique déjà trié) autour de l'icône d'un
+   résultat groupé -- voir style.css `.sr-icon-ring` pour le seul mouvement au
+   REPOS (léger agrandissement + halo au survol d'UNE ligne à la fois, jamais
+   une boucle qui tournerait en continu dans une liste qui peut compter
+   plusieurs entrées multi-rareté). Segments à bord dur (deux valeurs de
+   %/deg identiques par frontière, pas de dégradé) : chaque quartier reste
+   une couleur plate et lisible même à 20px. */
+function ringGradient(swatches) {
+  const n = swatches.length;
+  const step = 360 / n;
+  const stops = swatches.map((s, i) => `${s.hex} ${(i * step).toFixed(2)}deg ${((i + 1) * step).toFixed(2)}deg`);
+  return `conic-gradient(${stops.join(', ')})`;
+}
+/* Calques de survol (hover-cycle, design pass "sliced ring crossfade") : un
+   `<span class="sr-var">` par variante, empilés en position absolute par-
+   dessus l'icône de base (voir style.css .sr-var) -- opacité 0 au repos
+   (AUCUNE règle d'animation hors :hover/.active, coût idle strictement nul),
+   et sous #search-results li:hover/.active un fondu-enchaîné CSS pur cycle
+   chaque variante ~0.9s (voir @keyframes sr-cycle-n2..n5). Chaque calque
+   porte SA PROPRE icône (s.icon, rarity.js rarityGroupSwatches) : sur les 3
+   groupes à art distinct par palier (ex. synthesis_item_upgrade_t1_*) l'image
+   change vraiment ; sur les 10 autres (même image pour toutes les raretés)
+   c'est la même icône que la base mais la teinte --vc (couleur RARITY de
+   cette variante) continue de défiler par-dessus -- l'effet reste donc
+   significatif pour les 13 groupes, pas seulement les 3 à art distinct.
+   `--n`/`--i` (nombre de variantes / index dans l'ordre canonique) pilotent
+   respectivement le choix de la classe sr-var-nN (voir pourquoi dans
+   style.css -- les % d'un @keyframes ne peuvent pas dépendre d'une variable
+   CSS, un jeu de keyframes par N distinct est donc généré à l'avance) et le
+   délai de démarrage de CE calque dans le cycle. */
+function variantLayers(it) {
+  const swatches = it.ring;
+  const n = swatches.length;
+  return swatches.map((s, i) => {
+    const img = iconTag(s.icon ? `icons/${s.icon}` : null, 'sr-icon', it.glyph);
+    return `<span class="sr-var sr-var-n${n}" style="--vc:${s.hex};--i:${i}">${img}</span>`;
+  }).join('');
+}
+/* Icône + anneau si l'entrée est un représentant multi-rareté (it.ring, voir
+   pushSearchEntry), icône seule sinon -- comportement/markup inchangés pour
+   tout le reste de la recherche (objets à rareté unique compris). `title`
+   (libellés de rareté localisés, ex. "Peu commun · Rare · Épique") donne le
+   même renseignement que l'anneau à qui ne peut pas distinguer les couleurs
+   (lecteur d'écran/survol), en plus du sous-libellé "N raretés" déjà affiché
+   à côté -- la couleur n'est jamais le SEUL canal d'info. L'état statique
+   (repos, ce bloc seul) reste EXACTEMENT le camembert conique existant :
+   les calques de survol (variantLayers) sont ajoutés dans le markup mais
+   n'ont aucun effet visuel tant que #search-results li:hover/.active ne les
+   active pas côté CSS (voir style.css .sr-var) -- rien ne change pour qui ne
+   survole/active jamais la ligne. */
+function iconWithRing(it) {
+  const img = iconTag(it.icon, 'sr-icon', it.glyph);
+  if (!it.ring || it.ring.length < 2) return img;
+  const title = it.ring.map(s => rarityLabel(s.rarity)).join(' · ');
+  return `<span class="sr-icon-ring" style="--ring-grad:${ringGradient(it.ring)}" title="${esc(title)}">${img}${variantLayers(it)}</span>`;
+}
+
 const resBox = $('#search-results');
 let searchTimer = null;
 $('#search').addEventListener('input', e => {
@@ -588,7 +662,7 @@ function renderSearch(raw) {
       ? `<span class="map-badge" title="${esc(tr('mapBadgeTitle', mapName(it.map)))}">${esc(mapName(it.map))}</span>` : '';
     li.innerHTML = `<div class="sr-row">
       <span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>
-      ${iconTag(it.icon, 'sr-icon', it.glyph)}
+      ${iconWithRing(it)}
       <span class="sr-label">${esc(it.label)}</span>
       ${mapBadge}
       <span class="muted">${it.x != null ? fmtCoord(it.x, it.z) : esc(it.sub || '')}</span>

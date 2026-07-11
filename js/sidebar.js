@@ -2,7 +2,7 @@
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, LS, save } from './state.js';
 import {
-  CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey,
+  CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyHexByRank,
   chestDisplayName, chestHex, mapName, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
 } from './config.js';
 import { $, $$, esc, pretty, fold } from './utils.js';
@@ -12,6 +12,7 @@ import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
+import { monsterFamilies } from './pointsets.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -124,9 +125,11 @@ function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') 
    `camp_chest` n'a pas son propre tableau S.data (les points viennent du
    même S.data.chest que la décor/legacy, filtrés par `group`, voir
    config.js/main.js registerAllDenseRenderers) : seule exception à la règle
-   générale "un tableau S.data par clé CATS". */
+   générale "un tableau S.data par clé CATS". (L'ancien cas spécial
+   `key === 'quest'` a été retiré avec la ligne de filtre `quest` elle-même,
+   2026-07-11 -- il était de toute façon strictement redondant avec le
+   repli générique ci-dessous, `S.data['quest']` étant `S.data.quest`.) */
 function catStats(key) {
-  if (key === 'quest') return positionCounts(S.data.quest);
   if (key === 'camp_chest') return positionCounts(S.data.chest.filter(r => r.group === 'camp_chest'));
   return positionCounts(S.data[key]);
 }
@@ -194,7 +197,9 @@ function buildDecorGroup() {
 }
 /* Rafraîchit juste les cases à cocher des lignes famille après un
    Tous/Aucun (évite de reconstruire tout le groupe, perdant l'état
-   open/fermé du <details>). */
+   open/fermé du <details>). Partagé tel quel par le sous-groupe « Par
+   famille » (buildMonsterFamilyGroup ci-dessous) — même forme d'entries
+   [clé, {on}]. */
 function refreshDecorRows(sub, entries) {
   const rows = sub.querySelectorAll('.filter-row-sub');
   entries.forEach(([, st], i) => {
@@ -204,6 +209,87 @@ function refreshDecorRows(sub, entries) {
     const input = row.querySelector('input');
     if (input) input.checked = st.on;
   });
+}
+
+/* ── Sous-groupe « Par famille » (#82 chunk (b), design §4) ──────────────
+   Gabarit exact de buildDecorGroup ci-dessus (<details> + subfilter-list +
+   tête [Tous][Aucun] + lignes filter-row-sub) appliqué aux familles de
+   monstres : UNE ligne par famille avec ≥1 camp joint sur la carte ACTIVE
+   (~20 sur Kwalat, jointure espèce→camps du résolveur unique js/pointsets.js
+   monsterFamilies() — honnête : une famille sans camp joint n'a pas de
+   ligne morte, design §4.2). Chaque ligne affiche son total BRUT (camps ·
+   points — ce qu'elle allumerait seule) : rat et ratmutant partagent les 10
+   mêmes camps et affichent chacun 4 045, assumé (données réelles, design
+   §13.3) ; le dédoublonnage est un fait de RENDU (main.js
+   compositeCampPoints, priorité épinglé > famille > kind), jamais de
+   comptage. Couleur par rang (familyHexByRank, ordre pts desc = ordre des
+   lignes). PAS de case maîtresse (discipline Décor : le on/off vit sur
+   chaque sous-ligne). Hash : `on=monfam.<famille>` (token post-alias,
+   urlstate.js/router.js). Retourne null tant que species/monsters/camps ne
+   sont pas chargés ou qu'aucune famille n'a de camp joint ici.
+   GLOSSARY-PENDING : le nom affiché d'une famille est son token moteur
+   prettifié (pretty(f.family) — « Boarmammoth », « Ratmutant »…), comme le
+   bestiaire : AUCUNE table de localisation des familles n'existe dans les
+   données expédiées (vérifié — le bestiaire affiche déjà ce même token brut
+   dans les 5 langues) ; à balayer quand l'extraction de glossaire (#86)
+   livrera des libellés prouvés. */
+function buildMonsterFamilyGroup() {
+  const fams = monsterFamilies();
+  if (!fams.length) return null;
+  // État par famille : créé à la première apparition — sauf s'il existe déjà
+  // (hash `monfam.*` restauré AVANT l'arrivée des données différées, voir
+  // router.js applyLocationState : l'état précède la ligne, jamais écrasé).
+  const entries = fams.map((f, i) => {
+    const st = S.monfam[f.family] || (S.monfam[f.family] = { on: false });
+    return [f.family, st, f, familyHexByRank(i)];
+  });
+
+  const li = document.createElement('li');
+  const det = document.createElement('details');
+  det.className = 'decor-group';
+  const summary = document.createElement('summary');
+  summary.innerHTML = `<span class="swatch" style="background:${MONSTER_HEX}"></span>
+    <span class="flabel">${esc(tr('monsterFamiliesTitle'))}</span>
+    <span class="fcount">${fams.length.toLocaleString(numberLocale())}</span>`;
+  det.appendChild(summary);
+
+  const sub = document.createElement('ul');
+  sub.className = 'subfilter-list';
+  const head = document.createElement('li');
+  head.className = 'subfilter-head';
+  head.innerHTML = `<span class="subf-title">${esc(tr('monsterFamiliesTitle'))}</span>
+    <span class="subf-actions">
+      <button type="button" class="subf-btn" data-mode="all">${esc(tr('chestTypesAllBtn'))}</button>
+      <button type="button" class="subf-btn" data-mode="none">${esc(tr('chestTypesNoneBtn'))}</button>
+    </span>`;
+  const refresh = () => refreshDecorRows(sub, entries);
+  head.querySelector('[data-mode="all"]').addEventListener('click', () => {
+    for (const [, st] of entries) st.on = true;
+    scheduleRedraw(); syncHash(); refresh();
+  });
+  head.querySelector('[data-mode="none"]').addEventListener('click', () => {
+    for (const [, st] of entries) st.on = false;
+    scheduleRedraw(); syncHash(); refresh();
+  });
+  sub.appendChild(head);
+  for (const [fam, st, f, hex] of entries) {
+    const row = filterRow('monfam:' + fam, pretty(fam), hex, f.nPts, 0, st.on, on => {
+      st.on = on;
+      scheduleRedraw();
+    }, 'filter-row-sub');
+    // « N camps » entre le libellé et le compte de points (mock design §2 :
+    // « Rat   10 camps · 4 045 ») — libellé honnête : ce sont les points des
+    // CAMPS où la famille apparaît, jamais « positions de X » (design §13.1).
+    // Style inline plutôt qu'une classe : style.css est en édition
+    // concurrente par une autre mission (multi-rareté) et la classe partagée
+    // max-height (#85) n'existe pas encore — à migrer quand elle livre.
+    row.querySelector('.flabel').insertAdjacentHTML('afterend',
+      `<span class="fam-camps" style="color:var(--muted);font-size:.68rem;white-space:nowrap;margin-right:5px">${esc(tr('familyCampsN', f.nCamps))}</span>`);
+    sub.appendChild(row);
+  }
+  det.appendChild(sub);
+  li.appendChild(det);
+  return li;
 }
 
 /* ── Arbre de couches (#82 chunk (a) — refacto de PRÉSENTATION seulement) ──
@@ -217,8 +303,9 @@ function refreshDecorRows(sub, entries) {
    FIXE (celui du mock du design, pas un tri par volume) ; un kind absent de
    la carte active n'affiche simplement pas sa ligne -- même garde que
    l'ancien buildCampFilters, qui n'itérait déjà que sur Object.entries
-   (S.camps). Le sous-groupe « Par famille » (Monstres & faune) et le
-   découpage qao par type (Quêtes) sont hors scope ici (chunk (b)/(c)). */
+   (S.camps). Le sous-groupe « Par famille » (Monstres & faune) est livré
+   par le chunk (b) (buildMonsterFamilyGroup, résolveur js/pointsets.js) ;
+   le découpage qao par type (Quêtes) reste hors scope (chunk (c)). */
 const CAMP_KIND_GROUPS = {
   monsters: ['monsters', 'creeps', 'wildlife'],
   harvest: ['herbalism', 'logging', 'mining'],
@@ -275,13 +362,17 @@ function buildGroupPoi() {
     ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX, S.zonesGeo.length, 0, S.zonesOn, toggleZones));
   }
 }
-/* Groupe « Monstres & faune » : 3 lignes camp:<kind> à plat (le sous-groupe
-   « Par famille » est chunk (b), design §4 -- hors scope ici). */
+/* Groupe « Monstres & faune » : 3 lignes camp:<kind> à plat (couverture
+   COMPLÈTE, ~35 k pts — les familles seules ne peuvent pas les remplacer,
+   design §4.4/§13.2) + le sous-groupe repliable « Par famille » (chunk (b),
+   buildMonsterFamilyGroup ci-dessus). */
 function buildGroupMonsters() {
   const ul = $('#group-monsters-list');
   ul.innerHTML = '';
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
   appendCampRows(ul, CAMP_KIND_GROUPS.monsters);
+  const famLi = buildMonsterFamilyGroup();
+  if (famLi) ul.appendChild(famLi);
 }
 /* Groupe « Récolte » : les 3 métiers de camp:<kind>. */
 function buildGroupHarvest() {
@@ -307,17 +398,31 @@ function buildGroupContainers() {
   const decorLi = buildDecorGroup();
   if (decorLi) ul.appendChild(decorLi);
 }
-/* Groupe « Quêtes » : quest/qao (CATS, critique) + camp:quest (différé,
-   "Camps d'objets de quête" -- déménagé ici depuis l'ancienne section Camps
-   à plat, voir design §5). qao reste une SEULE ligne pour cette tranche
+/* Groupe « Quêtes » : qao (CATS, critique) + camp:quest (différé, "Camps
+   d'objets de quête" -- déménagé ici depuis l'ancienne section Camps à
+   plat, voir design §5). qao reste une SEULE ligne pour cette tranche
    (chunk (c) la scindera en sous-lignes par type d'activable, voir design
    §5) -- GLOSSARY-PENDING : catLabel('qao') ("Objets de quête"/"Quest
    objects", table i18n `cat`) réutilisé tel quel, aucun nouveau libellé
-   introduit ici. */
+   introduit ici.
+   Décision utilisateur (2026-07-11, « les quêtes sont sur les PNJ ; les
+   PNJ portent les quêtes ») : la ligne de filtre `quest` (le point violet
+   posé à la position du donneur, canvas registerDense -- voir main.js) a
+   été RETIRÉE, plus la couche carte elle-même -- elle dupliquait à
+   l'identique le pin PNJ du même donneur depuis le giver-pos-snap (~576
+   quêtes/319 avec position, TOUTES rattachées à un pin PNJ, vérifié). Le
+   titre « Quêtes » du groupe reste juste : qao (objets de quête posés sur
+   la carte) et les camps `camp:quest` (camps d'objets de quête) SONT
+   toujours deux vraies couches carte quête, seule la 3e (le point par
+   quête individuelle) disparaît -- pas de renommage de groupe, pas de
+   déplacement d'ul (minimal-diff, voir la mission). Une quête se lit
+   maintenant sur le pin/la fiche de son donneur (« N quêtes » -- déjà en
+   place, voir popups.js/fiches.js::openNpcFiche) et reste pleinement
+   trouvable par recherche (search.js indexe aussi les 24 quêtes SANS
+   donneur/position connue -- ouvre directement la fiche, jamais filtré). */
 function buildGroupQuests() {
   const ul = $('#group-quests-list');
   ul.innerHTML = '';
-  ul.appendChild(catRow('quest'));
   ul.appendChild(catRow('qao'));
   if (!deferredReady) ul.appendChild(loadingHintLi());
   else appendCampRows(ul, CAMP_KIND_GROUPS.quests);

@@ -254,6 +254,135 @@ body {
 #search-results .sr-row { display: flex; align-items: center; gap: 8px; }
 #search-results .muted { color: var(--muted); font-size: .75rem; margin-left: auto; white-space: nowrap; }
 #search-results .sr-icon { flex: none; width: 20px; height: 20px; object-fit: contain; border-radius: 3px; font-size: .56rem; }
+/* ── Anneau multi-rareté (résultat de recherche groupé, ex. "Synthesis Item
+   Upgrade T1" en Uncommon/Rare/Epic) ──────────────────────────────────────
+   Camembert CSS pur (conic-gradient posé via --ring-grad, calculé par
+   js/search.js ringGradient() à partir des VRAIES couleurs RARITY de chaque
+   variante) qui encadre l'icône -- seul endroit qui montre honnêtement les
+   N raretés d'un coup d'œil (la puce catégorie ne peut en porter qu'une,
+   voir search.js : elle redevient neutre pour ces résultats-là). 4px de plus
+   que .sr-icon dans chaque dimension (2px de "cadre" par côté) : l'icône
+   garde sa taille normale, jamais rétrécie pour faire de la place à
+   l'anneau. Statique par défaut -- aucune boucle/minuterie, une liste
+   chargée en plusieurs résultats multi-rareté ne doit jamais scintiller ;
+   seul le survol (une ligne à la fois) l'anime, même idiome que .mk:hover
+   .mk-pin (léger agrandissement + halo du camembert, INCHANGÉ ci-dessous) --
+   PLUS, depuis ce pass, un fondu-enchaîné qui fait défiler les variantes
+   dans la zone icône elle-même (voir bloc .sr-var juste après : calques
+   absolute empilés sur l'icône de base, js/search.js variantLayers()).
+   position:relative ajouté ici pour ancrer ces calques (sinon ils se
+   positionneraient par rapport au <li>, beaucoup trop grand). prefers-
+   reduced-motion coupe déjà toute transition ET toute animation site-wide
+   (règle globale `* { animation: none !important; transition: none
+   !important; }` en bas de fichier -- vérifié, elle couvre bien `animation`
+   et pas seulement `transition`) : aucun cas particulier à gérer ici, ni
+   pour le scale/halo existant ni pour le nouveau cycle de calques. */
+#search-results .sr-icon-ring {
+  position: relative;
+  flex: none;
+  width: 24px; height: 24px;
+  padding: 2px;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: var(--ring-grad);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+#search-results .sr-icon-ring .sr-icon { background: var(--panel-2); }
+#search-results li:hover .sr-icon-ring, #search-results li.active .sr-icon-ring {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+}
+/* ── Calques de survol du camembert (fondu-enchaîné des variantes) ──────
+   Un `<span class="sr-var sr-var-nN">` par variante (N = nombre de raretés
+   du groupe), empilé en position:absolute exactement sur l'icône de base
+   (inset:2px = même zone 20x20 que .sr-icon, à l'intérieur du cadre 2px de
+   l'anneau) : icône PROPRE de la variante (souvent identique à la base --
+   seulement 3 groupes/13 ont un art distinct par palier, voir rarity.js
+   rarityGroupSwatches -- mais la teinte --vc défile quand même) sur un
+   fond radial teinté à sa couleur RARITY réelle (--vc, posée inline par
+   variantLayers() -- même idiome color-mix() que --chip-c ailleurs dans ce
+   fichier, jamais une teinte dupliquée en dur).
+   Repos : `animation: none` explicite -- AUCUNE règle d'animation n'existe
+   en dehors des sélecteurs :hover/.active ci-dessous, donc une liste de
+   résultats affichant plusieurs lignes multi-rareté ne scintille jamais
+   (coût idle strictement nul, zéro timer/boucle JS, conforme à l'invariant
+   du camembert lui-même juste au-dessus).
+   Keyframes PAR NOMBRE de variantes (sr-cycle-n2..n5) plutôt qu'un seul jeu
+   paramétré par --n : les pourcentages d'un @keyframes sont des valeurs
+   CSS *statiques*, calc()/var() n'y sont pas utilisables (contrairement à
+   animation-duration/-delay, qui eux acceptent calc(var(--n) * .9s) et
+   calc(var(--i) * .9s) sans problème) -- donc un groupe à 2 variantes doit
+   passer par un jeu de paliers différent (50 %/50 %) d'un groupe à 5
+   (20 %/20 %) : ces jeux sont juste... précalculés une fois pour toutes ici
+   plutôt qu'être générés dynamiquement (site 100 % statique, pas de build
+   CSS). Seuls 2 comptes existent dans les données actuelles (3 et 4
+   variantes), n2/n5 sont là par robustesse si une future variante change ça.
+   Dans chaque jeu : 0 % → 15 %·slot = fondu IN, plateau jusqu'à 85 %·slot,
+   85 %→100 %·slot = fondu OUT, puis opacité 0 jusqu'à 100 % du cycle complet
+   (le reste du temps, pendant que les AUTRES calques ont leur tour) --
+   `slot` = 100/N % du cycle. Chaque calque démarre son propre cycle décalé
+   de `--i` crans (animation-delay: calc(var(--i) * .9s)) : au survol, le
+   calque i=0 (délai nul) fait donc le premier fondu IN par-dessus l'icône
+   de base (toujours visible en dessous, seul calque non positionné), puis
+   cède la place au suivant, etc., boucle infinie et sans à-coup (100 % d'un
+   cycle = opacité 0, identique au 0 % du suivant). */
+#search-results .sr-var {
+  position: absolute;
+  inset: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  background: radial-gradient(circle, color-mix(in srgb, var(--vc) 55%, transparent) 0%, transparent 72%);
+  animation: none;   /* repos : rien -- voir les sélecteurs :hover/.active plus bas */
+  pointer-events: none;
+}
+#search-results li:hover .sr-var.sr-var-n2, #search-results li.active .sr-var.sr-var-n2 {
+  animation: sr-cycle-n2 calc(2 * .9s) linear infinite;
+  animation-delay: calc(var(--i) * .9s);
+}
+#search-results li:hover .sr-var.sr-var-n3, #search-results li.active .sr-var.sr-var-n3 {
+  animation: sr-cycle-n3 calc(3 * .9s) linear infinite;
+  animation-delay: calc(var(--i) * .9s);
+}
+#search-results li:hover .sr-var.sr-var-n4, #search-results li.active .sr-var.sr-var-n4 {
+  animation: sr-cycle-n4 calc(4 * .9s) linear infinite;
+  animation-delay: calc(var(--i) * .9s);
+}
+#search-results li:hover .sr-var.sr-var-n5, #search-results li.active .sr-var.sr-var-n5 {
+  animation: sr-cycle-n5 calc(5 * .9s) linear infinite;
+  animation-delay: calc(var(--i) * .9s);
+}
+@keyframes sr-cycle-n2 {
+  0%     { opacity: 0; }
+  7.5%   { opacity: 1; }
+  42.5%  { opacity: 1; }
+  50%    { opacity: 0; }
+  100%   { opacity: 0; }
+}
+@keyframes sr-cycle-n3 {
+  0%      { opacity: 0; }
+  5%      { opacity: 1; }
+  28.33%  { opacity: 1; }
+  33.33%  { opacity: 0; }
+  100%    { opacity: 0; }
+}
+@keyframes sr-cycle-n4 {
+  0%      { opacity: 0; }
+  3.75%   { opacity: 1; }
+  21.25%  { opacity: 1; }
+  25%     { opacity: 0; }
+  100%    { opacity: 0; }
+}
+@keyframes sr-cycle-n5 {
+  0%    { opacity: 0; }
+  3%    { opacity: 1; }
+  17%   { opacity: 1; }
+  20%   { opacity: 0; }
+  100%  { opacity: 0; }
+}
 #search-results .sr-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Indice « la quête sort sur un mot de son déroulé » — discret, jamais aussi
    appuyé que le libellé lui-même. */
@@ -806,6 +935,27 @@ body {
 .mk-pin .mk-img { width: 24px; height: 24px; object-fit: contain; border-radius: 50%; font-size: .62rem; }
 .mk:hover .mk-pin { transform: scale(1.2); box-shadow: 0 4px 14px rgba(0, 0, 0, .6), 0 0 0 1px var(--pin, var(--accent)); }
 .mk-done .mk-pin { opacity: .38; filter: grayscale(.7); }
+
+/* Accent "donne une quête" (task "NPCs hold their quests", 2026-07-11) --
+   posé en SIBLING de .mk-pin (pas un enfant : .mk-pin a overflow:hidden,
+   voir js/mapview.js domIcon's own comment) au coin haut-droit du pin PNJ,
+   dans le même conteneur .mk que Leaflet positionne déjà en absolu pour
+   placer le marqueur sur la carte -- ce positionnement ambiant EST le
+   contexte de positionnement de ce badge, jamais besoin de `position:
+   relative` supplémentaire ici. Remplace l'ancien point violet séparé de
+   la couche `quest` retirée : la quête se lit désormais SUR le pin qui la
+   donne. Discret (10px, pas de texte/icône) -- une teinte suffit, la vraie
+   information (laquelle/combien) vit dans le popup/la fiche du PNJ. */
+.mk-quest-badge {
+  position: absolute; top: -2px; right: -2px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--quest, #c77dff);
+  border: 1.5px solid rgba(10, 14, 20, .92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
+.mk-done .mk-quest-badge { opacity: .38; filter: grayscale(.7); }
 
 /* ── Sélection d'un pin déjà rendu (goto conscient du pin) ──
    Posée brièvement (~3.2s, voir pins.js highlightMarker) sur le marqueur DOM

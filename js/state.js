@@ -34,6 +34,14 @@ const S = {
                             // -> {on, count} — sous-couches "Décor" (chests.bin group="decor"|
                             // "legacy_chest", toutes OFF par défaut), voir data.js
                             // buildDecorGroups() et js/sidebar.js buildDecorGroup()
+  monfam: {},               // famille de monstre (post-alias, ex. "imp") -> {on} — sous-couches
+                            // « Par famille » (#82 chunk (b)), toutes OFF par défaut. SEUL l'état
+                            // on/off vit ici (global, survit à la bascule de carte) ; camps/points
+                            // se résolvent à la volée (js/pointsets.js familyCampSet — une famille
+                            // sans camp joint sur la carte active n'a ni ligne ni points, l'état
+                            // reste). Hash `on=monfam.<famille>` — voir sidebar.js
+                            // buildMonsterFamilyGroup, main.js compositeCampPoints, urlstate.js
+                            // buildHash, router.js applyLocationState.
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}
   lootTableContents: {},    // libellé de table -> [{key,name,icon,w,c,g,ch}], table COMPLÈTE

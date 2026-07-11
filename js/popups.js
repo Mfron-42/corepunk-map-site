@@ -97,15 +97,15 @@ function searchableChestPopup(r) {
     ${actionBtns(id, extraBtn)}</div>`;
 }
 
-function questPopup(q) {
-  const id = 'quest:' + q.slug;
-  return `<div class="pop">
-    <h3>${esc(q.name)}</h3>
-    <div class="pop-cat" style="color:${CATS.quest.hex}">${esc(tr('questCat'))}${q.giver ? esc(tr('givenBySuffix', q.giver)) : ''}</div>
-    <span class="pop-coords">${fmtCoord(q.x, q.z)}</span>
-    ${actionBtns(id, `<button class="act primary" data-act="fiche-quest" data-id="${esc(q.slug)}">${esc(tr('ficheCompleteBtn'))}</button>`)}
-  </div>`;
-}
+/* questPopup (popup du point violet "quête" au clic sur le point canvas
+   posé à la position de son donneur) a été retirée avec la couche
+   registerDense('quest', ...) elle-même (main.js registerAllDenseRenderers,
+   2026-07-11) : ce point dupliquait exactement le pin PNJ du même donneur
+   (giver-pos-snap). Une quête se lit désormais sur le pin de son donneur
+   (popup PNJ "N quêtes" + fiche "Quêtes données") et via la recherche,
+   jamais plus via son propre marqueur carte -- voir CATS.quest (config.js,
+   sa .hex reste utilisée par les chips/liens quête ailleurs) et
+   urlstate.js (exclusion explicite du jeton `on=quest`). */
 /* Libellé de mob commun (fiche camp / popup camp) : cliquable vers la fiche
    monstre quand elle existe, texte simple sinon. */
 function mobLabelHtml(m, cls) {
@@ -151,4 +151,4 @@ function campPopup(p, n) {
     ${extra}${ficheBtn}</div>`;
 }
 
-export { popupHtml, questPopup, campPopup, mobLabelHtml, searchableChestPopup };
+export { popupHtml, campPopup, mobLabelHtml, searchableChestPopup };

@@ -20,6 +20,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js'
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
+import { campGroupByKey } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
@@ -2732,12 +2733,14 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
   return shown + more;
 }
 
-/* Camps aplatis depuis S.camps (une entrée par camp distinct, tous kinds
-   confondus) : jointure PARTAGÉE par farmSectionHtml (fiche objet) et
-   monsterCampsHtml (fiche monstre, "voir tous les spawns" July 2026) --
-   même lookup que openCampFiche/campPointsForZone/le handler camp-highlight
-   de main.js, calculée une fois par site d'appel plutôt que dupliquée. */
-function allCampGroupsFlat() { return Object.values(S.camps).flatMap(st => st.groups); }
+/* Jointure camp→groupe : l'ancien helper local allCampGroupsFlat() (tableau
+   aplati re-cherché en .find() O(n) par clé) a migré vers le résolveur de
+   points UNIQUE js/pointsets.js (#82 chunk (b), design §3) — même lookup
+   (index paresseux campGroupByKey, partagé avec le compositeur de rendu, le
+   handler camp-highlight de main.js et les sous-couches famille), jamais
+   re-dérivé par surface. Les 3 consommateurs historiques ci-dessous
+   (monsterSpawnHighlightBtn / farmSectionHtml / monsterCampsHtml) l'appellent
+   désormais directement par clé. */
 
 /* Bouton « Montrer/voir tous les spawns » PARTAGÉ (task #79, quest-driven
    spawn highlighting) : union de TOUS les camps joints d'un monstre en un
@@ -2756,8 +2759,7 @@ function allCampGroupsFlat() { return Object.values(S.camps).flatMap(st => st.gr
 function monsterSpawnHighlightBtn(m) {
   const camps = m?.camps || [];
   if (!camps.length) return '';
-  const allCampGroups = allCampGroupsFlat();
-  const joined = camps.map(c => ({ c, g: allCampGroups.find(x => x.k === c.camp) })).filter(r => r.g);
+  const joined = camps.map(c => ({ c, g: campGroupByKey(c.camp) })).filter(r => r.g);
   if (!joined.length) return '';
   const totalPts = joined.reduce((s, r) => s + r.g.pts.length, 0);
   const ids = joined.map(r => r.c.camp).join(',');
@@ -2780,14 +2782,13 @@ function farmSectionHtml(it) {
     return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>
       <p class="hint">${esc(tr('farmGenericPoolNote', it.farm.length))}</p></div>`;
   }
-  // Jointure camp -> vrai nuage de points (allCampGroupsFlat ci-dessus),
-  // construite UNE fois ici plutôt qu'une fois par ligne (it.farm va jusqu'à
-  // 24 entrées).
-  const allCampGroups = allCampGroupsFlat();
+  // Jointure camp -> vrai nuage de points (campGroupByKey, résolveur unique
+  // js/pointsets.js — index paresseux, plus de tableau aplati re-cherché
+  // ligne par ligne).
   const byKind = new Map();
   const unjoined = [];
   for (const c of it.farm) {
-    const g = allCampGroups.find(x => x.k === c.camp);
+    const g = campGroupByKey(c.camp);
     if (g) {
       if (!byKind.has(g.kind)) byKind.set(g.kind, []);
       byKind.get(g.kind).push({ key: c.camp, g });
@@ -2853,10 +2854,9 @@ function monsterCampsHtml(m) {
     return `<div class="fiche-section"><h3>${title}</h3>
       <p class="hint">${stateChip('unknown')} ${esc(tr('noCampsKnown'))}</p></div>`;
   }
-  const allCampGroups = allCampGroupsFlat();
   const joined = [], unjoined = [];
   for (const c of camps) {
-    const g = allCampGroups.find(x => x.k === c.camp);
+    const g = campGroupByKey(c.camp);
     if (g) joined.push({ c, g }); else unjoined.push(c);
   }
   joined.sort((a, b) => b.g.pts.length - a.g.pts.length);

@@ -5,7 +5,7 @@
 import { KWALAT_DEFAULTS, TILE_BASE, CATS } from './config.js';
 import { S } from './state.js';
 import { esc, iconTag, initials } from './utils.js';
-import { isHiddenTest } from './devcontent.js';
+import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
 
 export let activeMap = KWALAT_DEFAULTS;
 export function setActiveMap(m) { activeMap = m; }
@@ -67,10 +67,25 @@ const canvasR = L.canvas({ padding: 0.35 });
 const layers = {};   // cat -> L.LayerGroup
 function markerId(cat, i) { return `${cat}:${i}`; }
 
-function domIcon(cat, iconUrl, done, name) {
+/* Indicateur « donne une quête » (task "NPCs hold their quests", 2026-07-11)
+   -- un petit accent violet (teinte CATS.quest.hex) posé au coin du pin PNJ
+   plutôt qu'un point/popup séparé (l'ancienne couche canvas `quest`,
+   retirée -- voir main.js registerAllDenseRenderers) : la quête reste
+   lisible directement SUR le pin qui la donne, jamais un marqueur en
+   doublon. Placé en SIBLING de `.mk-pin` (jamais un enfant : `.mk-pin` a
+   `overflow: hidden` pour rogner le portrait rond, un enfant positionné à
+   cheval sur le bord serait tronqué) à l'intérieur du même conteneur `.mk`
+   que Leaflet positionne déjà en absolu -- voir css/style.css `.mk-quest-
+   badge`. 323 PNJ sur Kwalat (coût négligeable, un <span> de plus par
+   portrait déjà construit) : jamais posé sur les points canvas agrégés du
+   repli zoomé (renderDomDots, cat toujours 'npc' mais pas de portrait/HTML
+   par point à ce niveau de zoom -- resterait un simple point, l'accent n'y
+   ajouterait rien de lisible), seulement sur les portraits DOM ci-dessous. */
+function domIcon(cat, iconUrl, done, name, hasQuest) {
+  const badge = hasQuest ? `<span class="mk-quest-badge" style="--quest:${CATS.quest.hex}"></span>` : '';
   return L.divIcon({
     className: 'mk' + (done ? ' mk-done' : ''),
-    html: `<div class="mk-pin" style="--pin:${CATS[cat].hex}">${iconTag(iconUrl, 'mk-img', initials(name))}</div>`,
+    html: `<div class="mk-pin" style="--pin:${CATS[cat].hex}">${iconTag(iconUrl, 'mk-img', initials(name))}</div>${badge}`,
     iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -14],
   });
 }
@@ -105,12 +120,22 @@ function fastProject(t, x, z) {
 function renderDense(cat, points, color, popupFor) {
   const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
   g.clearLayers();
-  // Couches "camp:<kind>" (S.camps) et "decor:<famille>" (S.decor, groupe
-  // "Décor" — voir config.js DECOR_FAMILIES/js/sidebar.js buildDecorGroup) :
-  // même convention de préfixe, l'état on/off vit dans un dict à part plutôt
-  // que dans CATS (nombre de sous-couches variable, connu seulement une fois
-  // les données arrivées).
-  const st = cat.startsWith('camp:') ? S.camps[cat.slice(5)]
+  // Couches "decor:<famille>" (S.decor, groupe "Décor" — voir config.js
+  // DECOR_FAMILIES/js/sidebar.js buildDecorGroup) : l'état on/off vit dans
+  // un dict à part plutôt que dans CATS (nombre de sous-couches variable,
+  // connu seulement une fois les données arrivées).
+  // "campComposite" (#82 chunk (b), design §4.3) : LE rendu unique de TOUS
+  // les points de camp — remplace les anciennes couches "camp:<kind>" (une
+  // par kind, voir main.js registerAllDenseRenderers). Pas d'état on/off
+  // propre : la liste fournie par main.js compositeCampPoints() est déjà le
+  // résultat des sélecteurs actifs (filtre épinglé > famille > kind), vide
+  // quand rien n'est coché — chaque point porte sa couleur GAGNANTE dans
+  // `p.c` (lue par fillColor ci-dessous) et chaque point de camp est
+  // dessiné AU PLUS une fois par passe, quel que soit le nombre de
+  // sélecteurs qui recouvrent son camp. (Le préfixe "camp:" reste compris
+  // ci-dessous par prudence — plus aucun renderer ne l'enregistre.)
+  const st = cat === 'campComposite' ? { on: true }
+    : cat.startsWith('camp:') ? S.camps[cat.slice(5)]
     : cat.startsWith('decor:') ? S.decor[cat.slice(6)] : CATS[cat];
   if (!st || !st.on) return;
 
@@ -154,7 +179,11 @@ function renderDense(cat, points, color, popupFor) {
     const mk = L.circleMarker(toLL(p.x, p.z), {
       renderer: canvasR, radius: n > 1 ? Math.min(6 + Math.log2(n) * 1.8, 13) : 4.6,
       color: isDev ? '#e0645c' : '#0a0e14', weight: isDev ? 1.8 : 1.2, dashArray: isDev ? '2,2' : null,
-      fillColor: color, fillOpacity: n > 1 ? .75 : .88,
+      // `p.c` : couleur PAR POINT posée par le compositeur de camps (main.js
+      // compositeCampPoints — la teinte du sélecteur gagnant du camp de ce
+      // point) ; absente partout ailleurs → couleur de couche historique.
+      // Une cellule agrégée (n>1) prend la couleur de son premier point.
+      fillColor: p.c || color, fillOpacity: n > 1 ? .75 : .88,
     });
     // Repère de position (goto conscient du pin, voir pins.js
     // resolveGotoMarker/findRenderedMarker ci-dessous) : seulement pour un
@@ -186,7 +215,7 @@ function renderDomDots(cat, g, popupFor, onSelect) {
   for (let i = 0; i < arr.length; i++) {
     const r = arr[i];
     if (r.x == null || r.z == null) continue;
-    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec quest/qao
+    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec qao
     const q = fastProject(t, r.x, r.z);
     if (q.x < pb.min.x - padX || q.x > pb.max.x + padX || q.y < pb.min.y - padY || q.y > pb.max.y + padY) continue;
     const id = markerId(cat, i);
@@ -218,12 +247,17 @@ function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
     const r = arr[i];
     if (r.x == null || r.z == null) continue;   // known only from dialog/quest-slot,
                                                    // no fixed position -- fiche/search only
-    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec quest/qao
+    if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec qao
     const q = fastProject(t, r.x, r.z);
     if (q.x < minX || q.x > maxX || q.y < minY || q.y > maxY) continue;
     const id = markerId(cat, i);
     const url = r.icon ? `icons/${iconPathFor}/${encodeURIComponent(r.icon)}.png` : null;
-    const mk = L.marker(toLL(r.x, r.z), { icon: domIcon(cat, url, S.done.has(id), r.name) });
+    // Accent "donne une quête" (voir domIcon ci-dessus) : seulement pour les
+    // PNJ, et seulement des quêtes RÉELLEMENT visibles (même garde que la
+    // popup PNJ/la fiche -- visibleQuestSlugs, jamais un simple hello_/
+    // info_ bark compté comme une quête).
+    const hasQuest = cat === 'npc' && visibleQuestSlugs(r.quests).length > 0;
+    const mk = L.marker(toLL(r.x, r.z), { icon: domIcon(cat, url, S.done.has(id), r.name, hasQuest) });
     mk._meta = { cat, i, id, r };
     mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });
     // `onSelect` (facultatif, posé par main.js) : ouverture directe de la
@@ -258,8 +292,15 @@ function scheduleRedraw() {
   requestAnimationFrame(() => { redrawQueued = false; denseRenderers.forEach(fn => fn()); });
 }
 map.on('moveend zoomend', scheduleRedraw);
+/* Les points de camp vivent désormais TOUS dans la couche composite unique
+   "campComposite" (#82 chunk (b), voir renderDense ci-dessus) — les
+   appelants qui adressent encore une couche par kind ("camp:<kind>", ex.
+   les boutons goto data-cat="camp:…" des fiches, pins.js resolveGotoMarker)
+   sont redirigés ici plutôt que corrigés un à un : même comportement
+   qu'avant (couche éteinte → marqueur introuvable → réticule de repli). */
+const layerCatFor = cat => (cat && cat.startsWith('camp:')) ? 'campComposite' : cat;
 function refreshIconLayer(cat) {
-  denseByCat[cat]?.(); // rejoue le rendu (canvas ou DOM culled) de cette seule couche
+  denseByCat[layerCatFor(cat)]?.(); // rejoue le rendu (canvas ou DOM culled) de cette seule couche
 }
 /* Marqueur déjà RENDU à une position exacte (goto conscient du pin -- voir
    pins.js resolveGotoMarker) : cherche, dans la couche `cat` actuellement
@@ -278,7 +319,7 @@ function refreshIconLayer(cat) {
    rafraîchissement, ou point agrégé) : l'appelant retombe alors sur le
    réticule ambré historique, jamais un marqueur voisin mais différent. */
 function findRenderedMarker(cat, x, z, eps = 0.05) {
-  const g = layers[cat];
+  const g = layers[layerCatFor(cat)];   // "camp:<kind>" → couche composite, voir layerCatFor
   if (!g) return null;
   let found = null;
   g.eachLayer(mk => {

@@ -8,7 +8,7 @@
    coordonnées, hooks de bascule de carte, init. Seul module qui importe
    tout le monde ; aucune logique métier propre. */
 import { S } from './state.js';
-import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX } from './config.js';
+import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyHexByRank } from './config.js';
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
@@ -17,7 +17,7 @@ import {
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred, initVersion } from './data.js';
 import { startUpdateWatcher, refreshUpdateBannerI18n } from './updatecheck.js';
-import { popupHtml, questPopup, campPopup, searchableChestPopup } from './popups.js';
+import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
@@ -25,6 +25,7 @@ import {
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
+import { campGroupByKey, monsterFamilies } from './pointsets.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } from './sidebar.js';
 import { syncHash, pushFocusState, unfocus } from './urlstate.js';
@@ -76,11 +77,13 @@ document.addEventListener('click', e => {
       highlightedBtn = null;
     } else {
       const ids = b.dataset.ids ? b.dataset.ids.split(',') : (id ? [id] : []);
-      const allGroups = Object.values(S.camps).flatMap(st => st.groups);
       const pts = [];
       let color = b.dataset.color || null;
       for (const k of ids) {
-        const g = allGroups.find(c => c.k === k);
+        // Résolveur unique (#82 chunk (b), js/pointsets.js) : même index
+        // camp→groupe que fiches.js/le compositeur — remplace l'ancien
+        // flatMap+find O(n) par clé, comportement identique.
+        const g = campGroupByKey(k);
         if (!g) continue;
         if (!color) color = CAMP_COLORS[g.kind] || '#888';
         pts.push(...g.pts.map(([x, z]) => ({ x, z })));
@@ -196,17 +199,33 @@ function registerAllDenseRenderers() {
   registerDomDense('poi', 'interest_points', (r, id) => popupHtml('poi', r, id));
   registerDomDense('workshop', 'npc_map', (r, id) => popupHtml('workshop', r, id)); // ateliers : pictogramme couleur, pas d'icône dédiée
   // Contenu dev (feature #13) : tout enregistrement isTest masqué de la
-  // carte par défaut (S.devOn faux) -- quest/qao ET (parité, data-accuracy
-  // audit world_objects.md "isTest gating parity") searchable_chest/
-  // camp_chest/decor/npc ci-dessous : monstres/items n'ont pas de couche
-  // carte propre (voir js/devcontent.js), mais tout enregistrement AVEC
-  // position qui porte isTest:true doit rester filtré, jamais juste 2 des
-  // 6 couches concernées. Le point gardé isTest:true (jamais retiré de
+  // carte par défaut (S.devOn faux) -- qao ET (parité, data-accuracy audit
+  // world_objects.md "isTest gating parity") searchable_chest/camp_chest/
+  // decor/npc ci-dessous : monstres/items n'ont pas de couche carte propre
+  // (voir js/devcontent.js), mais tout enregistrement AVEC position qui
+  // porte isTest:true doit rester filtré, jamais juste quelques-unes des 5
+  // couches concernées. Le point gardé isTest:true (jamais retiré de
   // l'objet, juste laissé passer le filtre quand S.devOn est vrai) pilote
   // le liseré tireté de mapview.js renderDense (npc filtré directement dans
   // mapview.js::renderDomDots/renderDomCulled, seules couches DOM du lot).
-  registerDense('quest', () => S.data.quest.filter(q => q.x != null && !isHiddenTest(q)), CATS.quest.hex,
-    q => questPopup(q));
+  // Quête (feature "NPCs holds their quests", 2026-07-11) : l'ancienne
+  // couche canvas `registerDense('quest', ...)` — un point violet PAR
+  // QUÊTE, posé exactement à la position de son donneur depuis le
+  // giver-pos-snap précédent — dupliquait à l'identique le pin PNJ de ce
+  // même donneur (~576 quêtes sur pin PNJ) : deux marqueurs superposés pour
+  // une seule chose. Retirée : une quête n'a plus de marqueur carte à elle,
+  // elle se lit sur le pin de son donneur (popup "N quêtes" + fiche PNJ
+  // "Quêtes données", inchangées, voir popups.js/fiches.js::openNpcFiche)
+  // et via la recherche (search.js, inchangée -- indexe aussi les quêtes
+  // SANS position connue, jamais un simple sous-ensemble). `questPopup`
+  // (popups.js) n'a plus aucun appelant, retirée avec cette couche.
+  // CATS.quest (config.js) reste défini : sa seule propriété encore lue est
+  // `.hex` (teinte violette réutilisée par les chips/liens quête un peu
+  // partout — fiches.js/popups.js/search.js/sidebar.js — et par la liste de
+  // suivi), `.on`/`.dense` ne pilotent plus rien (aucun renderer, aucune
+  // ligne de filtre ne les lit désormais) ; urlstate.js l'exclut donc
+  // explicitement de la sérialisation `on=` pour ne pas laisser un jeton
+  // fantôme réapparaître dans les liens partagés.
   registerDense('qao', () => S.data.qao.filter(p => !isHiddenTest(p)), CATS.qao.hex,
     p => popupHtml('qao', p, markerId('qao', S.data.qao.indexOf(p))));
   // Coffres fouillables RÉELS (searchable_chests.bin, sa propre couche/son
@@ -232,10 +251,61 @@ function registerAllDenseRenderers() {
       (fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)) && !isHiddenTest(p)),
       DECOR_HEX[fam], p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
   }
-  for (const kind of Object.keys(S.camps)) {
-    registerDense('camp:' + kind, () => S.camps[kind].points,
-      CAMP_COLORS[kind] || '#888', (p, n) => campPopup(p, n));
+  // Compositeur de points de camp (#82 chunk (b), design §4.3) : UNE couche
+  // dense pour TOUS les camps, remplace les N registerDense('camp:'+kind).
+  // Enregistrée inconditionnellement (compositeCampPoints lit S.camps en
+  // direct : liste vide tant que camps.bin n'est pas arrivé — même
+  // dégénérescence silencieuse que l'ancienne boucle qui n'itérait rien).
+  registerDense('campComposite', compositeCampPoints, '#888', (p, n) => campPopup(p, n));
+}
+
+/* Composite des points de camp — anti double-tracé (design §4.3, contrat :
+   « chaque point de camp dessiné au plus une fois »). Pour chaque CAMP
+   (groupe), le gagnant = premier sélecteur ACTIF qui le contient, priorité
+   filtre épinglé (espèce, chunk (d)) > famille (S.monfam, ordre déterministe
+   des familles par points décroissants — même ordre que les lignes du
+   panneau et l'assignation de couleur) > kind (S.camps[kind].on). Un camp
+   sans gagnant ne dessine rien ; les compteurs de lignes du panneau restent
+   les totaux BRUTS par sélecteur (le dédoublonnage est un fait de rendu,
+   pas de comptage — design §4.3). Les objets-points de S.camps[].points
+   sont réutilisés tels quels (popup campPopup lit p.g inchangé) ; `p.c`
+   porte la couleur gagnante, lue par mapview.js renderDense. */
+function compositeCampPoints() {
+  // (1) sélecteurs famille actifs → camp gagné par la PREMIÈRE famille
+  // active qui le contient (rat avant ratmutant : mêmes 10 camps, la
+  // couleur du mieux classé gagne — données réelles, design §13.3).
+  const famWinner = new Map();   // campKey -> hex de la famille gagnante
+  const fams = monsterFamilies();
+  for (let i = 0; i < fams.length; i++) {
+    const f = fams[i];
+    if (!S.monfam[f.family]?.on) continue;
+    const hex = familyHexByRank(i);
+    for (const k of f.campKeys) if (!famWinner.has(k)) famWinner.set(k, hex);
   }
+  // (2) gagnant par GROUPE de camp : épinglé (chunk (d) — emplacement câblé,
+  // inerte tant que S.pinFilters n'existe pas) > famille > kind.
+  const winner = new Map();      // objet groupe -> hex gagnant
+  for (const [kind, st] of Object.entries(S.camps)) {
+    const kindHex = st.on ? (CAMP_COLORS[kind] || '#888') : null;
+    for (const g of st.groups) {
+      const pinHex = null;       // chunk (d) : premier filtre épinglé actif contenant g.k
+      const hex = pinHex || famWinner.get(g.k) || kindHex;
+      if (hex) winner.set(g, hex);
+    }
+  }
+  if (!winner.size) return [];
+  // (3) une passe sur les points : chaque point appartient à UN groupe →
+  // dessiné au plus une fois, avec la couleur du gagnant de son camp.
+  const out = [];
+  for (const st of Object.values(S.camps)) {
+    for (const p of st.points) {
+      const hex = winner.get(p.g);
+      if (!hex) continue;
+      p.c = hex;
+      out.push(p);
+    }
+  }
+  return out;
 }
 
 /* Date de génération des données (site_meta.json) : fraîcheur du jeu de
