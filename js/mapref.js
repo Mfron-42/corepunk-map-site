@@ -171,13 +171,39 @@ function isDrawable(desc) {
   return refMode(desc) !== 'N';
 }
 
+/* ── Q7 (spec §9, ratifié 2026-07-11 soir) : clé STABLE d'un pin locate ──
+   Les pastilles mode L sont des TOGGLES (plus jamais un ping one-shot) : leur
+   appartenance vit dans S.locates (Map clé→pin, session seule, posée par
+   pins.js — jamais le hash en v1). La clé : data-key quand présent, sinon
+   kind + carte + coordonnées ARRONDIES — deux refs qui visent le même point
+   partagent donc la même clé (même pin, même état : deux conteneurs placés
+   au MÊME endroit — ex. Posters 02/03 — sont UN SEUL pin, honnête). Helper
+   EXPORTÉ : main.js (toggle) et sidebar.js (resync des pastilles) composent
+   la MÊME clé, jamais re-dérivée par surface. Accepte les deux formes
+   x/z (dataset relu) et pos:{x,z,map} (descripteur). */
+function locateRefKey(kind, key, x, z, mapId) {
+  if (key != null && key !== '') return `${kind}:${key}`;
+  if (x == null || z == null || !Number.isFinite(+x) || !Number.isFinite(+z)) return null;
+  return `${kind}:${mapId || S.map}:${Math.round(+x)},${Math.round(+z)}`;
+}
+
 /* État dessiné LU EN DIRECT sur S.* (§5.1/§5.3, garantie du même-état) —
    la pastille est une VUE de l'état, jamais un état privé. Priorité :
    desc.drawn explicite (les vagues fournissent l'état calculé) > lecture live.
    L'état ◐ partiel reste explicite (desc.partial) en vague 0 — sa dérivation
    (une catégorie dont certains enfants sont cochés) appartient à l'arbre
-   (sidebar.js, vague 6). */
+   (sidebar.js, vague 6). Mode L (Q7) : l'appartenance au jeu de pins locate
+   S.locates EST l'état dessiné — aria-pressed/remplissage suivent tout seuls
+   (refFill/tagHtml inchangés). Exception documentée : les refs zone
+   data-subrole="goal-zone" (dynamicPosBadge) gardent leur drawn:false
+   explicite — leur machinerie single-slot (drawGoalZone/currentGoalZones,
+   indexée par fiche ouverte) n'est PAS un pin locate, suivi honnête en
+   attente (voir fiches.js dynamicPosBadge). */
 function liveDrawn(desc) {
+  if (refMode(desc) === 'L') {
+    const k = locateRefKey(desc.kind, desc.key, desc.pos?.x, desc.pos?.z, desc.pos?.map);
+    return !!(k && S.locates?.has(k));
+  }
   switch (desc.kind) {
     case 'species': return !!(S.monsp[desc.key] && S.monsp[desc.key].on);
     case 'family':  return !!(S.monfam[desc.key] && S.monfam[desc.key].on);
@@ -358,4 +384,4 @@ function initMapRefDelegation(rootEl, handlers = {}) {
   });
 }
 
-export { ref, refEl, refList, refKindLabel, refKindColor, initMapRefDelegation };
+export { ref, refEl, refList, refKindLabel, refKindColor, locateRefKey, initMapRefDelegation };

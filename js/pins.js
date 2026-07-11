@@ -148,6 +148,89 @@ function clearLocator() {
   S.locator = null;
   syncHash();
 }
+/* ── Pins LOCATE (Q7, spec mapref §9 — ratifié 2026-07-11 soir) ─────────────
+   Les pastilles mode L des EntityRef (position/qao/npc/centroïde de zone)
+   sont des TOGGLES : un clic AJOUTE un pin locate persistant (marqueur posé
+   + caméra centrée), un second clic (ou le ✕ du bandeau-légende) le RETIRE —
+   supersède le modèle one-shot goTo/« auto-effacé à la fermeture de fiche »
+   de §2.4. État : S.locates (Map clé→{x,z,map,label,hex,kind}), SESSION
+   seule — jamais le hash (v1), jamais localStorage : troisième système à
+   côté du réticule goto (single-slot, hash S.locator, effacé par closeFiche)
+   et des drapeaux utilisateur (clic droit, localStorage par carte) — AUCUN
+   des deux n'est touché ici. Clé stable : mapref.js locateRefKey (data-key
+   sinon kind+carte+coords arrondies — composée par main.js/sidebar.js via le
+   même helper). Multi-cartes : un pin garde sa carte (p.map) ; sur une autre
+   carte il ne se DESSINE pas mais RESTE dans le jeu (re-rendu au retour,
+   renderLocatePins est rejouée par le hook onMapSwitch de main.js — même
+   modèle que les autres couches/les drapeaux). Fermer une fiche ne les
+   efface JAMAIS (Q7 : closeFiche ne connaît pas ce module au-delà de
+   clearLocator, qui ne touche que le réticule single-slot). Abonnement
+   « jeu changé » : même idiome Set que onUserFlagsChange ci-dessous —
+   sidebar.js resynchronise bandeau-légende + pastilles L à chaque mutation. */
+if (!S.locates) S.locates = new Map();   // posé ICI (pins.js possède le cycle de vie), state.js intact
+let locateLayer = null;                  // L.layerGroup monté pour S.map courante seulement
+const locateMarkers = new Map();         // clé -> L.marker, carte courante uniquement
+const locatesListeners = new Set();
+function onLocatesChange(cb) { locatesListeners.add(cb); }
+function notifyLocatesChange() { locatesListeners.forEach(cb => cb()); }
+function locatePinPopupHtml(key, p) {
+  return `<div class="pop">
+    <h3>${esc(p.label || tr('locatorTitle'))}</h3>
+    <div class="pop-cat" style="color:${esc(p.hex || 'var(--accent)')}">${esc(tr('locatorTitle'))}</div>
+    <span class="pop-coords">${fmtCoord(p.x, p.z)}</span>
+    <div class="pop-actions"><button class="act ghost" data-act="remove-locate-pin" data-id="${esc(key)}">${esc(tr('removeBtn'))}</button></div>
+  </div>`;
+}
+function mountLocatePin(key, p) {
+  if (!locateLayer) locateLayer = L.layerGroup().addTo(map);
+  const mk = L.marker(toLL(p.x, p.z), {
+    icon: L.divIcon({
+      className: 'locate-pin-marker',
+      // Teinte du pin = la teinte de la référence qui l'a posé (--ref-c,
+      // loi Q6 : la couleur porte l'identité précise) — repli accent.
+      html: `<div class="lp-ring" style="--c:${esc(p.hex || 'var(--accent)')}"></div><div class="lp-dot" style="--c:${esc(p.hex || 'var(--accent)')}"></div>`,
+      iconSize: [0, 0],
+    }),
+    zIndexOffset: 940,   // sous le réticule goto (950), au-dessus des couches denses
+  });
+  mk.bindPopup(locatePinPopupHtml(key, p));
+  mk.addTo(locateLayer);
+  locateMarkers.set(key, mk);
+  return mk;
+}
+/* (Re)pose tous les pins locate de la carte ACTIVE — appelée par main.js à
+   chaque bascule de carte (hook onMapSwitch) : les pins d'une autre carte
+   restent dans S.locates (état global) mais ne se dessinent pas ici. */
+function renderLocatePins() {
+  if (locateLayer) { map.removeLayer(locateLayer); locateLayer = null; }
+  locateMarkers.clear();
+  for (const [key, p] of S.locates) if ((p.map || S.map) === S.map) mountLocatePin(key, p);
+  notifyLocatesChange();
+}
+/* Ajout = pin posé + caméra centrée (Q7 : « marker drawn + center camera »).
+   Le vol reprend l'idiome goTo ci-dessus (flyTo/reduce-motion + vague pulse)
+   SANS setLocator/resolveGotoMarker : un pin locate n'est jamais le réticule
+   single-slot, et il doit rester posé — pas de repli « marqueur réel mis en
+   avant » ici (le pin EST l'état persistant que la légende liste/retire). */
+function addLocatePin(key, p) {
+  if (!key || p.x == null || p.z == null) return;
+  const pin = { x: p.x, z: p.z, map: p.map || S.map, label: p.label || null, hex: p.hex || null, kind: p.kind || null };
+  S.locates.set(key, pin);
+  if (pin.map === S.map) {
+    mountLocatePin(key, pin);
+    const ll = toLL(pin.x, pin.z);
+    const target = Math.max(map.getZoom(), 3);
+    reduceMotion ? map.setView(ll, target) : map.flyTo(ll, target, { duration: .7 });
+    pulse(ll);
+  }
+  notifyLocatesChange();
+}
+function removeLocatePin(key) {
+  S.locates.delete(key);
+  const mk = locateMarkers.get(key);
+  if (mk) { locateLayer?.removeLayer(mk); locateMarkers.delete(key); }
+  notifyLocatesChange();
+}
 /* ── Drapeaux utilisateur (clic droit) ── #84 ──────────────────
    Remplace l'ancien "ping" (setPing/clearPing ci-dessus dans les versions
    précédentes de ce fichier) : un marqueur SINGLE-SLOT partagé avec le même
@@ -261,4 +344,5 @@ map.on('contextmenu', e => {
 export {
   goTo, setLocator, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
   onUserFlagsChange, listUserFlags,
+  addLocatePin, removeLocatePin, renderLocatePins, onLocatesChange,
 };

@@ -30,13 +30,16 @@ import {
 } from './pointsets.js';
 import { toggleSpecies, speciesCampWinner, setFamilyOn } from './specieslayer.js';
 import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
-import { initMapRefDelegation } from './mapref.js';
+import { initMapRefDelegation, locateRefKey, refKindLabel } from './mapref.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import {
   buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
 } from './sidebar.js';
 import { syncHash, pushFocusState, unfocus } from './urlstate.js';
-import { goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags } from './pins.js';
+import {
+  goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
+  addLocatePin, removeLocatePin, renderLocatePins,
+} from './pins.js';
 import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
 import './analytics.js';
@@ -203,6 +206,10 @@ document.addEventListener('click', e => {
   // est donc toujours immédiate, jamais un Précédent/Suivant.
   else if (b.dataset.act === 'remove-user-flag') removeUserFlag(b.dataset.id);
   else if (b.dataset.act === 'clear-user-flags') clearAllUserFlags();
+  // Pin locate (Q7) : retrait depuis son popup — même discipline hors
+  // focus/historique que les drapeaux (pas de pushFocusState/unfocus),
+  // l'autre voie de retrait étant la pastille/le ✕ du bandeau-légende.
+  else if (b.dataset.act === 'remove-locate-pin') removeLocatePin(b.dataset.id);
   // Bouton « voir tous les spawns » des fiches monstre/étapes de quête
   // (#82 chunk (d) — fiches.js monsterSpawnHighlightBtn, rebranché) : la
   // MÊME action que la case espèce de l'arbre, en TOGGLE — persistant
@@ -306,21 +313,40 @@ initMapRefDelegation(document, {
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la
         // zone », key = index dans currentGoalZones de la fiche ouverte).
         if (info.kind === 'zone' && info.subrole === 'goal-zone') { viewGoalZone(info.key); break; }
-        // Locate (mode L, spec §2.4) : position / centroïde de zone / PNJ
-        // épinglé / objet placé / cible cross-carte. Coordonnées FINIES
+        // Locate (mode L) — TOGGLE (Q7, spec §9, ratifié 2026-07-11 soir,
+        // supersède le one-shot goTo de §2.4) : position / qao placé / PNJ
+        // épinglé / centroïde de zone. Membre du jeu S.locates → RETRAIT du
+        // pin ; sinon AJOUT (pin persistant posé + caméra centrée —
+        // pins.js addLocatePin ; l'ancien repli « mettre en avant le marqueur
+        // réel » de goTo/pinRef ne s'applique plus ici : le pin EST l'état
+        // que la légende liste et retire — goTo garde ce repli pour les
+        // data-act="goto" hors-ref, inchangés). Clé stable partagée
+        // (mapref.js locateRefKey) ; teinte/libellé du pin = ceux de la
+        // référence cliquée (--ref-c / libellé, repli mot de kind — mêmes
+        // données que le bandeau-légende affichera). Coordonnées FINIES
         // exigées (une référence cross-carte sans position locale expédie
-        // data-x="null" → NaN au décodage). data-subrole (ex. 'npc') = la
-        // couche du marqueur réel déjà rendu — même rôle que l'ancien
-        // data-cat de gotoBtn (pins.js pinRef). Cible sur une autre carte :
-        // bascule d'abord, puis focus si des coordonnées existent (mêmes
-        // gestes que les ex-map-goto/map-switch).
+        // data-x="null" → NaN au décodage) : sans elles, une cible
+        // cross-carte reste une simple bascule de carte (rien à épingler).
+        // Cible sur une AUTRE carte AVEC coordonnées : bascule puis ajout
+        // (le pin appartient à sa carte — re-rendu par le hook onMapSwitch).
         if (info.mode === 'L') {
           const hasXY = Number.isFinite(info.x) && Number.isFinite(info.z);
-          const cat = info.subrole && info.subrole !== 'goal-zone' ? info.subrole : null;
-          if (info.map) {
-            switchMap(info.map, { keepView: true }).then(() => { if (hasXY) goTo(info.x, info.z, undefined, info.label, cat ? { cat } : null); });
-          } else if (hasXY) {
-            goTo(info.x, info.z, undefined, info.label, cat ? { cat } : null);
+          if (!hasXY) {
+            if (info.map) switchMap(info.map, { keepView: true });
+            break;
+          }
+          const key = locateRefKey(info.kind, info.key, info.x, info.z, info.map);
+          if (!key) break;
+          if (S.locates?.has(key)) { removeLocatePin(key); break; }
+          const hex = (info.el?.style.getPropertyValue('--ref-c') || '').trim() || null;
+          const label = (info.label || '').trim()
+            || (info.el?.querySelector('.ref-kindword')?.textContent || '').trim()
+            || refKindLabel(info.kind);
+          const pin = { x: info.x, z: info.z, map: info.map || S.map, label, hex, kind: info.kind };
+          if (info.map && info.map !== S.map) {
+            switchMap(info.map, { keepView: true }).then(() => addLocatePin(key, pin));
+          } else {
+            addLocatePin(key, pin);
           }
           break;
         }
@@ -670,6 +696,8 @@ async function setLang(code) {
     buildSearch();
     buildDevToggle();   // compte qao/quête isTest propre à la carte qui vient d'être chargée
     renderUserFlags();  // drapeaux utilisateur (#84) : scopés par carte, S.map vient de changer
+    renderLocatePins(); // pins locate (Q7) : ceux de la carte active se re-dessinent,
+                        // les autres RESTENT dans S.locates (jamais perdus à la bascule)
   });
 
   buildFilters();

@@ -10,7 +10,8 @@ import { $, $$, esc, fmtCoord, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
-import { goTo, onUserFlagsChange, listUserFlags } from './pins.js';
+import { goTo, onUserFlagsChange, listUserFlags, removeLocatePin, onLocatesChange } from './pins.js';
+import { locateRefKey, refKindLabel } from './mapref.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
 import {
@@ -157,6 +158,12 @@ function renderUserPins() {
   });
 }
 onUserFlagsChange(renderUserPins);
+/* Pins LOCATE (Q7) : même idiome d'abonnement unique — chaque mutation du
+   jeu S.locates (ajout/retrait/re-rendu de carte, pins.js) republie le
+   bandeau-légende (les tags de pins y vivent, voir collectActiveTags) ET
+   resynchronise les pastilles L affichées (loi du même-état §5.3 étendue
+   au mode L — aria-pressed/remplissage relus de S.locates, jamais figés). */
+onLocatesChange(() => { renderActiveTags(); syncEntityRefDots(); });
 
 /* ── Filtres (sidebar) ──────────────────────────────────────── */
 /* Badge discret "+N" quand une catégorie a des enregistrements réels sans
@@ -745,6 +752,22 @@ function syncEntityRefDots() {
     if (f === 'empty' || f === 'empty-on') bub.dataset.fill = on ? 'empty-on' : 'empty';
     else if (f !== 'partial') bub.dataset.fill = on ? 'on' : 'off';
   }
+  // Pastilles mode L (Q7, pins locate) : même loi du même-état — chaque
+  // pastille locate affichée relit l'appartenance à S.locates (clé stable
+  // partagée mapref.js locateRefKey, jamais re-dérivée ici). Exclusion
+  // documentée : les refs [Région ●] data-subrole="goal-zone" gardent leur
+  // machinerie single-slot (drawGoalZone) — pas des pins locate (voir
+  // fiches.js dynamicPosBadge, suivi honnête).
+  for (const btn of document.querySelectorAll('.ref[data-mode="L"] [data-act="ref-draw"]')) {
+    const d = btn.closest('.ref').dataset;
+    if (d.subrole === 'goal-zone') continue;
+    const key = locateRefKey(d.kind, d.key, d.x, d.z, d.map);
+    if (!key) continue;
+    const on = !!S.locates?.has(key);
+    btn.setAttribute('aria-pressed', String(on));
+    const bub = btn.querySelector('.ref-bubble');
+    if (bub && bub.dataset.fill !== 'partial') bub.dataset.fill = on ? 'on' : 'off';
+  }
 }
 
 /* ── Bandeau « couches actives » — LÉGENDE en tags (sous la recherche,
@@ -805,7 +828,7 @@ function activeTagInput(d) {
 function collectActiveTags() {
   const tags = [];
   const seen = new Set();
-  const push = d => { const id = (d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); tags.push(d); } };
+  const push = d => { const id = (d.locate ? 'loc:' : d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); tags.push(d); } };
   for (const el of document.querySelectorAll('#filters details.decor-group, #filters li[data-fkey], #filters li[data-species]')) {
     if (el.matches('details.decor-group')) {
       const input = el.querySelector(':scope > summary .subgrp-check');
@@ -860,6 +883,17 @@ function collectActiveTags() {
     if (fam && S.monfam[fam]?.on) continue;
     push({ sp: true, key: id, label: sp?.name || pretty(id), hex: speciesLayerHex(id) });
   }
+  // Pins LOCATE (Q7) : chaque pin actif est une tag de légende comme les
+  // couches — libellé = celui de la référence qui l'a posé (repli : mot de
+  // kind localisé), teinte = la teinte de la référence (--ref-c). TOUS les
+  // pins sont listés, y compris ceux d'une AUTRE carte (l'état est global et
+  // survit à la bascule — sans tag ici, un pin cross-carte deviendrait
+  // irretirables sans re-basculer ; même parité que les couches espèce à
+  // 0 point locaux, qui gardent leur tag). Retrait : buildTagEl route la
+  // tag/le ✕ vers removeLocatePin (l'alias dot-off ratifié §2.5).
+  for (const [key, p] of S.locates || []) {
+    push({ locate: true, key, label: p.label || refKindLabel(p.kind || 'position'), hex: p.hex || 'var(--accent)' });
+  }
   return tags;
 }
 /* Une tag = un <button> plein : pastille (couleur de couche, demi-teinte si
@@ -883,6 +917,11 @@ function buildTagEl(d) {
   b.title = d.label;
   b.setAttribute('aria-label', tr('activeTagRemove', d.label));
   b.addEventListener('click', () => {
+    // Tag de pin LOCATE (Q7) : pas de case d'arbre derrière (même famille
+    // « sans input DOM » que la branche espèce d'état ci-dessous) — le clic
+    // retire le pin (removeLocatePin notifie → cette légende et les
+    // pastilles L des fiches se republient seules via onLocatesChange).
+    if (d.locate) { removeLocatePin(d.key); return; }
     const input = activeTagInput(d);
     if (input) {
       input.checked = false;

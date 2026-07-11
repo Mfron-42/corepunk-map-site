@@ -395,6 +395,14 @@ export default {
       obtainStatusCosmetic: 'Appearance/skin asset — not referenced as obtainable in the current game data.',
       obtainStatusLobby: 'Arena-lobby equipment — not referenced as obtainable outside arena matches.',
       obtainStatusInternal: 'Internal game record (effect/ability data) — not a player-obtainable item.',
+      // Quest shells (questStatus, closed enum stamped by the pipeline on
+      // zero-goal quest records — extraction markers / dev shells / no
+      // decoded objectives): same register as obtainStatus above — states
+      // what the DATA defines, never lore, never "broken quest". Mapped in
+      // fiches.js openQuestFiche (QUEST_STATUS_KEY).
+      questStatusExtractionMarker: 'Engine marker (extraction/zone transition) — not a playable quest: the game data defines no objectives for it.',
+      questStatusDevShell: 'Development shell — an internal/test quest record with no objectives in the current game data.',
+      questStatusNoObjectives: 'No objectives are defined for this quest in the current game data.',
       // "Internal" badge (items-obtain audit §B3): pseudo-item records
       // (ability/effect payloads) display-gated like dev content, still
       // openable through their joins — the badge says what it is.

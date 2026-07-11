@@ -364,6 +364,12 @@ export default {
       obtainStatusCosmetic: 'Elemento de apariencia (skin) — sin fuente de obtención registrada en los datos actuales del juego.',
       obtainStatusLobby: 'Equipo del lobby de arena — sin fuente de obtención registrada fuera de las partidas de arena.',
       obtainStatusInternal: 'Registro interno del juego (datos de efecto/habilidad) — no es un objeto obtenible por el jugador.',
+      // Cascarones de misión (questStatus, enum cerrado estampado por el
+      // pipeline en misiones sin ningún objetivo): mismo registro que
+      // obtainStatus — dice lo que definen los DATOS, nunca lore.
+      questStatusExtractionMarker: 'Marcador del motor (extracción/transición de zona) — no es una misión jugable: los datos del juego no le definen ningún objetivo.',
+      questStatusDevShell: 'Cascarón de desarrollo — registro de misión interno/de prueba sin objetivos en los datos actuales del juego.',
+      questStatusNoObjectives: 'Los datos actuales del juego no definen objetivos para esta misión.',
       // Insignia «Interno» (audit §B3): pseudoobjetos técnicos ocultos de los
       // listados como el contenido dev, siempre abribles por sus enlaces.
       internalBadge: 'Interno',

@@ -1383,7 +1383,12 @@ function closeFiche() {
   // (goal dynamique, centroïde de camp…) ne devait jamais survivre à la
   // fermeture de la fiche qui l'a fait apparaître -- avant ce correctif, rien
   // ne l'effaçait jamais (voir npc_dual_identity_INVESTIGATION.md, "lingers
-  // forever"). No-op si aucun réticule n'est posé.
+  // forever"). No-op si aucun réticule n'est posé. Q7 (ratifié §9) : les
+  // pins LOCATE (S.locates, pins.js addLocatePin — les toggles des pastilles
+  // mode L) ne sont VOLONTAIREMENT pas effacés ici : ils survivent à la
+  // fermeture de fiche et ne se retirent que par leur pastille, leur tag de
+  // légende (✕) ou leur popup — clearLocator ne touche que le réticule
+  // single-slot historique.
   clearLocator();
   S.openFiche = null;
   setFicheHash(null);
@@ -1682,9 +1687,19 @@ function dynamicPosBadge(t, regionHint) {
     // EntityRef (vague 1) : l'ancien bouton « Voir la zone » (zoneViewBtn,
     // supprimé) devient une référence [Région ●] — la pastille dessine la
     // zone de recherche (viewGoalZone, routé par main.js sur data-subrole
-    // "goal-zone", key = index dans currentGoalZones). État non persistant
-    // (locate, comme un goto) : drawn:false explicite — jamais l'état de la
-    // couche Régions (S.zonesOn), qui est un AUTRE toggle.
+    // "goal-zone", key = index dans currentGoalZones). drawn:false explicite
+    // — jamais l'état de la couche Régions (S.zonesOn), qui est un AUTRE
+    // toggle. EXCEPTION Q7 DOCUMENTÉE (suivi honnête, pas un hack) : ces
+    // refs goal-zone ne sont PAS des pins locate togglables — leur
+    // machinerie est single-slot (goalZoneLayer/clearGoalZone, cercle OU
+    // vrais points selon la confiance, effacée à la fermeture de fiche) et
+    // leur clé n'est qu'un INDEX dans currentGoalZones, ré-attribué à chaque
+    // openQuestFiche (aucune identité stable à mettre dans S.locates, et la
+    // géométrie n'est pas un point). Les faire entrer dans le modèle Q7
+    // demanderait des pins-zone multi-slots à géométrie persistée — suivi
+    // séparé ; en attendant, comportement historique inchangé (dessin
+    // one-shot), et sidebar.js/mapref.js les EXCLUENT explicitement du jeu
+    // de pins (data-subrole="goal-zone").
     return `<span class="pos-dynamic" title="${esc(title)}">${esc(label)}</span>${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false })}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
@@ -2713,10 +2728,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // souligné tant que la fiche région n'existe pas (vague R — honnêteté
     // §3.5 : pas de lien vers une page qui n'existe pas). Sans centroïde
     // (« Around wreck », trou honnête) : tag+nom nus, posRow garde ses replis.
+    // Q7 (pins locate toggle) : plus de `drawn:false` figé — l'état de la
+    // pastille est relu en direct de S.locates (mapref.js liveDrawn, mode L),
+    // comme toute autre pastille locate (le centroïde devient un pin
+    // persistant, listé dans le bandeau-légende, retirable).
     const canPing = t.x != null;
     const zoneRef = zLabel ? ref({
       kind: 'zone', label: zLabel, drawable: canPing,
-      pos: canPing ? { x: t.x, z: t.z } : undefined, drawn: false,
+      pos: canPing ? { x: t.x, z: t.z } : undefined,
     }) : '';
     const nameRow = zoneRef ? `<div class="goal-target-row goal-target-row-rel">${zoneRef}</div>` : '';
     return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
@@ -2757,25 +2776,39 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
    "Broken pipe 1/2/3" — fixing_leaking_pipes' étape "repair" ×3) : le graphe
    de quête ne résout qu'UNE position par objectif même quand celui-ci porte
    sur toute une série, alors que tous les membres positionnés existent déjà
-   dans q.actors (même libellé de base + numéro). Ne matche que si le
-   libellé de la cible se termine par un nombre ET qu'au moins un autre
-   acteur du MÊME type de slot partage ce préfixe — sinon (pas une série)
-   renvoie null et l'appelant garde le rendu à cible unique habituel. */
+   dans q.actors (même libellé de base + numéro). Sinon (pas une série)
+   renvoie null et l'appelant garde le rendu à cible unique habituel.
+   DEUX sources de motif, essayées dans l'ordre (correctif de classe
+   2026-07-11, quête ancre silencing_the_rumors « Collect Posters ×5 ») :
+   1. le libellé de l'OBJECTIF (g.label — l'historique : « Broken pipe 3 ») ;
+   2. le libellé de la CIBLE/du conteneur (g.target.label — « Posters_01 »).
+   La cause profonde de la troncature : un objectif « Collect Posters » ne se
+   termine PAS par un numéro, mais son conteneur résolu (« Posters_01 ») si —
+   et ses frères numérotés (Posters_01..05) sont déjà dans q.actors avec
+   leurs positions. Ne matcher que g.label rendait alors UN SEUL conteneur
+   (branche differing de goalTargetChip) au lieu de la série complète —
+   19 objectifs / 19 quêtes dans ce cas au balayage du catalogue (contre 2
+   déjà couverts par g.label). Garde inchangée : ≥2 acteurs du MÊME type de
+   slot partageant le préfixe — jamais un membre fabriqué : uniquement les
+   acteurs RÉELLEMENT présents dans les données (si le jeu n'en place que 3
+   sur ×5 — digging_at_the_truth — la série honnête en liste 3). */
 function seriesActorsFor(q, g) {
   const kind = g.target?.kind;
   if (!kind) return null;
-  const m = /^(.*?)[ _]*(\d+)$/.exec((g.label || '').trim());
-  const base = m && m[1].trim();
-  if (!base) return null;
-  const rx = new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[ _]*(\\d+)$', 'i');
-  const members = [];
-  for (const a of q.actors || []) {
-    if (a.kind !== kind) continue;
-    const am = rx.exec((a.label || '').trim());
-    if (am) members.push({ ...a, _n: parseInt(am[1], 10) });
+  for (const raw of [g.label, g.target?.label]) {
+    const m = /^(.*?)[ _]*(\d+)$/.exec((raw || '').trim());
+    const base = m && m[1].trim();
+    if (!base) continue;
+    const rx = new RegExp('^' + base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[ _]*(\\d+)$', 'i');
+    const members = [];
+    for (const a of q.actors || []) {
+      if (a.kind !== kind) continue;
+      const am = rx.exec((a.label || '').trim());
+      if (am) members.push({ ...a, _n: parseInt(am[1], 10) });
+    }
+    if (members.length >= 2) return members.sort((a, b) => a._n - b._n);
   }
-  if (members.length < 2) return null;
-  return members.sort((a, b) => a._n - b._n);
+  return null;
 }
 /* Rendu d'une série de cibles positionnées : une vignette PAR MEMBRE (avec
    son propre libellé numéroté) — la phrase de l'objectif ne cite qu'un seul
@@ -2803,6 +2836,31 @@ function seriesTargetChips(members, kind, regionHint) {
       ${a.x != null ? '' : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
     </div>`).join('')}</div>`;
 }
+/* Vignette COMPLÈTE d'une cible en série (correctif de classe 2026-07-11,
+   même passe que seriesActorsFor ci-dessus) : seriesTargetChips REMPLAÇAIT
+   toute la vignette — un objectif collect_from_object en série perdait alors
+   sa ligne d'IDENTITÉ d'item (« [Objet de quête] Poster ») et son verbe de
+   relation (« found in ») que la branche differing de goalTargetChip rend
+   pour le conteneur unique. Ici : quand la cible porte un item rattaché
+   (t.item_key/item_label — 17 des 21 séries du catalogue), la série rend le
+   MÊME vocabulaire empilé que la vignette à cible unique — 1. identité de
+   l'item (goalTargetItemRow, mêmes gardes jamais-de-lien-deviné), 2. verbe
+   de relation (« found in » pour un objet, « dropped by » pour un éventuel
+   monstre — parité exacte avec les branches de goalTargetChip), 3. TOUS les
+   membres placés en références locate compactes. Sans item rattaché
+   (fixing_leaking_pipes, shattered_memory, the_light_of_dagaron) : les
+   puces seules, strictement comme avant. */
+function seriesTargetHtml(t, members, regionHint) {
+  const chips = seriesTargetChips(members, t.kind, regionHint);
+  const differing = !!(t.item_key && t.item_key !== t.key);
+  const primaryKey = differing ? t.item_key : (t.item_key || t.key);
+  const itemRow = (t.item_key || t.item_label)
+    ? goalTargetItemRow(primaryKey, t.item_label, t.item_approx) : '';
+  if (!itemRow) return chips;
+  const verb = t.kind === 'monster' ? tr('goalDroppedByLabel') : tr('goalFoundInLabel');
+  const relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(verb)}</span></div>`;
+  return `<div class="goal-target goal-target-serieshost">${itemRow}${relRow}${chips}</div>`;
+}
 
 /* Étapes numérotées, machine-exactes (goals[]). Repli sur la liste texte
    « objectives » historique pour les quêtes sans graphe de goals décodé
@@ -2822,7 +2880,7 @@ function goalStepsSection(q) {
     const aggregate = g.target?.kind === 'multiple' ? ' goal-step-aggregate' : '';
     const series = n > 1 ? seriesActorsFor(q, g) : null;
     const targetHtml = series
-      ? seriesTargetChips(series, g.target.kind, regionHint)
+      ? seriesTargetHtml(g.target, series, regionHint)
       : goalTargetChip(g.target, cleanLabel(g.label), regionHint, q.isTest);
     // `verb_included` : le libellé du but contient DÉJÀ son verbe ("Bring
     // book to King Head") — ne pas re-préfixer, sinon verbe doublé
@@ -3078,6 +3136,36 @@ function openQuestFiche(slug) {
   // Repli texte historique — seulement pour les quêtes sans graphe de goals décodé.
   const objectives = (!goalSteps && q.objectives?.length)
     ? `<div class="fiche-section"><h3>${esc(tr('objectivesTitle'))}</h3><ul class="fiche-goals">${q.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>` : '';
+  // Coquille de quête sans aucun but (q.questStatus, enum FERMÉ stampé par le
+  // pipeline sur les 9 fiches zéro-goal — marqueurs d'extraction/transition,
+  // coquilles dev, quêtes sans objectif décodé) : MIROIR EXACT de la ligne
+  // d'obtention honnête côté item (openItemFiche, OBTAIN_STATUS_KEY) — au
+  // lieu d'une page nue Suivre/Fait, la fiche énonce ce que la DONNÉE définit
+  // (jamais « quête cassée », affirmation sur le jeu qu'on ne peut pas
+  // prouver). Rendue UNIQUEMENT quand ni étapes ni repli objectifs n'ont
+  // rien produit (jamais en contradiction d'un contenu réel — ex.
+  // monochrome_gardening_goldenfield porte le stamp mais AUSSI de vrais
+  // textes d'objectifs : eux s'affichent, pas la ligne). Statut inconnu
+  // (drift futur) → formulation générique, jamais une clé brute ; repli
+  // anglais en dur si une locale n'a pas encore la clé (même filet que
+  // mapref.js uiRef — tr() renvoie la clé brute quand elle manque).
+  let questStatusHtml = '';
+  if (q.questStatus && !goalSteps && !objectives) {
+    const QUEST_STATUS_KEY = {
+      extractionMarker: 'questStatusExtractionMarker',
+      devShell: 'questStatusDevShell',
+      noObjectives: 'questStatusNoObjectives',
+    };
+    const QUEST_STATUS_FALLBACK = {
+      questStatusExtractionMarker: 'Engine marker (extraction/zone transition) — not a playable quest: the game data defines no objectives for it.',
+      questStatusDevShell: 'Development shell — an internal/test quest record with no objectives in the current game data.',
+      questStatusNoObjectives: 'No objectives are defined for this quest in the current game data.',
+    };
+    const k18 = QUEST_STATUS_KEY[q.questStatus] || 'questStatusNoObjectives';
+    const txt = tr(k18) === k18 ? QUEST_STATUS_FALLBACK[k18] : tr(k18);
+    questStatusHtml = `<div class="fiche-section"><h3>${esc(tr('objectivesTitle'))}</h3>
+      <p class="hint">${esc(txt)}</p></div>`;
+  }
   const dialogs = (q.dialogs && (q.dialogs.npc?.length || q.dialogs.player?.length))
     ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('dialogsN', (q.dialogs.npc?.length || 0) + (q.dialogs.player?.length || 0)))}</summary>
         ${(q.dialogs.npc || []).map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')}
@@ -3132,6 +3220,7 @@ function openQuestFiche(slug) {
     ${hintBox(q)}
     ${goalSteps}
     ${objectives}
+    ${questStatusHtml}
     ${rewards}
     ${items}
     ${onMap}

@@ -392,6 +392,12 @@ export default {
       obtainStatusCosmetic: 'Élément d\'apparence (skin) — aucune source d\'obtention référencée dans les données actuelles du jeu.',
       obtainStatusLobby: 'Équipement de lobby d\'arène — aucune source d\'obtention référencée hors des matchs d\'arène.',
       obtainStatusInternal: 'Donnée interne du jeu (effet/capacité) — pas un objet obtenable par le joueur.',
+      // Coquilles de quête (questStatus, enum fermé stampé par le pipeline
+      // sur les fiches de quête sans aucun but) : même registre que
+      // obtainStatus — énonce ce que la DONNÉE définit, jamais du lore.
+      questStatusExtractionMarker: 'Marqueur moteur (extraction/transition de zone) — pas une quête jouable : les données du jeu ne lui définissent aucun objectif.',
+      questStatusDevShell: 'Coquille de développement — fiche de quête interne/test sans objectif dans les données actuelles du jeu.',
+      questStatusNoObjectives: 'Aucun objectif n\'est défini pour cette quête dans les données actuelles du jeu.',
       // Badge « Interne » (audit §B3) : pseudo-items techniques masqués du
       // listage comme le contenu dev, toujours ouvrables via leurs jointures.
       internalBadge: 'Interne',

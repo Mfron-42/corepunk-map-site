@@ -1302,6 +1302,28 @@ body {
 }
 @keyframes loc-spin { to { transform: rotate(360deg); } }
 
+/* ── Pins LOCATE (Q7, pastilles mode L des EntityRef — voir pins.js) ──
+   MULTIPLES et persistants (session), teintés par la référence qui les a
+   posés (--c = la teinte --ref-c du tag, loi Q6 — repli accent) : anneau
+   PLEIN statique + point central, volontairement distincts du réticule goto
+   ci-dessus (single-slot, tirets ambrés, rotation) et des drapeaux
+   utilisateur (drapeau --core) — trois systèmes, trois glyphes. */
+.locate-pin-marker { position: relative; }
+.locate-pin-marker .lp-ring {
+  position: absolute; left: 50%; top: 50%;
+  width: 22px; height: 22px; margin: -11px 0 0 -11px;
+  border: 2px solid var(--c, var(--accent));
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(10, 14, 20, .55), 0 0 10px color-mix(in srgb, var(--c, var(--accent)) 60%, transparent);
+}
+.locate-pin-marker .lp-dot {
+  position: absolute; left: 50%; top: 50%;
+  width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--c, var(--accent));
+  box-shadow: 0 0 0 2px rgba(10, 14, 20, .85);
+}
+
 /* ── Drapeaux utilisateur (clic droit) ── #84 ──────────────────
    Multiples, persistants (localStorage par carte, voir pins.js) -- glyphe
    et teinte VOLONTAIREMENT distincts du réticule goto ci-dessus (cercle en
@@ -1838,6 +1860,13 @@ body {
    même vocabulaire fond/liseré/rayon que la carte à cible unique, juste
    applati sur une seule ligne. */
 .goal-target-series { display: flex; flex-wrap: wrap; gap: 6px 8px; width: 100%; }
+/* Série AVEC identité d'item (fiches.js seriesTargetHtml, correctif de
+   classe 2026-07-11) : la vignette-carte héberge la ligne d'item + le verbe
+   de relation + les puces membres — les puces (elles-mêmes .goal-target
+   compactes) prennent un fond un cran plus clair pour rester lisibles SUR
+   le fond de la carte hôte (sinon panel-3 sur panel-3, liseré seul). */
+.goal-target-serieshost .goal-target-series { margin-top: 4px; }
+.goal-target-serieshost .goal-target-compact { background: var(--panel-4); }
 .goal-target.goal-target-compact {
   flex-direction: row; align-items: center; gap: 6px;
   width: auto; max-width: 100%;
