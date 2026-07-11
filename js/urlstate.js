@@ -33,6 +33,11 @@ function buildHash() {
     // pour la famille (l'état survit à la bascule de carte, la ligne/le
     // rendu se résolvent par carte — voir js/pointsets.js familyCampSet).
     ...Object.entries(S.monfam).filter(([, v]) => v.on).map(([k]) => 'monfam.' + k),
+    // Couches ESPÈCE (#82 chunk (d), S.monsp — id d'espèce moteur, stable
+    // ×langues/cartes) : même sérialisation que monfam.* ; la restauration
+    // est en revanche ENSURE-only (jamais un décochage par restauration —
+    // voir js/specieslayer.js applySpeciesTokens + router.js).
+    ...Object.entries(S.monsp).filter(([, v]) => v.on).map(([k]) => 'monsp.' + k),
     ...(S.zonesOn ? ['zones'] : []),
     // Contenu dev révélé (feature #13, tag en bas du panneau — voir
     // main.js buildDevToggle) : même idiome que `zones` ci-dessus, un
@@ -93,12 +98,14 @@ function readHash() {
     // ligne ne fait que reprendre la même clé pour les navigations
     // ultérieures (popstate, hash édité à la main).
     S.devOn = onSet.has('devcontent');
-    // les clés camp.*/decor.*/monfam.* de onSet sont réappliquées par
-    // router.js applyLocationState (camps : sous whenDeferred, chargement
-    // différé ; Décor : immédiat, juste après une éventuelle bascule de
-    // carte puisque S.decor en dépend, voir data.js buildDecorGroups ;
-    // monfam : immédiat sur l'ÉTAT, le rendu/la ligne se résolvent à
-    // l'arrivée des données différées — #82 chunk (b)).
+    // les clés camp.*/decor.*/monfam.*/monsp.* de onSet sont réappliquées
+    // par router.js applyLocationState (camps : sous whenDeferred,
+    // chargement différé ; Décor : immédiat, juste après une éventuelle
+    // bascule de carte puisque S.decor en dépend, voir data.js
+    // buildDecorGroups ; monfam : immédiat sur l'ÉTAT, le rendu/la ligne se
+    // résolvent à l'arrivée des données différées — #82 chunk (b) ;
+    // monsp : immédiat aussi mais ENSURE-only, voir js/specieslayer.js
+    // applySpeciesTokens — #82 chunk (d)).
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {

@@ -42,6 +42,17 @@ const S = {
                             // reste). Hash `on=monfam.<famille>` — voir sidebar.js
                             // buildMonsterFamilyGroup, main.js compositeCampPoints, urlstate.js
                             // buildHash, router.js applyLocationState.
+  monsp: {},                // couches ESPÈCE (#82 chunk (d), modèle « l'arbre EST le
+                            // bestiaire ») : id d'espèce -> {on} — le grain le plus fin de
+                            // l'arbre Monstres & faune (sous-lignes des nœuds famille,
+                            // sidebar.js buildSpeciesSublist), priorité de rendu MAXIMALE
+                            // (compositeur main.js : espèce > famille > kind) + couche ZONE
+                            // par camp (js/specieslayer.js). Même discipline que S.monfam :
+                            // état GLOBAL (survit à la bascule de carte — points/zones
+                            // re-résolus par carte via js/pointsets.js speciesPoints, une
+                            // espèce sans camp ici reste listée « 0 camp »), hash
+                            // `on=monsp.<speciesId>` (restauration ENSURE-only, voir
+                            // router.js), jamais de localStorage.
   investLayer: null,        // fil d'enquête (fiche quête)
   campDetails: {},          // clé de camp -> {mobs, drops}
   lootTableContents: {},    // libellé de table -> [{key,name,icon,w,c,g,ch}], table COMPLÈTE

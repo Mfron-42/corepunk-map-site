@@ -12,7 +12,7 @@ import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyHexByRank } from '.
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
-  map, toWorld, registerDense, registerDomDense,
+  map, toWorld, registerDense, registerDomDense, scheduleRedraw,
   denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred, initVersion } from './data.js';
@@ -25,9 +25,14 @@ import {
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
-import { campGroupByKey, monsterFamilies } from './pointsets.js';
+import { campGroupByKey, monsterFamilies, speciesPoints } from './pointsets.js';
+import {
+  ensureSpeciesOn, toggleSpecies, speciesCampWinner, renderSpeciesZones,
+} from './specieslayer.js';
 import { buildSearch, hideSearchResults } from './search.js';
-import { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary } from './sidebar.js';
+import {
+  buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary, revealMonsterNode,
+} from './sidebar.js';
 import { syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags } from './pins.js';
 import { applyLocationState } from './router.js';
@@ -68,10 +73,64 @@ function applyPointHighlight(b, pts, color) {
   b.textContent = tr('hideHighlightBtn');
 }
 
+/* ── Couches espèce/famille (#82 chunk (d)) : orchestration d'un geste ────
+   DÉCISION UTILISATEUR (évolution 2026-07-11, « l'arbre EST le bestiaire ») :
+   le clic sur un chip d'entité DANS une fiche fait LES DEUX — il ouvre la
+   fiche (comportement existant, inchangé) ET coche le BON nœud de l'arbre
+   (espèce quand la précision espèce est prouvée, famille quand seul le
+   groupe l'est — échelle de précision COORDINATION.md) quand un point-set
+   existe. Pas de point-set → fiche seule (le state-chip de la fiche dit
+   déjà « inconnu ») ; le clic n'est JAMAIS mort. Dédoublonnage = c'est une
+   case (re-cliquer re-révèle la ligne déjà cochée) ; retrait = décocher
+   dans l'arbre. Un seul point d'orchestration (même discipline que
+   setLang/buildDevToggle : jamais une mutation qui laisserait une partie de
+   l'UI dans l'ancien état). */
+function activateSpeciesLayer(spId) {
+  ensureSpeciesOn(spId);
+  buildFilters();                       // la sous-ligne espèce apparaît (famille auto-dépliée)
+  scheduleRedraw();                     // compositeur (points) — priorité espèce
+  renderSpeciesZones();                 // zones par camp (enveloppes tiretées)
+  syncHash();                           // `on=monsp.<id>` (lien partageable)
+  // Révèle la ligne à GAUCHE (ouvre les <details>, déplie la famille, flash)
+  // — jamais de flyTo (le geste caméra reste goto/zone).
+  revealMonsterNode('species', spId);
+}
+/* Chip à portée FAMILLE (bound_units.scope, étape de quête) : coche la ou
+   les lignes famille correspondantes — même geste, grain 2 de l'échelle. */
+function activateFamilyLayers(fams) {
+  let first = null;
+  for (const f of fams) {
+    if (!f) continue;
+    (S.monfam[f] || (S.monfam[f] = { on: false })).on = true;
+    if (!first) first = f;
+  }
+  if (!first) return;
+  buildFilters();
+  scheduleRedraw();
+  syncHash();
+  revealMonsterNode('family', first);
+}
+/* Espèce cochable d'un chip monstre (id = clé S.monsters) : la couche vit
+   au grain ESPÈCE (référence canonique, COORDINATION.md) — résolue via le
+   catalogue puis le résolveur unique ; null quand aucun camp ne joint sur la
+   carte active (93/209 espèces — la fiche seule s'ouvre alors, l'arbre
+   reste la voie manuelle vers sa ligne « 0 camp »). */
+function monsterChipSpeciesId(monsterKey) {
+  const spId = S.monsters[monsterKey]?.species;
+  return (spId && speciesPoints(spId)) ? spId : null;
+}
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const id = b.dataset.id;
+  // Portée du clic-double-effet : les chips DANS le drawer de fiche (#detail)
+  // — « les panneaux à droite focusent des trucs ET activent des filtres »
+  // (phrase canonique). Recherche/bestiaire (gauche) et popups de carte
+  // (« les points de la carte focusent ») restent focus-seul. Évalué AVANT
+  // toute ouverture de fiche : openFiche() remplace #detail-body et
+  // détacherait `b` de son ancêtre.
+  const inFiche = !!b.closest('#detail');
   // Un seul pushFocusState() par geste, ici en TOUT DÉBUT de délégué — avant
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
@@ -83,7 +142,16 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-npc') openNpcFiche(+id.split(':')[1]);
   else if (b.dataset.act === 'fiche-camp') openCampFiche(id);
   else if (b.dataset.act === 'fiche-item') openItemFiche(id);
-  else if (b.dataset.act === 'fiche-monster') openMonsterFiche(id);
+  else if (b.dataset.act === 'fiche-monster') {
+    // Clic-double-effet (#82 chunk (d), décision utilisateur) : fiche + case
+    // ESPÈCE de l'arbre cochée quand un point-set existe — uniformément sur
+    // tout chip monstre d'une fiche (étape de quête, « En tuant X » d'une
+    // fiche objet, liste de mobs d'une fiche camp, pastilles de variante…).
+    // Espèce résolue AVANT l'ouverture (elle remplace le contenu du drawer).
+    const spId = inFiche ? monsterChipSpeciesId(id) : null;
+    openMonsterFiche(id);
+    if (spId) activateSpeciesLayer(spId);
+  }
   else if (b.dataset.act === 'fiche-location') openLocationFiche(+id);
   else if (b.dataset.act === 'fiche-loot') openLootTableFiche(id);
   else if (b.dataset.act === 'fiche-chest') openChestFiche(+id.split(':')[1]);
@@ -151,6 +219,29 @@ document.addEventListener('click', e => {
   // est donc toujours immédiate, jamais un Précédent/Suivant.
   else if (b.dataset.act === 'remove-user-flag') removeUserFlag(b.dataset.id);
   else if (b.dataset.act === 'clear-user-flags') clearAllUserFlags();
+  // Bouton « voir tous les spawns » des fiches monstre/étapes de quête
+  // (#82 chunk (d) — fiches.js monsterSpawnHighlightBtn, rebranché) : la
+  // MÊME action que la case espèce de l'arbre, en TOGGLE — persistant
+  // jusqu'au décochage, plus jamais un aperçu éphémère qui meurt avec la
+  // fiche (pas de pushFocusState : aucun focus ne change).
+  else if (b.dataset.act === 'species-layer') {
+    const spId = b.dataset.species;
+    if (!spId) return;
+    const on = toggleSpecies(spId);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+    buildFilters();
+    scheduleRedraw();
+    renderSpeciesZones();
+    syncHash();
+    if (on) revealMonsterNode('species', spId);
+  }
+  // Chip à portée FAMILLE (étape de quête, bound_units.scope="family"/
+  // "families" — fiches.js goalTargetChip) : pas de fiche famille (chunk
+  // (e)), le clic coche la/les lignes famille — jamais un clic mort.
+  else if (b.dataset.act === 'family-layer') {
+    activateFamilyLayers((b.dataset.family || '').split(',').filter(Boolean));
+  }
 });
 /* ── Lecture des coordonnées ────────────────────────────────── */
 /* Un mousemove tire à chaque pixel pendant un déplacement de souris ; on ne
@@ -277,12 +368,18 @@ function registerAllDenseRenderers() {
   // direct : liste vide tant que camps.bin n'est pas arrivé — même
   // dégénérescence silencieuse que l'ancienne boucle qui n'itérait rien).
   registerDense('campComposite', compositeCampPoints, '#888', (p, n) => campPopup(p, n));
+  // Couche ZONE des espèces cochées (#82 chunk (d), js/specieslayer.js) :
+  // enregistrée avec les rendus denses pour être rejouée à CHAQUE cycle de
+  // vie (bascule carte/langue, restauration, arrivée du différé) sans point
+  // d'appel supplémentaire — son cache par signature rend les rejeux
+  // moveend/zoomend gratuits (les polygones Leaflet se re-projettent seuls).
+  denseRenderers.push(renderSpeciesZones);
 }
 
 /* Composite des points de camp — anti double-tracé (design §4.3, contrat :
    « chaque point de camp dessiné au plus une fois »). Pour chaque CAMP
    (groupe), le gagnant = premier sélecteur ACTIF qui le contient, priorité
-   filtre épinglé (espèce, chunk (d)) > famille (S.monfam, ordre déterministe
+   ESPÈCE cochée (S.monsp, chunk (d)) > famille (S.monfam, ordre déterministe
    des familles par points décroissants — même ordre que les lignes du
    panneau et l'assignation de couleur) > kind (S.camps[kind].on). Un camp
    sans gagnant ne dessine rien ; les compteurs de lignes du panneau restent
@@ -302,14 +399,15 @@ function compositeCampPoints() {
     const hex = familyHexByRank(i);
     for (const k of f.campKeys) if (!famWinner.has(k)) famWinner.set(k, hex);
   }
-  // (2) gagnant par GROUPE de camp : épinglé (chunk (d) — emplacement câblé,
-  // inerte tant que S.pinFilters n'existe pas) > famille > kind.
+  // (2) gagnant par GROUPE de camp : ESPÈCE cochée (chunk (d) — première
+  // espèce cochée contenant le camp, js/specieslayer.js speciesCampWinner)
+  // > famille > kind.
+  const spWinner = speciesCampWinner();
   const winner = new Map();      // objet groupe -> hex gagnant
   for (const [kind, st] of Object.entries(S.camps)) {
     const kindHex = st.on ? (CAMP_COLORS[kind] || '#888') : null;
     for (const g of st.groups) {
-      const pinHex = null;       // chunk (d) : premier filtre épinglé actif contenant g.k
-      const hex = pinHex || famWinner.get(g.k) || kindHex;
+      const hex = spWinner.get(g.k) || famWinner.get(g.k) || kindHex;
       if (hex) winner.set(g, hex);
     }
   }

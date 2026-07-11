@@ -14,6 +14,7 @@ import {
 } from './fiches.js';
 import { buildFilters } from './sidebar.js';
 import { whenDeferred, deferredReady } from './data.js';
+import { applySpeciesTokens } from './specieslayer.js';
 
 /* ── Restauration d'état (chargement ET popstate) ──────────────
    Fonction UNIQUE qui relit le hash et republie l'UI : caméra, fiche
@@ -73,6 +74,9 @@ async function applyLocationState() {
   toggleZones(S.zonesOn);
   const applyCampFilters = () => {
     if (onSet) for (const k of Object.keys(S.camps)) S.camps[k].on = onSet.has('camp.' + k);
+    // (renderSpeciesZones est DANS denseRenderers — voir main.js
+    // registerAllDenseRenderers — donc les zones des espèces cochées suivent
+    // ce même forEach une fois camps/species arrivés.)
     denseRenderers.forEach(fn => fn());
   };
   if (deferredReady) applyCampFilters(); else whenDeferred(applyCampFilters);
@@ -95,6 +99,16 @@ async function applyLocationState() {
       const f = t.slice(7);
       if (f) (S.monfam[f] || (S.monfam[f] = { on: false })).on = true;
     }
+    // Couches ESPÈCE (#82 chunk (d), S.monsp) : même application immédiate
+    // de l'ÉTAT que monfam.* — mais ENSURE-only (un token coche/crée, son
+    // ABSENCE ne décoche jamais) : fermer une fiche repasse par
+    // history.back() vers une entrée antérieure au clic qui a coché
+    // l'espèce — une sémantique miroir stricte décocherait la couche à la
+    // fermeture, en contradiction frontale avec le flux verbatim du
+    // propriétaire (« survit à la fermeture de fiche »). Contrepartie
+    // assumée : décocher puis Précédent RE-coche (l'entrée ancienne porte
+    // le token). Voir js/specieslayer.js applySpeciesTokens.
+    applySpeciesTokens(onSet);
   }
   denseRenderers.forEach(fn => fn());
   buildFilters();

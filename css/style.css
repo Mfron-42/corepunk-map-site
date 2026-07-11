@@ -2257,3 +2257,84 @@ button.rar-pill:hover {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+/* ── L'arbre EST le bestiaire (#82 chunk (d), décision utilisateur) ──────
+   Nœuds famille DÉPLIABLES de « Par famille » (js/sidebar.js
+   attachFamilyNode) : chevron en bout de ligne, sous-lignes ESPÈCE rendues
+   paresseusement (buildSpeciesSublist) — case (couche espèce, S.monsp) +
+   nom cliquable → fiche + méta honnête « N camps · M pts » / « 0 camp ».
+   (L'ancien bloc « filtres épinglés » — entonnoir, ✕, plafond — est
+   retiré avec le concept.) */
+/* Chevron de dépliage — bouton DANS le <label> de la ligne famille
+   (preventDefault côté JS : ne bascule jamais la case). */
+.fam-expand {
+  flex: none;
+  width: 18px; height: 18px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  border-radius: var(--radius-s);
+}
+.fam-expand::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 5px;
+  width: 6px; height: 6px;
+  border-right: 1.6px solid var(--muted);
+  border-bottom: 1.6px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform var(--dur) var(--ease);
+}
+.fam-expand:hover { background: var(--line-soft); }
+.fam-expand:hover::after { border-color: var(--accent); }
+.fam-expand[aria-expanded="true"]::after { transform: rotate(45deg); left: 5px; top: 3px; }
+.fam-expand:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Famille sans camp joint sur la carte active : listée quand même (l'arbre
+   est le bestiaire — accès aux espèces/fiches), griseé honnêtement. */
+.filter-row-sub.fam-zero .flabel,
+.filter-row-sub.fam-zero .fam-camps,
+.filter-row-sub.fam-zero .fcount { color: var(--muted); opacity: .6; }
+.filter-row-sub.fam-zero .swatch { background: transparent !important; box-shadow: inset 0 0 0 1.5px rgba(233,226,208,.3); }
+
+/* Sous-liste des espèces d'une famille (rendu paresseux au dépliage). */
+.species-sublist {
+  list-style: none;
+  margin: 1px 0 3px;
+  padding: 1px 0 1px 12px;
+  border-left: 1px solid var(--line-soft);
+  margin-left: 13px;
+}
+/* Ligne espèce : PAS un <label> global — la case vit dans son mini-label
+   .sp-check (pastille cliquable), le NOM ouvre la fiche (fonction
+   bestiaire), le clic ailleurs ne fait rien. */
+.species-row { padding: 3px 6px; gap: 8px; cursor: default; }
+.species-row .sp-check {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.species-row .swatch { width: 9px; height: 9px; pointer-events: none; }
+.species-row .flabel { font-size: .78rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-meta {
+  font-family: var(--font-mono);
+  font-size: .64rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.species-row.off .sp-meta { opacity: .55; }
+/* « 0 camp » (espèce sans camp joint ici) : griseée mais JAMAIS masquée —
+   la ligne reste l'accès à la fiche, cocher n'allume rien et la méta le dit. */
+.species-row.sp-zero .flabel, .species-row.sp-zero .sp-meta { color: var(--muted); opacity: .6; }
+.species-row.sp-zero .swatch { background: transparent !important; box-shadow: inset 0 0 0 1.5px rgba(233,226,208,.3); }
+
+/* Flash de révélation d'un nœud coché par un chip de fiche
+   (revealMonsterNode) — le dédoublonnage visible : re-cliquer un chip
+   déjà coché fait clignoter la ligne existante. */
+@keyframes node-flash {
+  0%, 55% { background: var(--accent-soft-2); }
+  100% { background: none; }
+}
+.node-flash { animation: node-flash 1.5s var(--ease) 1; }

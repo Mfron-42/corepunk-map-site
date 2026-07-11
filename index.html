@@ -34,15 +34,12 @@
     </div>
 
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
-      <!-- Filtres épinglés (#82 chunk (d), pas encore implémenté) : simple
-           emplacement STRUCTUREL pour l'instant -- masqué (hidden), sans
-           lignes, sans compteur. La tranche (d) posera S.pinFilters, le
-           bloc `pf=` et retirera `hidden` ; rien à faire ici avant elle
-           (voir  unified_layers_DESIGN.md §6/§12(d)). -->
-      <details class="side-sec" data-sec="pinfilters" id="pinfilters-sec" hidden>
-        <summary><h2 data-i18n="pinFiltersTitle">Filtres épinglés</h2></summary>
-        <ul id="pinfilters-list" class="layer-list"></ul>
-      </details>
+      <!-- (L'emplacement structurel « Filtres épinglés » du chunk (a) a été
+           RETIRÉ : le concept de filtre épinglé séparé est abandonné —
+           décision utilisateur 2026-07-11, « l'arbre EST le bestiaire ».
+           Le grain espèce vit désormais DANS l'arbre : nœuds famille
+           dépliables de « Monstres & faune › Par famille », voir
+           js/sidebar.js buildSpeciesSublist + js/specieslayer.js.) -->
       <details class="side-sec" data-sec="group-poi" open>
         <summary><h2 data-i18n="groupPoi">Points d'intérêt</h2></summary>
         <ul id="group-poi-list" class="layer-list"></ul>

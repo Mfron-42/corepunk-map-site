@@ -28,7 +28,7 @@ export default {
       groupContainers: "Контейнери та інтерактивні об'єкти",
       groupQuests: 'Квести',
       groupWorld: 'Світ',
-      pinFiltersTitle: 'Закріплені фільтри',
+      // (pinFiltersTitle вилучено разом із відмовою від окремих закріплених фільтрів.)
       trackedTitle: 'Відстежуване',
       trackedEmptyHint: 'Закріпіть маркер кнопкою «Відстежувати», щоб знайти його тут.',
       footerNote: 'Дані видобуто з клієнта гри · не пов’язано з Artificial Core.',
@@ -60,6 +60,13 @@ export default {
       // як у бестіарії).
       monsterFamiliesTitle: 'За родинами',
       familyCampsN: n => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')}`,
+      // Підрядки ВИДІВ дерева (#82 chunk (d), «дерево — це бестіарій» —
+      // js/sidebar.js buildSpeciesSublist). Та сама чесність, що familyCampsN
+      // (точки виду = точки ТАБОРІВ, де він може з'явитися, design §13.1)
+      // — `p` надходить уже відформатованим (locale).
+      speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')} · ${p} тчк`,
+      speciesZeroCamps: '0 таборів на цій карті',
+      famSpeciesToggle: 'Переглянути види цієї родини',
       chestTypesAllBtn: 'Усі',
       chestTypesNoneBtn: 'Жодного',
       // Реорганізація контейнерів (DATA_CONTRACT.md): 2 реальних шари скринь

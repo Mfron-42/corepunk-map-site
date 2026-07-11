@@ -27,7 +27,7 @@ export default {
       groupContainers: 'Contenedores e interactivos',
       groupQuests: 'Misiones',
       groupWorld: 'Mundo',
-      pinFiltersTitle: 'Filtros anclados',
+      // (pinFiltersTitle retirado con el concepto abandonado de filtros anclados.)
       trackedTitle: 'Seguimiento',
       trackedEmptyHint: 'Fija un marcador con «Seguir» para encontrarlo aquí.',
       footerNote: 'Datos extraídos del cliente del juego · no afiliado con Artificial Core.',
@@ -59,7 +59,17 @@ export default {
       // (design §13.1). Los nombres de familia mostrados son los tokens del
       // juego prettificados (GLOSSARY-PENDING #86, como el bestiario).
       monsterFamiliesTitle: 'Por familia',
-      familyCampsN: n => `${n} campamento${n > 1 ? 's' : ''}`,
+      // n === 1 (no n > 1): «0 campamentos» es el plural honesto para las
+      // familias sin campamento que el árbol ahora lista (chunk (d)).
+      familyCampsN: n => `${n} campamento${n === 1 ? '' : 's'}`,
+      // Sublíneas de ESPECIE del árbol (#82 chunk (d), "el árbol ES el
+      // bestiario" — js/sidebar.js buildSpeciesSublist). Misma honestidad
+      // que familyCampsN (los puntos de una especie = los de los
+      // CAMPAMENTOS donde puede aparecer, design §13.1) — `p` llega ya
+      // formateado (locale).
+      speciesCampsPts: (n, p) => `${n} campamento${n === 1 ? '' : 's'} · ${p} pts`,
+      speciesZeroCamps: '0 campamentos en este mapa',
+      famSpeciesToggle: 'Explorar las especies de esta familia',
       chestTypesAllBtn: 'Todos',
       chestTypesNoneBtn: 'Ninguno',
       // Recategorización de contenedores (DATA_CONTRACT.md): las 2 capas

@@ -4,6 +4,7 @@ import { S, LS, save } from './state.js';
 import {
   CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyHexByRank,
   chestDisplayName, chestHex, mapName, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
+  speciesLayerHex,
 } from './config.js';
 import { $, $$, esc, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -12,7 +13,8 @@ import { syncHash, pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
-import { monsterFamilies } from './pointsets.js';
+import { monsterFamilies, speciesPoints } from './pointsets.js';
+import { renderSpeciesZones } from './specieslayer.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -199,7 +201,9 @@ function buildDecorGroup() {
    Tous/Aucun (évite de reconstruire tout le groupe, perdant l'état
    open/fermé du <details>). Partagé tel quel par le sous-groupe « Par
    famille » (buildMonsterFamilyGroup ci-dessous) — même forme d'entries
-   [clé, {on}]. */
+   [clé, {on}]. Les sous-lignes ESPÈCE (.species-row, chunk (d)) imbriquées
+   sous les lignes famille ne portent PAS la classe .filter-row-sub : ce
+   mapping par INDEX ne voit que les lignes d'entries, jamais elles. */
 function refreshDecorRows(sub, entries) {
   const rows = sub.querySelectorAll('.filter-row-sub');
   entries.forEach(([, st], i) => {
@@ -209,6 +213,126 @@ function refreshDecorRows(sub, entries) {
     const input = row.querySelector('input');
     if (input) input.checked = st.on;
   });
+}
+
+/* ── L'arbre EST le bestiaire (#82 chunk (d), décision utilisateur) ──────
+   Chaque ligne famille de « Par famille » est un NŒUD DÉPLIABLE : le
+   chevron déplie (rendu PARESSEUX — jamais les ~224 espèces d'un coup) les
+   sous-lignes ESPÈCE de la famille, chacune avec sa case (couche espèce,
+   S.monsp — points + ZONE par camp), son nom cliquable → sa fiche (la
+   fonction bestiaire), et sa méta honnête « N camps · M pts » (les points
+   des CAMPS où elle PEUT apparaître, design §13.1) ou « 0 camp » grisé
+   (93/209 espèces sans camp joint : listées quand même — l'accès fiche est
+   la raison d'être — cocher n'allume rien et la méta le dit, jamais
+   masquées). TOUTES les familles du catalogue sont listées (celles sans
+   camp sur la carte active aussi, grisées « 0 camp ») pour que les 224
+   espèces restent parcourables. État de dépliage : session seule
+   (expandedFams) ; une famille avec ≥1 espèce cochée se déplie d'elle-même
+   à chaque rebuild (la ligne cochée doit rester visible — hash restauré,
+   clic de chip). */
+const expandedFams = new Set();
+
+/* Espèces du catalogue GLOBAL groupées par famille (post-alias), triées
+   niveau puis nom (même ordre que le bestiaire) — cache paresseux invalidé
+   par identité S.species + valeur S.devOn (même discipline que
+   pointsets.js familyTable). */
+let _spByFam = null, _spByFamSrc = null, _spByFamDev = null;
+function speciesByFamily() {
+  if (_spByFam && _spByFamSrc === S.species && _spByFamDev === S.devOn) return _spByFam;
+  const byFam = new Map();
+  for (const [id, sp] of Object.entries(S.species || {})) {
+    if (isHiddenTest(sp)) continue;
+    const fam = familyKey(sp.family || 'other');
+    let arr = byFam.get(fam);
+    if (!arr) byFam.set(fam, arr = []);
+    arr.push({ id, sp });
+  }
+  for (const arr of byFam.values()) {
+    arr.sort((a, b) => (a.sp.levelMin ?? 99) - (b.sp.levelMin ?? 99) || a.sp.name.localeCompare(b.sp.name));
+  }
+  _spByFam = byFam; _spByFamSrc = S.species; _spByFamDev = S.devOn;
+  return byFam;
+}
+
+/* Sous-ligne ESPÈCE : mini-label case+pastille (cocher = couche espèce) +
+   nom cliquable → fiche (délégué main.js fiche-monster — dans l'arbre de
+   GAUCHE, donc fiche SEULE, jamais d'auto-cochage : le clic-double-effet
+   n'appartient qu'aux chips des panneaux de droite) + méta honnête. */
+function speciesRowLi(id, sp) {
+  const st = S.monsp[id] || (S.monsp[id] = { on: false });
+  const res = speciesPoints(id);
+  const meta = res
+    ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale()))
+    : tr('speciesZeroCamps');
+  const [key] = speciesRep(sp);
+  const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+  const nameAttrs = key ? ` data-act="fiche-monster" data-id="${esc(key)}"` : '';
+  const li = document.createElement('li');
+  li.dataset.species = id;
+  li.innerHTML = `<div class="filter-row species-row ${st.on ? '' : 'off'}${res ? '' : ' sp-zero'}">
+    <label class="sp-check"><input type="checkbox" ${st.on ? 'checked' : ''} aria-label="${esc(sp.name)}">
+      <span class="swatch" style="background:${speciesLayerHex(id)}"></span></label>
+    <span class="flabel"><span class="sp-name${key ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
+    <span class="sp-meta">${esc(meta)}</span>
+  </div>`;
+  li.querySelector('input').addEventListener('change', e => {
+    st.on = e.target.checked;
+    li.querySelector('.species-row').classList.toggle('off', !st.on);
+    scheduleRedraw();
+    renderSpeciesZones();
+    syncHash();
+  });
+  return li;
+}
+function buildSpeciesSublist(fam) {
+  const ul = document.createElement('ul');
+  ul.className = 'species-sublist';
+  for (const { id, sp } of speciesByFamily().get(fam) || []) ul.appendChild(speciesRowLi(id, sp));
+  return ul;
+}
+/* Chevron de dépliage d'un nœud famille — bouton DANS le <label> de la
+   ligne (preventDefault : ne doit jamais basculer la case de la famille). */
+function attachFamilyNode(li, fam) {
+  li.dataset.fam = fam;
+  const row = li.querySelector('.filter-row');
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'fam-expand';
+  btn.title = tr('famSpeciesToggle');
+  btn.setAttribute('aria-label', tr('famSpeciesToggle'));
+  btn.setAttribute('aria-expanded', String(expandedFams.has(fam)));
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (expandedFams.has(fam)) {
+      expandedFams.delete(fam);
+      li.querySelector('.species-sublist')?.remove();
+      btn.setAttribute('aria-expanded', 'false');
+    } else {
+      expandedFams.add(fam);
+      li.appendChild(buildSpeciesSublist(fam));   // rendu PARESSEUX, au dépliage
+      btn.setAttribute('aria-expanded', 'true');
+    }
+  });
+  row.appendChild(btn);
+  if (expandedFams.has(fam)) li.appendChild(buildSpeciesSublist(fam));
+  return li;
+}
+/* Révèle un nœud de l'arbre Monstres (espèce/famille) fraîchement coché par
+   un chip de fiche (main.js) : ouvre les <details> ancêtres, flash, scroll —
+   la famille d'une espèce cochée est déjà auto-dépliée par le rebuild.
+   AUCUN mouvement caméra (le geste caméra reste goto/zone). */
+function revealMonsterNode(kind, id) {
+  const target = kind === 'species'
+    ? document.querySelector(`#group-monsters-list li[data-species="${CSS.escape(id)}"] .species-row`)
+    : document.querySelector(`#group-monsters-list li[data-fam="${CSS.escape(id)}"] .filter-row`);
+  if (!target) return;
+  for (let el = target.parentElement; el; el = el.parentElement) {
+    if (el.tagName === 'DETAILS' && !el.open) el.open = true;
+  }
+  target.classList.add('node-flash');
+  setTimeout(() => target.classList.remove('node-flash'), 1600);
+  target.scrollIntoView({ block: 'nearest' });
 }
 
 /* ── Sous-groupe « Par famille » (#82 chunk (b), design §4) ──────────────
@@ -233,24 +357,42 @@ function refreshDecorRows(sub, entries) {
    données expédiées (vérifié — le bestiaire affiche déjà ce même token brut
    dans les 5 langues) ; à balayer quand l'extraction de glossaire (#86)
    livrera des libellés prouvés. */
-function buildMonsterFamilyGroup() {
-  const fams = monsterFamilies();
-  if (!fams.length) return null;
-  // État par famille : créé à la première apparition — sauf s'il existe déjà
-  // (hash `monfam.*` restauré AVANT l'arrivée des données différées, voir
-  // router.js applyLocationState : l'état précède la ligne, jamais écrasé).
-  const entries = fams.map((f, i) => {
-    const st = S.monfam[f.family] || (S.monfam[f.family] = { on: false });
-    return [f.family, st, f, familyHexByRank(i)];
+function buildMonsterFamilyGroup(keepOpen = false) {
+  const fams = monsterFamilies();               // familles AVEC camps joints ici (triées pts desc)
+  const byFam = speciesByFamily();              // TOUTES les familles du catalogue global
+  if (!fams.length && !byFam.size) return null;
+  // Une famille avec ≥1 espèce cochée se déplie d'elle-même : la ligne cochée
+  // doit être VISIBLE (hash restauré, clic de chip — décision utilisateur
+  // « auto-expanding its family so the checked row is visible »).
+  for (const [fam, list] of byFam) {
+    if (list.some(({ id }) => S.monsp[id]?.on)) expandedFams.add(fam);
+  }
+  // Ordre : familles avec camps (rang = couleur, design §4.3) puis les
+  // familles SANS camp ici (alphabétiques, grisées « 0 camp » — listées
+  // quand même : l'arbre est le bestiaire, chunk (d)). État par famille :
+  // créé à la première apparition — sauf s'il existe déjà (hash `monfam.*`
+  // restauré AVANT l'arrivée des données différées, voir router.js).
+  const withCamps = new Set(fams.map(f => f.family));
+  const zeroFams = [...byFam.keys()].filter(f => !withCamps.has(f)).sort();
+  const entries = [
+    ...fams.map((f, i) => [f.family, null, f, familyHexByRank(i)]),
+    ...zeroFams.map(f => [f, null, { nCamps: 0, nPts: 0 }, MONSTER_HEX]),
+  ].map(([fam, , f, hex]) => {
+    const st = S.monfam[fam] || (S.monfam[fam] = { on: false });
+    return [fam, st, f, hex];
   });
 
   const li = document.createElement('li');
   const det = document.createElement('details');
   det.className = 'decor-group';
+  // Rebuild après un geste DANS le sous-groupe ([Aucun], cochage par chip…) :
+  // préserver l'état ouvert — jamais un geste qui replie la liste sous la
+  // souris de l'utilisateur.
+  if (keepOpen) det.open = true;
   const summary = document.createElement('summary');
   summary.innerHTML = `<span class="swatch" style="background:${MONSTER_HEX}"></span>
     <span class="flabel">${esc(tr('monsterFamiliesTitle'))}</span>
-    <span class="fcount">${fams.length.toLocaleString(numberLocale())}</span>`;
+    <span class="fcount">${entries.length.toLocaleString(numberLocale())}</span>`;
   det.appendChild(summary);
 
   const sub = document.createElement('ul');
@@ -263,20 +405,27 @@ function buildMonsterFamilyGroup() {
       <button type="button" class="subf-btn" data-mode="none">${esc(tr('chestTypesNoneBtn'))}</button>
     </span>`;
   const refresh = () => refreshDecorRows(sub, entries);
+  // [Tous] : toutes les FAMILLES (les espèces sont des sous-ensembles de
+  // leur famille — les cocher toutes ne dessinerait rien de plus).
   head.querySelector('[data-mode="all"]').addEventListener('click', () => {
     for (const [, st] of entries) st.on = true;
     scheduleRedraw(); syncHash(); refresh();
   });
+  // [Aucun] : familles ET espèces (« plus rien de ce groupe » — décocher les
+  // familles en laissant des espèces allumées serait un demi-geste).
   head.querySelector('[data-mode="none"]').addEventListener('click', () => {
     for (const [, st] of entries) st.on = false;
-    scheduleRedraw(); syncHash(); refresh();
+    for (const id of Object.keys(S.monsp)) S.monsp[id].on = false;
+    scheduleRedraw(); renderSpeciesZones(); syncHash();
+    buildGroupMonsters();   // les sous-lignes espèce doivent refléter le décochage
   });
   sub.appendChild(head);
   for (const [fam, st, f, hex] of entries) {
+    const zero = !f.nPts;
     const row = filterRow('monfam:' + fam, pretty(fam), hex, f.nPts, 0, st.on, on => {
       st.on = on;
       scheduleRedraw();
-    }, 'filter-row-sub');
+    }, 'filter-row-sub' + (zero ? ' fam-zero' : ''));
     // « N camps » entre le libellé et le compte de points (mock design §2 :
     // « Rat   10 camps · 4 045 ») — libellé honnête : ce sont les points des
     // CAMPS où la famille apparaît, jamais « positions de X » (design §13.1).
@@ -285,7 +434,9 @@ function buildMonsterFamilyGroup() {
     // max-height (#85) n'existe pas encore — à migrer quand elle livre.
     row.querySelector('.flabel').insertAdjacentHTML('afterend',
       `<span class="fam-camps" style="color:var(--muted);font-size:.68rem;white-space:nowrap;margin-right:5px">${esc(tr('familyCampsN', f.nCamps))}</span>`);
-    sub.appendChild(row);
+    // Nœud dépliable (chunk (d), « l'arbre EST le bestiaire ») : chevron +
+    // sous-lignes espèce paresseuses.
+    sub.appendChild(attachFamilyNode(row, fam));
   }
   det.appendChild(sub);
   li.appendChild(det);
@@ -368,10 +519,13 @@ function buildGroupPoi() {
    buildMonsterFamilyGroup ci-dessus). */
 function buildGroupMonsters() {
   const ul = $('#group-monsters-list');
+  // Rebuild depuis un geste interne ([Aucun], cochage d'espèce par chip) :
+  // préserver l'état ouvert du sous-groupe.
+  const famOpen = !!ul.querySelector('.decor-group[open]');
   ul.innerHTML = '';
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
   appendCampRows(ul, CAMP_KIND_GROUPS.monsters);
-  const famLi = buildMonsterFamilyGroup();
+  const famLi = buildMonsterFamilyGroup(famOpen);
   if (famLi) ul.appendChild(famLi);
 }
 /* Groupe « Récolte » : les 3 métiers de camp:<kind>. */
@@ -627,4 +781,4 @@ $('#panel-toggle').addEventListener('click', () => {
   setTimeout(() => map.invalidateSize(), 280);
 });
 
-export { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary };
+export { buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary, revealMonsterNode };

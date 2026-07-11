@@ -26,7 +26,8 @@ export default {
       groupContainers: 'Contenants & interactifs',
       groupQuests: 'Quêtes',
       groupWorld: 'Monde',
-      pinFiltersTitle: 'Filtres épinglés',
+      // (pinFiltersTitle retiré avec le concept abandonné de filtres épinglés
+      // séparés — décision utilisateur 2026-07-11, l'arbre EST le bestiaire.)
       trackedTitle: 'Suivis',
       trackedEmptyHint: 'Épinglez un marqueur avec « Suivre » pour le retrouver ici.',
       footerNote: 'Données extraites du client du jeu · non affilié à Artificial Core.',
@@ -61,6 +62,15 @@ export default {
       // comme le bestiaire).
       monsterFamiliesTitle: 'Par famille',
       familyCampsN: n => `${n} camp${n > 1 ? 's' : ''}`,
+      // Sous-lignes ESPÈCE de l'arbre (#82 chunk (d), « l'arbre EST le
+      // bestiaire » — js/sidebar.js buildSpeciesSublist). speciesCampsPts :
+      // même honnêteté que familyCampsN (les points d'une espèce = ceux des
+      // CAMPS où elle peut apparaître, design §13.1) — `p` arrive déjà
+      // formaté (locale). speciesZeroCamps : une espèce/famille sans camp
+      // joint sur la carte active reste listée (accès fiche), grisée.
+      speciesCampsPts: (n, p) => `${n} camp${n > 1 ? 's' : ''} · ${p} pts`,
+      speciesZeroCamps: '0 camp sur cette carte',
+      famSpeciesToggle: 'Parcourir les espèces de cette famille',
       chestTypesAllBtn: 'Tous',
       chestTypesNoneBtn: 'Aucun',
       // Container re-categorization (DATA_CONTRACT.md) : les 2 vraies couches

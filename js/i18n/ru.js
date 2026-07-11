@@ -28,7 +28,7 @@ export default {
       groupContainers: 'Контейнеры и интерактивные объекты',
       groupQuests: 'Задания',
       groupWorld: 'Мир',
-      pinFiltersTitle: 'Закреплённые фильтры',
+      // (pinFiltersTitle удалён вместе с отказом от отдельных закреплённых фильтров.)
       trackedTitle: 'Отслеживаемое',
       trackedEmptyHint: 'Закрепите маркер кнопкой «Отслеживать», чтобы найти его здесь.',
       footerNote: 'Данные извлечены из клиента игры · не связано с Artificial Core.',
@@ -61,6 +61,13 @@ export default {
       // #86, как в бестиарии).
       monsterFamiliesTitle: 'По семействам',
       familyCampsN: n => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')}`,
+      // Подстроки ВИДОВ дерева (#82 chunk (d), «дерево — это бестиарий» —
+      // js/sidebar.js buildSpeciesSublist). Та же честность, что familyCampsN
+      // (точки вида = точки ЛАГЕРЕЙ, где он может появиться, design §13.1)
+      // — `p` приходит уже отформатированным (locale).
+      speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')} · ${p} тчк`,
+      speciesZeroCamps: '0 лагерей на этой карте',
+      famSpeciesToggle: 'Показать виды этого семейства',
       chestTypesAllBtn: 'Все',
       chestTypesNoneBtn: 'Нет',
       // Реорганизация контейнеров (DATA_CONTRACT.md): 2 реальных слоя

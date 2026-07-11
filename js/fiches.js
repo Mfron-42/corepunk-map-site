@@ -12,7 +12,7 @@ import {
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campDisplayName, campLootTableName, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr,
+  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -20,7 +20,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js'
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
-import { campGroupByKey } from './pointsets.js';
+import { campGroupByKey, speciesPoints } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
@@ -2011,6 +2011,13 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const primaryKey = differing ? t.item_key : (t.item_key || t.key);
     const approxForItem = t.item_key ? t.item_approx : t.approx;
     const activableBadge = `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('activableBadge'))}</span>`;
+    // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
+    // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
+    // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
+    // TODO(chunk (c)) : quand les sous-lignes `qao.<type>` existeront, le
+    // clic d'un chip objet devra cocher la ligne de SON type (placements
+    // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
+    // t.label — 45), même clic-double-effet que les chips monstre.
     let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, differing ? '' : activableBadge);
     let relRow = '';
     if (itemRow && differing) {
@@ -2101,8 +2108,15 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // ci-dessus) ; `levelHint` supprimé du 3ᵉ argument (voir plus haut).
     const mk = isFamilyScope ? null : monsterKeyFor(t.key || null, nameLbl, null);
     const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
+    // Portée FAMILLE (#82 chunk (d), modèle « l'arbre EST le bestiaire ») :
+    // pas de fiche famille (chunk (e)) mais le clic n'est plus mort — il
+    // coche la/les lignes FAMILLE de l'arbre (data-act="family-layer",
+    // délégué main.js, tokens post-alias familyKey) : le bon barreau de
+    // l'échelle de précision (le trigger accepte tout le groupe, jamais une
+    // espèce nommée à sa place).
+    const famTokens = isFamilyScope ? (bu.families || []).map(familyKey).filter(Boolean) : [];
     const nameSpan = isFamilyScope
-      ? (famLabel ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(famLabel)}</span>` : '')
+      ? (famLabel ? `<span class="goal-target-name${famTokens.length ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${famTokens.length ? ` data-act="family-layer" data-family="${esc(famTokens.join(','))}"` : ''}>${esc(famLabel)}</span>` : '')
       : mk
         ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
         : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
@@ -2124,13 +2138,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const relRow = itemRow
       ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}${chanceSpan}</div>`
       : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}${lvlSpan}</div>` : '');
-    // « Montrer les spawns » (task #79, quest-driven spawn highlighting) :
-    // union de TOUS les camps joints du monstre cible, même primitive que la
-    // fiche monstre (monsterSpawnHighlightBtn, réutilise allCampGroupsFlat --
-    // voir sa doc plus bas) -- "Tuer 20 araignées" doit pouvoir allumer les
-    // points de spawn concernés SANS quitter la fiche quête. Repli honnête :
-    // monstre non résolu (mk null) ou résolu mais sans AUCUN camp joint ->
-    // chaîne vide, jamais un bouton qui ne surlignerait rien.
+    // « Voir les spawns » (task #79, REBRANCHÉ par #82 chunk (d)) : le même
+    // bouton que la fiche monstre (monsterSpawnHighlightBtn, voir sa doc
+    // plus bas) — désormais LA case espèce de l'arbre (persistante jusqu'au
+    // décochage, points + zones), plus jamais un aperçu éphémère --
+    // "Tuer 20 araignées" doit pouvoir allumer les points de spawn concernés
+    // SANS quitter la fiche quête. Repli honnête : monstre non résolu (mk
+    // null) ou espèce sans AUCUN camp joint -> chaîne vide, jamais un bouton
+    // qui n'allumerait rien.
     const spawnBtn = mk ? monsterSpawnHighlightBtn(S.monsters[mk]) : '';
     const spawnRow = spawnBtn ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn}</div>` : '';
     return `<div class="goal-target">${itemRow}${relRow}${posRow}${spawnRow}</div>`;
@@ -2750,46 +2765,59 @@ function isGenericFarmPoolItem(drops) {
 
 /* Ligne de camp JOINT (g trouvé dans S.camps) : pastille couleur de kind
    (même teinte que la fiche camp/les couches carte -- CAMP_COLORS), nom
-   d'affichage réel (campDisplayName, pas le pretty() brut d'avant cette
-   passe) cliquable vers la fiche camp complète (inchangé), et un bouton
-   « Surligner » qui dessine le VRAI nuage de points de CE camp + vole à ses
-   bornes -- même primitive/même libellé que le bouton de la fiche camp
-   (data-n porte le compte BRUT, jamais formaté : main.js reconstruit ce même
-   libellé au toggle-off via +b.dataset.n, un texte initial formaté
-   différemment du texte de reset aurait clignoté au premier clic).
-   `displayName` (facultatif) : repli fiche monstre (openMonsterFiche/
-   monsterCampsHtml, "voir tous les spawns" July 2026) -- réutilise CETTE
-   ligne telle quelle plutôt que d'en dupliquer une variante, mais le nom déjà
-   COOK dans m.camps[].name (localisé, correctement casé -- ex.
-   "Monsters-Imp-Windreach-Woods") vaut mieux que campDisplayName(key), dont
-   le repli pretty() sur une clé non typée (kind monstre, jamais
-   destroyable/searchable/reactive) ne remet en forme QUE la première lettre
-   ("Monsters imp windreach woods") -- une régression de lisibilité pour ce
-   contexte précis. Sans 2ᵉ argument (fiche objet), comportement inchangé. */
-function farmCampRow(key, g, displayName = campDisplayName(key)) {
+   d'affichage réel (campDisplayName -- LE formateur partagé, désormais aussi
+   pour la fiche monstre : l'ancien 3ᵉ argument `displayName` qui préférait
+   le nom « déjà cuit » du pipeline (m.camps[].name) est RETIRÉ — ce nom est
+   cassé pour toute clé de vocabulaire non-Kwalat ("Ffm-Island-Monster-
+   Buffed-Wolf-Undead", voir  island_camp_labels_INVESTIGATION.md
+   §1/bonus finding) et campDisplayName strippe maintenant lui-même les
+   préfixes de vocabulaire, en un seul endroit) cliquable vers la fiche camp
+   complète (inchangé), et un bouton « Surligner » qui dessine le VRAI nuage
+   de points de CE camp + vole à ses bornes -- même primitive/même libellé
+   que le bouton de la fiche camp (data-n porte le compte BRUT, jamais
+   formaté : main.js reconstruit ce même libellé au toggle-off via
+   +b.dataset.n, un texte initial formaté différemment du texte de reset
+   aurait clignoté au premier clic). */
+function farmCampRow(key, g) {
   const n = g.pts.length;
   const campHex = CAMP_COLORS[g.kind] || '#999';
   return `<div class="frow">
     <span class="rar-dot" style="background:${campHex}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(displayName)}</span>
+    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campDisplayName(key))}</span>
     <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
   </div>`;
 }
 
 /* Ligne de repli : camp NON trouvé dans S.camps (carte différente --
-   préfixe ffm-island-*, confirmé réel sur ~24 % des items déjà groupés dans
-   les données expédiées --, ou S.camps pas encore chargé). Comportement
-   EXACT d'avant cette passe (réticule ambré, pas de compte inventé, pas de
-   bouton Surligner qu'on ne peut pas honorer) -- honnête plutôt que de
-   fabriquer un kind/point count qu'on n'a pas. Cas S.camps-pas-encore-chargé :
+   préfixe ffm-island-*, réel sur 84,3 % des items à liste de farm dans les
+   bins actuellement expédiés (377/447, recompté par
+   island_camp_labels_INVESTIGATION.md §5 — l'ancien « ~24 % » de ce
+   commentaire était périmé) --, ou S.camps pas encore chargé). Pas de
+   compte inventé, pas de bouton Surligner qu'on ne peut pas honorer --
+   honnête plutôt que de fabriquer un kind/point count qu'on n'a pas.
+   Libellé : campDisplayName(clé) — plus jamais le c.name « cuit » du
+   pipeline, cassé pour les clés non-Kwalat (même correctif que farmCampRow
+   ci-dessus). Bouton : les x/z d'un camp d'une AUTRE carte sont dans SON
+   repère — l'ancien gotoBtn local panoramiquait la carte ACTIVE vers des
+   coordonnées d'une autre (bug réel, investigation §2) → crossMapBtn
+   (bascule PUIS focus) quand la carte du camp est dérivable de sa clé
+   (ffm-island- → Extraction_Island_large, la seule dérivation prouvée
+   aujourd'hui). TODO(pipeline) : remplacer cette dérivation par le champ
+   `map` (présent dans data/camps.json, jamais copié dans m.camps[]/
+   item.farm[] — investigation §2). Cas S.camps-pas-encore-chargé :
    se répare tout seul sans code supplémentaire ici, main.js ré-ouvre déjà
    cette fiche après loadDeferred() (même mécanisme que la course it.
    questSource/S.monsters documentée plus haut). */
 function farmUnjoinedRow(c) {
+  const label = campDisplayName(c.camp);
+  const mid = c.camp.startsWith('ffm-island-') ? 'Extraction_Island_large' : null;
+  const btn = (mid && S.maps[mid] && c.x != null)
+    ? crossMapBtn(mid, c.x, c.z, label)
+    : gotoBtn(c.x, c.z, label);
   return `<div class="frow">
     <span class="fr-icon icon-broken" data-fb="📍"></span>
-    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(c.name)}</span>
-    ${gotoBtn(c.x, c.z, c.name)}
+    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(label)}</span>
+    ${btn}
   </div>`;
 }
 
@@ -2813,29 +2841,26 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
    (monsterSpawnHighlightBtn / farmSectionHtml / monsterCampsHtml) l'appellent
    désormais directement par clé. */
 
-/* Bouton « Montrer/voir tous les spawns » PARTAGÉ (task #79, quest-driven
-   spawn highlighting) : union de TOUS les camps joints d'un monstre en un
-   seul surlignage -- même primitive/libellé que le bouton de groupe de
-   monsterCampsHtml ci-dessous (qui l'utilise désormais aussi, DRY) ET que
-   goalTargetChip (étape de quête kill/kill_collect, "montre-moi les araignées
-   concernées"). `m.camps` (voir data/SCHEMA.md monsters.json record shape)
-   est l'UNION déjà cuite de tous les camps de la créature ; ce helper ne fait
-   que la jointure vers le vrai nuage de points (campGroupByKey, résolveur
-   unique js/pointsets.js — même jointure que speciesCampSet, design §3) et compte
-   RÉELLEMENT ce qui sera surligné -- jamais le compte brut `m.camps.length`
-   quand certains de ces camps n'existent que sur une AUTRE carte (préfixe
-   ffm-island-*, non joints ici) : le libellé doit rester honnête ("N camps"
-   = N camps RÉELLEMENT allumables). Repli honnête : monstre sans camp DU
-   TOUT, ou dont AUCUN camp ne se rejoint (autre carte) -> chaîne vide, jamais
-   un bouton qui ne surlignerait rien. */
+/* Bouton « voir tous les spawns » PARTAGÉ (task #79, quest-driven spawn
+   highlighting — REBRANCHÉ par #82 chunk (d), modèle « l'arbre EST le
+   bestiaire ») : le même bouton sur la fiche monstre (monsterCampsHtml) et
+   les cartes d'étape (goalTargetChip kill/kill_collect) n'est plus un aperçu
+   ÉPHÉMÈRE (l'ancien camp-highlight mourait avec la fiche) mais LA MÊME
+   ACTION que la case espèce de l'arbre de gauche : data-act="species-layer"
+   (délégué main.js — toggle S.monsp, persistant jusqu'au décochage, points +
+   zones par camp via le compositeur/js/specieslayer.js, aucun flyTo). Compte
+   affiché = LE résolveur unique (js/pointsets.js speciesPoints, grain
+   espèce — exactement ce que la case allumera), jamais l'union par-variante
+   d'avant (m.camps), qui pouvait diverger de la ligne de l'arbre. Repli
+   honnête : espèce sans camp joint sur la carte active -> chaîne vide,
+   jamais un bouton qui n'allumerait rien (sa ligne d'arbre « 0 camp » reste
+   la voie manuelle). */
 function monsterSpawnHighlightBtn(m) {
-  const camps = m?.camps || [];
-  if (!camps.length) return '';
-  const joined = camps.map(c => ({ c, g: campGroupByKey(c.camp) })).filter(r => r.g);
-  if (!joined.length) return '';
-  const totalPts = joined.reduce((s, r) => s + r.g.pts.length, 0);
-  const ids = joined.map(r => r.c.camp).join(',');
-  return `<button class="act ghost" data-act="camp-highlight" data-ids="${esc(ids)}" data-n="${totalPts}" data-color="${MONSTER_HEX}">${esc(tr('monsterHighlightAllSpawns', joined.length, totalPts))}</button>`;
+  const spId = m?.species;
+  if (!spId) return '';
+  const res = speciesPoints(spId);
+  if (!res) return '';
+  return `<button class="act ghost" data-act="species-layer" data-species="${esc(spId)}" data-n="${res.nPts}" aria-pressed="${S.monsp[spId]?.on ? 'true' : 'false'}">${esc(tr('monsterHighlightAllSpawns', res.nCamps, res.nPts))}</button>`;
 }
 
 function farmSectionHtml(it) {
@@ -2973,17 +2998,22 @@ function containersSectionHtml(it) {
    main.js) -- la demande d'origine ("où sont les imps bleus ?") attend
    l'UNION des nuages réels de TOUS les camps de la créature (4 camps ≈ 900+
    points pour les imps), jamais une poignée de points choisis à la main.
-   m.camps[] porte déjà {camp, name, x, z} PAR CAMP (name pré-localisé côté
-   pipeline) -- une forme strictement identique à it.farm[], donc les MÊMES
-   lignes sont réutilisées telles quelles : farmCampRow (camp joint, avec son
-   3ᵉ argument pour garder le nom déjà cuit dans m.camps plutôt que le repli
-   pretty() de campDisplayName, voir sa doc) et farmUnjoinedRow (camp d'une
-   autre carte, préfixe ffm-island-* -- 449 refs réelles sur le catalogue
-   monstre expédié, jamais un compte fabriqué). Bouton de groupe omis à ≤1
-   camp joint (ferait doublon exact du bouton de sa propre ligne, même
-   convention que highlightAllBtn/farmSectionHtml ci-dessus) ; 0 camp DU TOUT
-   retombe sur la pastille "unknown" déjà en place (unknown_states_DESIGN.md
-   #10, task #67 -- comportement inchangé). */
+   m.camps[] porte déjà {camp, name, x, z} PAR CAMP -- une forme strictement
+   identique à it.farm[], donc les MÊMES lignes sont réutilisées telles
+   quelles : farmCampRow (camp joint -- le nom vient de campDisplayName(clé),
+   LE formateur partagé ; l'ancien passage du name « cuit » du pipeline est
+   retiré, il fuyait les clés brutes non-Kwalat « Ffm-Island-Monster-… »,
+   voir island_camp_labels_INVESTIGATION.md) et farmUnjoinedRow (camp d'une
+   autre carte, préfixe ffm-island-* -- 448 lignes réelles sur le catalogue
+   monstre expédié (129/916 monstres, recompté par l'investigation §1 --
+   l'ancien « 449 refs » était périmé), jamais un compte fabriqué ; bouton
+   cross-carte, voir sa doc). Les lignes sœurs camp/patrol/buffed d'une même
+   espèce restent des lignes DISTINCTES (leurs nuages de points sont
+   réellement distincts, investigation §4(b) -- jamais fusionnées) ; le
+   qualificatif affiché (— Patrol / — Buffed (PvP)) attend le champ pipeline
+   `qualifier`, pas une dérivation client. 0 camp DU TOUT retombe sur la
+   pastille "unknown" déjà en place (unknown_states_DESIGN.md #10, task #67
+   -- comportement inchangé). */
 function monsterCampsHtml(m) {
   const camps = m.camps || [];
   const title = esc(tr('monsterCampsN', camps.length));
@@ -2998,14 +3028,16 @@ function monsterCampsHtml(m) {
   }
   joined.sort((a, b) => b.g.pts.length - a.g.pts.length);
   // Bouton de groupe (monsterSpawnHighlightBtn, PARTAGÉ avec goalTargetChip
-  // -- task #79) omis à ≤1 camp joint : ferait doublon exact du bouton de sa
-  // propre ligne (farmCampRow, même highlight/même clic) juste en dessous.
-  const highlightAllBtn = joined.length > 1
-    ? `<div class="pop-actions">${monsterSpawnHighlightBtn(m)}</div>`
-    : '';
+  // -- task #79, rebranché par #82 chunk (d)) : coche la case ESPÈCE de
+  // l'arbre (persistant, points + zones) -- une action DIFFÉRENTE du
+  // « Surligner » éphémère par camp des lignes en dessous, donc plus
+  // d'omission à ≤1 camp joint (l'ancien bouton-union dupliquait exactement
+  // le highlight de la ligne unique ; celui-ci non).
+  const spawnToggle = monsterSpawnHighlightBtn(m);
+  const highlightAllBtn = spawnToggle ? `<div class="pop-actions">${spawnToggle}</div>` : '';
   const rowsHtml = farmCapRows(
     [...joined.map(r => ({ row: r, joined: true })), ...unjoined.map(c => ({ row: c, joined: false }))],
-    x => x.joined ? farmCampRow(x.row.c.camp, x.row.g, x.row.c.name) : farmUnjoinedRow(x.row),
+    x => x.joined ? farmCampRow(x.row.c.camp, x.row.g) : farmUnjoinedRow(x.row),
     n => tr('farmMoreCampsN', n),
   );
   return `<div class="fiche-section"><h3>${title}</h3>${highlightAllBtn}${rowsHtml}</div>`;
@@ -3287,6 +3319,11 @@ function openItemFiche(key) {
       } else if (qs.via === 'container') {
         // collect_from_object (renamed from the old generic "interact" --
         // same wording, see build_site_data.py's own comment on the rename).
+        // TODO(chunk (c), #82 chunk (d) evolved model): once the per-TYPE qao
+        // sub-rows ship, this line should check the matching type row
+        // (placements join by folded object_label -- 47/186 measured), same
+        // click-double-effect as the monster chips. No tree node exists for
+        // it today.
         viaLine = qs.object_label ? `<p class="hint">${esc(tr('obtainViaInteract', qs.object_label))}</p>` : '';
       } else if (qs.via === 'harvest') {
         viaLine = `<p class="hint">${esc(tr('obtainViaHarvest', professionLabel(capitalize(qs.profession))))}</p>`;

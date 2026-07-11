@@ -26,7 +26,8 @@ export default {
       groupContainers: 'Containers & interactables',
       groupQuests: 'Quests',
       groupWorld: 'World',
-      pinFiltersTitle: 'Pinned filters',
+      // (pinFiltersTitle removed with the abandoned separate pinned-filters
+      // concept -- user decision 2026-07-11, the tree IS the bestiary.)
       trackedTitle: 'Tracked',
       trackedEmptyHint: 'Pin a marker with “Track” to find it here.',
       footerNote: 'Data extracted from the game client · not affiliated with Artificial Core.',
@@ -58,7 +59,18 @@ export default {
       // game's raw family tokens prettified (no localization table exists
       // in the shipped data -- GLOSSARY-PENDING #86, same as the bestiary).
       monsterFamiliesTitle: 'By family',
-      familyCampsN: n => `${n} camp${n > 1 ? 's' : ''}`,
+      // n === 1 (not n > 1): "0 camps" is the honest plural for the 0-camp
+      // catalog families the tree now lists (tree-is-bestiary, chunk (d)).
+      familyCampsN: n => `${n} camp${n === 1 ? '' : 's'}`,
+      // Species tree rows (#82 chunk (d), "the tree IS the bestiary" —
+      // js/sidebar.js buildSpeciesSublist). speciesCampsPts: same honest
+      // wording as familyCampsN (a species' points are the points of the
+      // CAMPS it can spawn in, design §13.1) — `p` arrives pre-formatted
+      // (locale digits). speciesZeroCamps: a species/family with no joined
+      // camp on the active map stays listed (fiche access), muted.
+      speciesCampsPts: (n, p) => `${n} camp${n === 1 ? '' : 's'} · ${p} pts`,
+      speciesZeroCamps: '0 camps on this map',
+      famSpeciesToggle: 'Browse this family’s species',
       chestTypesAllBtn: 'All',
       chestTypesNoneBtn: 'None',
       // Container re-categorization (DATA_CONTRACT.md): the 2 real chest

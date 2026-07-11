@@ -261,10 +261,22 @@ const CAMP_TYPE_RULES = [
   [/\burban\b/, 'urban'],
 ];
 const TYPED_CAMP_RE = /destroyable|searchable|reactive/;
+/* Préfixes de VOCABULAIRE de manager encore présents dans certaines clés de
+   camp expédiées (les clés Kwalat arrivent déjà strippées de
+   `fulfillment-manager-` par le pipeline ; celles des îles d'Extraction et
+   des arènes BG ne le sont PAS — voir 
+   island_camp_labels_INVESTIGATION.md §1 : « Ffm-Island-Monster-… » leak).
+   Strip d'AFFICHAGE uniquement, en UN endroit partagé — les clés de
+   jointure (g.k, m.camps[].camp) restent brutes partout. À retirer quand le
+   pipeline expédiera des `name` propres (le vrai fix délègue au parseur
+   multi-vocabulaire côté pipeline, voir l'investigation §4). */
+const CAMP_KEY_VOCAB_PREFIX_RE = /^(fulfillment-manager-|ffm-island-|ffm-bg-arena-)/;
 /* Nom d'affichage d'un camp (popup, fiche, recherche) : type localisé +
    reste de clé prettifié ("Caisse de maïs — Goldenfield town"). Les camps
-   sans type encodé (monstres, minerai…) gardent le pretty(clé) historique. */
-function campDisplayName(k) {
+   sans type encodé (monstres, minerai…) gardent le pretty(clé) historique
+   — préfixe de vocabulaire strippé d'abord (voir ci-dessus). */
+function campDisplayName(rawKey) {
+  const k = (rawKey || '').replace(CAMP_KEY_VOCAB_PREFIX_RE, '');
   if (!TYPED_CAMP_RE.test(k)) return pretty(k);
   let type = null, rest = k;
   for (const [re, key] of CAMP_TYPE_RULES) {
@@ -402,6 +414,27 @@ const MONSTER_FAMILY_HEX_CYCLE = [
 ];
 const familyHexByRank = i => MONSTER_FAMILY_HEX_CYCLE[((i % 8) + 8) % 8];
 
+/* Teintes des couches ESPÈCE (#82 chunk (d), modèle « l'arbre EST le
+   bestiaire ») : cycle dédié, volontairement plus clair/saturé que
+   MONSTER_FAMILY_HEX_CYCLE ci-dessus (S/L ~78 %/68 % vs 70 %/58 %, mêmes 8
+   rotations de teinte) — une espèce cochée (grain le plus fin, priorité de
+   rendu MAXIMALE dans le compositeur main.js : espèce > famille > kind) doit
+   rester distinguable de la famille et du kind qu'elle recouvre quand les
+   trois sont cochés. Assignation DÉTERMINISTE par IDENTITÉ (hash djb2 de
+   l'id d'espèce, stable ×sessions/cartes/langues — jamais un rang de liste,
+   qui glisserait à chaque décochage) ; deux espèces peuvent partager une
+   teinte (8 teintes) : assumé, la ligne du panneau porte le libellé qui
+   désambiguïse. */
+const SPECIES_LAYER_HEX_CYCLE = [
+  '#f2a35e', '#dff25e', '#7df25e', '#5ef2a3',
+  '#5edff2', '#7d8ff2', '#a35ef2', '#f25edf',
+];
+function speciesLayerHex(spId) {
+  let h = 5381;
+  for (let i = 0; i < spId.length; i++) h = ((h * 33) ^ spId.charCodeAt(i)) >>> 0;
+  return SPECIES_LAYER_HEX_CYCLE[h % SPECIES_LAYER_HEX_CYCLE.length];
+}
+
 /* ── Accent d'entité (task #77, entity-color coherence) ──────────────────
    UNE convention pour tout chip/lien qui référence une AUTRE fiche (PNJ,
    objet, quête, monstre, camp, recette…) : la couleur vient TOUJOURS de la
@@ -422,6 +455,7 @@ function ecAttr(hex, kind) {
 
 export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank,
+  SPECIES_LAYER_HEX_CYCLE, speciesLayerHex,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
