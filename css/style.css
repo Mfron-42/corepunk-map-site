@@ -246,26 +246,95 @@ body {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* ── Recherche ── */
-.search-wrap { position: relative; padding: 15px 16px 6px; }
+/* ── Recherche flottante, haut-centre (repositionnement 2026-07-11) ──────
+   #topbar (index.html, enfant de #map-wrap) est un pur conteneur de
+   CENTRAGE : aucun fond propre, pointer-events:none (les enfants le
+   réarment juste dessous) — il flotte au-dessus DE LA CARTE (centré sur
+   #map-wrap, pas le viewport entier : glisse donc avec le panneau gauche
+   quand il se masque/réapparaît, toujours « au milieu de ce qu'on voit de
+   la carte »). .search-wrap/#search/#search-results/#active-dots gardent
+   EXACTEMENT les mêmes id/classes que dans l'ancien panneau — js/search.js
+   et js/sidebar.js n'ont pas une ligne à changer.
+   #search-results et #active-dots forment UNE SEULE unité fonctionnelle
+   avec la barre (exigence utilisateur 2026-07-11c, ferme) : on AJOUTE une
+   couche en cliquant un résultat espèce/famille (le clic-double-effet
+   existant coche déjà le nœud de l'arbre, voir js/layeractivate.js) et on
+   la RETIRE en cliquant sa pastille juste sous la barre (renderActiveDots,
+   js/sidebar.js) — jamais deux widgets qui cohabitent par hasard, voir la
+   recette --glass PARTAGÉE de #active-dots plus bas.
+   Habillage réutilise le vocabulaire chrome flottant EXISTANT (--glass +
+   flou, --line/--line-strong, --radius-m — même recette que #panel-toggle/
+   .readout/#detail, jamais une nouvelle palette) plutôt que les tons
+   --panel-3 "encastrés" de l'ancien input de panneau.
+   Tiroir #detail (392px, glisse depuis la droite, même #map-wrap, z 1150) :
+   à l'ouverture, un padding-right pousse le centrage dans l'espace libre
+   restant (#map-wrap:has(#detail.open) plus bas, z-index 1200 > 1150 —
+   jamais recouverte). ≤760px, le tiroir passe plein écran (règle
+   existante) : la barre s'efface plutôt que de flotter sur le titre/✕ de
+   la fiche, aucun espace libre n'existe alors (voir media queries plus
+   bas). */
+#topbar {
+  position: absolute;
+  top: 14px; left: 16px; right: 16px;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  transition: padding-right var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+#topbar > * { pointer-events: auto; }
+
+.search-wrap { position: relative; width: min(520px, 100%); }
 #search {
   width: 100%;
-  padding: 10px 13px;
-  background: var(--panel-3);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius-s);
+  padding: 11px 40px 11px 14px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
   color: var(--ink);
   font-family: var(--font-body);
   font-size: .9rem;
-  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  box-shadow: var(--shadow);
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 #search::placeholder { color: var(--muted); }
-#search:hover { border-color: var(--line); }
-#search:focus { outline: none; border-color: var(--accent); background: var(--panel-4); box-shadow: 0 0 0 3px var(--accent-soft); }
+#search:hover { border-color: var(--line-strong); }
+#search:focus { outline: none; border-color: var(--accent); background: var(--panel-3); box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow); }
 
+/* Pilule d'indice « / » (raccourci clavier, js/search.js) — s'efface dès
+   que le focus entre dans la barre OU qu'une saisie existe (jamais en
+   concurrence visuelle avec le texte réel). Décorative seule
+   (aria-hidden) : l'input porte déjà son propre aria-label +
+   aria-keyshortcuts, un lecteur d'écran n'a pas besoin de ce doublon. */
+.search-kbd {
+  position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: .68rem;
+  color: var(--muted);
+  background: var(--panel-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-s);
+  padding: 1px 6px;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
+}
+.search-wrap:focus-within .search-kbd { opacity: 0; }
+.search-wrap:has(#search:not(:placeholder-shown)) .search-kbd { opacity: 0; }
+
+/* Dropdown de résultats : PLUS LARGE que la barre elle-même (demande
+   mission — les lignes riches, portraits/lignes famille/chips, respirent),
+   centré sur .search-wrap (son ancêtre positionné) plutôt que calé sur ses
+   bords — peut donc déborder légèrement de la barre des deux côtés, sans
+   jamais être clippé (aucun ancêtre ici ne pose overflow:hidden). */
 #search-results {
   position: absolute;
-  left: 16px; right: 16px; top: calc(100% - 2px);
+  left: 50%; top: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: min(640px, 92vw);
   margin: 0; padding: 5px;
   list-style: none;
   background: var(--glass);
@@ -273,8 +342,8 @@ body {
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--line);
   border-radius: var(--radius-m);
-  box-shadow: var(--shadow);
-  max-height: 320px;
+  box-shadow: var(--shadow-lg);
+  max-height: min(60vh, 420px);
   overflow-y: auto;
   z-index: 1300;
 }
@@ -446,22 +515,41 @@ body {
 .no-results-main { font-size: .85rem; color: var(--ink); }
 .no-results-hint { font-size: .76rem; color: var(--muted); }
 
-/* ── Pastilles « couches actives » (bandeau sous la recherche) ──────────
+/* ── Pastilles « couches actives » (attachée SOUS la barre flottante) ───
    Un point coloré par couche qui peint des pins en ce moment (rempli par
    js/sidebar.js renderActiveDots) : même recette visuelle que les .swatch
    de l'arbre (liseré sombre + halo de sa propre teinte) pour se lire comme
    la même famille d'objet. Survol : léger agrandissement + ✕ sombre au
    centre (affordance « masquer ») ; demi-teinte .partial = même vocabulaire
    que l'état partiel des lignes famille. Vide → masqué (:empty), le bandeau
-   ne réserve jamais d'espace pour rien. */
+   ne réserve jamais d'espace pour rien.
+   BOUCLE canonique (exigence utilisateur 2026-07-11c, ferme) : on AJOUTE
+   une couche via la recherche (résultat espèce/famille -> activateSpeciesLayer/
+   activateFamilyLayers, js/layeractivate.js -- déjà branché, buildFilters()
+   republie ce bandeau) et on la RETIRE en cliquant sa pastille ici -- la
+   barre et ce bandeau sont donc UNE SEULE unité fonctionnelle (ajout en
+   haut, retrait juste en dessous), pas deux widgets qui cohabitent par
+   hasard. Rendu visuel EXPRÈS pareil à #search (même recette --glass +
+   flou + --line + --radius-m que la barre juste au-dessus, gap réduit à
+   8px entre les deux dans #topbar) : les deux lisent comme LA MÊME carte
+   à deux rangées, jamais deux éléments flottants indépendants. Centré +
+   plafonné à la même largeur que le dropdown de résultats. */
 #active-dots {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 16px 0;
+  max-width: min(640px, 92vw);
+  padding: 7px 12px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  box-shadow: var(--shadow);
 }
-#active-dots:empty { display: none; }
+#active-dots:empty { display: none; padding: 0; border: none; background: none; box-shadow: none; }
 .adot {
   position: relative;
   flex: none;
@@ -490,6 +578,11 @@ body {
 
 /* ── Filtres ── */
 #filters, #tracked-section { padding: 10px 16px 2px; }
+/* Panneau devenu un arbre de filtre PUR (repositionnement 2026-07-11 : la
+   recherche a quitté #panel pour la barre flottante) — #filters suit
+   désormais .plaque directement ; un peu d'air en tête pour ne pas coller
+   au bandeau titre (l'espace libéré par la recherche/les pastilles). */
+.plaque + #filters { padding-top: 20px; }
 #filters h2, #tracked-section h2 {
   font-family: var(--font-display);
   font-size: .72rem;
@@ -2352,6 +2445,26 @@ button.rar-pill:hover {
   }
   #panel-toggle { left: 12px; }
   #detail { width: 100vw; max-width: 100vw; }
+  /* Tiroir plein écran ici (règle ci-dessus) : aucun espace libre où
+     recentrer la barre flottante — elle s'efface plutôt que de flotter
+     par-dessus le titre/✕ de la fiche (mission "search bar top-center"). */
+  #map-wrap:has(#detail.open) #topbar { opacity: 0; pointer-events: none; }
+}
+/* Au-delà de 760px, #detail garde sa largeur fixe (392px, voir sa règle de
+   base) : recentrer la barre dans l'espace libre RESTANT plutôt que la
+   laisser se faire recouvrir ou chevaucher le tiroir (mission "search bar
+   top-center" — décision : centrage-dans-l'espace-libre, pas centrage
+   viewport figé, voir captures drawer ouvert/fermé). */
+@media (min-width: 761px) {
+  #map-wrap:has(#detail.open) #topbar { padding-right: 392px; }
+  /* Le dropdown de résultats (normalement plus large que la barre, 640px)
+     ne doit pas non plus déborder sur le tiroir ouvert à une largeur
+     resserrée (ex. 1280px + tiroir) -- calé en plus sur .search-wrap (déjà
+     réduite par le padding-right ci-dessus) via ce 3e terme, jamais plus
+     large que l'espace réellement libre quand celui-ci est le facteur
+     limitant. Sans effet quand l'espace libre dépasse déjà 640px (le
+     premier terme du min() gagne alors, comportement de base inchangé). */
+  #map-wrap:has(#detail.open) #search-results { width: min(640px, 92vw, 100%); }
 }
 
 /* ── Téléphone (≤ 520 px) : le site doit rester utilisable en jeu ──────
@@ -2384,6 +2497,12 @@ button.rar-pill:hover {
   .readout { display: none; }          /* lecture de coordonnées : geste souris, inutile au doigt */
   .update-banner { left: 12px; right: 12px; max-width: none; transform: translateY(14px); }
   .update-banner.is-shown { transform: translateY(0); }
+  /* Barre flottante quasi pleine largeur (mission "search bar top-center") :
+     décalée sous le hamburger (#panel-toggle, 40px + 10px de marge) plutôt
+     que juxtaposée — un input quasi plein écran à CÔTÉ d'un bouton de 40px
+     serait écrasé des deux côtés. */
+  #topbar { top: 60px; left: 10px; right: 10px; }
+  .search-wrap { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -26,21 +26,6 @@
       </div>
     </header>
 
-    <div class="search-wrap">
-      <input id="search" type="search" placeholder="Chercher un PNJ, une quête, un objet…"
-             autocomplete="off" spellcheck="false" aria-label="Recherche"
-             data-i18n-attr="placeholder:searchPlaceholder;aria-label:searchAriaLabel">
-      <ul id="search-results" hidden></ul>
-    </div>
-
-    <!-- Pastilles « couches actives » (demande utilisateur 2026-07-11) : un
-         point coloré par couche qui peint des pins en ce moment — survol =
-         nom, clic = masquer sans re-parcourir l'arbre. Rempli/rejoué par
-         js/sidebar.js renderActiveDots() (dérivé du DOM de l'arbre, jamais
-         un état parallèle) ; masqué par CSS quand vide (:empty). -->
-    <div id="active-dots" role="group" aria-label="Couches actives"
-         data-i18n-attr="aria-label:activeDotsLabel"></div>
-
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
       <!-- ARBRE FINAL du panneau gauche (2026-07-11, corrections utilisateur
            du même jour — supersède les « 4 groupes + miroir de kinds ») :
@@ -108,6 +93,38 @@
   </button>
 
   <main id="map-wrap">
+    <!-- Barre de recherche flottante, haut-centre (repositionnement
+         2026-07-11, hors du panneau gauche) : #topbar est un conteneur de
+         CENTRAGE pur (aucun fond, pointer-events:none — voir css/style.css),
+         centré sur #map-wrap (LA CARTE, pas le viewport entier) donc suit le
+         panneau quand il se masque/réapparaît. .search-wrap (barre + son
+         dropdown) et #active-dots (bandeau des couches actives, juste
+         dessous) gardent EXACTEMENT les mêmes id/classes qu'avant dans le
+         panneau : js/search.js et js/sidebar.js n'ont pas une ligne à
+         changer, seul l'emplacement bouge. La barre et #active-dots forment
+         UNE SEULE unité (exigence utilisateur 2026-07-11c, ferme) : on
+         AJOUTE une couche via un résultat de recherche (clic-double-effet,
+         js/layeractivate.js) et on la RETIRE en cliquant sa pastille juste
+         en dessous. Raccourci « / » (hors saisie) et Échap (ferme les
+         résultats/quitte le focus) : voir js/search.js. -->
+    <div id="topbar">
+      <div class="search-wrap">
+        <input id="search" type="search" placeholder="Chercher un PNJ, une quête, un objet…"
+               autocomplete="off" spellcheck="false" aria-label="Recherche" aria-keyshortcuts="/"
+               data-i18n-attr="placeholder:searchPlaceholder;aria-label:searchAriaLabel">
+        <kbd class="search-kbd" aria-hidden="true">/</kbd>
+        <ul id="search-results" hidden></ul>
+      </div>
+      <!-- Pastilles « couches actives » (demande utilisateur 2026-07-11) : un
+           point coloré par couche qui peint des pins en ce moment — survol =
+           nom, clic = masquer sans re-parcourir l'arbre. Rempli/rejoué par
+           js/sidebar.js renderActiveDots() (dérivé du DOM de l'arbre, jamais
+           un état parallèle) ; masqué par CSS quand vide (:empty).
+           Repositionné SOUS la barre flottante (2026-07-11b, mission "search
+           bar top-center") — même id/comportement, seul l'emplacement change. -->
+      <div id="active-dots" role="group" aria-label="Couches actives"
+           data-i18n-attr="aria-label:activeDotsLabel"></div>
+    </div>
     <div id="map" aria-label="Carte du monde" data-i18n-attr="aria-label:mapAriaLabel"></div>
     <div id="readout" class="readout" aria-hidden="true">
       <span id="ro-coords">x — · z —</span><span class="ro-sep"></span><span id="ro-zoom">z0</span>

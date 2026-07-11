@@ -798,10 +798,31 @@ function iconWithRing(it) {
 }
 
 const resBox = $('#search-results');
+const searchInput = $('#search');
 let searchTimer = null;
-$('#search').addEventListener('input', e => {
+searchInput.addEventListener('input', e => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => renderSearch(e.target.value), 70);
+});
+/* Raccourcis clavier (repositionnement 2026-07-11, barre flottante
+   haut-centre) : « / » focus la barre depuis n'importe où — SAUF si le
+   focus est déjà dans un champ de saisie (input/textarea/contenteditable,
+   ce qui couvre aussi #search lui-même : taper un "/" dans une recherche
+   reste un caractère normal, jamais intercepté). Échap ferme le dropdown
+   de résultats et/ou quitte le focus de la barre — jamais un effet de bord
+   sur un Échap tapé ailleurs (aucun des deux n'a lieu si ni l'un ni
+   l'autre n'est actif). */
+document.addEventListener('keydown', e => {
+  if (e.key === '/') {
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    e.preventDefault();
+    searchInput.focus();
+    searchInput.select();
+  } else if (e.key === 'Escape' && (document.activeElement === searchInput || !resBox.hidden)) {
+    resBox.hidden = true;
+    searchInput.blur();
+  }
 });
 function renderSearch(raw) {
   const v = raw.trim();
