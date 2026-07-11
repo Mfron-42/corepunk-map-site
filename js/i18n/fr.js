@@ -198,6 +198,11 @@ export default {
       // Mécanisme harvest : un nœud de récolte (bûcheronnage/herboristerie/
       // minage — target.profession, localisé via professionLabel).
       goalHarvestLabel: profession => `récolte (${profession})`,
+      // Buts de récolte dont les TYPES de nœud acceptés sont byte-prouvés
+      // (#81, target.node_types -- 11 buts) -- ladder de chips nœud sous
+      // l'objectif, jamais une couche carte (aucun lien nœud->point côté
+      // client, voir data.js S.nodes).
+      goalAcceptedNodesLabel: 'Nœuds acceptés :',
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).
@@ -254,6 +259,15 @@ export default {
       farmGenericPoolNote: n => `Aussi un drop rare parmi ${n} camps à récompense générique — pas un spot de farm ciblé.`,
       farmSourcesNotMapped: 'Sources non rattachées à un camp connu pour l’instant.',
       farmOtherSourcesTitle: 'Autres sources',
+      // « Également trouvable dans des coffres » (#65) : containers[] d'un
+      // item/d'une recette, agrégé PAR CLASSE (camp_chest par famille de
+      // monstre, searchable_chest par bande de rareté) -- `ch` est déjà la
+      // MEILLEURE chance parmi les variantes de palier/grade repliées dans
+      // cette classe (voir build_site_data.py).
+      containersTitle: 'Également trouvable dans des coffres',
+      containerCampChestHint: 'Généré côté serveur par famille de monstre — aucun placement précis à montrer sur la carte.',
+      containerChanceUpTo: pct => `jusqu'à ${pct} %`,
+      containerChanceBelowOne: "jusqu'à < 1 %",
       soldByTitle: 'Vendu par',
       obtainDuringQuestTitle: 'Comment obtenir',
       obtainViaKill: name => `En tuant ${name}`,
@@ -326,6 +340,14 @@ export default {
       abilityLabel: 'Capacité',
       harvestTitle: 'Dépeçage',
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
+      // Fiche de référence « nœud de récolte » (#81, site/data/<lang>/nodes.bin)
+      // -- nom + palier + métier + ses propres lignes de butin (lootRowsHtml).
+      nodeFicheKind: 'Nœud de récolte',
+      // generic:true (9/30 types de nœud) : aucune localisation en jeu
+      // n'existe pour cette fiche interne -- pastille state-chip honnête,
+      // jamais un faux nom localisé inventé.
+      nodeGenericNote: "Nom interne — aucune localisation en jeu n'existe pour ce type de nœud.",
+      harvestedOnTitle: 'Récolté sur',
       statsTitle: 'Statistiques',
       realStatsBadge: 'réel',
       // Info-bulle du badge « réel » (monsters.md finding #1) : distingue
@@ -488,7 +510,7 @@ export default {
       workshop: 'Atelier', camp: 'Camp', item: 'Item', recipe: 'Recette',
       monster: 'Monstre', zone: 'Région', location: 'Lieu',
       ability: 'Capacité', event: 'Événement', chest: 'Coffre',
-      searchable_chest: 'Coffre fouillable',
+      searchable_chest: 'Coffre fouillable', node: 'Nœud de récolte',
     },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"

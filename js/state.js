@@ -69,6 +69,11 @@ const S = {
                             // js/fiches.js monsterVariantPickHtml/monsterKeyFor)
   devOn: initialDevOn(),    // révèle le contenu isTest (monstres/items/objets de quête/quêtes, feature #13)
                             // — masqué par défaut, voir js/devcontent.js + main.js buildDevToggle()
+  nodes: {},                // clé gn_* -> {name, tier, prof, generic?, aliases?, drops?}
+                            // (site/data/<lang>/nodes.bin, #81 — voir data.js loadDeferred,
+                            // js/fiches.js openNodeFiche/nodeChip, js/search.js buildNodeSearchIndex).
+                            // PAS de position/pin : le lien nœud->point de carte n'existe pas
+                            // côté client (byte-prouvé) -- fiche/recherche seulement, jamais une couche.
   locations: [],            // bestiaire/lore (MapMarkers.xml), index = id de recherche/fiche
   abilities: {},            // clé de capacité (nommées seulement) -> fiche
   events: [],               // événements de monde nommés

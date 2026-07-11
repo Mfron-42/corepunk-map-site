@@ -161,7 +161,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -195,6 +195,11 @@ async function loadDeferred() {
     // 404-tolérant comme tout fichier optionnel : une carte/build sans ce
     // bundle retombe juste sur "aucune table" plutôt que de planter.
     fetchJson(dataPath('loot_table_contents.bin')).catch(() => ({})),
+    // Nœuds de récolte (#81, site/data/<lang>/nodes.bin) : 30 types gn_* —
+    // référence seule (fiche + recherche + jointures item/but de quête),
+    // jamais une couche carte (voir S.nodes, js/state.js). 404-tolérant comme
+    // le reste de ce lot différé.
+    fetchJson(dataPath('nodes.bin')).catch(() => ({})),
   ]);
   S.campDetails = campDetails;
   S.recipes = recipes;
@@ -206,6 +211,7 @@ async function loadDeferred() {
   S.abilities = abilities;
   S.events = events;
   S.lootTableContents = lootTableContents;
+  S.nodes = nodes;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
   speciesNameIdx = null;   // index paresseux nom (replié, alias namesAll inclus) → id d'espèce (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)

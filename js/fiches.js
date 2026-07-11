@@ -6,7 +6,7 @@
    ici aussi. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX,
+  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
@@ -192,6 +192,32 @@ function openLootTableFiche(label) {
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
       ${sorted.length > 30 ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : ''}
       <div class="fiche-scroll">${lootRowsHtml(sorted, 'noLootCatalogued')}</div></div>`);
+  setFicheHash(null);
+}
+
+/* Fiche « nœud de récolte » (#81, site/data/<lang>/nodes.bin -- 30 types
+   gn_*) : nom + palier (T1-T3, texte brut comme it.tier ailleurs) + métier
+   (professionLabel) + ses propres lignes de butin agrégées (drops[], même
+   lootRowsHtml que monstre/camp/coffre/table -- garanti/chance, jamais un
+   rendu réinventé). `generic:true` (9/30, aucune localisation en jeu pour ce
+   type -- voir build_site_data.py resource_nodes_site()) : pastille
+   "unknown" honnête à côté du nom plutôt qu'un faux nom localisé -- même
+   vocabulaire state-chip que partout ailleurs (COORDINATION.md), jamais un
+   texte libre inventé. Pas de position/couche carte (le lien nœud->point
+   n'existe pas côté client, byte-prouvé) : pas de lien profond dédié
+   (setFicheHash(null)), même traitement que openRecipeFiche/openChestFiche. */
+function openNodeFiche(key) {
+  const n = S.nodes?.[key];
+  if (!n) return;
+  S.openFiche = { kind: 'node', id: key };
+  const hex = nodeHex(n);
+  const tierLine = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
+  const genericChip = n.generic ? ` ${stateChip('unknown', tr('nodeGenericNote'))}` : '';
+  openFiche(`
+    <div class="fiche-head"><div>
+      <div class="fiche-kind" style="color:${hex}">${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}</div>
+      <h2>${esc(n.name)}${genericChip}</h2></div></div>
+    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>`);
   setFicheHash(null);
 }
 
@@ -1408,15 +1434,18 @@ function vendorStockSection(vendorKey) {
   const v = S.vendors[vendorKey];
   if (!v) return '';
   if (!v.sells?.length) {
-    // Pastille "unknown" par défaut (unknown_states_DESIGN.md #19/re-check #4,
-    // task #67) : 20/69 vendors.json ont un `sells:[]` littéral, aucune
-    // documentation ne tranche pourquoi -- au moins 2 sous-populations
-    // probables (vendeurs de spec de héros S1/S2 potentiellement générés
-    // côté client vs. simple trou d'extraction), non distinguées ici faute
-    // d'un signal fiable ; "unknown" reste la formulation honnête par défaut
-    // tant que cette distinction n'est pas faite (suivi séparé, pas cette
-    // passe).
-    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('noVendorItems'))}</p></div>`;
+    // Pastille d'état RÉELLE (#68) : les 20/69 vendors.bin `sells:[]` vides
+    // (unknown_states_DESIGN.md #19/re-check #4, task #67) portent désormais
+    // `stockState` (dynamic/dev/unknown, la sous-distinction que le suivi
+    // ci-dessus disait manquer) + `stockStateReason` -- une phrase COURTE en
+    // anglais, jamais localisée (c'est une note de provenance technique pour
+    // qui creuse, pas un texte joueur, voir wave_pipeline_FRONT_TODO.md #4) --
+    // portée en info-bulle du chip via le 2ᵉ paramètre de stateChip (même
+    // mécanique que campFaunaUnknownNote/extraTitle ailleurs dans ce
+    // fichier). Repli "unknown" nu pour tout futur vendeur non classifié
+    // (aucun aujourd'hui, filet de sécurité seulement).
+    const chip = v.stockState ? stateChip(v.stockState, v.stockStateReason) : stateChip('unknown');
+    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${chip} ${esc(tr('noVendorItems'))}</p></div>`;
   }
   const rows = v.sells.map(s => {
     const key = typeof s === 'string' ? s : s.key;
@@ -1583,6 +1612,22 @@ function npcChip(name, ni) {
   const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
   const attrs = ni >= 0 ? ` data-act="fiche-npc" data-id="npc:${ni}"` : '';
   return `<span class="chip"${ecAttr(CATS.npc.hex, 'npc')}${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
+}
+
+/* Chip nœud de récolte (#81, gn_* -- S.nodes) : même composant `.chip` que
+   itemChip/npcChip ci-dessus, ouvre la fiche nœud (openNodeFiche). Teinte =
+   nodeHex (métier réel du nœud, jamais une couleur dupliquée en dur -- voir
+   config.js). `S.nodes` est chargé en différé (loadDeferred, comme
+   S.recipes/S.monsters) : un nœud pas encore résolu s'affiche en texte
+   replié sur sa CLÉ (jamais un lien deviné) et se répare tout seul au
+   prochain rendu de la fiche courante (item -> déjà dans la liste de
+   re-rendu post-loadDeferred de main.js ; but de quête -> la fiche quête
+   entière se rouvre déjà pour la même raison). */
+function nodeChip(nk) {
+  const n = S.nodes?.[nk];
+  const label = n ? n.name : pretty(nk.replace(/^gn_/, ''));
+  const attrs = n ? ` data-act="fiche-node" data-id="${esc(nk)}"` : '';
+  return `<span class="chip"${ecAttr(nodeHex(n), 'node')}${attrs}>${esc(label)}</span>`;
 }
 
 /* Désambiguïsation des items de quête « même nom » (quest-guide-feature plan
@@ -1926,6 +1971,19 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   }
 
   if (t.kind === 'object') {
+    // Ladder des nœuds acceptés (#81, target.node_types -- 11 buts / ~8
+    // quêtes, ex. a_fortune_forewarned ×3, heartwood_gethering) : QUELS types
+    // de nœud (S.nodes, gn_*) satisfont ce but de récolte, quand byte-prouvé
+    // -- une ligne de chips cliquables (nodeChip, ouvre la fiche nœud),
+    // JAMAIS une couche carte (le lien nœud->point n'existe pas côté client,
+    // voir data.js S.nodes/js/state.js) : une liste de référence, pas un
+    // "va ici". Calculé une fois, ajouté aux DEUX branches ci-dessous (avec
+    // ou sans `t.profession`) puisque les 11 buts observés se répartissent
+    // sur les deux (voir wave_pipeline_FRONT_TODO.md #3).
+    const nodesRow = (t.node_types && t.node_types.length)
+      ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedNodesLabel'))}</span></div>
+         <div class="goal-target-row"><div class="reward-chips">${t.node_types.map(nodeChip).join('')}</div></div>`
+      : '';
     // harvest (mechanism): a resource-gathering node (logging/herbalism/
     // mining -- geo.py's dedicated harvest branch, `target.profession`),
     // never an "Activatable" quest prop -- checked FIRST, before the
@@ -1939,7 +1997,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
       const profLabel = professionLabel(capitalize(t.profession));
       const relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalHarvestLabel', profLabel))}</span></div>`;
-      return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+      return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posRow}</div>`;
     }
     // t.item_key (quest-guide-feature plan sec 5.2) est une chose DIFFÉRENTE
     // de t.key ci-dessus : t.key est la clé catalogue PROPRE de cet objet
@@ -1982,7 +2040,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         ${activableBadge}
       </div>`;
     }
-    return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posRow}</div>`;
   }
 
   if (t.kind === 'monster') {
@@ -2000,20 +2058,34 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // monster fiche the link opens. Genuinely different labels (rare) are
     // left untouched -- never inventing or destroying real information.
     const nameLbl = (t.label && label && fold(t.label) === fold(label)) ? label : (t.label || label || '');
-    // Indice de niveau (task #80, "quest zone/step level hint") : la ZONE de
-    // ce but EST le camp résolu par geo.py (t.camp / t.search_zone.camp) --
-    // camp_details.json (déjà chargé, S.campDetails) porte justement le
-    // niveau RÉEL de cette espèce dans CE camp précis (`mobs[].lvl`, voir
-    // data/SCHEMA.md camps.json "One mobs[] row per species"). Quand la ligne
-    // se retrouve (par clé brute exacte ou, à défaut, par nom replié -- même
-    // repli que monsterKeyFor's dernier recours), monsterKeyFor résout vers
-    // le spawn de l'ESPÈCE le plus proche de CE niveau plutôt qu'un repli
-    // arbitraire (canonicalSiteKey pourrait être un niveau tout autre pour
-    // une espèce qui couvre 2 à 20). Même strip de préfixe que
-    // campPointsForZone ci-dessous (fulfillment-manager-/ffm-island-).
-    const campKeyShort = t.camp ? t.camp.replace(/^fulfillment-manager-/, '').replace(/^ffm-island-/, '') : null;
-    const campMobRow = campKeyShort && S.campDetails[campKeyShort]?.mobs?.find(mm => mm.key === t.key || fold(mm.name) === fold(nameLbl));
-    const levelHint = campMobRow?.lvl ?? null;
+    // Précision de cible (#87, échelle de précision COORDINATION.md "jamais
+    // plus précis que prouvable") : `t.bound_units` (byte-proven, geo.py's
+    // trigger-slot decode -- see wave_pipeline_FRONT_TODO.md #1) est
+    // désormais la SEULE source de niveau/portée affichée ici. L'ancien
+    // `levelHint` (campMobRow?.lvl, la plage COMPLÈTE de l'espèce dans CE
+    // camp -- ex. 2-20 pour les Imps de Windreach Woods) fabriquait un "niv 2"
+    // ou "niv 20" ponctuel pour un trigger qui accepte en réalité toute la
+    // plage -- supprimé PURE ET SIMPLEMENT (jamais réutilisé), avec le
+    // repli catalogue `S.monsters[mk].level` qui le remplaçait au premier
+    // rendu (avant que S.campDetails n'arrive) -- les deux étaient la MÊME
+    // fabrication de précision. Anchors : imp_brain_hunt Executioner "niv
+    // 5-20" (jamais "niv 2"), corruption_clean-up "niv 15" (un vrai niveau
+    // unique, prouvé malgré la portée famille), shell_we_eat = AUCUN niveau
+    // (abstract -- le trigger accepte n'importe quel niveau de Tortue).
+    const bu = t.bound_units;
+    // Portée (bu.scope) : "species" (ou bu absent/abstract, jamais de scope
+    // dans ce cas -- voir bound_units doc) -> une créature précise, nommée +
+    // fiche liée (résolution historique, inchangée). "family"/"families" ->
+    // le trigger accepte tout un GROUPE (ex. tous les Imps) -- jamais nommer
+    // une seule espèce à sa place ni lier sa fiche (l'échelle de précision
+    // l'interdit) : le libellé redevient la famille (pretty(), ou la
+    // jointure des familles quand `scope==="families"`), sans lien.
+    const isFamilyScope = !!(bu && bu.scope && bu.scope !== 'species');
+    const famLabel = isFamilyScope ? (bu.families || []).map(pretty).join(' / ') : null;
+    const lvl = !bu || bu.abstract ? null
+      : bu.levels?.length === 1 ? tr('levelAbbrev', bu.levels[0])
+        : bu.levels?.length > 1 ? tr('levelRangeAbbrev', bu.levels[0], bu.levels[bu.levels.length - 1])
+          : null;
     // BUG FIX (deferred-render-race blast-radius audit, follow-up task 3):
     // was `t.key || null` -- t.key is the RAW canonical monster key geo.py's
     // resolver matched, not necessarily the (name,level)-grouped
@@ -2025,16 +2097,15 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // or renders a link before S.monsters has even loaded. Same guarded
     // pattern as actorRows: unresolved -> plain text, never a guessed link;
     // self-heals once loadDeferred() completes and the quest fiche re-renders.
-    const mk = monsterKeyFor(t.key || null, nameLbl, levelHint);
-    // Niveau (S.monsters[mk].level) -- même garde différé que le lien : un
-    // niveau non résolu ne s'affiche simplement pas encore, il apparaît au
-    // re-rendu post-loadDeferred() comme le lien lui-même, jamais un chiffre
-    // deviné entre-temps.
-    const lvl = (mk && S.monsters[mk]?.level != null) ? tr('levelAbbrev', S.monsters[mk].level) : null;
-    const nameSpan = mk
-      ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
-      : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
+    // Portée famille -> jamais résolu/lié (pas de `mk`, voir isFamilyScope
+    // ci-dessus) ; `levelHint` supprimé du 3ᵉ argument (voir plus haut).
+    const mk = isFamilyScope ? null : monsterKeyFor(t.key || null, nameLbl, null);
     const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
+    const nameSpan = isFamilyScope
+      ? (famLabel ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(famLabel)}</span>` : '')
+      : mk
+        ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
+        : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
     const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
     // byte-attached -- see geo.py's drops_quest_loot join on BOTH mechs):
@@ -2830,6 +2901,71 @@ function farmSectionHtml(it) {
   return `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3>${groupsHtml}${unjoinedHtml}</div>`;
 }
 
+/* « Récolté sur » (#81) : ladder de chips nœud (it.nodes[], gn_* -- 35 items,
+   ex. Iron Ore -> ses 3 paliers de minerai météorique) -- même composant
+   nodeChip que la ligne de but de quête ci-dessus (goalTargetChip), aucune
+   duplication. Absent (le catalogue objet n'a pas ce champ, ex. tout objet
+   non récolté) -> section omise entièrement, jamais un titre vide. */
+function harvestedOnHtml(it) {
+  if (!it.nodes?.length) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('harvestedOnTitle'))}</h3>
+    <div class="reward-chips">${it.nodes.map(nodeChip).join('')}</div></div>`;
+}
+
+/* « Également trouvable dans des coffres » (#65, it.containers[]/recipes[]
+   .containers[]) : le pipeline agrège déjà PAR CLASSE de contenant --
+   camp_chest par famille de monstre, searchable_chest par bande de rareté --
+   `ch` étant la MEILLEURE chance parmi les variantes de palier/grade
+   repliées dans cette classe (voir build_site_data.py, commentaire de la
+   passe #65). Les deux classes n'ont PAS le même degré de vérité carte :
+     - camp_chest : AUCUN placement réel ne porte la famille de monstre (les
+       901 placements chests.bin `group==="camp_chest"` partagent tous le
+       même skin d'art "sci_fi", jamais la famille du camp voisin -- byte-
+       prouvé) -- classe de contenant SEULE, jamais de bouton carte (note
+       honnête `containerCampChestHint`), jamais un surlignage qui mentirait
+       sur ce qu'il montre.
+     - searchable_chest : les 487 placements RÉELS existent (searchable_chests.bin)
+       mais la rareté est décidée côté serveur au spawn (jamais dérivable
+       client, voir openSearchableChestFiche's own note) -- surligner ne peut
+       donc honnêtement allumer que la couche ENTIÈRE, jamais un sous-
+       ensemble par rareté fabriqué (data-act="chest-layer-highlight",
+       main.js -- même bookkeeping de toggle que camp-highlight). */
+function containerChanceText(ch) {
+  const pct = ch * 100;
+  if (pct < 1) return tr('containerChanceBelowOne');
+  const rounded = pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct < 10 ? 1 : 0 });
+  return tr('containerChanceUpTo', rounded);
+}
+function containerRarityLabel(r) {
+  const cap = r ? r[0].toUpperCase() + r.slice(1) : '';
+  return rarityLabel(cap) || pretty(r || '');
+}
+function containerRow(c) {
+  const label = c.group === 'searchable_chest' ? containerRarityLabel(c.rarity) : pretty(c.family || '');
+  const chance = c.ch != null ? `<span class="muted">${esc(containerChanceText(c.ch))}</span>` : '';
+  return `<div class="frow"><span class="fr-label">${esc(label)}</span>${chance}</div>`;
+}
+function containersSectionHtml(it) {
+  if (!it.containers?.length) return '';
+  const campRows = it.containers.filter(c => c.group === 'camp_chest');
+  const searchRows = it.containers.filter(c => c.group === 'searchable_chest');
+  const campBlock = campRows.length
+    ? `<div class="farm-group">
+        <div class="farm-group-head"><span class="farm-group-label" style="color:${CATS.camp_chest.hex}">${esc(tr('campChestLabel'))}</span></div>
+        <p class="hint">${esc(tr('containerCampChestHint'))}</p>
+        ${campRows.map(containerRow).join('')}
+      </div>` : '';
+  const searchN = (S.data.searchable_chest || []).length;
+  const searchHighlightBtn = searchRows.length && searchN
+    ? `<button class="act ghost" data-act="chest-layer-highlight" data-n="${searchN}">${esc(tr('highlightPointsBtn', searchN))}</button>` : '';
+  const searchBlock = searchRows.length
+    ? `<div class="farm-group">
+        <div class="farm-group-head"><span class="farm-group-label" style="color:${CATS.searchable_chest.hex}">${esc(tr('searchableChestTitle'))}</span>${searchHighlightBtn}</div>
+        ${searchRows.map(containerRow).join('')}
+      </div>` : '';
+  return `<div class="fiche-section"><h3>${esc(tr('containersTitle'))}</h3>${campBlock}${searchBlock}</div>`;
+}
+
 /* Section « Apparaît dans » de la fiche monstre (openMonsterFiche) : même
    jointure camp -> vrai nuage de points que farmSectionHtml ci-dessus
    (campGroupByKey, résolveur unique js/pointsets.js), + un bouton de groupe qui UNIT tous les camps joints
@@ -2952,12 +3088,18 @@ function openRecipeFiche(key) {
           <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
         </div>`;
       }).join('')}</div>` : '';
+  // Schéma trouvable en coffre (#65, 240 stubs recette) : MÊME composant que
+  // la fiche objet (containersSectionHtml, reward-chips/farm-group partagés)
+  // -- un schéma de recette EST un objet trouvable en contenant comme un
+  // autre, jamais une phrase réinventée séparément.
+  const containersHtml = containersSectionHtml(it);
   openFiche(`
     <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
       <div><div class="fiche-kind" style="color:${RECIPE_HEX}">${esc(tr('recipeTitle'))}${it.prof ? ' · ' + esc(professionLabel(it.prof)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${devMark}</div>
       <h2>${esc(it.name)}</h2>
       ${craftsHtml}</div></div>
     ${ingredientsHtml}
+    ${containersHtml}
     ${questsHtml}`);
   setFicheHash(null);
 }
@@ -3012,6 +3154,8 @@ function openItemFiche(key) {
   }
 
   const farmHtml = farmSectionHtml(it);
+  const harvestedOnHtmlBlock = harvestedOnHtml(it);
+  const containersHtml = containersSectionHtml(it);
 
   let vendorsHtml = '';
   if (it.soldBy?.length) {
@@ -3279,6 +3423,8 @@ function openItemFiche(key) {
     ${vendorsHtml}
     ${dropsHtml}
     ${farmHtml}
+    ${harvestedOnHtmlBlock}
+    ${containersHtml}
     ${useEffectHtml}
     ${rollRangeHtml}
     ${formulaHtmlBlock}
@@ -3349,5 +3495,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  openChestFiche, openSearchableChestFiche, openRecipeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
+  openChestFiche, openSearchableChestFiche, openRecipeFiche, openNodeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 };

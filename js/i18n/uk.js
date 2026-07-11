@@ -196,6 +196,10 @@ export default {
       // травництво/видобуток руди — target.profession, локалізовано через
       // professionLabel).
       goalHarvestLabel: profession => `видобуток (${profession})`,
+      // Цілі збору, чиї допустимі ТИПИ вузлів підтверджені побайтово (#81,
+      // target.node_types -- 11 цілей) -- ряд чипів-вузлів під ціллю, ніколи
+      // не шар карти (зв'язок тип-вузла -> точка не існує на клієнті).
+      goalAcceptedNodesLabel: 'Придатні вузли:',
       // Механізм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точне значення) — відрізняється від загального dropChanceApprox
       // (розрахункова частка, тут ніколи немає "≈" — це заданий грою відсоток).
@@ -244,6 +248,14 @@ export default {
       farmGenericPoolNote: n => `Також зрідка випадає в ${n} таборах із загальною нагородою — це не цільове місце фарму.`,
       farmSourcesNotMapped: 'Джерела ще не прив’язані до відомого табору.',
       farmOtherSourcesTitle: 'Інші джерела',
+      // «Також трапляється в скринях» (#65): containers[] предмета/рецепта,
+      // агреговано ЗА КЛАСОМ (camp_chest за родиною монстра, searchable_chest
+      // за класом рідкості) -- `ch` вже НАЙКРАЩИЙ шанс серед варіантів
+      // грейду/рівня, згорнутих у цей клас (див. build_site_data.py).
+      containersTitle: 'Також трапляється в скринях',
+      containerCampChestHint: 'Генерується сервером за родиною монстрів — немає конкретного розміщення, щоб показати на карті.',
+      containerChanceUpTo: pct => `до ${pct} %`,
+      containerChanceBelowOne: 'до < 1 %',
       soldByTitle: 'Продається у',
       obtainDuringQuestTitle: 'Як отримати',
       obtainViaKill: name => `Вбивши ${name}`,
@@ -314,6 +326,14 @@ export default {
       abilityLabel: 'Здібність',
       harvestTitle: 'Здобич',
       noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',
+      // Довідкова картка «вузол видобутку» (#81, site/data/<lang>/nodes.bin) --
+      // назва + рівень + професія + власні рядки здобичі (lootRowsHtml).
+      nodeFicheKind: 'Вузол видобутку',
+      // generic:true (9/30 типів вузлів): для цього внутрішнього запису немає
+      // локалізації в грі -- чесна пастилка state-chip, ніколи не вигадана
+      // локалізована назва.
+      nodeGenericNote: 'Внутрішня назва — для цього типу вузла немає локалізації в грі.',
+      harvestedOnTitle: 'Здобувається на',
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальні',
       // Підказка бейджа «реальні» (monsters.md finding #1): явно відрізняє
@@ -463,7 +483,7 @@ export default {
       workshop: 'Майстерня', camp: 'Табір', item: 'Предмет',
       monster: 'Монстр', zone: 'Регіон', location: 'Місце',
       ability: 'Здібність', event: 'Подія', chest: 'Скриня',
-      searchable_chest: 'Обшукувана скриня',
+      searchable_chest: 'Обшукувана скриня', recipe: 'Рецепт', node: 'Вузол видобутку',
     },
     // Категорії декору (chests.bin group="decor" за family, + "legacy" для
     // group="legacy_chest") — підрядки згортної групи "Декор"

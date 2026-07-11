@@ -21,7 +21,7 @@ import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openLocationFiche, openLootTableFiche, openChestFiche,
-  openSearchableChestFiche, openRecipeFiche,
+  openSearchableChestFiche, openRecipeFiche, openNodeFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -44,6 +44,30 @@ import { isHiddenTest, devContentCounts } from './devcontent.js';
 // plusieurs boutons rendus simultanément.
 let highlightedBtn = null;
 
+/* Bascule de surlignage PARTAGÉE (highlight = aperçu éphémère, un seul à la
+   fois — COORDINATION.md) : factorisée hors de 'camp-highlight' ci-dessous
+   pour que 'chest-layer-highlight' (#65, fiches.js containersSectionHtml)
+   participe au MÊME bookkeeping `highlightedBtn` plutôt que de dupliquer le
+   toggle -- cliquer l'un désactive proprement le libellé de l'autre s'il
+   était actif, comme deux boutons camp-highlight le faisaient déjà entre eux. */
+function applyPointHighlight(b, pts, color) {
+  if (highlightedBtn === b && hasHighlight()) {
+    clearHighlight();
+    b.textContent = tr('highlightPointsBtn', +b.dataset.n || 0);
+    highlightedBtn = null;
+    return;
+  }
+  if (!pts.length) return;
+  showHighlight(pts, color || '#888');
+  // Un AUTRE bouton était actif (ex. on bascule de la ligne d'un camp au
+  // bouton « Surligner tout » de son groupe, ou d'un camp à un contenant) :
+  // son libellé doit revenir à l'état par défaut, jamais rester bloqué sur
+  // « Masquer ».
+  if (highlightedBtn && highlightedBtn !== b) highlightedBtn.textContent = tr('highlightPointsBtn', +highlightedBtn.dataset.n || 0);
+  highlightedBtn = b;
+  b.textContent = tr('hideHighlightBtn');
+}
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
@@ -52,7 +76,7 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'fiche-node', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
@@ -65,39 +89,35 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-chest') openChestFiche(+id.split(':')[1]);
   else if (b.dataset.act === 'fiche-searchable-chest') openSearchableChestFiche(id);
   else if (b.dataset.act === 'fiche-recipe') openRecipeFiche(id);
+  else if (b.dataset.act === 'fiche-node') openNodeFiche(id);
   else if (b.dataset.act === 'camp-highlight') {
     // « Montre-moi TOUS les points de ce contenant » — toggle : un second
     // clic efface le surlignage sans fermer la fiche. `data-ids` (farm_spot_UX
     // : bouton « Surligner tout » d'un groupe de camps, fiches.js openItemFiche)
     // union les points de PLUSIEURS camps ; sans lui, comportement inchangé
     // (un seul camp, `data-id`, exactement l'ancien code de la fiche camp).
-    if (highlightedBtn === b && hasHighlight()) {
-      clearHighlight();
-      b.textContent = tr('highlightPointsBtn', +b.dataset.n || 0);
-      highlightedBtn = null;
-    } else {
-      const ids = b.dataset.ids ? b.dataset.ids.split(',') : (id ? [id] : []);
-      const pts = [];
-      let color = b.dataset.color || null;
-      for (const k of ids) {
-        // Résolveur unique (#82 chunk (b), js/pointsets.js) : même index
-        // camp→groupe que fiches.js/le compositeur — remplace l'ancien
-        // flatMap+find O(n) par clé, comportement identique.
-        const g = campGroupByKey(k);
-        if (!g) continue;
-        if (!color) color = CAMP_COLORS[g.kind] || '#888';
-        pts.push(...g.pts.map(([x, z]) => ({ x, z })));
-      }
-      if (pts.length) {
-        showHighlight(pts, color || '#888');
-        // Un AUTRE bouton était actif (ex. on bascule de la ligne d'un camp
-        // au bouton « Surligner tout » de son groupe) : son libellé doit
-        // revenir à l'état par défaut, jamais rester bloqué sur « Masquer ».
-        if (highlightedBtn && highlightedBtn !== b) highlightedBtn.textContent = tr('highlightPointsBtn', +highlightedBtn.dataset.n || 0);
-        highlightedBtn = b;
-        b.textContent = tr('hideHighlightBtn');
-      }
+    const ids = b.dataset.ids ? b.dataset.ids.split(',') : (id ? [id] : []);
+    const pts = [];
+    let color = b.dataset.color || null;
+    for (const k of ids) {
+      // Résolveur unique (#82 chunk (b), js/pointsets.js) : même index
+      // camp→groupe que fiches.js/le compositeur — remplace l'ancien
+      // flatMap+find O(n) par clé, comportement identique.
+      const g = campGroupByKey(k);
+      if (!g) continue;
+      if (!color) color = CAMP_COLORS[g.kind] || '#888';
+      pts.push(...g.pts.map(([x, z]) => ({ x, z })));
     }
+    applyPointHighlight(b, pts, color);
+  }
+  else if (b.dataset.act === 'chest-layer-highlight') {
+    // Ligne « Coffre fouillable » d'un groupe de contenants (#65,
+    // fiches.js containersSectionHtml) : la rareté n'est PAS dérivable par
+    // placement (décidée côté serveur au spawn, voir openSearchableChestFiche's
+    // own note) -- seule la couche ENTIÈRE des 487 vrais placements peut
+    // s'allumer honnêtement, jamais un sous-ensemble par rareté fabriqué.
+    const pts = (S.data.searchable_chest || []).map(r => ({ x: r.x, z: r.z }));
+    applyPointHighlight(b, pts, CATS.searchable_chest.hex);
   }
   else if (b.dataset.act === 'roll-rarity') setRollRarity(id, b.dataset.r);
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);

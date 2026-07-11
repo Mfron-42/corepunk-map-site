@@ -200,6 +200,11 @@ export default {
       // herboristería/minería — target.profession, localizado vía
       // professionLabel).
       goalHarvestLabel: profession => `recolectar (${profession})`,
+      // Objetivos de recolección cuyos TIPOS de nodo aceptados están
+      // probados a nivel de bytes (#81, target.node_types -- 11 objetivos) --
+      // una hilera de chips de nodo bajo el objetivo, nunca una capa del
+      // mapa (no existe un vínculo tipo-de-nodo -> punto en el cliente).
+      goalAcceptedNodesLabel: 'Nodos aceptados:',
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).
@@ -251,6 +256,15 @@ export default {
       farmGenericPoolNote: n => `También un botín raro entre ${n} campamentos de recompensa genérica — no es una zona de farmeo específica.`,
       farmSourcesNotMapped: 'Fuentes aún no vinculadas a un campamento conocido.',
       farmOtherSourcesTitle: 'Otras fuentes',
+      // «También se encuentra en cofres» (#65): containers[] de un ítem/una
+      // receta, agregado POR CLASE (camp_chest por familia de monstruo,
+      // searchable_chest por banda de rareza) -- `ch` ya es la MEJOR
+      // probabilidad entre las variantes de grado/nivel plegadas en esa
+      // clase (ver build_site_data.py).
+      containersTitle: 'También se encuentra en cofres',
+      containerCampChestHint: 'Generado por el servidor según la familia de monstruo — no hay una ubicación concreta que mostrar en el mapa.',
+      containerChanceUpTo: pct => `hasta ${pct} %`,
+      containerChanceBelowOne: 'hasta < 1 %',
       soldByTitle: 'Vendido por',
       obtainDuringQuestTitle: 'Cómo obtenerlo',
       obtainViaKill: name => `Matando a ${name}`,
@@ -325,6 +339,15 @@ export default {
       abilityLabel: 'Habilidad',
       harvestTitle: 'Recolección',
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
+      // Ficha de referencia «nodo de recolección» (#81, site/data/<lang>/
+      // nodes.bin) -- nombre + nivel + profesión + sus propias filas de
+      // botín (lootRowsHtml).
+      nodeFicheKind: 'Nodo de recolección',
+      // generic:true (9/30 tipos de nodo): no existe localización en el
+      // juego para este registro interno -- nota honesta al estilo
+      // state-chip, nunca un nombre localizado inventado.
+      nodeGenericNote: 'Nombre interno — no existe localización en el juego para este tipo de nodo.',
+      harvestedOnTitle: 'Recolectado en',
       statsTitle: 'Estadísticas',
       realStatsBadge: 'real',
       // Info-bulle del badge « real » (monsters.md finding #1): distingue un
@@ -472,7 +495,7 @@ export default {
       workshop: 'Taller', camp: 'Campamento', item: 'Ítem',
       monster: 'Monstruo', zone: 'Región', location: 'Lugar',
       ability: 'Habilidad', event: 'Evento', chest: 'Cofre',
-      searchable_chest: 'Cofre registrable',
+      searchable_chest: 'Cofre registrable', recipe: 'Receta', node: 'Nodo de recolección',
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable

@@ -3,7 +3,7 @@
    de déroulé de quête, et rendu de la liste de résultats. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX,
+  CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   catLabel, campDisplayName, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel,
   locationKindLabel, mapName,
@@ -17,7 +17,7 @@ import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
   openMonsterFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
-  openRecipeFiche,
+  openRecipeFiche, openNodeFiche,
 } from './fiches.js';
 import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
@@ -51,7 +51,7 @@ function itemBias(key, it) {
 const CAT_GLYPH = {
   npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦',
   monster: '🐾', zone: '🗺', location: '📖', ability: '✨', event: '⚑', chest: '🧰',
-  searchable_chest: '🗝', recipe: '📜',
+  searchable_chest: '🗝', recipe: '📜', node: '🌿',
 };
 const searchCatLabel = key => tbl('searchCat', key) || key;
 let searchIndex = [];
@@ -223,6 +223,7 @@ function buildSearch() {
   whenDeferred(buildLocationSearchIndex);
   whenDeferred(buildAbilitySearchIndex);
   whenDeferred(buildEventSearchIndex);
+  whenDeferred(buildNodeSearchIndex);
   // Recherche CROSS-CARTE : les entités des AUTRES cartes (non chargées
   // localement) viennent de search_index.bin. Ajoutées ici pour que la
   // recherche spanne tout dès le boot, quelle que soit la carte active.
@@ -485,6 +486,21 @@ function buildAbilitySearchIndex() {
    clic -> va juste voir sur la carte. */
 function buildEventSearchIndex() {
   S.events.forEach(e => pushSearchEntry(e.name, 'event', EVENT_HEX, e.x, e.z, null, null, pretty(e.kind), '⚑'));
+}
+
+/* Nœuds de récolte (#81, S.nodes -- 30 types gn_*, chargés en différé comme
+   S.abilities/S.locations ci-dessus) : pas de position (aucun lien nœud->point
+   n'existe côté client, voir data.js/state.js) -- fiche seule (openNodeFiche),
+   comme une capacité nommée. Sous-libellé = palier + métier ; le nom affiché
+   pour un nœud `generic:true` (9/30) est déjà le repli honnête posé par le
+   pipeline (pretty(clé), voir nodes.json) -- la pastille "unknown" explicite
+   vit sur SA FICHE (openNodeFiche), jamais dupliquée ici en un badge "Test"
+   qui mentirait sur la nature du contenu (réel, juste non localisé). */
+function buildNodeSearchIndex() {
+  Object.entries(S.nodes || {}).forEach(([key, n]) => {
+    const sub = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
+    pushSearchEntry(n.name, 'node', nodeHex(n), null, null, () => openNodeFiche(key), null, sub, '🌿');
+  });
 }
 
 /* Score d'un jeton de requête contre une entrée (plus bas = meilleur) :

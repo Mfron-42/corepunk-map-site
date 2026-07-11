@@ -195,6 +195,10 @@ export default {
       // Механизм harvest: узел добычи ресурсов (лесозаготовка/травничество/
       // добыча руды — target.profession, локализовано через professionLabel).
       goalHarvestLabel: profession => `добыча (${profession})`,
+      // Цели сбора, чьи допустимые ТИПЫ узлов подтверждены побайтово (#81,
+      // target.node_types -- 11 целей) -- ряд чипов-узлов под целью, никогда
+      // не слой карты (связь тип-узла -> точка не существует на клиенте).
+      goalAcceptedNodesLabel: 'Подходящие узлы:',
       // Механизм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точное значение) — отличается от общего dropChanceApprox (расчётная
       // доля, здесь никогда нет "≈" — это заданный игрой процент).
@@ -242,6 +246,14 @@ export default {
       farmGenericPoolNote: n => `Также изредка выпадает в ${n} лагерях с общей наградой — это не целевое место фарма.`,
       farmSourcesNotMapped: 'Источники пока не привязаны к известному лагерю.',
       farmOtherSourcesTitle: 'Другие источники',
+      // «Также встречается в сундуках» (#65): containers[] предмета/рецепта,
+      // агрегировано ПО КЛАССУ (camp_chest по семейству монстра,
+      // searchable_chest по классу редкости) -- `ch` уже ЛУЧШИЙ шанс среди
+      // вариантов грейда/уровня, свёрнутых в этот класс (см. build_site_data.py).
+      containersTitle: 'Также встречается в сундуках',
+      containerCampChestHint: 'Генерируется сервером по семейству монстров — нет конкретного места для показа на карте.',
+      containerChanceUpTo: pct => `до ${pct} %`,
+      containerChanceBelowOne: 'до < 1 %',
       soldByTitle: 'Продаётся у',
       obtainDuringQuestTitle: 'Как получить',
       obtainViaKill: name => `Убив ${name}`,
@@ -312,6 +324,14 @@ export default {
       abilityLabel: 'Способность',
       harvestTitle: 'Добыча',
       noHarvestCatalogued: 'Добыча при разделке этого монстра не каталогизирована.',
+      // Справочная карточка «узел добычи» (#81, site/data/<lang>/nodes.bin) --
+      // имя + уровень + профессия + собственные строки добычи (lootRowsHtml).
+      nodeFicheKind: 'Узел добычи',
+      // generic:true (9/30 типов узлов): для этой внутренней записи нет
+      // локализации в игре -- честная пастилка state-chip, никогда не
+      // выдуманное локализованное имя.
+      nodeGenericNote: 'Внутреннее имя — для этого типа узла нет локализации в игре.',
+      harvestedOnTitle: 'Добывается на',
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальные',
       // Подсказка бейджа «реальные» (monsters.md finding #1): явно отличает
@@ -462,7 +482,7 @@ export default {
       workshop: 'Мастерская', camp: 'Лагерь', item: 'Предмет',
       monster: 'Монстр', zone: 'Регион', location: 'Место',
       ability: 'Способность', event: 'Событие', chest: 'Сундук',
-      searchable_chest: 'Обыскиваемый сундук',
+      searchable_chest: 'Обыскиваемый сундук', recipe: 'Рецепт', node: 'Узел добычи',
     },
     // Категории декора (chests.bin group="decor" по family, + "legacy" для
     // group="legacy_chest") — подстроки сворачиваемой группы "Декор"

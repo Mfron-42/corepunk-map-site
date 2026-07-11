@@ -120,6 +120,16 @@ const EVENT_HEX = '#d65db1';
    chromatique du site (~45-80°, entre les ors/tans existants ~30-42° et les
    verts ~90°+ — même méthode que le commentaire CAMP_COLORS ci-dessus). */
 const RECIPE_HEX = '#c2a83f';
+/* Nœud de récolte (#81, site/data/<lang>/nodes.bin) : PAS de teinte dédiée
+   inventée -- un nœud EST déjà l'un des 3 métiers de récolte dont la couleur
+   de couche carte existe (CAMP_COLORS.mining/herbalism/logging, voir le
+   commentaire "palette pass" ci-dessus) ; ce helper réutilise directement
+   cette même source (même principe qu'ecAttr : jamais une teinte dupliquée en
+   dur à un nouveau site d'appel) plutôt que de forger une 4ᵉ couleur qui
+   diluerait le triplet déjà choisi pour sa lisibilité mutuelle. Repli
+   RECIPE_HEX (brasage cuivré neutre) seulement quand le nœud n'est pas encore
+   résolu (course de chargement différé, voir js/fiches.js nodeChip). */
+const nodeHex = n => CAMP_COLORS[(n?.prof || '').toLowerCase()] || RECIPE_HEX;
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 /* Statistiques de monstre (stats_decoded / stat_curve) — voir
@@ -413,7 +423,7 @@ function ecAttr(hex, kind) {
 export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank,
   CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
-  MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX,
+  MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,

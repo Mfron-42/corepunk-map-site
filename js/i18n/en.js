@@ -200,6 +200,11 @@ export default {
       // harvest mechanism: a resource-gathering node (logging/herbalism/
       // mining — target.profession, localized via professionLabel).
       goalHarvestLabel: profession => `harvest (${profession})`,
+      // harvest goal targets whose accepted node TYPES are byte-proven (#81,
+      // target.node_types -- 11 goals) -- rendered as a node-chip ladder
+      // under the objective, never a map layer (no node-type -> point
+      // binding exists client-side, see data.js S.nodes doc).
+      goalAcceptedNodesLabel: 'Accepted nodes:',
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,
@@ -258,6 +263,14 @@ export default {
       farmGenericPoolNote: n => `Also a rare drop from ${n} generic reward camps — not a targeted farm spot.`,
       farmSourcesNotMapped: 'Sources not mapped to a known camp yet.',
       farmOtherSourcesTitle: 'Other sources',
+      // "Also found in containers" (#65): an item/recipe's containers[]
+      // aggregated per class (camp_chest by monster family, searchable_chest
+      // by rarity band) -- `ch` is already the BEST chance across every
+      // grade/band variant folded into that class (see build_site_data.py).
+      containersTitle: 'Also found in containers',
+      containerCampChestHint: 'Spawned per monster family by the server — no single placement to point at on the map.',
+      containerChanceUpTo: pct => `up to ${pct} %`,
+      containerChanceBelowOne: 'up to < 1 %',
       soldByTitle: 'Sold by',
       // Quest-scripted-only obtain fallback (quest-guide-feature plan sec
       // 5.2/6.3): shown ONLY when an item has no generic recipe/drop/vendor
@@ -332,6 +345,14 @@ export default {
       abilityLabel: 'Ability',
       harvestTitle: 'Harvesting',
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
+      // Gathering-node reference fiche (#81, site/data/<lang>/nodes.bin) --
+      // name + tier + profession + its own harvest drop rows (lootRowsHtml).
+      nodeFicheKind: 'Gathering node',
+      // generic:true (9/30 node types): no in-game localization exists for
+      // this internal record anywhere in the client -- state-chip-style
+      // note, never a fabricated display name.
+      nodeGenericNote: 'Internal name — no in-game localization exists for this node type.',
+      harvestedOnTitle: 'Harvested from',
       statsTitle: 'Stats',
       realStatsBadge: 'real',
       // "real" badge tooltip (monsters.md finding #1): explicitly distinguish
@@ -487,7 +508,7 @@ export default {
       workshop: 'Workshop', camp: 'Camp', item: 'Item', recipe: 'Recipe',
       monster: 'Monster', zone: 'Region', location: 'Place',
       ability: 'Ability', event: 'Event', chest: 'Chest',
-      searchable_chest: 'Searchable chest',
+      searchable_chest: 'Searchable chest', node: 'Gathering node',
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
