@@ -420,6 +420,12 @@ export default {
       familyMembersTitle: n => `Види (${n})`,
       familyQuestsN: n => `Завдання для цієї родини (${n})`,
       abilityLabel: 'Здібність',
+      // EntityRef (◇, js/mapref.js — хвиля 0): a11y/title-фрази двох цілей
+      // кліку (крапка = показати/сховати, мітка = відкрити картку). Див.
+      //  §1.3.
+      refDrawShow: name => `Показати ${name} на карті`,
+      refDrawHide: name => `Сховати ${name} з карти`,
+      refOpenLabel: name => `Відкрити ${name}`,
       harvestTitle: 'Здобич',
       noHarvestCatalogued: 'Здобич при обробці цього монстра не каталогізована.',
       // Довідкова картка «вузол видобутку» (#81, site/data/<lang>/nodes.bin) --
@@ -586,6 +592,18 @@ export default {
       // "Wolf") від рядка виду "Монстр" (чіп "Монстр" + мітка "Wolf
       // Alpha").
       family: 'Родина',
+    },
+    // EntityRef (◇): слова kind, не покриті searchCat (таблиця здобичі /
+    // позиція / гравці PvP) — лише однина, ніколи не категорія. Див.
+    // js/mapref.js + en.js (повна документація).
+    refKind: {
+      loot: 'Таблиця здобичі', position: 'Позиція', players: 'Гравці',
+    },
+    // EntityRef: узагальнені мітки деградації (спец. §6.3, ЗАКРИТИЙ набір) —
+    // ніколи внутрішній ключ, ніколи вигаданий лор.
+    refGeneric: {
+      position: 'Точка завдання', object: 'Об’єкт завдання',
+      area: 'Область завдання', target: 'Ціль завдання',
     },
     // Категорії декору (chests.bin group="decor" за family, + "legacy" для
     // group="legacy_chest") — підрядки згортної групи "Декор"

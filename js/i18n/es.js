@@ -435,6 +435,12 @@ export default {
       familyMembersTitle: n => `Especies (${n})`,
       familyQuestsN: n => `Misiones para esta familia (${n})`,
       abilityLabel: 'Habilidad',
+      // EntityRef (◇, js/mapref.js — ola 0): frases a11y/title de los dos
+      // objetivos de clic (punto = mostrar/ocultar, etiqueta = abrir la
+      // ficha). Ver  §1.3.
+      refDrawShow: name => `Mostrar ${name} en el mapa`,
+      refDrawHide: name => `Ocultar ${name} del mapa`,
+      refOpenLabel: name => `Abrir ${name}`,
       harvestTitle: 'Recolección',
       noHarvestCatalogued: 'No hay botín de recolección catalogado para este monstruo.',
       // Ficha de referencia «nodo de recolección» (#81, site/data/<lang>/
@@ -600,6 +606,18 @@ export default {
       // Wolf" (chip "Familia" + etiqueta "Wolf") de una fila de especie
       // "Monstruo" (chip "Monstruo" + etiqueta "Wolf Alpha").
       family: 'Familia',
+    },
+    // EntityRef (◇): palabras de kind no cubiertas por searchCat (tabla de
+    // botín / posición / jugadores PvP) — solo singular, nunca una
+    // categoría. Ver js/mapref.js + en.js para la doc completa.
+    refKind: {
+      loot: 'Tabla de botín', position: 'Posición', players: 'Jugadores',
+    },
+    // EntityRef: etiquetas genéricas degradadas (spec §6.3, conjunto
+    // CERRADO) — nunca la clave interna, nunca lore inventado.
+    refGeneric: {
+      position: 'Posición de misión', object: 'Objeto de misión',
+      area: 'Área de misión', target: 'Objetivo',
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable

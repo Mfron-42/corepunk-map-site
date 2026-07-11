@@ -21,14 +21,14 @@ import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
-  openSearchableChestFiche, openRecipeFiche, openNodeFiche,
+  openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
   campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys,
 } from './pointsets.js';
-import { toggleSpecies, speciesCampWinner } from './specieslayer.js';
+import { toggleSpecies, speciesCampWinner, setFamilyOn } from './specieslayer.js';
 import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
 import { initMapRefDelegation } from './mapref.js';
 import { buildSearch, hideSearchResults } from './search.js';
@@ -252,22 +252,82 @@ initMapRefDelegation(document, {
       case 'loot': openLootTableFiche(info.key); break;
       case 'chest': openChestFiche(+String(info.key).split(':').pop()); break;
       case 'searchable_chest': openSearchableChestFiche(info.key); break;
-      // ability (GAP, vague 1) / zone (fiche région, vague R) : openers pas
-      // encore branchés ici — le libellé rend un span non-souligné honnête
-      // (mapref.js hasFiche=false), donc aucun ref-open n'est émis d'ici.
+      // GAP §7.1 fermé (vague 1) : la fiche capacité existait mais n'était
+      // atteignable que par la recherche — une référence [Capacité] à clé
+      // prouvée (S.abilities) est désormais soulignée et route ici.
+      case 'ability': openAbilityFiche(info.key); break;
+      // zone (fiche région, vague R) : opener pas encore branché — le
+      // libellé rend un span non-souligné honnête (mapref.js hasFiche=false),
+      // donc aucun ref-open n'est émis d'ici.
     }
   },
   draw(info) {
     switch (info.kind) {
-      case 'species': activateSpeciesLayer(info.key); break;
-      case 'family': activateFamilyLayers((info.family || info.key || '').split(',').filter(Boolean)); break;
-      case 'position': case 'zone':
-        if (info.x != null) goTo(info.x, info.z, undefined, info.label);
+      // La pastille est un TOGGLE (draw⇄hide, ratifié §1.3/§2.5 : UN sens
+      // partout) — jamais les orchestrateurs force-ON activateSpeciesLayer/
+      // activateFamilyLayers (eux servent le clic-double-effet de la
+      // recherche/des chips d'ouverture, sémantique « allumer », pas
+      // « basculer »). Même chemin que l'ex-handler species-layer :
+      // toggleSpecies + republication arbre/carte/hash.
+      // Clé DOUBLE espèce (vague 1) : une référence espèce porte la clé de
+      // FICHE (mk, S.monsters) ; la couche de l'arbre vit sur l'id d'ESPÈCE.
+      // La résolution mk→species appartient au routeur (jamais re-dérivée
+      // par surface) ; une clé déjà-espèce (harness, arbre vague 6) passe
+      // telle quelle.
+      case 'species': {
+        const sp = S.monsters?.[info.key]?.species || info.key;
+        if (!sp) break;
+        const on = toggleSpecies(sp);
+        buildFilters();
+        scheduleRedraw();
+        syncHash();
+        if (on) revealMonsterNode('species', sp);
         break;
-      default:
+      }
+      // Famille : bascule aussi — toutes les lignes déjà cochées → tout
+      // éteindre (setFamilyOn false, cascade espèces incluse) ; sinon le
+      // même geste d'allumage cascade que la case famille de l'arbre.
+      case 'family': {
+        const fams = (info.family || info.key || '').split(',').filter(Boolean);
+        if (!fams.length) break;
+        if (fams.every(f => S.monfam[f]?.on)) {
+          fams.forEach(f => setFamilyOn(f, false));
+          buildFilters();
+          scheduleRedraw();
+          syncHash();
+        } else {
+          activateFamilyLayers(fams);
+        }
+        break;
+      }
+      default: {
+        // Zone de recherche d'un OBJECTIF ([Région ●] de dynamicPosBadge,
+        // vague 1) : dessine le cercle/les vrais points de cette search_zone
+        // (viewGoalZone — même primitive que l'ancien bouton « Voir la
+        // zone », key = index dans currentGoalZones de la fiche ouverte).
+        if (info.kind === 'zone' && info.subrole === 'goal-zone') { viewGoalZone(info.key); break; }
+        // Locate (mode L, spec §2.4) : position / centroïde de zone / PNJ
+        // épinglé / objet placé / cible cross-carte. Coordonnées FINIES
+        // exigées (une référence cross-carte sans position locale expédie
+        // data-x="null" → NaN au décodage). data-subrole (ex. 'npc') = la
+        // couche du marqueur réel déjà rendu — même rôle que l'ancien
+        // data-cat de gotoBtn (pins.js pinRef). Cible sur une autre carte :
+        // bascule d'abord, puis focus si des coordonnées existent (mêmes
+        // gestes que les ex-map-goto/map-switch).
+        if (info.mode === 'L') {
+          const hasXY = Number.isFinite(info.x) && Number.isFinite(info.z);
+          const cat = info.subrole && info.subrole !== 'goal-zone' ? info.subrole : null;
+          if (info.map) {
+            switchMap(info.map, { keepView: true }).then(() => { if (hasXY) goTo(info.x, info.z, undefined, info.label, cat ? { cat } : null); });
+          } else if (hasXY) {
+            goTo(info.x, info.z, undefined, info.label, cat ? { cat } : null);
+          }
+          break;
+        }
         // Catégorie (mode C) : bascule le VRAI nœud d'arbre (même orchestration
         // partagée que les chips/recherche, jamais une seconde sémantique).
         if (info.mode === 'C' && info.fkey) activateCategoryNode('row', info.fkey);
+      }
     }
   },
 });

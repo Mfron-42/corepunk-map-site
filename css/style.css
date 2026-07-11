@@ -2778,3 +2778,8 @@ button.ref-label:focus-visible { outline: 2px solid var(--accent); outline-offse
   color: var(--muted);
   white-space: nowrap;
 }
+/* Dans une carte de cible d'objectif (vague 1), la référence se replie sur
+   plusieurs lignes quand elle déborde (libellé long + suffixe méta
+   « lvl 5–20 · 926 pts ») — jamais rognée au bord du tiroir. */
+.goal-target .ref { flex-wrap: wrap; min-width: 0; }
+.goal-target .ref .ref-label { text-align: left; }

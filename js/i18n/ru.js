@@ -418,6 +418,12 @@ export default {
       familyMembersTitle: n => `Виды (${n})`,
       familyQuestsN: n => `Задания на это семейство (${n})`,
       abilityLabel: 'Способность',
+      // EntityRef (◇, js/mapref.js — волна 0): a11y/title-фразы двух целей
+      // клика (точка = показать/скрыть, метка = открыть карточку). См.
+      //  §1.3.
+      refDrawShow: name => `Показать ${name} на карте`,
+      refDrawHide: name => `Скрыть ${name} с карты`,
+      refOpenLabel: name => `Открыть ${name}`,
       harvestTitle: 'Добыча',
       noHarvestCatalogued: 'Добыча при разделке этого монстра не каталогизирована.',
       // Справочная карточка «узел добычи» (#81, site/data/<lang>/nodes.bin) --
@@ -585,6 +591,18 @@ export default {
       // "Семейство" + метка "Wolf") от строки вида "Монстр" (чип "Монстр" +
       // метка "Wolf Alpha").
       family: 'Семейство',
+    },
+    // EntityRef (◇): слова kind, не покрытые searchCat (таблица добычи /
+    // позиция / игроки PvP) — только единственное число, никогда не
+    // категория. См. js/mapref.js + en.js (полная документация).
+    refKind: {
+      loot: 'Таблица добычи', position: 'Позиция', players: 'Игроки',
+    },
+    // EntityRef: обобщённые метки деградации (спец. §6.3, ЗАКРЫТЫЙ набор) —
+    // никогда внутренний ключ, никогда выдуманный лор.
+    refGeneric: {
+      position: 'Точка задания', object: 'Объект задания',
+      area: 'Область задания', target: 'Цель задачи',
     },
     // Категории декора (chests.bin group="decor" по family, + "legacy" для
     // group="legacy_chest") — подстроки сворачиваемой группы "Декор"

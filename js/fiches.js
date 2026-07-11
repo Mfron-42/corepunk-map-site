@@ -24,6 +24,7 @@ import { campGroupByKey, speciesPoints, familyPoints } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
+import { ref } from './mapref.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -1519,10 +1520,9 @@ function drawEstimatedZone(sz) {
   clearHighlight();
   drawGoalZone(sz, { estimate: true });
 }
-function zoneViewBtn(zi, isEstimate) {
-  const label = isEstimate ? tr('viewEstimatedZoneBtn') : tr('viewZoneBtn');
-  return `<button class="goto" data-act="goal-zone-view" data-zi="${zi}">${GOTO_ICON}<span>${esc(label)}</span></button>`;
-}
+/* (zoneViewBtn supprimé — vague 1 EntityRef : la zone de recherche d'un
+   objectif est désormais une référence [Région ●] construite directement
+   dans dynamicPosBadge, routée par main.js ref-draw → viewGoalZone.) */
 /* Zone(s) de monstre sur la carte (bestiaire / fiche « Voir la zone ») :
    dessine les VRAIS polygones de région (S.zonesGeo, propre à Kwalat) résolus
    par NOM depuis m.zones. Réutilise l'infra de zone d'objectif de quête
@@ -1600,7 +1600,13 @@ function dynamicPosBadge(t, regionHint) {
     const isEstimate = sz.confidence === 'medium';
     const label = isEstimate ? tr('posEstimatedZone') : tr('posDynamicZone');
     const title = tr(isEstimate ? 'stateUnknownTitle' : 'stateDynamicTitle');
-    return `<span class="pos-dynamic" title="${esc(title)}">${esc(label)}</span>${zoneViewBtn(zi, isEstimate)}`;
+    // EntityRef (vague 1) : l'ancien bouton « Voir la zone » (zoneViewBtn,
+    // supprimé) devient une référence [Région ●] — la pastille dessine la
+    // zone de recherche (viewGoalZone, routé par main.js sur data-subrole
+    // "goal-zone", key = index dans currentGoalZones). État non persistant
+    // (locate, comme un goto) : drawn:false explicite — jamais l'état de la
+    // couche Régions (S.zonesOn), qui est un AUTRE toggle.
+    return `<span class="pos-dynamic" title="${esc(title)}">${esc(label)}</span>${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false })}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
     return `<span class="pos-dynamic" title="${esc(tr('stateUnknownTitle'))}">${esc(tr('posUncatalogued'))}</span>`;
@@ -2036,20 +2042,27 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   if (!base) return '';
   const name = disambiguatedItemName(base, key, currentQuestItemDisambig);
   const icon = it?.icon ? `icons/${it.icon}` : null;
-  const attrs = it ? ` data-act="${itemFicheAct(it)}" data-id="${esc(key)}"` : '';
   const approxSup = approx ? '<sup>≈</sup>' : '';
   const qiFlag = key ? currentQuestItemFlags?.get(key) : undefined;
   const isQuest = qiFlag !== undefined ? qiFlag : (hint !== undefined ? hint : (it ? it.kind === 'quest_item' : null));
-  const badge = isQuest != null
-    ? `<span class="k-chip" style="--chip-c:${isQuest ? CATS.qao.hex : CATS.workshop.hex}">${esc(isQuest ? tr('questItemBadge') : tr('gameItemBadge'))}</span>`
-    : '';
-  // Une seule ligne SANS retours/indentation internes (fix bulle « ligne
-  // vide ») : le newline+indentation d'un gabarit multi-lignes se retrouvait
-  // tel quel dans le texte de la bulle quand le joueur le copiait/collait.
-  // Couleur d'entité (task #77) : posée sur le CONTENEUR (--chip-c consommé
-  // par .goal-target-item-label enfant, voir style.css) -- même teinte que
-  // itemChip/qtyItemChip pour cette même clé partout ailleurs sur le site.
-  return `<div class="goal-target-row goal-target-item${it ? ' link' : ''}"${it ? ecAttr(itemEcHex(it), itemEcKind(it)) : ''}${attrs}>${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}<span class="goal-target-item-label">${esc(name)}${approxSup}</span>${badge}${extraBadge || ''}</div>`;
+  // EntityRef (vague 1) : l'ancien badge k-chip détaché ([Objet de quête]/
+  // [Objet du jeu]) DEVIENT le kind-tag du composant — même information, un
+  // seul vocabulaire visuel ([Quest Item]/[Item]/[Recipe], §3.2 de la spec).
+  // Teinte : itemEcHex (rareté/recette, task #77 — la même que partout) via
+  // desc.hex ; libellé souligné ⇔ l'item résout au catalogue (jamais un lien
+  // deviné, même garde qu'avant) ; pas de pastille (un item n'a rien à
+  // dessiner — le placement éventuel vit dans la ligne position à côté).
+  // L'icône du catalogue reste en chrome de ligne (identité visuelle),
+  // AVANT la référence.
+  const kind = isQuest ? 'quest_item' : (it && isRecipeKind(it) ? 'recipe' : 'item');
+  const itemRef = ref({
+    kind,
+    key: key || null,
+    label: name,
+    hex: it ? itemEcHex(it) : null,
+    hasFiche: !!it,
+  });
+  return `<div class="goal-target-row goal-target-item">${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}${itemRef}${approxSup}${extraBadge || ''}</div>`;
 }
 /* Relation row for a receive_reward mechanism target whose `reward_of`
    (geo.py's _resolve_target_mech) names at least one quest OTHER than the
@@ -2071,13 +2084,13 @@ function rewardOfRelRow(t) {
   const others = (t.reward_of || []).filter(s => s !== S.openFiche?.id);
   if (!others.length) return '';
   const namesAligned = t.reward_of_names && t.reward_of_names.length === t.reward_of.length;
+  // EntityRef (vague 1) : chaque quête source est une référence [Quête] Nom —
+  // souligné ⇔ la quête résout sur S.quests (jamais un lien deviné).
   const links = others.map(slug => {
     const rq = S.quests.get(slug);
     const idx = t.reward_of.indexOf(slug);
     const qname = rq?.name || (namesAligned ? t.reward_of_names[idx] : slug);
-    return rq
-      ? `<span class="goal-target-name link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(qname)}</span>`
-      : `<span class="goal-target-name"${ecAttr(CATS.quest.hex, 'quest')}>${esc(qname)}</span>`;
+    return ref({ kind: 'quest', key: slug, label: qname, hasFiche: !!rq });
   }).join(esc(tr('orWord')));
   return `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`;
 }
@@ -2098,7 +2111,6 @@ function heroSpecLabel(code) {
 }
 function goalTargetChip(t, label, regionHint, isTestQuest) {
   if (!t || t.kind === 'multiple') return '';
-  const lbl = esc(label || '');
   // Cible NPC déjà résolue par nom (voir la branche t.kind === 'npc' plus
   // bas, même npcIndexByName) : quand une position fixe existe déjà (t.x !=
   // null), viser le pin NPC réel plutôt que la position brute de la cible --
@@ -2119,9 +2131,20 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // carte, jamais une coordonnée locale (mechanism decode job A, ex. le PNJ de
   // remise d'un receive_reward sur une autre carte) : bascule simple plutôt
   // que le texte générique dynamicPosBadge, qui masquait l'info de carte.
+  // EntityRef (vague 1) : l'ancien bouton « Carte » (gotoBtn) et les bascules
+  // cross-carte deviennent la référence locate ratifiée `[Position ●] <nom>`
+  // (spec §2.4/§3.3) — la pastille EST l'affordance carte, le nom reste un
+  // libellé EN CLAIR (une position n'a pas de fiche). `posCat` (couche du
+  // marqueur réel déjà rendu, ex. 'npc') voyage en data-subrole, relu par le
+  // routeur ref-draw de main.js — même rôle que l'ancien data-cat de gotoBtn.
+  // Cible cross-carte sans coordonnée locale : même référence, la pastille
+  // bascule de carte (libellé = nom de la carte cible, pos.x nul — le
+  // routeur ne vise que des coordonnées finies). Sans rien : dynamicPosBadge
+  // inchangé (états d'honnêteté — sa zone de recherche est elle-même devenue
+  // une référence [Région ●], voir dynamicPosBadge).
   const posRow = `<div class="goal-target-row goal-target-row-pos">${
-    t.x != null ? gotoBtn(posX, posZ, lbl, posCat)
-      : t.map ? crossMapOnlyBtn(t.map, lbl)
+    t.x != null ? ref({ kind: 'position', pos: { x: posX, z: posZ }, label: label || '', subrole: posCat || null })
+      : t.map ? ref({ kind: 'position', pos: { x: null, z: null, map: t.map }, label: mapName(t.map) })
         : dynamicPosBadge(t, regionHint)
   }</div>`;
 
@@ -2171,9 +2194,16 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // "va ici". Calculé une fois, ajouté aux DEUX branches ci-dessous (avec
     // ou sans `t.profession`) puisque les 11 buts observés se répartissent
     // sur les deux (voir wave_pipeline_FRONT_TODO.md #3).
+    // EntityRef (vague 1) : chaque type de nœud accepté est une référence
+    // [Nœud] Nom — souligné ⇔ résolu sur S.nodes (chargement différé : se
+    // répare seul au re-rendu, même garde que l'ancien nodeChip) ; jamais de
+    // pastille (le lien nœud→point n'existe pas côté client, byte-prouvé).
     const nodesRow = (t.node_types && t.node_types.length)
       ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedNodesLabel'))}</span></div>
-         <div class="goal-target-row"><div class="reward-chips">${t.node_types.map(nodeChip).join('')}</div></div>`
+         <div class="goal-target-row"><div class="reward-chips">${t.node_types.map(nk => {
+    const n = S.nodes?.[nk];
+    return ref({ kind: 'node', key: nk, label: n ? n.name : pretty(nk.replace(/^gn_/, '')), hex: nodeHex(n), hasFiche: !!n });
+  }).join('')}</div></div>`
       : '';
     // harvest (mechanism): a resource-gathering node (logging/herbalism/
     // mining -- geo.py's dedicated harvest branch, `target.profession`),
@@ -2201,7 +2231,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const differing = !!(t.item_key && t.item_key !== t.key);
     const primaryKey = differing ? t.item_key : (t.item_key || t.key);
     const approxForItem = t.item_key ? t.item_approx : t.approx;
-    const activableBadge = `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('activableBadge'))}</span>`;
+    // EntityRef (vague 1) : l'ancien badge k-chip « Activable » devient un
+    // tag de kind inerte [Objet] (mode N : pas de pastille tant que les
+    // couches qao.<type> du chunk (c) n'existent pas — dégradation honnête
+    // prévue par la spec §8, jamais une pastille qui n'allumerait rien).
+    const activableBadge = ref({ kind: 'qao', mode: 'N' });
     // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
     // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
     // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
@@ -2211,6 +2245,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // t.label — 45), même clic-double-effet que les chips monstre.
     let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, differing ? '' : activableBadge);
     let relRow = '';
+    // Quand la référence objet porte ELLE-MÊME la pastille de position
+    // (locate), la ligne position séparée disparaît — une seule affordance
+    // carte par cible, jamais deux boutons pour le même point (loi
+    // d'uniformisation, même logique que hasLayerResolution côté monstre).
+    let posInRef = false;
     if (itemRow && differing) {
       // collect_from_object (mechanism): the ONLY mech that ever attaches an
       // item_key distinct from the object's own key (use_object never does,
@@ -2218,35 +2257,36 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       // the actual container's own label when known (t.label, e.g. "Old
       // crate"), never a fabricated container name when it isn't (falls
       // back to the previous generic "obtained here" phrasing untouched).
-      relRow = t.label
-        ? `<div class="goal-target-row goal-target-row-rel">
-            <span class="k-chip" style="--chip-c:${CATS.qao.hex}">${esc(tr('containerBadge'))}</span>
+      // EntityRef (vague 1) : le conteneur nommé est une référence [Objet]
+      // — avec pastille locate quand son placement est byte-joint (t.x).
+      if (t.label) {
+        const canPing = t.x != null;
+        posInRef = canPing;
+        relRow = `<div class="goal-target-row goal-target-row-rel">
             <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
-            <span class="goal-target-name">${esc(cleanLabel(t.label))}</span>
-          </div>`
-        : `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+            ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
+          </div>`;
+      } else {
+        relRow = `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+      }
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
     // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
     // `label` (la phrase d'objectif déjà affichée au-dessus), la seule donnée
-    // honnête qu'on ait pour nommer cet objet, plutôt qu'une icône+badge sans
-    // aucun texte (le "ressemble à un tag mais y'a rien dedans" d'origine).
+    // honnête qu'on ait pour nommer cet objet. EntityRef (vague 1) : l'objet
+    // activable sans clé catalogue (ex. « soplo », l'aéronef d'Inspect the
+    // aircraft) est une référence [Objet] — pastille locate quand son
+    // placement qao est byte-joint (le retour « activable n'est plus
+    // cliquable »), tag+libellé nus sinon (honnête : rien à viser).
     if (!itemRow) {
-      // Objet activable SANS clé catalogue (ex. « soplo » = l'aéronef d'Inspect
-      // the aircraft) : la ligne d'identité n'a pas de fiche à ouvrir, mais
-      // quand une position est connue (t.x, placement qao byte-joint) elle
-      // devient un PING cliquable vers ce point (data-act="goto", MÊME geste
-      // que le bouton Carte de posRow) au lieu d'un libellé mort — le retour
-      // « activable n'est plus cliquable ». Sans position, reste un libellé
-      // simple (honnête : rien à viser). posRow garde le bouton Carte explicite.
       const canPing = t.x != null;
-      itemRow = `<div class="goal-target-row goal-target-item${canPing ? ' link' : ''}"${canPing ? ` data-act="goto" data-x="${t.x}" data-z="${t.z}" data-label="${lbl}"` : ''}>
+      posInRef = canPing;
+      itemRow = `<div class="goal-target-row goal-target-item">
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
-        <span class="goal-target-item-label">${lbl}</span>
-        ${activableBadge}
+        ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: label || '' })}
       </div>`;
     }
-    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posRow}</div>`;
+    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posInRef ? '' : posRow}</div>`;
   }
 
   if (t.kind === 'monster') {
@@ -2306,7 +2346,6 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // Portée famille -> jamais résolu/lié (pas de `mk`, voir isFamilyScope
     // ci-dessus) ; `levelHint` supprimé du 3ᵉ argument (voir plus haut).
     const mk = isFamilyScope ? null : monsterKeyFor(t.key || null, nameLbl, null);
-    const lvlSpan = lvl ? `<span class="goal-target-lvl">${esc(lvl)}</span>` : '';
     // Portée FAMILLE (#82 chunk (e), modèle « l'arbre EST le bestiaire ») :
     // le nom de CHAQUE famille est désormais un LIEN vers sa fiche FAMILLE
     // (data-act="fiche-family", délégué main.js — openFamilyFiche) : le
@@ -2322,51 +2361,73 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const famTokens = isFamilyScope
       ? [...new Set((bu.families || []).map(familyKey).filter(Boolean))]
       : [];
-    // Un jeton famille n'est LIÉ que s'il a vraiment une fiche (membres
-    // catalogue) — sinon libellé nu, jamais un lien mort.
-    const famNameSpan = f => familyHasMembers(f)
-      ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-family" data-id="${esc(f)}">${esc(pretty(f))}</span>`
-      : `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(pretty(f))}</span>`;
-    const nameSpan = isFamilyScope
-      ? (famTokens.length
-        ? famTokens.map(famNameSpan).join(' / ')
-        : (famLabel ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(famLabel)}</span>` : ''))
-      : mk
-        ? `<span class="goal-target-name link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(nameLbl)}</span>`
-        : (nameLbl ? `<span class="goal-target-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(nameLbl)}</span>` : '');
-    const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
+    // EntityRef (vague 1) — le mock canonique de la spec (§1.2) : la cible
+    // monstre devient `[Espèce ●] Imp Executioner  lvl 5–20 · 926 pts`.
+    //   - la PASTILLE remplace l'ancien bouton « Afficher X · N pts »
+    //     (monsterSpawnHighlightBtn/familyLayerActivateBtn, kill-list §7.2) :
+    //     même action (case espèce/famille de l'arbre, ref-draw → main.js),
+    //     état lu du même S.monsp/S.monfam, compte au survol + suffixe méta ;
+    //     0 point sur la carte active → ⊘ honnête (jamais pas-de-pastille) ;
+    //   - le NOM souligné remplace l'ancien span data-act (fiche monstre/
+    //     famille) — souligné ⇔ la fiche résout vraiment (mk/membres, jamais
+    //     un lien deviné, mêmes gardes qu'avant) ;
+    //   - niveau/chance de drop passent dans le suffixe méta (ratifié Q3 :
+    //     jamais un compte littéral DANS le tag).
+    // Clé DOUBLE espèce (fiche = mk, couche = spId) : la référence porte mk
+    // (data-key) ; le routeur ref-draw de main.js résout mk → S.monsters[mk]
+    // .species pour la couche — la résolution vit chez le routeur, jamais
+    // re-dérivée par surface (même discipline que le résolveur de points).
+    const spId = mk ? S.monsters[mk]?.species : null;
+    const spPts = spId ? speciesPoints(spId) : null;
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
     // byte-attached -- see geo.py's drops_quest_loot join on BOTH mechs):
     // `target.drop_chance` (0-100, byte-exact from SetQuestLootDirect, NOT
     // the generic loot-table weight share dropRateHtml renders elsewhere) --
     // shown as a plain percentage, or "Guaranteed" at the 100% direct-grant
-    // value QUEST_FORMAT.md sec 9b documents. Purely data-driven (no mechanism
-    // string needed): only ever present when a real quest-loot join happened.
+    // value QUEST_FORMAT.md sec 9b documents. Only meaningful next to a real
+    // attached item (t.item_key/item_label) -- never on a bare kill.
     const chanceText = t.drop_chance == null ? null
       : t.drop_chance >= 100 ? tr('guaranteedLabel') : tr('goalDropChanceLabel', t.drop_chance);
-    const chanceSpan = (itemRow && chanceText) ? `<span class="goal-target-lvl">${esc(chanceText)}</span>` : '';
+    const chanceInMeta = (t.item_key || t.item_label) ? chanceText : null;
+    const metaParts = n => [lvl, chanceInMeta,
+      n != null ? tr('entityPtsN', n.toLocaleString(numberLocale())) : null].filter(Boolean).join(' · ');
+    const famRef = f => {
+      const res = familyPoints(f);
+      return ref({
+        kind: 'family', key: f, label: pretty(f), hex: MONSTER_HEX,
+        hasFiche: familyHasMembers(f),
+        drawable: true, count: res ? res.nPts : 0,
+        drawn: !!S.monfam[f]?.on,
+        meta: metaParts(res ? res.nPts : null),
+      });
+    };
+    const nameSpan = isFamilyScope
+      ? (famTokens.length
+        ? famTokens.map(famRef).join(' / ')
+        : (famLabel ? ref({ kind: 'family', label: famLabel, hex: MONSTER_HEX, hasFiche: false, drawable: false }) : ''))
+      : mk
+        ? ref({
+          kind: 'species', key: mk, label: nameLbl, hex: MONSTER_HEX,
+          hasFiche: true,
+          drawable: !!spId, count: spPts ? spPts.nPts : 0,
+          drawn: !!(spId && S.monsp[spId]?.on),
+          meta: metaParts(spPts ? spPts.nPts : null),
+        })
+        : (nameLbl ? ref({ kind: 'species', label: nameLbl, hex: MONSTER_HEX, hasFiche: false, drawable: false, meta: metaParts(null) }) : '');
+    const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
     // Relation EXPLICITE seulement quand un item de quête est réellement
     // rattaché (le point central de cette passe) : "dropped by <monstre>".
     // Sans item (kill pur, ex. killig_creatures_field_robot), rien à relier
-    // -- la ligne redevient juste le nom+niveau, sans verbe inventé.
+    // -- la ligne redevient juste la référence, sans verbe inventé (niveau/
+    // chance/points vivent dans son suffixe méta, plus jamais des spans
+    // détachés).
     const relRow = itemRow
-      ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}${lvlSpan}${chanceSpan}</div>`
-      : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}${lvlSpan}</div>` : '');
-    // « Voir les spawns » (task #79, REBRANCHÉ par #82 chunk (d)) : le même
-    // bouton que la fiche monstre (monsterSpawnHighlightBtn, voir sa doc
-    // plus bas) — désormais LA case espèce de l'arbre (persistante jusqu'au
-    // décochage, points + zones), plus jamais un aperçu éphémère --
-    // "Tuer 20 araignées" doit pouvoir allumer les points de spawn concernés
-    // SANS quitter la fiche quête. Repli honnête : monstre non résolu (mk
-    // null) ou espèce sans AUCUN camp joint -> chaîne vide, jamais un bouton
-    // qui n'allumerait rien.
-    const spawnBtn = mk ? monsterSpawnHighlightBtn(S.monsters[mk]) : '';
-    // Affordance carte à portée FAMILLE (la « bulle » de la demande
-    // utilisateur, DISTINCTE du lien de nom vers la fiche ci-dessus) : bouton
-    // d'activation dédié, même modèle « Afficher · N pts » que les espèces
-    // (familyLayerActivateBtn — vide si la famille n'a aucun point ici).
-    const familyBtn = (isFamilyScope && famTokens.length) ? familyLayerActivateBtn(famTokens) : '';
-    const spawnRow = (spawnBtn || familyBtn) ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn || familyBtn}</div>` : '';
+      ? `<div class="goal-target-row goal-target-row-rel">${nameSpan ? `<span class="goal-target-rel-verb">${esc(tr('goalDroppedByLabel'))}</span>` : ''}${nameSpan}</div>`
+      : (nameSpan ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${nameSpan}</div>` : '');
+    // (Vague 1 EntityRef : l'ancienne ligne « Afficher X · N pts » —
+    // spawnBtn/familyBtn/spawnRow — est SUPPRIMÉE : la pastille du tag
+    // ci-dessus est la même case espèce/famille de l'arbre, persistante
+    // jusqu'au décochage, kill-list §7.2 de la spec.)
     // SCOPE ADDITION (2026-07-11, retour utilisateur : « quand je cherche tel
     // monstre, il me montre toujours des points au pif — il devrait activer
     // un de ces points [filtres] dont on vient de parler ») : `posRow`
@@ -2396,10 +2457,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // correctif que pour les espèces 0-camp (le lien de nom vers la fiche
     // famille reste, lui, toujours présent). Objets/monde/dynamique (autres
     // branches) gardent `posRow` inchangé — seule cette branche monstre est
-    // concernée.
-    const hasLayerResolution = !!spawnBtn || !!familyBtn;
+    // concernée. (Vague 1 : « bouton d'activation non vide » devient « la
+    // couche a réellement des points » lu au résolveur unique — spPts pour
+    // l'espèce, familyPoints par jeton pour la famille — strictement la même
+    // condition que rendaient spawnBtn/familyBtn.)
+    const hasLayerResolution = !!spPts
+      || (isFamilyScope && famTokens.some(f => !!familyPoints(f)));
     const monsterPosRow = hasLayerResolution ? '' : posRow;
-    return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}${spawnRow}</div>`;
+    return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}</div>`;
   }
 
   if (t.kind === 'npc') {
@@ -2433,13 +2498,20 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       if (rewardRow) {
         return `<div class="goal-target">${itemRow}${rewardRow}${posRow}</div>`;
       }
+      // EntityRef (vague 1) : le donneur est une référence [PNJ ●] — nom
+      // souligné ⇔ le PNJ résout sur la carte active (jamais un lien
+      // deviné), pastille locate ⇔ une position est connue (elle remplace la
+      // ligne « Carte » séparée : une seule affordance carte par cible).
       const ni = t.label ? npcIndexByName(t.label) : -1;
-      const giverSpan = (ni >= 0)
-        ? `<span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(t.label)}</span>`
-        : (t.label ? `<span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${esc(t.label)}</span>` : '');
-      const relRow = giverSpan
-        ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverSpan}</div>` : '';
-      return `<div class="goal-target">${itemRow}${relRow}${posRow}</div>`;
+      const canPing = t.x != null;
+      const giverRef = t.label ? ref({
+        kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: t.label,
+        hasFiche: ni >= 0, mode: 'L', drawable: canPing,
+        pos: canPing ? { x: posX, z: posZ } : undefined, subrole: posCat || null,
+      }) : '';
+      const relRow = giverRef
+        ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverRef}</div>` : '';
+      return `<div class="goal-target">${itemRow}${relRow}${canPing ? '' : posRow}</div>`;
     }
     // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) —
     // CORRIGÉ (audit quêtes 2026-07-11, classe A : 88 buts « talk/help »
@@ -2453,12 +2525,21 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // phrase en repli (`npcName`, calculé en tête de fonction avec le join
     // de pin) ; repli texte simple si le PNJ n'est pas sur la carte active
     // (jamais un lien deviné).
+    // EntityRef (vague 1) : `[PNJ ●] Nom` — nom souligné ⇔ le PNJ résout sur
+    // la carte active (mêmes gardes/sources qu'avant, voir le commentaire
+    // ci-dessus), pastille locate ⇔ une position existe (pin réel corrigé en
+    // tête de fonction — posX/posZ/posCat) ; elle absorbe la ligne « Carte »
+    // séparée. Sans position : tag+nom sans pastille, et posRow garde ses
+    // replis honnêtes (bascule cross-carte / position dynamique).
     const ni = npcName ? npcIndexByName(npcName) : -1;
-    const nameText = esc(cleanLabel(npcName || ''));
-    const nameRow = (ni >= 0)
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${nameText}</span></div>`
-      : (npcName ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name"${ecAttr(CATS.npc.hex, 'npc')}>${nameText}</span></div>` : '');
-    return `<div class="goal-target">${nameRow}${posRow}</div>`;
+    const canPing = t.x != null;
+    const npcRef = npcName ? ref({
+      kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: cleanLabel(npcName),
+      hasFiche: ni >= 0, mode: 'L', drawable: canPing,
+      pos: canPing ? { x: posX, z: posZ } : undefined, subrole: posCat || null,
+    }) : '';
+    const nameRow = npcRef ? `<div class="goal-target-row goal-target-row-rel">${npcRef}</div>` : '';
+    return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
   }
 
   if (t.kind === 'dynamic') {
@@ -2480,11 +2561,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // « activate_qao_… ») ; première lettre capitalisée pour le chip.
     const abLabel = t.label ? cleanLabel(t.label).replace(/^./, c => c.toUpperCase()) : null;
     if (!abLabel) return '';
+    // EntityRef (vague 1, GAP §7.1 de la spec) : `[Capacité] Nom` — le
+    // k-chip détaché devient le kind-tag. Souligné (ref-open →
+    // openAbilityFiche, routé main.js) UNIQUEMENT quand la CLÉ de la cible
+    // résout sur S.abilities — jamais un match par nom (la garde d'origine
+    // de cette branche : un lien de capacité faux serait pire que pas de
+    // lien). Jamais de pastille : lancer une capacité n'a pas de lieu.
+    const ab = t.key ? S.abilities?.[t.key] : null;
     return `<div class="goal-target">
       <div class="goal-target-row goal-target-item">
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
-        <span class="goal-target-item-label">${esc(abLabel)}</span>
-        <span class="k-chip" style="--chip-c:${ABILITY_HEX}">${esc(tr('abilityLabel'))}</span>
+        ${ref({ kind: 'ability', key: ab ? t.key : null, label: ab?.name || abLabel, hasFiche: !!ab })}
       </div>
     </div>`;
   }
@@ -2506,10 +2593,19 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // carte dessus, et la fiche offre en plus « Voir la zone » (contour
     // complet, S.zonesQuest). Sans centroïde (zone sans géométrie décodée :
     // « Around wreck », honnête trou), reste un libellé simple.
+    // EntityRef (vague 1) : `[Région ●] Nom` — pastille locate ⇔ le centroïde
+    // du polygone décodé est joint (t.x, geo.py zone_geo) ; elle absorbe la
+    // ligne « Carte » séparée (une seule affordance carte). Nom JAMAIS
+    // souligné tant que la fiche région n'existe pas (vague R — honnêteté
+    // §3.5 : pas de lien vers une page qui n'existe pas). Sans centroïde
+    // (« Around wreck », trou honnête) : tag+nom nus, posRow garde ses replis.
     const canPing = t.x != null;
-    const nameRow = zLabel
-      ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-name${canPing ? ' link' : ''}"${ecAttr(ZONE_HEX, 'zone')}${canPing ? ` data-act="goto" data-x="${t.x}" data-z="${t.z}" data-label="${esc(zLabel)}"` : ''}>${esc(zLabel)}</span></div>` : '';
-    return `<div class="goal-target">${nameRow}${posRow}</div>`;
+    const zoneRef = zLabel ? ref({
+      kind: 'zone', label: zLabel, drawable: canPing,
+      pos: canPing ? { x: t.x, z: t.z } : undefined, drawn: false,
+    }) : '';
+    const nameRow = zoneRef ? `<div class="goal-target-row goal-target-row-rel">${zoneRef}</div>` : '';
+    return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
   }
 
   if (t.kind === 'players') {
@@ -2518,8 +2614,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // position: a PvP kill objective has no single world location.
     const specs = (t.player_specs || []).map(heroSpecLabel);
     if (!specs.length) return '';
-    const text = tr('goalKillPlayerLabel', specs.join(', '));
-    return `<div class="goal-target"><div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-name">${esc(text)}</span></div></div>`;
+    // EntityRef (vague 1) : `[Joueurs] <specs>` — tag + libellé en clair
+    // (§3.3 : ni carte — un kill PvP n'a pas de lieu — ni fiche : aucune
+    // page de classe/héros n'existe, no-page justifié). Le verbe vit déjà
+    // dans la phrase d'objectif au-dessus, plus jamais une phrase dupliquée.
+    return `<div class="goal-target"><div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${ref({ kind: 'players', label: specs.join(', ') })}</div></div>`;
   }
 
   // Honest last-resort fallback (batch-wiring pass, mechanism decode job A):
@@ -2574,14 +2673,20 @@ function seriesActorsFor(q, g) {
    comme avant cette passe, jamais la mise en page verticale des vignettes à
    cible unique. */
 function seriesTargetChips(members, kind, regionHint) {
-  const badge = kind === 'object'
-    ? `<span class="k-chip" style="--chip-c:${CATS.qao.hex}">${tr('activableBadge')}</span>` : '';
+  // EntityRef (vague 1) : chaque membre est UNE référence — le kind-tag
+  // absorbe l'ancien badge « Activable », la pastille locate absorbe le
+  // bouton « Carte » (membre positionné) ; membre sans position : tag+nom
+  // nus + repli dynamicPosBadge inchangé. Membres = acteurs de slot, jamais
+  // des entités catalogue → pas de fiche (jamais un lien deviné).
+  const refKind = kind === 'object' ? 'qao'
+    : kind === 'monster' ? 'species'
+      : kind === 'npc' ? 'npc' : 'position';
   const icon = kind === 'object' ? `<span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>` : '';
   return `<div class="goal-target-series">${members.map(a => `
     <div class="goal-target goal-target-compact">
-      ${icon}${badge}
-      <span class="goal-target-mini-label">${esc(cleanLabel(a.label))}</span>
-      ${a.x != null ? gotoBtn(a.x, a.z, cleanLabel(a.label)) : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
+      ${icon}
+      ${ref({ kind: refKind, mode: a.x != null ? 'L' : 'N', hasFiche: false, pos: a.x != null ? { x: a.x, z: a.z } : undefined, label: cleanLabel(a.label) })}
+      ${a.x != null ? '' : dynamicPosBadge({ search_zone: a.searchZone }, regionHint)}
     </div>`).join('')}</div>`;
 }
 

@@ -454,6 +454,12 @@ export default {
       familyMembersTitle: n => `Espèces (${n})`,
       familyQuestsN: n => `Quêtes pour cette famille (${n})`,
       abilityLabel: 'Capacité',
+      // EntityRef (◇, js/mapref.js — vague 0) : phrases a11y/title des deux
+      // cibles de clic (pastille = afficher/masquer, libellé = ouvrir la
+      // fiche). Voir  §1.3.
+      refDrawShow: name => `Afficher ${name} sur la carte`,
+      refDrawHide: name => `Masquer ${name} de la carte`,
+      refOpenLabel: name => `Ouvrir ${name}`,
       harvestTitle: 'Dépeçage',
       noHarvestCatalogued: 'Aucun butin de dépeçage catalogué pour ce monstre.',
       // Fiche de référence « nœud de récolte » (#81, site/data/<lang>/nodes.bin)
@@ -632,6 +638,18 @@ export default {
       // la ligne "Famille Wolf" (chip "Famille" + libellé "Wolf") d'une
       // ligne espèce "Monstre" (chip "Monstre" + libellé "Wolf Alpha").
       family: 'Famille',
+    },
+    // EntityRef (◇) : mots de kind non couverts par searchCat (table de
+    // butin / position nue / joueurs PvP) — singulier seul, jamais une
+    // catégorie. Voir js/mapref.js + en.js pour la doc complète.
+    refKind: {
+      loot: 'Table de butin', position: 'Position', players: 'Joueurs',
+    },
+    // EntityRef : libellés génériques dégradés (spec §6.3, ensemble FERMÉ) —
+    // jamais la clé interne, jamais du lore inventé.
+    refGeneric: {
+      position: 'Position de quête', object: 'Objet de quête',
+      area: 'Zone de quête', target: 'Cible d’objectif',
     },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"

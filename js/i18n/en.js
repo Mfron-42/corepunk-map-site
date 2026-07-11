@@ -458,6 +458,13 @@ export default {
       familyMembersTitle: n => `Species (${n})`,
       familyQuestsN: n => `Quests for this family (${n})`,
       abilityLabel: 'Ability',
+      // EntityRef (◇, js/mapref.js — wave 0): a11y/title phrases of the two
+      // hit targets — the tag/dot ("show/hide on map", aria-pressed toggle)
+      // and the underlined name ("open the fiche"). See
+      //  §1.3.
+      refDrawShow: name => `Show ${name} on map`,
+      refDrawHide: name => `Hide ${name} from map`,
+      refOpenLabel: name => `Open ${name}`,
       harvestTitle: 'Harvesting',
       noHarvestCatalogued: 'No catalogued harvest loot for this monster.',
       // Gathering-node reference fiche (#81, site/data/<lang>/nodes.bin) --
@@ -630,6 +637,19 @@ export default {
       // (chip "Family" + label "Wolf") from a species "Monster" row (chip
       // "Monster" + label "Wolf Alpha").
       family: 'Family',
+    },
+    // EntityRef (◇) kind words that no searchCat key already covers (loot
+    // table / bare position / PvP players). Singular only — these kinds are
+    // never a category (all-vs-one), so no plural form. See js/mapref.js.
+    refKind: {
+      loot: 'Loot table', position: 'Position', players: 'Players',
+    },
+    // EntityRef degraded generic labels (spec §6.3) — the CLOSED set shown
+    // when the backing entity is display-gated: never the internal key, never
+    // invented lore. The kind tag still names the honest kind.
+    refGeneric: {
+      position: 'Quest position', object: 'Quest object',
+      area: 'Quest area', target: 'Objective target',
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
