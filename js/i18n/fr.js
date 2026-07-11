@@ -21,34 +21,45 @@ export default {
       // à balayer quand l'extraction de glossaire (#86) prouvera des termes
       // du jeu.
       groupMonsters: 'Monstres',
+      // Groupes racine Creeps/Wildlife (correction de structure utilisateur
+      // 2026-07-11 : Monsters/Creeps/Wildlife montés au niveau racine).
+      // groupCreeps suit le campKind expédié (« Creeps » — V20 en attente
+      // d'arbitrage owner) ; groupWildlife suit ONTOLOGY.md #11 (« Faune
+      // sauvage », le ◇ canonique — PAS le campKind.wildlife « Animaux »,
+      // violation V8 à balayer au chunk 3).
+      groupCreeps: 'Creeps',
+      groupWildlife: 'Faune sauvage',
       groupHarvest: 'Récolte',
       groupContainers: 'Interactables',
       groupWorld: 'Monde',
-      // Cases de cascade (IA finale) : aria-label partagé de chaque case
-      // maîtresse de groupe/sous-groupe (js/sidebar.js wireParentCheck).
+      // Pastille de cascade des sous-groupes (js/sidebar.js buildSubGroup) —
+      // les en-têtes de GROUPE racine n'en ont plus (correction finale
+      // 2026-07-11 : purs conteneurs plier/déplier).
       groupToggleAria: 'Cocher ou décocher toutes les couches de ce groupe',
-      // Titres de sous-groupes (IA finale). Ceux du groupe Monstres
-      // (Monsters/Creeps/Wildlife) réutilisent la table campKind — miroir
-      // VERBATIM des kinds du moteur (redirect utilisateur 2026-07-11),
-      // jamais un axe inventé. GLOSSARY-PENDING (libellés structurels).
+      // Chevron de pli des sous-groupes (bouton .subgrp-expand, à droite —
+      // zones de clic : pastille/libellé = bascule, chevron = pli seul).
+      subgroupFoldAria: 'Déplier ou replier',
+      // Titres de sous-groupes (IA finale). GLOSSARY-PENDING (libellés
+      // structurels).
       subWorldOthers: 'Autres',
       subChests: 'Coffres',
       subDestroyable: 'Destructibles',
       subInteractives: 'Interactifs',
       subOther: 'Autres',
       // Surcharges de libellé de ligne (affichage seul — les tokens de hash
-      // restent camp.<kind>) : la ligne kind grossière du sous-groupe
-      // Monsters ; le libellé honnête des gardes (2 camps/12 pts, AUCUN
-      // lien espèce/PNJ/butin — interactives_taxonomy_INVESTIGATION.md §5) ;
-      // la ligne honnête « Spawns non identifiés » (pools creeps-<région>/
-      // peaceful-animals-* sans espèce jointe — compte = exactement ce que
-      // la couche dessine, voir pointsets.js KIND_REST_ONLY) ; et la
+      // restent camp.<kind>) : le libellé honnête des gardes (2 camps/12
+      // pts, AUCUN lien espèce/PNJ/butin —
+      // interactives_taxonomy_INVESTIGATION.md §5) ; la ligne honnête
+      // « Spawns non identifiés » (camps sans espèce jointe — compte =
+      // exactement ce que la couche dessine, voir pointsets.js
+      // KIND_REST_ONLY ; sert désormais les TROIS groupes
+      // Monsters/Creeps/Wildlife, symétrie — l'ancienne monsterCampsRow
+      // « Camps de monstres » est retirée avec la bascule grossière) ; et la
       // désambiguïsation « (camps) » des kinds dynamiques rangés à côté de
       // props PLACÉS dans les buckets Interactables. Le kind `searchable`
       // reçoit un nom VRAIMENT distinct (« Points de fouille ») — plus
       // jamais quatre choses nommées « fouillable ». GLOSSARY-PENDING
       // (tokens internes d'outil de level-design, pas des termes du jeu).
-      monsterCampsRow: 'Camps de monstres',
       guardsRowLabel: 'Gardes (unité non identifiée)',
       kindRestRow: 'Spawns non identifiés',
       searchSpotsRow: 'Points de fouille (camps)',
@@ -92,7 +103,9 @@ export default {
       // affichés restent les tokens bruts du jeu prettifiés (aucune table de
       // localisation dans les données expédiées — GLOSSARY-PENDING #86,
       // comme le bestiaire).
-      monsterFamiliesTitle: 'Par famille',
+      // (monsterFamiliesTitle « Par famille » RETIRÉE 2026-07-11 avec la
+      // barre-séparateur + [Tous][Aucun], jugés inutiles par l'utilisateur —
+      // les lignes famille vivent directement dans le groupe Monsters.)
       familyCampsN: n => `${n} camp${n > 1 ? 's' : ''}`,
       // Sous-lignes ESPÈCE de l'arbre (#82 chunk (d), « l'arbre EST le
       // bestiaire » — js/sidebar.js buildSpeciesSublist). speciesCampsPts :
@@ -102,9 +115,32 @@ export default {
       // joint sur la carte active reste listée (accès fiche), grisée.
       speciesCampsPts: (n, p) => `${n} camp${n > 1 ? 's' : ''} · ${p} pts`,
       speciesZeroCamps: '0 camp sur cette carte',
+      // Faune 0-camp (wildlife_species.bin, job pass 2026-07-11b) : libellé
+      // GLOBAL — ces espèces (tortues/poules/oies…) n'ont de camp sur AUCUNE
+      // carte, contrairement à speciesZeroCamps (scopé carte active).
+      wildlifeZeroCamps: '0 camp connu',
       famSpeciesToggle: 'Parcourir les espèces de cette famille',
-      chestTypesAllBtn: 'Tous',
-      chestTypesNoneBtn: 'Aucun',
+      // #93 — fiche camp : activité + présence par mode (camp_details
+      // `activity`/`modes`, voir js/fiches.js campPresenceHtml). Formulation
+      // SOFT exigée (poids de registre serveur, unité exacte inconnue —
+      // jamais un taux de spawn/timer garanti).
+      campActivityLine: n => `Activité : ~${n} %`,
+      campActivityTitle: 'Poids d’activité du registre d’apparitions serveur — unité exacte inconnue ; absent = toujours actif.',
+      campModesTitle: 'Présence par mode',
+      campModesHint: 'Poids d’activation serveur par mode de jeu — jamais une garantie d’apparition.',
+      campModeTier: (m, n) => `${m} · palier ${n}`,
+      // POI enrichis (pipeline pass 2026-07-11b) : bouton vers la fiche
+      // encyclopédie (locations) + titre de lore divergent (locTitle).
+      poiLoreBtn: 'Encyclopédie',
+      poiLoreNamed: t => `Dans l’encyclopédie : « ${t} »`,
+      // Affordance compacte « Afficher [entité] · N pts » (uniformisation
+      // wording 2026-07-11 — remplace l'ancien « Voir tous les spawns dans
+      // ces camps (N camps · M points) », mot « camps » banni du wording
+      // quêtes/étapes/fiches ; voir js/fiches.js monsterSpawnHighlightBtn).
+      showEntityBtn: 'Afficher',
+      entityPtsN: p => `${p} pts`,
+      // (chestTypesAllBtn/chestTypesNoneBtn RETIRÉES 2026-07-11 avec la
+      // barre [Tous][Aucun] du groupe familles — plus aucun appelant.)
       // Container re-categorization (DATA_CONTRACT.md) : les 2 vraies couches
       // de coffres + le groupe "Décor" (legacy_chest/décor par famille).
       decorGroupLabel: 'Décor',
@@ -298,8 +334,12 @@ export default {
       // vidage à plat de 24 lignes — résumé d'en-tête, tiroir « +N », et les
       // replis honnêtes ci-dessous (camp non joint, aucune donnée de camp,
       // pool de récompense générique replié).
-      farmGroupSummary: (camps, pts) => `${camps} camp${camps > 1 ? 's' : ''} · ${pts} points`,
-      farmMoreCampsN: n => `+ ${n} autres camps`,
+      // Comptes MINIMAUX (uniformisation wording 2026-07-11 : « 926 pts »
+      // oui, « 4 camps » non — le mot « camps » est banni du wording des
+      // fiches ; le 1er paramètre historique (camps) est ignoré, signature
+      // conservée pour les appelants).
+      farmGroupSummary: (camps, pts) => `${pts} pts`,
+      farmMoreCampsN: n => `+ ${n} autres`,
       farmGenericPoolNote: n => `Aussi un drop rare parmi ${n} camps à récompense générique — pas un spot de farm ciblé.`,
       farmSourcesNotMapped: 'Sources non rattachées à un camp connu pour l’instant.',
       farmOtherSourcesTitle: 'Autres sources',
@@ -355,18 +395,12 @@ export default {
       variantsNote: n => ` · +${n} variantes`,
       monsterAbilitiesN: n => `Capacités (${n})`,
       monsterCampsN: n => `Apparaît dans (${n})`,
-      // Bouton de groupe « tout surligner » (fiche monstre, juillet 2026) :
-      // liaison au niveau CAMP uniquement — dessine l'union des nuages de
-      // points de tous les camps où ce monstre apparaît, jamais une
-      // affirmation sur quel point précis fait spawn quelle variante (voir
-      // le handler camp-highlight, main.js). Libellé « dans ces camps »
-      // volontaire, distinct du « Voir l'estimation » de l'étape de quête
-      // (viewEstimatedZoneBtn), qui dessine un autre jeu de données (points de
-      // camp de l'OBJET de quête).
-      monsterHighlightAllSpawns: (camps, pts) => `Voir tous les spawns dans ces camps (${camps} camp${camps > 1 ? 's' : ''} · ${pts} points)`,
+      // (monsterHighlightAllSpawns RETIRÉE 2026-07-11, uniformisation
+      // wording : remplacée par showEntityBtn/entityPtsN — « Afficher
+      // [espèce] · N pts », voir js/fiches.js monsterSpawnHighlightBtn.)
       noLootCatalogued: 'Butin non catalogué pour ce monstre.',
       noAbilitiesKnown: 'Aucune capacité connue pour ce monstre.',
-      noCampsKnown: 'Aucun camp connu pour ce monstre.',
+      noCampsKnown: 'Aucun lieu d’apparition connu pour ce monstre.',
       // Section faune de la fiche camp (unknown_states_DESIGN.md #4/#10,
       // tâche #67) : un camp « monster-ish » (kind monsters/creeps/wildlife)
       // dont le nom de manager ne donne aucune espèce résolue — prouvé au
@@ -600,6 +634,27 @@ export default {
       mushrooms: 'Champignons', bottles: 'Bouteilles', pots: 'Pots',
       wooden: 'Objets en bois', leafTrash: 'Tas de feuilles',
       vegetables: 'Légumes', urban: 'Objets urbains',
+    },
+    // Sous-catégories POI (interest_points.bin poiType — regroupement ◇
+    // curaté d'icônes, PAS une taxonomie du jeu, voir 
+    // §1 "poiType" ; les jetons sont les 8 familles réelles + "other"
+    // défensif, 0 record aujourd'hui).
+    poiType: {
+      habitat: 'Habitations', nature: 'Nature', fort: 'Fortifications',
+      curiosity: 'Curiosités', transport: 'Transport', profession: 'Métiers',
+      amenity: 'Commodités', portal: 'Portails', other: 'Autres',
+    },
+    // Qualificatif de camp (île-prison, jeton moteur patrol|buffed —
+    // sémantique byte-prouvée : base=PvE seul, patrol=seule variante
+    // présente en PvP (0.6), buffed=PvP seul 10 % — formulation SOFT,
+    // c'est un poids serveur, pas une garantie ni un tracé de ronde).
+    campQualifier: { patrol: 'Patrouille', buffed: 'Renforcé (PvP)' },
+    // Modes de jeu des tables de présence (#93, camp_details `modes`) —
+    // jetons moteur PvE/PvP/Solo*, PvE/PvP laissés tels quels (usage
+    // universel), Solo composé.
+    campMode: {
+      PvE: 'PvE', PvP: 'PvP', SoloPvE: 'PvE solo', SoloPvP: 'PvP solo',
+      SoloPvP_HC: 'PvP solo (HC)',
     },
     // Type physique d'un coffre (world_objects.json chest_type) -- ensemble
     // exact tiré de data/world_objects.json, voir data/SCHEMA.md "Chest loot + type".

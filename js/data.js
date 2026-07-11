@@ -161,7 +161,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -201,6 +201,14 @@ async function loadDeferred() {
     // jamais une couche carte (voir S.nodes, js/state.js). 404-tolérant comme
     // le reste de ce lot différé.
     fetchJson(dataPath('nodes.bin')).catch(() => ({})),
+    // Faune sauvage curatée (job pass 2026-07-11b, site/data/<lang>/
+    // wildlife_species.bin — voir data/SCHEMA.md, js/state.js S.wildlifeSpecies,
+    // js/pointsets.js zeroCampWildlifeSpecies, js/sidebar.js buildKindGroup) :
+    // catalogue GLOBAL (indépendant de la carte, comme species.bin), jamais
+    // une couche carte propre — alimente les sous-lignes espèce du sous-
+    // groupe Wildlife (les 19 espèces sans camp restent listées, "0 camp").
+    // 404-tolérant comme le reste de ce lot différé.
+    fetchJson(dataPath('wildlife_species.bin')).catch(() => ({})),
   ]);
   S.campDetails = campDetails;
   S.recipes = recipes;
@@ -213,9 +221,11 @@ async function loadDeferred() {
   S.events = events;
   S.lootTableContents = lootTableContents;
   S.nodes = nodes;
+  S.wildlifeSpecies = wildlifeSpecies;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
   speciesNameIdx = null;   // index paresseux nom (replié, alias namesAll inclus) → id d'espèce (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)
+  locationIdIdx = null;    // index paresseux id de lieu (POI `loc`) → index S.locations (voir locationIndexForId)
   // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
   // maps ship their own in their bundle (loadMapData). This deferred load is
   // Kwalat's — only apply it to S.camps when Kwalat is the ACTIVE map, else it
@@ -324,6 +334,23 @@ function loreIndexFor(key) {
   return i == null ? null : i;
 }
 
+/* POI `loc` (interest_points.bin, pipeline pass 2026-07-11b — jointure vers
+   MapMarkers.xml, S.locations `id`) -> index de fiche lore (même forme que
+   loreIndexFor ci-dessus, index inversé PAR id plutôt que par clé de
+   monstre). Sert le bouton « encyclopédie » du popup POI (js/popups.js
+   popupHtml) : ~32/156 POI ont un `loc` joint. Invalidé avec monsterLoreIdx
+   quand les données différées sont rechargées (setLang/loadDeferred). */
+let locationIdIdx = null;
+function locationIndexForId(id) {
+  if (!id) return null;
+  if (!locationIdIdx) {
+    locationIdIdx = new Map();
+    S.locations.forEach((l, i) => { if (l.id && !locationIdIdx.has(l.id)) locationIdIdx.set(l.id, i); });
+  }
+  const i = locationIdIdx.get(id);
+  return i == null ? null : i;
+}
+
 /* Table de butin COMPLÈTE par libellé (loot.md finding #2) : lue directement
    depuis S.lootTableContents (bundle dédié construit côté pipeline depuis
    loot_tables.json -- voir build_site_data.py::loot_table_contents_site(),
@@ -369,6 +396,6 @@ function resetDeferred() { deferredReady = false; }
 
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
-  resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems,
+  resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, locationIndexForId, lootTableItems,
   buildDecorGroups, initVersion, bootVersionStamp, fetchVersionStamp,
 };

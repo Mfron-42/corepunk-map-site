@@ -18,12 +18,16 @@ export default {
       // перенесено у «Світ»/«Інтерактивні об'єкти», див. js/sidebar.js).
       // GLOSSARY-PENDING.
       groupMonsters: 'Монстри',
+      // Кореневі групи Creeps/Wildlife (правка структури 2026-07-11).
+      groupCreeps: 'Кріпи',
+      groupWildlife: 'Дикі тварини',
       groupHarvest: 'Збір ресурсів',
       groupContainers: "Інтерактивні об'єкти",
       groupWorld: 'Світ',
       // Каскадні чекбокси (фінальна структура): спільний aria-label кожного
       // майстер-чекбокса групи/підгрупи (js/sidebar.js wireParentCheck).
       groupToggleAria: 'Позначити або зняти всі шари цієї групи',
+      subgroupFoldAria: 'Розгорнути або згорнути',
       // Заголовки підгруп. Підгрупи групи «Монстри» (Monsters/Creeps/
       // Wildlife) переиспользують таблицю campKind — дослівне дзеркало
       // kinds рушія. GLOSSARY-PENDING.
@@ -40,7 +44,6 @@ export default {
       // див. pointsets.js KIND_REST_ONLY); та суфікс «(табори)» динамічних
       // kinds поруч із РОЗМІЩЕНИМИ пропсами у бакетах інтерактивних
       // об'єктів. GLOSSARY-PENDING.
-      monsterCampsRow: 'Табори монстрів',
       guardsRowLabel: 'Стражі (неідентифікований юніт)',
       kindRestRow: 'Неідентифіковані спавни',
       searchSpotsRow: 'Місця обшуку (табори)',
@@ -79,7 +82,9 @@ export default {
       // ТАБОРІВ, де вона з'являється, ніколи «позиції X» (design §13.1).
       // Відображувані назви родин — сирі токени гри (GLOSSARY-PENDING #86,
       // як у бестіарії).
-      monsterFamiliesTitle: 'За родинами',
+      // (monsterFamiliesTitle вилучена 2026-07-11 разом із панеллю
+      // [Усі][Жодного] — рядки родин живуть прямо в кореневій групі
+      // «Монстри».)
       familyCampsN: n => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')}`,
       // Підрядки ВИДІВ дерева (#82 chunk (d), «дерево — це бестіарій» —
       // js/sidebar.js buildSpeciesSublist). Та сама чесність, що familyCampsN
@@ -87,9 +92,31 @@ export default {
       // — `p` надходить уже відформатованим (locale).
       speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')} · ${p} тчк`,
       speciesZeroCamps: '0 таборів на цій карті',
+      // Дика фауна без таборів (wildlife_species.bin, pass 2026-07-11b):
+      // ГЛОБАЛЬНЕ формулювання — ці види не мають таборів на ЖОДНІЙ карті,
+      // на відміну від speciesZeroCamps (активна карта).
+      wildlifeZeroCamps: '0 відомих таборів',
       famSpeciesToggle: 'Переглянути види цієї родини',
-      chestTypesAllBtn: 'Усі',
-      chestTypesNoneBtn: 'Жодного',
+      // #93 — картка табору: активність + присутність за режимами
+      // (camp_details `activity`/`modes`, js/fiches.js campPresenceHtml).
+      // М'ЯКЕ формулювання (вага серверного реєстру, точна одиниця
+      // невідома — ніколи не гарантований таймер появи).
+      campActivityLine: n => `Активність: ~${n}%`,
+      campActivityTitle: 'Вага активності в серверному реєстрі появ — точна одиниця невідома; відсутня = завжди активний.',
+      campModesTitle: 'Присутність за режимами',
+      campModesHint: 'Серверна вага активації за режимами гри — не гарантія появи.',
+      campModeTier: (m, n) => `${m} · рівень ${n}`,
+      // Збагачені POI (pass 2026-07-11b): кнопка до картки енциклопедії +
+      // розбіжна назва з лору (locTitle).
+      poiLoreBtn: 'Енциклопедія',
+      poiLoreNamed: t => `В енциклопедії: «${t}»`,
+      // Компактна кнопка «Показати [сутність] · N тчк» (уніфікація
+      // формулювань 2026-07-11 — слово «табори» вилучено з тексту
+      // завдань/карток; див. js/fiches.js monsterSpawnHighlightBtn).
+      showEntityBtn: 'Показати',
+      entityPtsN: p => `${p} тчк`,
+      // (chestTypesAllBtn/chestTypesNoneBtn вилучені 2026-07-11 —
+      // викликів не лишилось.)
       // Реорганізація контейнерів (DATA_CONTRACT.md): 2 реальних шари скринь
       // + група "Декор" (legacy_chest/decor за категорією).
       decorGroupLabel: 'Декор',
@@ -274,8 +301,10 @@ export default {
       // плаского списку з 24 рядків — підсумок у заголовку, розгортання
       // «+N», і чесні запасні варіанти нижче (незв’язаний табір, немає даних
       // про табір, згорнутий загальний пул нагород).
-      farmGroupSummary: (camps, pts) => `${camps} таборів · ${pts} точок`,
-      farmMoreCampsN: n => `+ ${n} таборів`,
+      // МІНІМАЛЬНІ лічильники (уніфікація 2026-07-11 — «926 тчк» так,
+      // «4 табори» ні; перший історичний параметр ігнорується).
+      farmGroupSummary: (camps, pts) => `${pts} тчк`,
+      farmMoreCampsN: n => `+ ще ${n}`,
       farmGenericPoolNote: n => `Також зрідка випадає в ${n} таборах із загальною нагородою — це не цільове місце фарму.`,
       farmSourcesNotMapped: 'Джерела ще не прив’язані до відомого табору.',
       farmOtherSourcesTitle: 'Інші джерела',
@@ -336,10 +365,11 @@ export default {
       // Формулювання «в цих таборах» навмисне, відрізняється від «Дивитися
       // оцінку» кроку завдання (viewEstimatedZoneBtn), яка малює інший набір
       // даних (точки табору ОБ'ЄКТА завдання).
-      monsterHighlightAllSpawns: (camps, pts) => `Показати всі спавни в цих таборах (${camps} ${pluralSlavic(camps, 'табір', 'табори', 'таборів')} · ${pts} ${pluralSlavic(pts, 'точка', 'точки', 'точок')})`,
+      // (monsterHighlightAllSpawns вилучена 2026-07-11 — замінена на
+      // showEntityBtn/entityPtsN, див. js/fiches.js.)
       noLootCatalogued: 'Здобич для цього монстра не каталогізована.',
       noAbilitiesKnown: 'Немає відомих здібностей у цього монстра.',
-      noCampsKnown: 'Немає відомих таборів для цього монстра.',
+      noCampsKnown: 'Відомих місць появи цього монстра немає.',
       // Секція фауни картки табору (unknown_states_DESIGN.md #4/#10, завдання
       // #67): «монстровий» табір (kind monsters/creeps/wildlife), чиє ім'я
       // менеджера не дає жодного розпізнаного виду — байт-доведено, що точки
@@ -554,6 +584,23 @@ export default {
       mushrooms: 'Гриби', bottles: 'Пляшки', pots: 'Горщики',
       wooden: "Дерев'яні об'єкти", leafTrash: 'Купи листя',
       vegetables: 'Овочі', urban: "Міські об'єкти",
+    },
+    // Підкатегорії POI (interest_points.bin poiType — НАШЕ кураторське
+    // групування іконок, НЕ таксономія гри, див.  §1
+    // "poiType").
+    poiType: {
+      habitat: 'Житла', nature: 'Природа', fort: 'Укріплення',
+      curiosity: 'Дивовижі', transport: 'Транспорт', profession: 'Професії',
+      amenity: 'Зручності', portal: 'Портали', other: 'Інше',
+    },
+    // Кваліфікатор табору (Острів-в'язниця, токен рушія patrol|buffed —
+    // семантика доведена байтово: база=лише PvE, patrol=єдиний варіант у
+    // PvP (0.6), buffed=лише PvP 10 %).
+    campQualifier: { patrol: 'Патруль', buffed: 'Посилений (PvP)' },
+    // Режими гри таблиць присутності (#93, camp_details `modes`).
+    campMode: {
+      PvE: 'PvE', PvP: 'PvP', SoloPvE: 'Соло PvE', SoloPvP: 'Соло PvP',
+      SoloPvP_HC: 'Соло PvP (HC)',
     },
     chestType: {
       Backpack: 'Рюкзак', Barrel: 'Бочка', Bathroom: 'Ванна кімната', Bedroom: 'Спальня',

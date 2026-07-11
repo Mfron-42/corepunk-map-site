@@ -191,6 +191,23 @@ function kindJoinTable() {
 /* Espèces WILD (non-catalogue) jointes à ≥1 camp d'un kind ici — lignes
    espèce du sous-groupe Creeps/Wildlife (sidebar.js). */
 function wildSpeciesOfKind(kind) { return kindJoinTable().get(kind)?.wild || []; }
+
+/* Espèces fauniques SANS AUCUN camp connu, catalogue ENTIER (job pass
+   2026-07-11b, wildlife_species.bin `camps: []` — 19/25 espèces : tortues
+   ×5, poule, oie, coq, corbeau, castor, rat ambiant, voglet, brisk, manta,
+   petit poisson, cochon, vache, buffle, chien). Contrairement à
+   wildSpeciesOfKind ci-dessus (jointure PAR kind via camp_details), ces
+   espèces n'ont RIEN à joindre nulle part -- listées quand même sous
+   Wildlife (sidebar.js buildKindGroup) : catalogue browsable/
+   recherchable, honnêteté "l'arbre est le bestiaire" (COORDINATION.md)
+   appliquée ici à la faune. GLOBAL (pas de résolution par carte, contrairement
+   à speciesCampSet -- il n'y a simplement aucun camp à résoudre). */
+function zeroCampWildlifeSpecies() {
+  return Object.entries(S.wildlifeSpecies || {})
+    .filter(([, w]) => !(w.camps && w.camps.length))
+    .map(([id, w]) => ({ id, name: w.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 /* Camps d'un kind joints à AU MOINS une espèce (catalogue ou wild). */
 function kindBoundCampKeys(kind) { return kindJoinTable().get(kind)?.bound || new Set(); }
 /* Camps d'un kind SANS aucune espèce jointe + leur volume de points —
@@ -213,11 +230,17 @@ function kindRestPoints(kind) {
    category/subtype fields. Kinds dont la ligne de panneau est « Spawns non
    identifiés » (compte = camps non joints) : leur couche kind ne dessine
    QUE ces camps-là (compositeur main.js) — les camps joints s'allument par
-   leurs lignes espèce/famille. Conséquence assumée/documentée : un lien
-   LEGACY `on=camp.creeps`/`camp.wildlife` dessine désormais le sous-
-   ensemble non joint (18 429/5 634 pts sur Kwalat) au lieu du kind entier —
-   le reste s'allume par les nouvelles lignes espèce, jamais perdu. */
-const KIND_REST_ONLY = new Set(['creeps', 'wildlife']);
+   leurs lignes espèce/famille. 'monsters' a rejoint le lot (correction de
+   structure utilisateur 2026-07-11 : Monsters/Creeps/Wildlife = trois
+   groupes racine SYMÉTRIQUES, chacun terminé par une ligne honnête
+   « Spawns non identifiés » — l'ancienne bascule grossière « Camps de
+   monstres », dont le compte recouvrait des camps déjà couverts par les
+   lignes famille, est remplacée par le même compte rest-only que les deux
+   autres). Conséquence assumée/documentée : un lien LEGACY
+   `on=camp.creeps`/`camp.wildlife`/`camp.monsters` dessine désormais le
+   sous-ensemble non joint au lieu du kind entier — le reste s'allume par
+   les lignes espèce/famille, jamais perdu. */
+const KIND_REST_ONLY = new Set(['monsters', 'creeps', 'wildlife']);
 
 /* ── Objets de quête (qao) → placements ─────────────────────────
    sel = {keys:[qaoKey…]} | {type:'Document'} — placements S.data.qao
@@ -243,6 +266,6 @@ function qaoPoints(sel) {
 export {
   campGroupByKey, speciesCampSet, speciesPoints,
   familyCampSet, familyPoints, monsterFamilies,
-  wildSpeciesOfKind, kindBoundCampKeys, kindRestPoints, KIND_REST_ONLY,
+  wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints, KIND_REST_ONLY,
   qaoPoints,
 };

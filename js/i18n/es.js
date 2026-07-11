@@ -16,12 +16,16 @@ export default {
       // groupPoi/groupQuests retirados con sus grupos (filas trasladadas a
       // World/Interactables, ver js/sidebar.js). GLOSSARY-PENDING.
       groupMonsters: 'Monstruos',
+      // Grupos raíz Creeps/Wildlife (corrección de estructura 2026-07-11).
+      groupCreeps: 'Creeps',
+      groupWildlife: 'Fauna',
       groupHarvest: 'Recolección',
       groupContainers: 'Interactuables',
       groupWorld: 'Mundo',
       // Casillas de cascada (IA final): aria-label compartido de cada
       // casilla maestra de grupo/subgrupo (js/sidebar.js wireParentCheck).
       groupToggleAria: 'Marcar o desmarcar todas las capas de este grupo',
+      subgroupFoldAria: 'Expandir o contraer',
       // Títulos de subgrupos (IA final). Los del grupo Monstruos
       // (Monsters/Creeps/Wildlife) reutilizan la tabla campKind — espejo
       // literal de los kinds del motor. GLOSSARY-PENDING.
@@ -38,7 +42,6 @@ export default {
       // pointsets.js KIND_REST_ONLY); y el sufijo «(campamentos)» de los
       // kinds dinámicos colocados junto a props FIJOS en los buckets de
       // Interactuables. GLOSSARY-PENDING.
-      monsterCampsRow: 'Campamentos de monstruos',
       guardsRowLabel: 'Guardias (unidad sin identificar)',
       kindRestRow: 'Apariciones sin identificar',
       searchSpotsRow: 'Puntos de registro (campamentos)',
@@ -78,7 +81,9 @@ export default {
       // son los de los CAMPAMENTOS donde aparece, nunca "posiciones de X"
       // (design §13.1). Los nombres de familia mostrados son los tokens del
       // juego prettificados (GLOSSARY-PENDING #86, como el bestiario).
-      monsterFamiliesTitle: 'Por familia',
+      // (monsterFamiliesTitle eliminada 2026-07-11 con la barra
+      // [Todos][Ninguno] — las filas de familia viven directamente en el
+      // grupo raíz Monstruos.)
       // n === 1 (no n > 1): «0 campamentos» es el plural honesto para las
       // familias sin campamento que el árbol ahora lista (chunk (d)).
       familyCampsN: n => `${n} campamento${n === 1 ? '' : 's'}`,
@@ -89,9 +94,32 @@ export default {
       // formateado (locale).
       speciesCampsPts: (n, p) => `${n} campamento${n === 1 ? '' : 's'} · ${p} pts`,
       speciesZeroCamps: '0 campamentos en este mapa',
+      // Fauna sin campamentos (wildlife_species.bin, pass 2026-07-11b):
+      // redacción GLOBAL — estas especies no tienen campamento en NINGÚN
+      // mapa, a diferencia de speciesZeroCamps (mapa activo).
+      wildlifeZeroCamps: '0 campamentos conocidos',
       famSpeciesToggle: 'Explorar las especies de esta familia',
-      chestTypesAllBtn: 'Todos',
-      chestTypesNoneBtn: 'Ninguno',
+      // #93 — ficha de campamento: actividad + presencia por modo
+      // (camp_details `activity`/`modes`, js/fiches.js campPresenceHtml).
+      // Redacción SUAVE (peso del registro del servidor, unidad exacta
+      // desconocida — nunca un temporizador garantizado).
+      campActivityLine: n => `Actividad: ~${n} %`,
+      campActivityTitle: 'Peso de actividad del registro de apariciones del servidor — unidad exacta desconocida; ausente = siempre activo.',
+      campModesTitle: 'Presencia por modo',
+      campModesHint: 'Peso de activación del servidor por modo de juego — nunca una garantía de aparición.',
+      campModeTier: (m, n) => `${m} · nivel ${n}`,
+      // POI enriquecidos (pass 2026-07-11b): botón hacia la ficha de la
+      // enciclopedia + título de lore divergente (locTitle).
+      poiLoreBtn: 'Enciclopedia',
+      poiLoreNamed: t => `En la enciclopedia: «${t}»`,
+      // Botón compacto «Mostrar [entidad] · N pts» (uniformización de
+      // redacción 2026-07-11 — sustituye al antiguo botón verboso; la
+      // palabra «campamentos» queda fuera de la redacción de misiones/
+      // fichas; ver js/fiches.js monsterSpawnHighlightBtn).
+      showEntityBtn: 'Mostrar',
+      entityPtsN: p => `${p} pts`,
+      // (chestTypesAllBtn/chestTypesNoneBtn eliminadas 2026-07-11 — sin
+      // llamadores.)
       // Recategorización de contenedores (DATA_CONTRACT.md): las 2 capas
       // reales de cofres + el grupo "Decoración" (legacy_chest/decor por
       // familia).
@@ -283,8 +311,10 @@ export default {
       // de un volcado plano de 24 filas — resumen de cabecera, desplegable
       // «+N», y los repliegues honestos de abajo (campamento sin unir, sin
       // datos de campamento, pool de recompensa genérica colapsado).
-      farmGroupSummary: (camps, pts) => `${camps} campamento${camps > 1 ? 's' : ''} · ${pts} puntos`,
-      farmMoreCampsN: n => `+ ${n} campamentos más`,
+      // Recuentos MÍNIMOS (uniformización 2026-07-11 — «926 pts» sí,
+      // «4 campamentos» no; primer parámetro histórico ignorado).
+      farmGroupSummary: (camps, pts) => `${pts} pts`,
+      farmMoreCampsN: n => `+ ${n} más`,
       farmGenericPoolNote: n => `También un botín raro entre ${n} campamentos de recompensa genérica — no es una zona de farmeo específica.`,
       farmSourcesNotMapped: 'Fuentes aún no vinculadas a un campamento conocido.',
       farmOtherSourcesTitle: 'Otras fuentes',
@@ -348,10 +378,11 @@ export default {
       // deliberado, distinto de "Ver estimación" del paso de misión
       // (viewEstimatedZoneBtn), que dibuja otro conjunto de datos (puntos de
       // campamento del OBJETO de misión).
-      monsterHighlightAllSpawns: (camps, pts) => `Resaltar todos los spawns en estos campamentos (${camps} campamento${camps > 1 ? 's' : ''} · ${pts} puntos)`,
+      // (monsterHighlightAllSpawns eliminada 2026-07-11 — sustituida por
+      // showEntityBtn/entityPtsN, ver js/fiches.js.)
       noLootCatalogued: 'Botín no catalogado para este monstruo.',
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
-      noCampsKnown: 'No se conoce ningún campamento para este monstruo.',
+      noCampsKnown: 'Ningún lugar de aparición conocido para este monstruo.',
       // Sección de fauna de la ficha de campamento (unknown_states_DESIGN.md
       // #4/#10, tarea #67): un campamento "de tipo monstruo" (kind monsters/
       // creeps/wildlife) cuyo nombre de manager no da ninguna especie
@@ -568,6 +599,23 @@ export default {
       mushrooms: 'Setas', bottles: 'Botellas', pots: 'Macetas',
       wooden: 'Objetos de madera', leafTrash: 'Montones de hojas',
       vegetables: 'Verduras', urban: 'Objetos urbanos',
+    },
+    // Subcategorías POI (interest_points.bin poiType — agrupación curada
+    // NUESTRA de iconos, NO una taxonomía del juego, ver 
+    // ONTOLOGY.md §1 "poiType").
+    poiType: {
+      habitat: 'Viviendas', nature: 'Naturaleza', fort: 'Fortificaciones',
+      curiosity: 'Curiosidades', transport: 'Transporte', profession: 'Oficios',
+      amenity: 'Servicios', portal: 'Portales', other: 'Otros',
+    },
+    // Calificador de campamento (Isla-prisión, token del motor
+    // patrol|buffed — semántica probada byte a byte: base=solo PvE,
+    // patrol=única variante en PvP (0.6), buffed=solo PvP 10 %).
+    campQualifier: { patrol: 'Patrulla', buffed: 'Reforzado (PvP)' },
+    // Modos de juego de las tablas de presencia (#93, camp_details `modes`).
+    campMode: {
+      PvE: 'PvE', PvP: 'PvP', SoloPvE: 'PvE individual', SoloPvP: 'PvP individual',
+      SoloPvP_HC: 'PvP individual (HC)',
     },
     chestType: {
       Backpack: 'Mochila', Barrel: 'Barril', Bathroom: 'Baño', Bedroom: 'Dormitorio',

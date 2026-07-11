@@ -18,12 +18,16 @@ export default {
       // перенесены в «Мир»/«Интерактивные объекты», см. js/sidebar.js).
       // GLOSSARY-PENDING.
       groupMonsters: 'Монстры',
+      // Корневые группы Creeps/Wildlife (правка структуры 2026-07-11).
+      groupCreeps: 'Крипы',
+      groupWildlife: 'Дикие животные',
       groupHarvest: 'Добыча ресурсов',
       groupContainers: 'Интерактивные объекты',
       groupWorld: 'Мир',
       // Каскадные чекбоксы (финальная структура): общий aria-label каждого
       // мастер-чекбокса группы/подгруппы (js/sidebar.js wireParentCheck).
       groupToggleAria: 'Отметить или снять все слои этой группы',
+      subgroupFoldAria: 'Развернуть или свернуть',
       // Заголовки подгрупп. Подгруппы группы «Монстры» (Monsters/Creeps/
       // Wildlife) переиспользуют таблицу campKind — дословное зеркало
       // kinds движка. GLOSSARY-PENDING.
@@ -40,7 +44,6 @@ export default {
       // pointsets.js KIND_REST_ONLY); и суффикс «(лагеря)» динамических
       // kinds, стоящих рядом с РАЗМЕЩЁННЫМИ пропсами в бакетах
       // интерактивных объектов. GLOSSARY-PENDING.
-      monsterCampsRow: 'Лагеря монстров',
       guardsRowLabel: 'Стражи (неопознанный юнит)',
       kindRestRow: 'Неопознанные спавны',
       searchSpotsRow: 'Места обыска (лагеря)',
@@ -80,7 +83,9 @@ export default {
       // ЛАГЕРЕЙ, где оно появляется, никогда «позиции X» (design §13.1).
       // Отображаемые имена семейств — сырые токены игры (GLOSSARY-PENDING
       // #86, как в бестиарии).
-      monsterFamiliesTitle: 'По семействам',
+      // (monsterFamiliesTitle удалена 2026-07-11 вместе с панелью
+      // [Все][Нет] — строки семейств живут прямо в корневой группе
+      // «Монстры».)
       familyCampsN: n => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')}`,
       // Подстроки ВИДОВ дерева (#82 chunk (d), «дерево — это бестиарий» —
       // js/sidebar.js buildSpeciesSublist). Та же честность, что familyCampsN
@@ -88,9 +93,31 @@ export default {
       // — `p` приходит уже отформатированным (locale).
       speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')} · ${p} тчк`,
       speciesZeroCamps: '0 лагерей на этой карте',
+      // Дикая фауна без лагерей (wildlife_species.bin, pass 2026-07-11b):
+      // ГЛОБАЛЬНАЯ формулировка — у этих видов нет лагерей НИ на одной
+      // карте, в отличие от speciesZeroCamps (активная карта).
+      wildlifeZeroCamps: '0 известных лагерей',
       famSpeciesToggle: 'Показать виды этого семейства',
-      chestTypesAllBtn: 'Все',
-      chestTypesNoneBtn: 'Нет',
+      // #93 — карточка лагеря: активность + присутствие по режимам
+      // (camp_details `activity`/`modes`, js/fiches.js campPresenceHtml).
+      // МЯГКАЯ формулировка (вес серверного реестра, точная единица
+      // неизвестна — никогда не гарантированный таймер появления).
+      campActivityLine: n => `Активность: ~${n}%`,
+      campActivityTitle: 'Вес активности в серверном реестре появлений — точная единица неизвестна; отсутствует = всегда активен.',
+      campModesTitle: 'Присутствие по режимам',
+      campModesHint: 'Серверный вес активации по режимам игры — не гарантия появления.',
+      campModeTier: (m, n) => `${m} · уровень ${n}`,
+      // Обогащённые POI (pass 2026-07-11b): кнопка к карточке энциклопедии
+      // + расходящееся название из лора (locTitle).
+      poiLoreBtn: 'Энциклопедия',
+      poiLoreNamed: t => `В энциклопедии: «${t}»`,
+      // Компактная кнопка «Показать [сущность] · N тчк» (унификация
+      // формулировок 2026-07-11 — слово «лагеря» исключено из текста
+      // заданий/карточек; см. js/fiches.js monsterSpawnHighlightBtn).
+      showEntityBtn: 'Показать',
+      entityPtsN: p => `${p} тчк`,
+      // (chestTypesAllBtn/chestTypesNoneBtn удалены 2026-07-11 — вызовов
+      // не осталось.)
       // Реорганизация контейнеров (DATA_CONTRACT.md): 2 реальных слоя
       // сундуков + группа "Декор" (legacy_chest/decor по категории).
       decorGroupLabel: 'Декор',
@@ -272,8 +299,10 @@ export default {
       // списка из 24 строк — сводка в заголовке, разворачиваемое «+N», и
       // честные запасные варианты ниже (несвязанный лагерь, нет данных о
       // лагере, свёрнутый общий пул наград).
-      farmGroupSummary: (camps, pts) => `${camps} лагерей · ${pts} точек`,
-      farmMoreCampsN: n => `+ ${n} лагерей`,
+      // МИНИМАЛЬНЫЕ счётчики (унификация 2026-07-11 — «926 тчк» да,
+      // «4 лагеря» нет; первый исторический параметр игнорируется).
+      farmGroupSummary: (camps, pts) => `${pts} тчк`,
+      farmMoreCampsN: n => `+ ещё ${n}`,
       farmGenericPoolNote: n => `Также изредка выпадает в ${n} лагерях с общей наградой — это не целевое место фарма.`,
       farmSourcesNotMapped: 'Источники пока не привязаны к известному лагерю.',
       farmOtherSourcesTitle: 'Другие источники',
@@ -334,10 +363,11 @@ export default {
       // main.js). Формулировка «в этих лагерях» намеренная, отличается от
       // «Смотреть оценку» шага задания (viewEstimatedZoneBtn), которая
       // рисует другой набор данных (точки лагеря ОБЪЕКТА задания).
-      monsterHighlightAllSpawns: (camps, pts) => `Показать все спавны в этих лагерях (${camps} ${pluralSlavic(camps, 'лагерь', 'лагеря', 'лагерей')} · ${pts} ${pluralSlavic(pts, 'точка', 'точки', 'точек')})`,
+      // (monsterHighlightAllSpawns удалена 2026-07-11 — заменена на
+      // showEntityBtn/entityPtsN, см. js/fiches.js.)
       noLootCatalogued: 'Добыча для этого монстра не каталогизирована.',
       noAbilitiesKnown: 'Нет известных способностей у этого монстра.',
-      noCampsKnown: 'Нет известных лагерей для этого монстра.',
+      noCampsKnown: 'Известных мест появления этого монстра нет.',
       // Секция фауны карточки лагеря (unknown_states_DESIGN.md #4/#10,
       // задача #67): «монстровый» лагерь (kind monsters/creeps/wildlife), чьё
       // имя менеджера не даёт ни одного распознанного вида — байт-доказано,
@@ -553,6 +583,23 @@ export default {
       mushrooms: 'Грибы', bottles: 'Бутылки', pots: 'Горшки',
       wooden: 'Деревянные объекты', leafTrash: 'Кучи листьев',
       vegetables: 'Овощи', urban: 'Городские объекты',
+    },
+    // Подкатегории POI (interest_points.bin poiType — НАША кураторская
+    // группировка иконок, НЕ таксономия игры, см.  §1
+    // "poiType").
+    poiType: {
+      habitat: 'Жилища', nature: 'Природа', fort: 'Укрепления',
+      curiosity: 'Диковинки', transport: 'Транспорт', profession: 'Профессии',
+      amenity: 'Удобства', portal: 'Порталы', other: 'Прочее',
+    },
+    // Квалификатор лагеря (Остров-тюрьма, токен движка patrol|buffed —
+    // семантика доказана байтово: база=только PvE, patrol=единственный
+    // вариант в PvP (0.6), buffed=только PvP 10 %).
+    campQualifier: { patrol: 'Патруль', buffed: 'Усиленный (PvP)' },
+    // Режимы игры таблиц присутствия (#93, camp_details `modes`).
+    campMode: {
+      PvE: 'PvE', PvP: 'PvP', SoloPvE: 'Соло PvE', SoloPvP: 'Соло PvP',
+      SoloPvP_HC: 'Соло PvP (HC)',
     },
     chestType: {
       Backpack: 'Рюкзак', Barrel: 'Бочка', Bathroom: 'Ванная', Bedroom: 'Спальня',

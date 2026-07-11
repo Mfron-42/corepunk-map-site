@@ -4,7 +4,7 @@ import { S, LS, save } from './state.js';
 import {
   CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyHexByRank,
   chestDisplayName, chestHex, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
-  speciesLayerHex,
+  speciesLayerHex, POI_TYPES, poiTypeLabel,
 } from './config.js';
 import { $, $$, esc, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -14,7 +14,7 @@ import { goTo } from './pins.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
 import {
-  monsterFamilies, speciesPoints, campGroupByKey, wildSpeciesOfKind, kindRestPoints,
+  monsterFamilies, speciesPoints, campGroupByKey, wildSpeciesOfKind, zeroCampWildlifeSpecies, kindRestPoints,
 } from './pointsets.js';
 import { setFamilyOn } from './specieslayer.js';
 
@@ -188,15 +188,14 @@ function decorRow(fam, extraClass = 'filter-row-sub') {
   }, extraClass);
 }
 /* (refreshDecorRows — l'ancien rafraîchissement par index des cases après un
-   Tous/Aucun — est RETIRÉ avec le groupe Décor : les boutons Tous/Aucun de
-   la liste des familles cascadent désormais aussi sur les sous-lignes
-   espèce (setFamilyOn), un rebuild complet du groupe est donc de toute
-   façon nécessaire — voir buildMonsterFamilyGroup.) */
+   Tous/Aucun — est RETIRÉ avec le groupe Décor ; les boutons [Tous][Aucun]
+   eux-mêmes ont suivi le 2026-07-11 avec la barre « Par famille », jugée
+   inutile par l'utilisateur — la cascade des pastilles couvre le besoin.) */
 
 /* ── L'arbre EST le bestiaire (#82 chunk (d), décision utilisateur) ──────
-   Chaque ligne famille de la liste des familles (aplatie directement dans
-   « Monstres & faune », voir buildMonsterFamilyGroup plus bas — le niveau
-   « Par famille » séparé a été retiré, 2026-07-11) est un NŒUD DÉPLIABLE :
+   Chaque ligne famille du groupe Monsters (rendue DIRECTEMENT dans le
+   groupe racine, voir buildGroupMonsters plus bas — correction de
+   structure 2026-07-11) est un NŒUD DÉPLIABLE :
    le chevron déplie (rendu PARESSEUX — jamais les ~224 espèces d'un coup)
    les sous-lignes ESPÈCE de la famille, chacune avec sa case (couche
    espèce, S.monsp — POINTS seulement, voir specieslayer.js ; plus de ZONE
@@ -238,13 +237,19 @@ function speciesByFamily() {
 /* Sous-ligne ESPÈCE : mini-label case+pastille (cocher = couche espèce) +
    nom cliquable → fiche (délégué main.js fiche-monster — dans l'arbre de
    GAUCHE, donc fiche SEULE, jamais d'auto-cochage : le clic-double-effet
-   n'appartient qu'aux chips des panneaux de droite) + méta honnête. */
-function speciesRowLi(id, sp) {
+   n'appartient qu'aux chips des panneaux de droite) + méta honnête.
+   `zeroMetaKey` (facultatif) : clé i18n du libellé « 0 camp » — le défaut
+   (speciesZeroCamps, « 0 camp sur cette carte ») est scopé CARTE ACTIVE,
+   pour les espèces catalogue dont les camps vivent ailleurs ; les espèces
+   fauniques 0-camp (wildlife_species.bin, job pass 2026-07-11b) n'ont de
+   camp NULLE PART → libellé GLOBAL « 0 camp connu » (wildlifeZeroCamps),
+   jamais une promesse implicite qu'une autre carte en aurait. */
+function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
   const st = S.monsp[id] || (S.monsp[id] = { on: false });
   const res = speciesPoints(id);
   const meta = res
     ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale()))
-    : tr('speciesZeroCamps');
+    : tr(zeroMetaKey);
   const [key] = speciesRep(sp);
   const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
   const nameAttrs = key ? ` data-act="fiche-monster" data-id="${esc(key)}"` : '';
@@ -305,15 +310,18 @@ function attachFamilyNode(li, fam) {
    un chip de fiche (main.js) : ouvre les <details> ancêtres, flash, scroll —
    la famille d'une espèce cochée est déjà auto-dépliée par le rebuild.
    Générique par construction : la boucle ouvre tout <details> fermé
-   rencontré en remontant, quel qu'en soit le nombre — deux aujourd'hui
-   (le sous-groupe « Hostiles », IA finale 2026-07-11, puis le groupe
-   « Monsters » lui-même, .side-sec ; l'ouverture programmatique déclenche
-   bien l'événement toggle, donc subOpen/le localStorage des groupes restent
-   synchrones). AUCUN mouvement caméra (le geste caméra reste goto/zone). */
+   rencontré en remontant, quel qu'en soit le nombre (aujourd'hui : le
+   groupe racine .side-sec seul — plus aucun sous-groupe intermédiaire dans
+   Monsters depuis la correction de structure 2026-07-11 ; l'ouverture
+   programmatique déclenche bien l'événement toggle, donc le localStorage
+   des groupes reste synchrone). Sélecteur élargi à #filters : une espèce
+   WILD cochée (turkey…) vit dans les groupes Creeps/Wildlife, plus
+   seulement #group-monsters-list. AUCUN mouvement caméra (le geste caméra
+   reste goto/zone). */
 function revealMonsterNode(kind, id) {
   const target = kind === 'species'
-    ? document.querySelector(`#group-monsters-list li[data-species="${CSS.escape(id)}"] .species-row`)
-    : document.querySelector(`#group-monsters-list li[data-fam="${CSS.escape(id)}"] .filter-row`);
+    ? document.querySelector(`#filters li[data-species="${CSS.escape(id)}"] .species-row`)
+    : document.querySelector(`#filters li[data-fam="${CSS.escape(id)}"] .filter-row`);
   if (!target) return;
   for (let el = target.parentElement; el; el = el.parentElement) {
     if (el.tagName === 'DETAILS' && !el.open) el.open = true;
@@ -323,148 +331,93 @@ function revealMonsterNode(kind, id) {
   target.scrollIntoView({ block: 'nearest' });
 }
 
-/* ── Liste des familles de monstres (le cœur de l'arbre « Hostiles ») ─────
-   IA FINALE (2026-07-11) : la liste — plate depuis le retrait du niveau
-   « Par famille » le même jour — vit désormais DANS le sous-groupe
-   « Hostiles » du groupe Monsters (buildGroupMonsters ci-dessous), juste
-   sous la ligne kind « Camps de monstres » (bascule GROSSIÈRE conservée :
-   elle seule couvre les ~25 k points de camp que les familles jointes ne
-   recouvrent pas, design §4.4/§13.2 — un retrait perdrait de la
-   couverture). La barre [Tous][Aucun] reste un séparateur NON repliable
-   (libellé `monsterFamiliesTitle` en repère de section) — et cascade
-   désormais familles + espèces (setFamilyOn, décision cascade).
-   Chaque ligne famille reste : UNE ligne par famille avec ≥1 camp joint sur
-   la carte ACTIVE (~20 sur Kwalat, jointure espèce→camps du résolveur
-   unique js/pointsets.js monsterFamilies() — honnête : une famille sans
-   camp joint n'a pas de ligne morte, design §4.2) + toutes les familles
-   catalogue SANS camp ici (grisées « 0 camp », listées quand même — l'arbre
-   est le bestiaire, chunk (d)). Total BRUT affiché (camps · points — ce
-   qu'elle allumerait seule) : rat et ratmutant partagent les 10 mêmes camps
-   et affichent chacun 4 045, assumé (données réelles, design §13.3) ; le
-   dédoublonnage est un fait de RENDU (main.js compositeCampPoints, priorité
-   espèce > famille > kind), jamais de comptage. Couleur par rang
-   (familyHexByRank, ordre pts desc = ordre des lignes). La case d'une ligne
-   famille est à la fois sa COUCHE (S.monfam, couleur famille) et un parent
-   de cascade (cocher = toutes ses espèces aussi, setFamilyOn ; décochée
-   avec ≥1 espèce cochée = état partiel, voir refreshParentChecks). Hash :
-   `on=monfam.<famille>` (token post-alias, urlstate.js/router.js — un lien
-   legacy sans tokens monsp.* restaure l'ancien rendu couleur-famille tel
-   quel). Retourne null tant que species/monsters/camps ne sont pas chargés
-   ou qu'aucune famille n'a de camp joint ici. GLOSSARY-PENDING : le nom
-   affiché d'une famille est son token moteur prettifié (pretty(f.family) —
-   « Boarmammoth », « Ratmutant »…), comme le bestiaire : AUCUNE table de
-   localisation des familles n'existe dans les données expédiées ; à
-   balayer quand l'extraction de glossaire (#86) livrera des libellés
-   prouvés. */
-function buildMonsterFamilyGroup() {
-  const fams = monsterFamilies();               // familles AVEC camps joints ici (triées pts desc)
-  const byFam = speciesByFamily();              // TOUTES les familles du catalogue global
-  if (!fams.length && !byFam.size) return null;
-  // Une famille avec ≥1 espèce cochée se déplie d'elle-même : la ligne cochée
-  // doit être VISIBLE (hash restauré, clic de chip — décision utilisateur
-  // « auto-expanding its family so the checked row is visible »).
-  for (const [fam, list] of byFam) {
-    if (list.some(({ id }) => S.monsp[id]?.on)) expandedFams.add(fam);
-  }
-  // Ordre : familles avec camps (rang = couleur, design §4.3) puis les
-  // familles SANS camp ici (alphabétiques, grisées « 0 camp » — listées
-  // quand même : l'arbre est le bestiaire, chunk (d)). État par famille :
-  // créé à la première apparition — sauf s'il existe déjà (hash `monfam.*`
-  // restauré AVANT l'arrivée des données différées, voir router.js).
-  const withCamps = new Set(fams.map(f => f.family));
-  const zeroFams = [...byFam.keys()].filter(f => !withCamps.has(f)).sort();
-  const entries = [
-    ...fams.map((f, i) => [f.family, null, f, familyHexByRank(i)]),
-    ...zeroFams.map(f => [f, null, { nCamps: 0, nPts: 0 }, MONSTER_HEX]),
-  ].map(([fam, , f, hex]) => {
-    const st = S.monfam[fam] || (S.monfam[fam] = { on: false });
-    return [fam, st, f, hex];
-  });
-
-  // UN SEUL <li>, contenant directement la <ul class="subfilter-list"> — plus
-  // de <details class="decor-group">/<summary> intermédiaire (voir la doc
-  // ci-dessus). `.family-list` en classe ADDITIONNELLE (IA finale) : la
-  // liste vit désormais imbriquée DANS le sous-groupe « Hostiles » (lui-même
-  // une .subfilter-list) — les consommateurs (harnais, CSS futur) ont besoin
-  // d'un sélecteur qui la distingue des .subfilter-list de sous-groupe.
-  const li = document.createElement('li');
-  const sub = document.createElement('ul');
-  sub.className = 'subfilter-list family-list';
-  const head = document.createElement('li');
-  head.className = 'subfilter-head';
-  head.innerHTML = `<span class="subf-title">${esc(tr('monsterFamiliesTitle'))}</span>
-    <span class="subf-actions">
-      <button type="button" class="subf-btn" data-mode="all">${esc(tr('chestTypesAllBtn'))}</button>
-      <button type="button" class="subf-btn" data-mode="none">${esc(tr('chestTypesNoneBtn'))}</button>
-    </span>`;
-  // [Tous]/[Aucun] : familles ET espèces (cascade, IA finale — cocher une
-  // famille coche tous ses enfants, voir setFamilyOn). Rebuild complet du
-  // groupe : les sous-lignes espèce dépliées doivent refléter la cascade.
-  head.querySelector('[data-mode="all"]').addEventListener('click', () => {
-    for (const [fam] of entries) setFamilyOn(fam, true);
-    scheduleRedraw(); syncHash();
-    buildGroupMonsters(); refreshParentChecks();
-  });
-  head.querySelector('[data-mode="none"]').addEventListener('click', () => {
-    for (const [fam] of entries) setFamilyOn(fam, false);
-    for (const id of Object.keys(S.monsp)) S.monsp[id].on = false;
-    scheduleRedraw(); syncHash();
-    buildGroupMonsters(); refreshParentChecks();
-  });
-  sub.appendChild(head);
-  for (const [fam, st, f, hex] of entries) {
-    const zero = !f.nPts;
-    // CASCADE (IA finale) : la case famille coche/décoche aussi TOUTES ses
-    // espèces (setFamilyOn) — rebuild du groupe pour que les sous-lignes
-    // espèce dépliées reflètent le geste (syncHash/refreshParentChecks sont
-    // déjà joués par l'écouteur générique de filterRow après ce callback).
-    const row = filterRow('monfam:' + fam, pretty(fam), hex, f.nPts, 0, st.on, on => {
-      setFamilyOn(fam, on);
-      scheduleRedraw();
-      buildGroupMonsters();
-    }, 'filter-row-sub' + (zero ? ' fam-zero' : ''));
-    // « N camps » entre le libellé et le compte de points (mock design §2 :
-    // « Rat   10 camps · 4 045 ») — libellé honnête : ce sont les points des
-    // CAMPS où la famille apparaît, jamais « positions de X » (design §13.1).
-    // Style inline plutôt qu'une classe : style.css est en édition
-    // concurrente par une autre mission (multi-rareté) et la classe partagée
-    // max-height (#85) n'existe pas encore — à migrer quand elle livre.
-    row.querySelector('.flabel').insertAdjacentHTML('afterend',
-      `<span class="fam-camps" style="color:var(--muted);font-size:.68rem;white-space:nowrap;margin-right:5px">${esc(tr('familyCampsN', f.nCamps))}</span>`);
-    // Nœud dépliable (chunk (d), « l'arbre EST le bestiaire ») : chevron +
-    // sous-lignes espèce paresseuses.
-    sub.appendChild(attachFamilyNode(row, fam));
-  }
-  li.appendChild(sub);
-  return li;
+/* ── Lignes familles de monstres (le cœur du groupe Monsters — voir la doc
+   de buildGroupMonsters plus bas pour l'ordre/la structure du groupe). La
+   case d'une ligne famille est à la fois sa COUCHE (S.monfam, couleur
+   famille) et un parent de cascade (cocher = toutes ses espèces aussi,
+   setFamilyOn ; décochée avec ≥1 espèce cochée = état partiel, voir
+   refreshParentChecks). Hash : `on=monfam.<famille>` (token post-alias,
+   urlstate.js/router.js — un lien legacy sans tokens monsp.* restaure
+   l'ancien rendu couleur-famille tel quel). */
+/* Méta « N camps » entre le libellé et le compte de points d'une ligne
+   famille (mock design §2 : « Rat   10 camps · 4 045 ») — libellé honnête :
+   ce sont les points des CAMPS où la famille apparaît, jamais « positions
+   de X » (design §13.1). Style inline plutôt qu'une classe : style.css est
+   en édition concurrente par une autre mission (multi-rareté) et la classe
+   partagée max-height (#85) n'existe pas encore — à migrer quand elle
+   livre. (Vocabulaire « camps » CONSERVÉ dans l'ARBRE : la consigne
+   anti-« camps » du 2026-07-11 vise le wording des quêtes/étapes/fiches,
+   le concept reste assumé côté data/panneau.) */
+function famCampsMeta(nCamps) {
+  return `<span class="fam-camps" style="color:var(--muted);font-size:.68rem;white-space:nowrap;margin-right:5px">${esc(tr('familyCampsN', nCamps))}</span>`;
+}
+/* Ligne FAMILLE partagée (groupe Monsters + copies MIROIR Creeps) : couche
+   S.monfam + parent de cascade (setFamilyOn — cocher coche toutes ses
+   espèces). `withNode` : le nœud dépliable espèces (chevron droit,
+   attachFamilyNode) ne vit QUE dans le groupe Monsters — les copies miroir
+   du groupe Creeps restent plates (le détail par espèce n'est jamais
+   dupliqué). Après un geste : rebuild du groupe Monsters (les sous-lignes
+   espèce dépliées doivent refléter la cascade) — les copies miroir se
+   resynchronisent par refreshParentChecks (déjà joué par l'écouteur
+   générique de filterRow après ce callback). */
+function familyRowLi(fam, f, hex, withNode) {
+  const st = S.monfam[fam] || (S.monfam[fam] = { on: false });
+  const zero = !f.nPts;
+  const row = filterRow('monfam:' + fam, pretty(fam), hex, f.nPts, 0, st.on, on => {
+    setFamilyOn(fam, on);
+    scheduleRedraw();
+    buildGroupMonsters();
+  }, 'filter-row-sub' + (zero ? ' fam-zero' : ''));
+  row.querySelector('.flabel').insertAdjacentHTML('afterend', famCampsMeta(f.nCamps));
+  if (withNode) return attachFamilyNode(row, fam);
+  row.dataset.fam = fam;   // copie miroir : resynchronisée par refreshParentChecks
+  return row;
+}
+/* Dernière ligne d'un groupe Monsters/Creeps/Wildlife : les camps du kind
+   SANS aucune espèce jointe (« Spawns non identifiés » — compte honnête
+   kindRestPoints = exactement ce que la couche kind dessine, tous ces kinds
+   étant rest-only, voir pointsets.js KIND_REST_ONLY). Symétrie des trois
+   groupes (correction structure 2026-07-11) : lignes espèce/famille
+   d'abord, UNE ligne honnête « non identifiés » en dernier. Token de hash
+   camp.<kind> inchangé. */
+function appendKindRestRow(ul, kind) {
+  const st = S.camps[kind];
+  if (!st) return;
+  const rest = kindRestPoints(kind);
+  if (!rest.nPts) return;
+  ul.appendChild(filterRow('camp:' + kind, tr('kindRestRow'), CAMP_COLORS[kind] || '#888',
+    rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, 'filter-row-sub'));
 }
 
-/* ── Arbre de couches : IA FINALE du panneau gauche (2026-07-11) ──────────
-   4 groupes fixes (COORDINATION.md §IA FINALE DU PANNEAU GAUCHE, verbatim
-   utilisateur — SUPERSEDE les 6 groupes du chunk (a)) :
-     1. World         — Zones · NPCs · POI (ligne plate, sous-familles
-                        d'icônes au step 2) · Workshops · Shrines ·
-                        Soulkeepers · Gardes (libellé honnête) · Others
-     2. Monsters      — MIROIR des 3 kinds moteur, data-natif (décision
-                        utilisateur, redirect 2026-07-11 — aucun axe
-                        inventé) : sous-groupe Monsters (ligne « Camps de
-                        monstres » + l'arbre familles→espèces existant) ·
-                        sous-groupe Creeps (familles jointes rat/ratmutant
-                        — présence DOUBLE assumée avec l'arbre, le moteur
-                        les spawne sous les 2 kinds — + espèces wild
-                        turkey/rabbit/fox/squirrel/porcupine via
-                        camp_details, + ligne « Spawns non identifiés » =
-                        les pools creeps-<région> sans espèce) · sous-groupe
-                        Wildlife (leaf_dragon + pools non identifiés)
-     3. Harvesting    — Herbalism · Logging · Mining (inchangé)
-     4. Interactables — Chests · Destroyable · Interactives · Other
+/* ── Arbre de couches : structure FINALE du panneau gauche (2026-07-11,
+   corrections utilisateur du jour — supersède « IA finale 4 groupes » ET le
+   « miroir de kinds en sous-groupes ») : 6 groupes RACINE (index.html),
+   en-têtes NON sélectionnables (titre + chevron natif, aucune case) :
+     1. World         — Zones · NPCs · Points d'intérêt (sous-groupe
+                        poiType, 8 lignes — step 2 LIVRÉ, buildPoiSubGroup)
+                        · Workshops · Shrines · Soulkeepers · Gardes
+                        (libellé honnête) · Others
+     2. Monsters      — les lignes FAMILLE directement (nœuds dépliables →
+                        espèces ; la barre « Par famille » + [Tous][Aucun]
+                        est RETIRÉE, jugée inutile — la cascade des lignes
+                        suffit) + dernière ligne honnête « Spawns non
+                        identifiés » (camps monsters sans espèce jointe,
+                        rest-only — voir appendKindRestRow/KIND_REST_ONLY)
+     3. Creeps        — familles jointes rat/ratmutant (copies MIROIR,
+                        présence DOUBLE assumée : le moteur les spawne sous
+                        les 2 kinds) + espèces wild (turkey/rabbit/fox/
+                        squirrel/porcupine via camp_details) + « Spawns non
+                        identifiés » en dernier
+     4. Wildlife      — espèces wild (leaf_dragon) + les 19 espèces
+                        fauniques 0-camp (wildlife_species.bin, honnêtes
+                        « 0 camp connu ») + « Spawns non identifiés »
+     5. Harvesting    — Herbalism · Logging · Mining (inchangé)
+     6. Interactables — Chests · Destroyable · Interactives · Other
                         (le groupe Décor y est dissous, voir DECOR_BUCKET)
-   Groupes RETIRÉS : « Lieux & personnages » (lignes → World), « Quêtes »
-   (qao → Interactables > Other, le découpage par type reste à venir),
-   « Monde » (lignes → World), « Décor » (dissous). MÊMES lignes
-   (filterRow/hiddenBadge), MÊME hash `on=`/`camp.*`/`decor.*`/`monfam.*`/
-   `monsp.*` (urlstate.js lit l'ÉTAT, jamais une position DOM) — zéro
-   nouvelle couche, zéro nouveau token : les lignes ne font que déménager.
+   Les trois groupes 2-4 sont SYMÉTRIQUES : espèces/familles d'abord, une
+   ligne « non identifiés » en dernier. MÊMES lignes (filterRow/hiddenBadge),
+   MÊME hash `on=`/`camp.*`/`decor.*`/`monfam.*`/`monsp.*`/`poi.*`
+   (urlstate.js lit l'ÉTAT, jamais une position DOM).
 
    INTERIM — replaced by pipeline-level canonical classification (see
     enforcement plan); delete this map when records ship
@@ -472,9 +425,11 @@ function buildMonsterFamilyGroup() {
    même dette que DECOR_BUCKET ci-dessus.) */
 const KIND_PLACEMENT = {
   world: ['shrines', 'soulkeeper', 'guards'],   // + guards : libellé honnête, voir buildGroupWorld
-  worldOthers: ['other'],                       // sous-groupe « Others » (familles d'icônes POI au step 2)
-  monstersKind: ['monsters'],                   // sous-groupe Monsters (kind moteur)
-  kindSubGroups: ['creeps', 'wildlife'],        // sous-groupes miroir : espèces jointes + « Spawns non identifiés »
+  worldOthers: ['other'],                       // sous-groupe « Others » (la ligne camp:other — les familles
+                                                // d'icônes POI ont leur PROPRE sous-groupe, buildPoiSubGroup)
+  // (monstersKind/kindSubGroups RETIRÉS — correction de structure
+  // utilisateur 2026-07-11 : Monsters/Creeps/Wildlife sont désormais trois
+  // GROUPES RACINE symétriques, voir buildGroupMonsters/buildKindGroup.)
   harvest: ['herbalism', 'logging', 'mining'],
   interDestroyable: ['destroyable'],
   interInteractives: ['reactive', 'searchable'],
@@ -492,6 +447,43 @@ function catRow(key, extraClass = '') {
     if (c.dense) scheduleRedraw();
     else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
   }, extraClass);
+}
+/* ── Sous-groupe « Points d'intérêt » (poiType, job pass 2026-07-11b) ────
+   Remplace l'ancienne ligne plate catRow('poi') par un nœud dépliable — 8
+   sous-lignes TOUJOURS listées (même carte sans POI, ex. îles : comptes à 0,
+   jamais masquées, même honnêteté que les familles/espèces "0 camp").
+   POI est du chemin CRITIQUE (loadCritical, jamais différé) : ce sous-groupe
+   se construit dès le premier rendu, aucune garde deferredReady nécessaire.
+   Teinte UNIQUE (CATS.poi.hex) pour les 8 lignes -- axe de FORME d'icône,
+   pas une taxonomie de jeu (voir config.js POI_TYPES). Hash `poi.<type>`
+   (+ legacy `on=poi` = tout ON, voir urlstate.js/router.js). */
+function poiTypeStats(type) {
+  return positionCounts((S.data.poi || []).filter(r => r.poiType === type));
+}
+function poiTypeLeaf(t) {
+  return { get: () => !!S.poiTypes[t]?.on, set: on => { if (S.poiTypes[t]) S.poiTypes[t].on = on; } };
+}
+/* Feuilles de cascade POI : seulement quand la carte ACTIVE a des POI
+   (Kwalat seule aujourd'hui — les bundles île/arène expédient poi: []) :
+   une carte sans POI n'a ni sous-groupe (voir buildPoiSubGroup) ni feuilles
+   fantômes dans la case World (même discipline que campLeavesOf, qui ne
+   liste que les kinds présents — jamais un parent bloqué par une couche
+   impossible ici). */
+const poiTypeLeaves = () => ((S.data.poi || []).length ? POI_TYPES.map(poiTypeLeaf) : []);
+function buildPoiSubGroup(ul) {
+  if (!(S.data.poi || []).length) return;   // carte sans POI : pas de coquille vide
+  let total = 0, totalHidden = 0;
+  for (const t of POI_TYPES) { const s = poiTypeStats(t); total += s.shown; totalHidden += s.hidden; }
+  const grp = buildSubGroup('world-poi', catLabel('poi'), CATS.poi.hex, poiTypeLeaves, total, totalHidden);
+  for (const t of POI_TYPES) {
+    const { shown, hidden } = poiTypeStats(t);
+    const st = S.poiTypes[t] || (S.poiTypes[t] = { on: true });
+    grp.ul.appendChild(filterRow('poi.' + t, poiTypeLabel(t), CATS.poi.hex, shown, hidden, st.on, on => {
+      st.on = on;
+      scheduleRedraw();
+    }, 'filter-row-sub'));
+  }
+  ul.appendChild(grp.li);
 }
 /* Ligne de filtre camp:<kind> (null si ce kind n'existe pas sur la carte
    active : S.camps ne contient QUE les kinds présents, voir data.js
@@ -513,52 +505,30 @@ function loadingHintLi() {
   return li;
 }
 
-/* ── CASCADE (décision utilisateur : « quand je coche une category parent ça
-   coche tous les enfants ») ─────────────────────────────────────────────
-   Chaque parent (groupe side-sec, sous-groupe) porte une vraie case à
-   cocher : cocher = TOUTES les feuilles du sous-arbre passent on ; décocher
-   = toutes off ; certaines seulement = état partiel natif (indeterminate).
-   Le parent n'est PAS une couche : il n'a aucun état propre (jamais
-   sérialisé dans le hash — les tokens existants suffisent, aucun nouveau
-   namespace), son affichage est DÉRIVÉ des feuilles à chaque
-   refreshParentChecks(). Seule exception : la ligne FAMILLE, qui est à la
-   fois une couche (S.monfam, couleur famille du compositeur) et un parent
-   (cascade sur ses espèces via setFamilyOn) — son état partiel = famille
-   décochée mais ≥1 espèce cochée.
+/* ── CASCADE (décision utilisateur, resserrée par la correction finale
+   2026-07-11) ────────────────────────────────────────────────────────────
+   SEULS les parents intermédiaires qui représentent une vraie UNITÉ DE
+   FILTRE portent une pastille de cascade : les sous-groupes (buildSubGroup
+   — POI/Others/buckets Interactables) et les lignes FAMILLE. Les en-têtes
+   de GROUPE racine (World/Monsters/…, index.html) n'ont PLUS AUCUNE case :
+   purs conteneurs plier/déplier (l'ancien câblage .grp-check/GROUP_LEAVES
+   est retiré). Cocher un parent = TOUTES les feuilles de son sous-arbre
+   passent on ; décocher = toutes off ; certaines = état partiel (pastille
+   demi-teinte). Le parent n'est PAS une couche : aucun état propre (jamais
+   sérialisé dans le hash), affichage DÉRIVÉ des feuilles à chaque
+   refreshParentChecks(). Seule exception : la ligne FAMILLE, à la fois
+   couche (S.monfam) et parent (cascade espèces via setFamilyOn).
    Une « feuille » = {get, set} sur l'état réel (CATS[x].on / S.camps[k].on /
-   S.decor[f].on / S.zonesOn / S.monfam[f].on / S.monsp[id].on) ; les
+   S.decor[f].on / S.poiTypes[t].on / S.monfam[f].on / S.monsp[id].on) ; les
    feuilles absentes de la carte active ne sont simplement pas listées
    (jamais un parent bloqué « ni tout ni rien » par une couche impossible). */
 const catLeaf = key => ({ get: () => !!CATS[key].on, set: on => { CATS[key].on = on; } });
 const campLeaf = kind => ({ get: () => !!S.camps[kind]?.on, set: on => { if (S.camps[kind]) S.camps[kind].on = on; } });
 const decorLeaf = fam => ({ get: () => !!S.decor[fam]?.on, set: on => { if (S.decor[fam]) S.decor[fam].on = on; } });
-// famLeaf.set CASCADE (setFamilyOn) : cocher une famille — par sa ligne OU
-// par un parent — coche toujours aussi ses espèces, une seule sémantique.
-const famLeaf = fam => ({ get: () => !!S.monfam[fam]?.on, set: on => setFamilyOn(fam, on) });
-const spLeaf = id => ({ get: () => !!S.monsp[id]?.on, set: on => { (S.monsp[id] || (S.monsp[id] = { on: false })).on = on; } });
 const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
 const decorLeavesOfBucket = bucket => decorFamsOf(bucket).map(decorLeaf);
-
-function worldLeaves() {
-  const l = [catLeaf('npc'), catLeaf('poi'), catLeaf('workshop')];
-  if (S.zonesGeo.length) l.push({ get: () => S.zonesOn, set: on => toggleZones(on) });
-  l.push(...campLeavesOf([...KIND_PLACEMENT.world, ...KIND_PLACEMENT.worldOthers]));
-  return l;
-}
-/* Sous-groupe Monsters (kind) = la ligne kind « Camps de monstres » + TOUT
-   l'arbre familles→espèces (catalogue global — cocher le parent coche
-   récursivement les familles ET leurs espèces, décision cascade ; les
-   0-camp ne dessinent rien, leur état reste honnête). */
-function monstersKindLeaves() {
-  const l = campLeavesOf(KIND_PLACEMENT.monstersKind);
-  for (const [fam, list] of speciesByFamily()) {
-    l.push(famLeaf(fam));
-    for (const { id } of list) l.push(spLeaf(id));
-  }
-  return l;
-}
 /* Familles (arbre) jointes à ≥1 camp d'un kind donné ici — lignes famille
-   MIROIR du sous-groupe Creeps (rat/ratmutant : le moteur les spawne sous
+   MIROIR du groupe Creeps (rat/ratmutant : le moteur les spawne sous
    monsters ET creeps, présence double assumée — même état S.monfam, même
    teinte de rang que dans l'arbre, jamais une couche dupliquée). */
 function famsOfKind(kind) {
@@ -566,37 +536,15 @@ function famsOfKind(kind) {
     .map((f, i) => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyHexByRank(i) }))
     .filter(f => [...f.campKeys].some(k => campGroupByKey(k)?.kind === kind));
 }
-/* Sous-groupe kind miroir (Creeps/Wildlife) : familles jointes + espèces
-   wild (camp_details) + la ligne kind « Spawns non identifiés ». */
-function kindSubLeaves(kind) {
-  return [
-    ...famsOfKind(kind).map(f => famLeaf(f.family)),
-    ...wildSpeciesOfKind(kind).map(w => spLeaf(w.id)),
-    ...campLeavesOf([kind]),
-  ];
-}
-const harvestLeaves = () => campLeavesOf(KIND_PLACEMENT.harvest);
 const chestsLeaves = () => [catLeaf('searchable_chest'), catLeaf('camp_chest'), ...decorLeavesOfBucket('chests')];
 const destroyableLeaves = () => [...campLeavesOf(KIND_PLACEMENT.interDestroyable), ...decorLeavesOfBucket('destroyable')];
 const interactivesLeaves = () => [...campLeavesOf(KIND_PLACEMENT.interInteractives), ...decorLeavesOfBucket('interactives')];
 const interOtherLeaves = () => [catLeaf('qao'), ...decorLeavesOfBucket('other')];
-const interactLeaves = () => [...chestsLeaves(), ...destroyableLeaves(), ...interactivesLeaves(), ...interOtherLeaves()];
-/* Feuilles par groupe STATIQUE (clé = data-sec d'index.html) — consommées
-   par le câblage unique des .grp-check tout en bas de ce module. */
-const GROUP_LEAVES = {
-  'group-world': worldLeaves,
-  'group-monsters': () => [
-    ...monstersKindLeaves(),
-    ...KIND_PLACEMENT.kindSubGroups.flatMap(kindSubLeaves),
-  ],
-  'group-harvest': harvestLeaves,
-  'group-containers': interactLeaves,
-};
 
-/* Registres des cases parent : statiques (groupes, câblés une fois au
-   chargement du module) + dynamiques (sous-groupes, reconstruits à chaque
-   rebuild de l'arbre). */
-const groupChecks = [];
+/* Registre des pastilles parent de sous-groupe (reconstruites à chaque
+   rebuild de l'arbre). (L'ancien registre STATIQUE des groupes racine —
+   groupChecks/GROUP_LEAVES/.grp-check — est RETIRÉ : correction finale
+   utilisateur 2026-07-11, les en-têtes de groupe ne se cochent plus.) */
 let subChecks = [];
 function wireParentCheck(input, leavesFn) {
   // stopPropagation : la case vit DANS un <summary> — son clic ne doit
@@ -612,17 +560,28 @@ function wireParentCheck(input, leavesFn) {
 }
 /* Republication d'AFFICHAGE des états parent (coché/partiel/décoché) —
    dérivés des feuilles, jamais l'inverse. Inclut l'état partiel des lignes
-   famille (espèces cochées sous famille décochée). */
+   famille (espèces cochées sous famille décochée). Sélecteurs élargis à
+   TOUT #filters : les lignes famille/espèce vivent désormais dans TROIS
+   groupes racine (Monsters + copies miroir Creeps + espèces Wildlife —
+   correction de structure 2026-07-11), plus seulement #group-monsters-list. */
 function refreshParentChecks() {
-  for (const { input, leavesFn } of [...groupChecks, ...subChecks]) {
+  for (const { input, leavesFn } of subChecks) {
     const vals = leavesFn().map(l => l.get());
     const all = vals.length > 0 && vals.every(Boolean);
     input.checked = all;
     input.indeterminate = !all && vals.some(Boolean);
     input.disabled = !vals.length;
+    // La pastille-case (appearance:none) n'expose pas :indeterminate en CSS
+    // pur sur ses VOISINS de summary (libellé) : reflété par classes sur le
+    // <summary> parent — même vocabulaire off/partial que les lignes.
+    const summary = input.closest('summary');
+    if (summary) {
+      summary.classList.toggle('off', !all && !vals.some(Boolean));
+      summary.classList.toggle('partial', !all && vals.some(Boolean));
+    }
   }
   const byFam = speciesByFamily();
-  for (const li of document.querySelectorAll('#group-monsters-list li[data-fam]')) {
+  for (const li of document.querySelectorAll('#filters li[data-fam]')) {
     const row = li.querySelector(':scope > .filter-row');
     if (!row) continue;
     const fam = li.dataset.fam;
@@ -634,10 +593,10 @@ function refreshParentChecks() {
     if (input) { input.checked = famOn; input.indeterminate = partial; }
   }
   // Lignes ESPÈCE : une même espèce peut avoir DEUX lignes (arbre des
-  // familles + sous-groupe Creeps/Wildlife — présence double assumée,
-  // miroir des kinds moteur) : resynchroniser toutes les copies depuis
-  // S.monsp (l'écouteur d'une case ne met à jour que sa propre ligne).
-  for (const li of document.querySelectorAll('#group-monsters-list li[data-species]')) {
+  // familles + groupes Creeps/Wildlife — présence double assumée, miroir
+  // des kinds moteur) : resynchroniser toutes les copies depuis S.monsp
+  // (l'écouteur d'une case ne met à jour que sa propre ligne).
+  for (const li of document.querySelectorAll('#filters li[data-species]')) {
     const row = li.querySelector('.species-row');
     if (!row) continue;
     const on = !!S.monsp[li.dataset.species]?.on;
@@ -650,26 +609,52 @@ function refreshParentChecks() {
 /* État d'ouverture des sous-groupes (session seule, même discipline que
    expandedFams — le localStorage ne persiste que les groupes side-sec). */
 const subOpen = new Set();
-/* Sous-groupe repliable générique (Monsters/Creeps/Wildlife/Chests/… —
-   même vocabulaire visuel que l'ex-groupe Décor, classe .decor-group
-   réutilisée telle quelle) + case de cascade dans son <summary>. `count`
-   null = pas de compteur agrégé (les sous-groupes Monsters/Creeps/Wildlife
-   RECOUVRENT leurs propres lignes — rat allume aussi des camps monsters
-   depuis Creeps — une somme mentirait ; les buckets Interactables sont
-   disjoints, eux affichent leur somme honnête). */
+/* Sous-groupe repliable générique (Points d'intérêt/Chests/Destroyable/… —
+   classe .decor-group réutilisée telle quelle). CORRECTION VISUELLE
+   utilisateur (2026-07-11, finale) : plus JAMAIS de case native visible —
+   la PASTILLE COLORÉE est elle-même la case (l'<input> est stylé en
+   pastille via appearance:none + --dot, voir style.css .subgrp-check :
+   pleine = coché, anneau vide = décoché, demi-teinte = partiel), et le
+   dépliage passe par un CHEVRON dédié à DROITE (bouton .subgrp-expand,
+   même vocabulaire visuel que le chevron d'espèces .fam-expand). Zones de
+   clic : pastille/libellé = bascule de cascade ; chevron = plier/déplier
+   SEUL. Ces parents intermédiaires GARDENT leur pastille de cascade
+   (décision utilisateur : un parent qui représente une vraie unité de
+   filtre — tous les POI, tous les coffres… — se coche ; les en-têtes de
+   GROUPE, eux, n'ont plus aucune case, voir index.html).
+   `count` null = pas de compteur agrégé (un sous-groupe qui RECOUVRE ses
+   propres lignes mentirait avec une somme ; les buckets disjoints
+   affichent leur somme honnête). */
 function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0) {
   const li = document.createElement('li');
   const det = document.createElement('details');
   det.className = 'decor-group';
   det.dataset.subgroup = key;
   if (subOpen.has(key)) det.open = true;
-  det.addEventListener('toggle', () => { det.open ? subOpen.add(key) : subOpen.delete(key); });
   const summary = document.createElement('summary');
-  summary.innerHTML = `<input type="checkbox" class="subgrp-check" aria-label="${esc(tr('groupToggleAria'))}">
-    <span class="swatch" style="background:${hex}"></span>
+  summary.innerHTML = `<input type="checkbox" class="subgrp-check" style="--dot:${hex}" aria-label="${esc(tr('groupToggleAria'))}">
     <span class="flabel">${esc(label)}</span>
-    ${count != null ? `<span class="fcount">${count.toLocaleString(numberLocale())}</span>` : ''}${hiddenBadge(hidden)}`;
+    ${count != null ? `<span class="fcount">${count.toLocaleString(numberLocale())}</span>` : ''}${hiddenBadge(hidden)}
+    <button type="button" class="fam-expand subgrp-expand" aria-expanded="${det.open}" title="${esc(tr('subgroupFoldAria'))}" aria-label="${esc(tr('subgroupFoldAria'))}"></button>`;
   const input = summary.querySelector('input');
+  const foldBtn = summary.querySelector('.subgrp-expand');
+  det.addEventListener('toggle', () => {
+    det.open ? subOpen.add(key) : subOpen.delete(key);
+    foldBtn.setAttribute('aria-expanded', String(det.open));
+  });
+  // Zones de clic (voir doc ci-dessus). Un clic sur l'<input>-pastille ou le
+  // chevron (éléments interactifs imbriqués) ne déclenche JAMAIS le pli
+  // natif du <summary> (spec HTML) : la pastille bascule nativement (change
+  // → cascade via wireParentCheck), le chevron plie programmatiquement ;
+  // tout AUTRE clic (libellé, compteur) bascule la pastille — preventDefault
+  // pour ne pas plier en même temps.
+  summary.addEventListener('click', e => {
+    if (e.target === input) return;
+    if (e.target.closest('.subgrp-expand')) { det.open = !det.open; return; }
+    e.preventDefault();
+    input.checked = !input.checked;
+    input.dispatchEvent(new Event('change'));
+  });
   wireParentCheck(input, leavesFn);
   subChecks.push({ input, leavesFn });
   det.appendChild(summary);
@@ -680,17 +665,20 @@ function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0) {
   return { li, ul };
 }
 
-/* ── Groupe « World » : Zones · NPCs · POI (plate, step 2 = familles
-   d'icônes) · Workshops · Shrines · Soulkeepers · Gardes · Others.
+/* ── Groupe « World » : Zones · NPCs · Points d'intérêt (sous-groupe
+   poiType, 8 lignes — voir buildPoiSubGroup ci-dessus) · Workshops ·
+   Shrines · Soulkeepers · Gardes · Others.
    npc/poi/workshop/zones : critiques (premier rendu) ; les lignes camp
    (shrines/soulkeeper/guards/other) attendent camps.bin (différé).
    Gardes : libellé honnête « Gardes (unité non identifiée) » — 2 camps/12
    points sans AUCUN lien espèce/PNJ/butin/niveau dans les données (voir
     interactives_taxonomy_INVESTIGATION.md §5) — jamais un pair
-   de camp de monstre qu'il n'est pas. « Others » : sous-groupe destiné aux
-   familles d'icônes POI (step 2, regen en cours) — il porte déjà la ligne
-   camp:other (littéralement les camps « autres »), plutôt qu'une coquille
-   vide ou une 2ᵉ ligne « Autres » à plat à côté du futur sous-groupe. */
+   de camp de monstre qu'il n'est pas. « Others » : sous-groupe DISTINCT du
+   sous-groupe POI ci-dessus — il porte la ligne camp:other (littéralement
+   les camps moteur « autres »), une notion de kind de camp, pas une famille
+   d'icône POI (le 9ᵉ jeton défensif `poiType.other` n'a JAMAIS de record à
+   ce jour — config.js POI_TYPES ne liste que les 8 familles réelles, voir
+    */
 function buildGroupWorld() {
   const ul = $('#group-world-list');
   ul.innerHTML = '';
@@ -700,7 +688,7 @@ function buildGroupWorld() {
     ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX, S.zonesGeo.length, 0, S.zonesOn, toggleZones));
   }
   ul.appendChild(catRow('npc'));
-  ul.appendChild(catRow('poi'));
+  buildPoiSubGroup(ul);
   ul.appendChild(catRow('workshop'));
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
   for (const kind of KIND_PLACEMENT.world) {
@@ -716,87 +704,78 @@ function buildGroupWorld() {
     ul.appendChild(grp.li);
   }
 }
-/* ── Groupe « Monsters » : MIROIR des 3 kinds moteur (redirect utilisateur
-   2026-07-11 — data-natif, aucun axe Hostile/Neutre inventé).
-   1. Sous-groupe MONSTERS (kind) : la ligne kind « Camps de monstres »
-      (bascule GROSSIÈRE : elle seule couvre les camps monsters non joints
-      aux familles, design §4.4/§13.2 — gardée comme PREMIÈRE LIGNE du
-      sous-groupe plutôt qu'en bascule de son <summary> : la case du summary
-      reste un pur maître de cascade, uniforme avec tous les autres parents,
-      et la couverture kind garde sa ligne dédiée, comptée et décochable
-      indépendamment) + l'arbre familles→espèces existant
-      (buildMonsterFamilyGroup, inchangé).
-   2. Sous-groupe CREEPS : lignes famille jointes (rat/ratmutant — le moteur
-      les spawne sous monsters ET creeps, présence double ASSUMÉE, même état
-      S.monfam/mêmes teintes que l'arbre, jamais une dédup fabriquée) +
-      lignes espèce WILD (turkey/rabbit/fox/squirrel/porcupine — liaison
-      camp_details, resolver js/pointsets.js wildSpeciesOfKind) + la ligne
-      « Spawns non identifiés » (les pools creeps-<région> sans espèce —
-      token camp.creeps conservé, compte honnête kindRestPoints, la couche
-      ne dessine QUE ces camps, voir KIND_REST_ONLY).
-   3. Sous-groupe WILDLIFE : même modèle (leaf_dragon + pools non
-      identifiés — honnête : c'est TOUT ce que la donnée lie aujourd'hui).
-   Auto-ouverture d'un sous-groupe quand quelque chose y est coché (une
-   ligne cochée doit rester visible — hash restauré, clic de chip ;
-   contrepartie assumée : replié-avec-coche se rouvre au prochain rebuild). */
+/* ── Groupe « Monsters » (racine — correction structure 2026-07-11) : les
+   lignes FAMILLE directement dans le groupe (nœuds dépliables → sous-lignes
+   espèce, chevron droit .fam-expand), triées camps joints d'abord (rang =
+   couleur, design §4.3) puis les familles catalogue SANS camp ici
+   (alphabétiques, grisées « 0 camp » — listées quand même : l'arbre est le
+   bestiaire, chunk (d)). Total BRUT affiché par ligne (camps · points — ce
+   qu'elle allumerait seule) : rat et ratmutant partagent les 10 mêmes camps
+   et affichent chacun 4 045, assumé (données réelles, design §13.3) ; le
+   dédoublonnage est un fait de RENDU (main.js compositeCampPoints, priorité
+   espèce > famille > kind), jamais de comptage. La barre « Par famille » +
+   [Tous][Aucun] est RETIRÉE (« useless », correction utilisateur — la
+   cascade des pastilles couvre tout-cocher/tout-décocher). Dernière ligne :
+   « Spawns non identifiés » (camps monsters SANS espèce jointe, rest-only —
+   remplace l'ancienne bascule grossière « Camps de monstres », dont le
+   compte incluait des camps déjà couverts par les familles ; 'monsters' a
+   rejoint KIND_REST_ONLY, la couche dessine EXACTEMENT ce compte).
+   GLOSSARY-PENDING : le nom affiché d'une famille est son token moteur
+   prettifié (pretty(f.family) — « Boarmammoth », « Ratmutant »…) : AUCUNE
+   table de localisation des familles n'existe dans les données expédiées ;
+   à balayer quand l'extraction de glossaire (#86) livrera des libellés
+   prouvés. */
 function buildGroupMonsters() {
   const ul = $('#group-monsters-list');
   ul.innerHTML = '';
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
-  if (monstersKindLeaves().some(l => l.get())) subOpen.add('monsters-kind');
-  const mGrp = buildSubGroup('monsters-kind', campKindLabel('monsters'), CAMP_COLORS.monsters, monstersKindLeaves);
-  const mRow = campRow('monsters', tr('monsterCampsRow'), 'filter-row-sub');
-  if (mRow) mGrp.ul.appendChild(mRow);
-  const famLi = buildMonsterFamilyGroup();
-  if (famLi) mGrp.ul.appendChild(famLi);
-  if (mGrp.ul.children.length) ul.appendChild(mGrp.li);
-  for (const kind of KIND_PLACEMENT.kindSubGroups) appendKindSubGroup(ul, kind);
+  const fams = monsterFamilies();               // familles AVEC camps joints ici (triées pts desc)
+  const byFam = speciesByFamily();              // TOUTES les familles du catalogue global
+  if (!fams.length && !byFam.size) return;
+  // Une famille avec ≥1 espèce cochée se déplie d'elle-même : la ligne cochée
+  // doit être VISIBLE (hash restauré, clic de chip — décision utilisateur
+  // « auto-expanding its family so the checked row is visible »).
+  for (const [fam, list] of byFam) {
+    if (list.some(({ id }) => S.monsp[id]?.on)) expandedFams.add(fam);
+  }
+  const withCamps = new Set(fams.map(f => f.family));
+  const zeroFams = [...byFam.keys()].filter(f => !withCamps.has(f)).sort();
+  for (const [i, f] of fams.entries()) ul.appendChild(familyRowLi(f.family, f, familyHexByRank(i), true));
+  for (const fam of zeroFams) ul.appendChild(familyRowLi(fam, { nCamps: 0, nPts: 0 }, MONSTER_HEX, true));
+  appendKindRestRow(ul, 'monsters');
 }
-/* Sous-groupe kind miroir (Creeps/Wildlife — voir la doc du groupe). */
-function appendKindSubGroup(ul, kind) {
-  const st = S.camps[kind];
-  const fams = famsOfKind(kind);
+/* ── Groupes « Creeps » / « Wildlife » (racine — même correction) : lignes
+   famille MIROIR jointes au kind (rat/ratmutant sous Creeps — même état
+   S.monfam/mêmes teintes que l'arbre, jamais une couche dupliquée, sans
+   chevron d'espèces : le détail par espèce vit dans le groupe Monsters,
+   jamais dupliqué) + lignes espèce WILD (speciesRowLi — case S.monsp, hash
+   monsp.<token moteur> ; pas de fiche monstre pour ces espèces, nom non
+   cliquable honnête via speciesRep → null) + (Wildlife seulement) les
+   espèces fauniques catalogue SANS AUCUN camp (job pass 2026-07-11b,
+   wildlife_species.bin — tortues/poule/oie/… : rangées ici, le groupe
+   générique « faune » du panneau, plutôt que réparties au hasard sur
+   Creeps ; lignes DISPLAY-ONLY assumées — AUCUNE fiche n'existe pour une
+   espèce faunique, cocher ne dessine rien et la méta « 0 camp connu » le
+   dit, jamais masquées : catalogue browsable, « l'arbre est le bestiaire »
+   appliqué à la faune) + la ligne « Spawns non identifiés » en DERNIER
+   (symétrie des trois groupes). */
+function buildKindGroup(listId, kind, withZeroWildlife = false) {
+  const ul = $(listId);
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
+  for (const f of famsOfKind(kind)) ul.appendChild(familyRowLi(f.family, f, f.hex, false));
   const wild = wildSpeciesOfKind(kind)
     .slice()
     .sort((a, b) => (speciesPoints(b.id)?.nPts || 0) - (speciesPoints(a.id)?.nPts || 0) || a.name.localeCompare(b.name));
-  if (!st && !fams.length && !wild.length) return;
-  const leavesFn = () => kindSubLeaves(kind);
-  if (leavesFn().some(l => l.get())) subOpen.add('monsters-' + kind);
-  const grp = buildSubGroup('monsters-' + kind, campKindLabel(kind), CAMP_COLORS[kind] || '#888', leavesFn);
-  for (const f of fams) {
-    // Ligne famille MIROIR : même case/état que la ligne de l'arbre (une
-    // seule couche S.monfam), cascade identique (setFamilyOn), même méta
-    // « N camps » honnête — sans chevron d'espèces (le détail par espèce
-    // vit dans l'arbre du sous-groupe Monsters, jamais dupliqué).
-    const stF = S.monfam[f.family] || (S.monfam[f.family] = { on: false });
-    const row = filterRow('monfam:' + f.family, pretty(f.family), f.hex, f.nPts, 0, stF.on, on => {
-      setFamilyOn(f.family, on);
-      scheduleRedraw();
-      buildGroupMonsters();
-    }, 'filter-row-sub');
-    row.dataset.fam = f.family;   // resynchronisée par refreshParentChecks (copies multiples)
-    row.querySelector('.flabel').insertAdjacentHTML('afterend',
-      `<span class="fam-camps" style="color:var(--muted);font-size:.68rem;white-space:nowrap;margin-right:5px">${esc(tr('familyCampsN', f.nCamps))}</span>`);
-    grp.ul.appendChild(row);
+  for (const w of wild) ul.appendChild(speciesRowLi(w.id, { name: w.name }));
+  if (withZeroWildlife) {
+    for (const w of zeroCampWildlifeSpecies()) ul.appendChild(speciesRowLi(w.id, { name: w.name }, 'wildlifeZeroCamps'));
   }
-  // Espèces WILD : mêmes lignes que les sous-lignes espèce de l'arbre
-  // (speciesRowLi — case S.monsp, hash monsp.<token moteur>, méta
-  // « N camps · M pts » via le resolver étendu au canal wild). Pas de fiche
-  // monstre pour ces espèces (aucun enregistrement monsters.bin) : le nom
-  // reste non cliquable, honnête (speciesRep → null).
-  for (const w of wild) grp.ul.appendChild(speciesRowLi(w.id, { name: w.name }));
-  // « Spawns non identifiés » : les pools du kind sans AUCUNE espèce jointe
-  // (creeps-<région>, peaceful-animals-*…) — compte = exactement ce que la
-  // couche kind dessine désormais (KIND_REST_ONLY, main.js).
-  if (st) {
-    const rest = kindRestPoints(kind);
-    if (rest.nPts) {
-      grp.ul.appendChild(filterRow('camp:' + kind, tr('kindRestRow'), CAMP_COLORS[kind] || '#888',
-        rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, 'filter-row-sub'));
-    }
-  }
-  if (grp.ul.children.length) ul.appendChild(grp.li);
+  appendKindRestRow(ul, kind);
 }
+const buildGroupCreeps = () => buildKindGroup('#group-creeps-list', 'creeps');
+const buildGroupWildlife = () => buildKindGroup('#group-wildlife-list', 'wildlife', true);
 /* ── Groupe « Harvesting » : les 3 métiers de camp:<kind>, inchangé. */
 function buildGroupHarvest() {
   const ul = $('#group-harvest-list');
@@ -881,6 +860,8 @@ function rebuildAllGroups() {
   subChecks = [];
   buildGroupWorld();
   buildGroupMonsters();
+  buildGroupCreeps();
+  buildGroupWildlife();
   buildGroupHarvest();
   buildGroupContainers();
   refreshParentChecks();
@@ -903,7 +884,7 @@ function buildFilters() {
 /* ── Bestiaire (sidebar) — RETIRÉ (2026-07-11, décision utilisateur) ──────
    La section « Bestiaire » (buildBestiary/#bestiary-list, un listing par
    famille séparé en bas du panneau) est SUPPRIMÉE : l'arbre Monstres &
-   faune (buildMonsterFamilyGroup ci-dessus) couvre désormais exactement le
+   faune (les lignes famille de buildGroupMonsters) couvre exactement le
    même besoin — toutes les 224+ espèces catalogue restent parcourables par
    famille (chunk (d), « l'arbre EST le bestiaire »), chaque nom ouvre la
    même fiche, et la recherche (search.js buildMonsterSearchIndex) les
@@ -945,19 +926,12 @@ $$('.side-sec').forEach(sec => {
   });
 });
 
-/* Cases de CASCADE des 4 groupes statiques (.grp-check dans chaque
-   <summary>, voir index.html) — câblées UNE seule fois au chargement du
-   module : contrairement aux sous-groupes (reconstruits par buildFilters),
-   les summaries des groupes survivent à tous les rebuilds. Leur état
-   coché/partiel est ensuite republié par refreshParentChecks() à chaque
-   rebuild/changement de feuille. */
-$$('#filters .side-sec').forEach(sec => {
-  const input = sec.querySelector(':scope > summary > .grp-check');
-  const leavesFn = GROUP_LEAVES[sec.dataset.sec];
-  if (!input || !leavesFn) return;
-  wireParentCheck(input, leavesFn);
-  groupChecks.push({ input, leavesFn });
-});
+/* (Le câblage des cases de cascade de GROUPE — .grp-check/GROUP_LEAVES/
+   groupChecks — est RETIRÉ : correction finale utilisateur 2026-07-11, les
+   en-têtes de groupe ne sont plus sélectionnables — purs conteneurs
+   plier/déplier natifs, titre + chevron. La cascade vit sur les parents
+   intermédiaires à unité de filtre réelle : sous-groupes buildSubGroup +
+   lignes famille — voir wireParentCheck/refreshParentChecks.) */
 
 $('#panel-toggle').addEventListener('click', () => {
   const p = $('#panel');

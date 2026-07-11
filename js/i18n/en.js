@@ -20,34 +20,41 @@ export default {
       // follow the user's verbatim wording; sweep when the glossary
       // extraction (#86) proves in-game terms.
       groupMonsters: 'Monsters',
+      // Root Creeps/Wildlife groups (user structure correction 2026-07-11:
+      // Monsters/Creeps/Wildlife promoted to root level). groupCreeps
+      // follows the shipped campKind ("Creeps" — V20 pending owner call);
+      // groupWildlife follows ONTOLOGY.md #11 ("Wildlife", the canonical ◇).
+      groupCreeps: 'Creeps',
+      groupWildlife: 'Wildlife',
       groupHarvest: 'Harvesting',
       groupContainers: 'Interactables',
       groupWorld: 'World',
-      // Cascade checkboxes (final IA): shared aria-label of every group/
-      // sub-group master checkbox (js/sidebar.js wireParentCheck).
+      // Sub-group cascade dot (js/sidebar.js buildSubGroup) — root GROUP
+      // headers no longer carry one (final correction 2026-07-11: pure
+      // fold/unfold containers).
       groupToggleAria: 'Check or uncheck every layer in this group',
-      // Sub-group titles (final IA). The Monsters group's own sub-groups
-      // (Monsters/Creeps/Wildlife) reuse the campKind table — they mirror
-      // the ENGINE's kinds verbatim (user redirect 2026-07-11), never an
-      // invented axis. GLOSSARY-PENDING (bespoke structural labels).
+      // Sub-group fold chevron (.subgrp-expand button, right side — click
+      // zones: dot/label = toggle, chevron = fold only).
+      subgroupFoldAria: 'Expand or collapse',
+      // Sub-group titles (final IA). GLOSSARY-PENDING (bespoke structural
+      // labels).
       subWorldOthers: 'Others',
       subChests: 'Chests',
       subDestroyable: 'Destroyable',
       subInteractives: 'Interactives',
       subOther: 'Other',
       // Row-label overrides (display only — hash tokens stay camp.<kind>):
-      // the coarse monsters kind row inside the Monsters sub-group; the
-      // honest guards label (2 camps/12 pts, no species/NPC/loot binding at
-      // all — see interactives_taxonomy_INVESTIGATION.md §5); the honest
+      // the honest guards label (2 camps/12 pts, no species/NPC/loot binding
+      // at all — see interactives_taxonomy_INVESTIGATION.md §5); the honest
       // "unidentified spawns" row for kind camps with NO species binding
-      // (the generic creeps-<region>/peaceful-animals-* pools — its count
-      // is exactly what the layer draws, see pointsets.js KIND_REST_ONLY);
-      // and the "(camps)" disambiguation of the dynamic-spawn kinds now
-      // sitting next to PLACED decor props inside the same Interactables
-      // buckets. The `searchable` kind gets a genuinely distinct name
-      // ("Search spots") — no more four things all called "searchable"/
-      // "fouillable". GLOSSARY-PENDING (internal level-design tokens).
-      monsterCampsRow: 'Monster camps',
+      // (its count is exactly what the layer draws, see pointsets.js
+      // KIND_REST_ONLY; now serves ALL THREE Monsters/Creeps/Wildlife root
+      // groups symmetrically — the old monsterCampsRow "Monster camps"
+      // coarse toggle is retired); and the "(camps)" disambiguation of the
+      // dynamic-spawn kinds sitting next to PLACED decor props inside the
+      // Interactables buckets. The `searchable` kind gets a genuinely
+      // distinct name ("Search spots"). GLOSSARY-PENDING (internal
+      // level-design tokens).
       guardsRowLabel: 'Guards (unidentified unit)',
       kindRestRow: 'Unidentified spawns',
       searchSpotsRow: 'Search spots (camps)',
@@ -88,7 +95,9 @@ export default {
       // "positions of X" (design §13.1). Family DISPLAY names stay the
       // game's raw family tokens prettified (no localization table exists
       // in the shipped data -- GLOSSARY-PENDING #86, same as the bestiary).
-      monsterFamiliesTitle: 'By family',
+      // (monsterFamiliesTitle "By family" REMOVED 2026-07-11 with the
+      // divider bar + [All][None] buttons, judged useless by the user —
+      // family rows live directly inside the Monsters root group.)
       // n === 1 (not n > 1): "0 camps" is the honest plural for the 0-camp
       // catalog families the tree now lists (tree-is-bestiary, chunk (d)).
       familyCampsN: n => `${n} camp${n === 1 ? '' : 's'}`,
@@ -100,9 +109,32 @@ export default {
       // camp on the active map stays listed (fiche access), muted.
       speciesCampsPts: (n, p) => `${n} camp${n === 1 ? '' : 's'} · ${p} pts`,
       speciesZeroCamps: '0 camps on this map',
+      // 0-camp wildlife (wildlife_species.bin, job pass 2026-07-11b): GLOBAL
+      // wording — these species (turtles/hens/geese…) have camps on NO map,
+      // unlike speciesZeroCamps (scoped to the active map).
+      wildlifeZeroCamps: '0 known camps',
       famSpeciesToggle: 'Browse this family’s species',
-      chestTypesAllBtn: 'All',
-      chestTypesNoneBtn: 'None',
+      // #93 — camp fiche: activity + per-mode presence (camp_details
+      // `activity`/`modes`, see js/fiches.js campPresenceHtml). SOFT wording
+      // required (server registry weight, exact unit unknown — never a
+      // guaranteed spawn rate/timer).
+      campActivityLine: n => `Activity: ~${n}%`,
+      campActivityTitle: 'Server spawn-registry activity weight — exact unit unknown; absent means always active.',
+      campModesTitle: 'Presence by game mode',
+      campModesHint: 'Server activation weight per game mode — never a spawn guarantee.',
+      campModeTier: (m, n) => `${m} · tier ${n}`,
+      // Enriched POIs (pipeline pass 2026-07-11b): encyclopedia fiche button
+      // + divergent lore title (locTitle).
+      poiLoreBtn: 'Encyclopedia',
+      poiLoreNamed: t => `In the encyclopedia: “${t}”`,
+      // Compact "Show [entity] · N pts" affordance (wording uniformization
+      // 2026-07-11 — replaces the verbose "Highlight all spawns in these
+      // camps (N camps · M points)"; the word "camps" is banned from
+      // quest/step/fiche wording; see js/fiches.js monsterSpawnHighlightBtn).
+      showEntityBtn: 'Show',
+      entityPtsN: p => `${p} pts`,
+      // (chestTypesAllBtn/chestTypesNoneBtn REMOVED 2026-07-11 with the
+      // family list's [All][None] bar — no caller left.)
       // Container re-categorization (DATA_CONTRACT.md): the 2 real chest
       // layers + the "Decor" group (legacy_chest/decor by family).
       decorGroupLabel: 'Decor',
@@ -302,8 +334,11 @@ export default {
       // by camp kind (Mining/Monsters/…) instead of a flat 24-row dump —
       // header summary, "+N more" expander, and the honest fallbacks below
       // (unjoined camp, no camp data at all, generic reward-pool collapse).
-      farmGroupSummary: (camps, pts) => `${camps} camp${camps > 1 ? 's' : ''} · ${pts} points`,
-      farmMoreCampsN: n => `+ ${n} more camps`,
+      // MINIMAL counts (wording uniformization 2026-07-11: "926 pts" yes,
+      // "4 camps" no — the word "camps" is banned from fiche wording; the
+      // historical first param (camps) is ignored, signature kept).
+      farmGroupSummary: (camps, pts) => `${pts} pts`,
+      farmMoreCampsN: n => `+ ${n} more`,
       farmGenericPoolNote: n => `Also a rare drop from ${n} generic reward camps — not a targeted farm spot.`,
       farmSourcesNotMapped: 'Sources not mapped to a known camp yet.',
       farmOtherSourcesTitle: 'Other sources',
@@ -362,17 +397,12 @@ export default {
       variantsNote: n => ` · +${n} variants`,
       monsterAbilitiesN: n => `Abilities (${n})`,
       monsterCampsN: n => `Spawns in (${n})`,
-      // Group-level "highlight everything" button (monster fiche, July 2026):
-      // camp-level binding only — draws the union of all camp point clouds
-      // this monster spawns in, never a claim about which exact point spawns
-      // which variant (see camp-highlight handler, main.js). Wording says
-      // "in these camps" on purpose, distinct from the quest-step "View
-      // estimate" (viewEstimatedZoneBtn), which draws a different dataset
-      // (quest-OBJECT camp points).
-      monsterHighlightAllSpawns: (camps, pts) => `Highlight all spawns in these camps (${camps} camp${camps > 1 ? 's' : ''} · ${pts} points)`,
+      // (monsterHighlightAllSpawns REMOVED 2026-07-11, wording
+      // uniformization: replaced by showEntityBtn/entityPtsN — "Show
+      // [species] · N pts", see js/fiches.js monsterSpawnHighlightBtn.)
       noLootCatalogued: 'No catalogued loot for this monster.',
       noAbilitiesKnown: 'No known abilities for this monster.',
-      noCampsKnown: 'No known camp for this monster.',
+      noCampsKnown: 'No known spawn location for this monster.',
       // Camp fiche fauna section (unknown_states_DESIGN.md #4/#10, task #67):
       // a "monster-ish" camp (monsters/creeps/wildlife kind) whose manager
       // name yields zero resolved species — byte-proven the camp's own spawn
@@ -592,6 +622,24 @@ export default {
       mushrooms: 'Mushrooms', bottles: 'Bottles', pots: 'Pots',
       wooden: 'Wooden props', leafTrash: 'Leaf piles',
       vegetables: 'Vegetables', urban: 'Urban props',
+    },
+    // POI sub-categories (interest_points.bin poiType — OUR curated icon
+    // grouping, NOT a game taxonomy, see  §1 "poiType";
+    // 8 real families + a defensive "other", 0 records today).
+    poiType: {
+      habitat: 'Dwellings', nature: 'Nature', fort: 'Fortifications',
+      curiosity: 'Curiosities', transport: 'Transport', profession: 'Professions',
+      amenity: 'Amenities', portal: 'Portals', other: 'Other',
+    },
+    // Camp qualifier (Prison Island, engine token patrol|buffed —
+    // byte-proven semantics: base=PvE-only, patrol=only variant present in
+    // PvP (0.6), buffed=PvP-only 10% — SOFT wording, it is a server weight,
+    // never a guarantee nor a drawable patrol route).
+    campQualifier: { patrol: 'Patrol', buffed: 'Buffed (PvP)' },
+    // Game-mode tokens of the presence tables (#93, camp_details `modes`).
+    campMode: {
+      PvE: 'PvE', PvP: 'PvP', SoloPvE: 'Solo PvE', SoloPvP: 'Solo PvP',
+      SoloPvP_HC: 'Solo PvP (HC)',
     },
     // Physical chest type (world_objects.json chest_type) -- exact set from
     // data/world_objects.json, see data/SCHEMA.md "Chest loot + type".

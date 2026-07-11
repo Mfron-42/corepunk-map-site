@@ -34,35 +34,45 @@
     </div>
 
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
-      <!-- IA FINALE du panneau gauche (2026-07-11, COORDINATION.md §IA
-           FINALE) : 4 groupes fixes — World / Monsters / Harvesting /
-           Interactables. Groupes RETIRÉS le même jour : « Lieux &
-           personnages » (ses lignes npc/poi/workshop/zones → World),
-           « Quêtes » (qao → Interactables > Autres), l'ancien « Monde »
-           (shrines/soulkeeper/gardes/autres → World) et le groupe « Décor »
-           (dissous dans Interactables — voir js/sidebar.js DECOR_BUCKET).
-           Chaque <summary> porte une case de CASCADE (.grp-check,
-           js/sidebar.js wireParentCheck) : cocher = toutes les couches du
-           groupe, décocher = aucune, une partie = état partiel natif
-           (indeterminate). Ces cases n'ont AUCUN état propre (jamais
-           sérialisées dans le hash — dérivées des feuilles).
+      <!-- ARBRE FINAL du panneau gauche (2026-07-11, corrections utilisateur
+           du même jour — supersède les « 4 groupes + miroir de kinds ») :
+           6 groupes fixes — World / Monsters / Creeps / Wildlife /
+           Harvesting / Interactables. Monsters/Creeps/Wildlife sont montés
+           au NIVEAU RACINE (l'imbrication « Monsters > Monsters > Camps de
+           monstres » jugée confuse par l'utilisateur est retirée).
+           Les en-têtes de groupe ne sont PAS sélectionnables (décision
+           utilisateur, correction finale) : AUCUNE case/pastille de cascade
+           au niveau groupe — titre + chevron droit natifs (<summary>), purs
+           conteneurs plier/déplier. La sélection vit sur les LIGNES à
+           l'intérieur (pastille colorée = la case ; les parents
+           intermédiaires à unité de filtre réelle — familles, sous-groupes
+           POI/Interactables — gardent leur pastille de cascade, voir
+           js/sidebar.js buildSubGroup/wireParentCheck).
            data-sec="group-containers" CONSERVÉ pour Interactables
            (continuité de l'état ouvert/replié persisté en localStorage —
            seul le libellé du groupe change). -->
       <details class="side-sec" data-sec="group-world" open>
-        <summary><input type="checkbox" class="grp-check" data-i18n-attr="aria-label:groupToggleAria"><h2 data-i18n="groupWorld">Monde</h2></summary>
+        <summary><h2 data-i18n="groupWorld">Monde</h2></summary>
         <ul id="group-world-list" class="layer-list"></ul>
       </details>
       <details class="side-sec" data-sec="group-monsters" open>
-        <summary><input type="checkbox" class="grp-check" data-i18n-attr="aria-label:groupToggleAria"><h2 data-i18n="groupMonsters">Monstres</h2></summary>
+        <summary><h2 data-i18n="groupMonsters">Monstres</h2></summary>
         <ul id="group-monsters-list" class="layer-list"></ul>
       </details>
+      <details class="side-sec" data-sec="group-creeps" open>
+        <summary><h2 data-i18n="groupCreeps">Creeps</h2></summary>
+        <ul id="group-creeps-list" class="layer-list"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-wildlife" open>
+        <summary><h2 data-i18n="groupWildlife">Faune sauvage</h2></summary>
+        <ul id="group-wildlife-list" class="layer-list"></ul>
+      </details>
       <details class="side-sec" data-sec="group-harvest" open>
-        <summary><input type="checkbox" class="grp-check" data-i18n-attr="aria-label:groupToggleAria"><h2 data-i18n="groupHarvest">Récolte</h2></summary>
+        <summary><h2 data-i18n="groupHarvest">Récolte</h2></summary>
         <ul id="group-harvest-list" class="layer-list"></ul>
       </details>
       <details class="side-sec" data-sec="group-containers" open>
-        <summary><input type="checkbox" class="grp-check" data-i18n-attr="aria-label:groupToggleAria"><h2 data-i18n="groupContainers">Interactables</h2></summary>
+        <summary><h2 data-i18n="groupContainers">Interactables</h2></summary>
         <ul id="group-containers-list" class="layer-list"></ul>
       </details>
       <!-- Bestiaire (sidebar) RETIRÉ (2026-07-11, décision utilisateur) :

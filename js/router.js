@@ -96,6 +96,18 @@ async function applyLocationState() {
   // fait partie du chemin critique / de la bascule de carte ci-dessus,
   // jamais du chargement différé) — pas de garde whenDeferred.
   if (onSet) for (const f of Object.keys(S.decor)) S.decor[f].on = onSet.has('decor.' + f);
+  // Sous-catégories POI (S.poiTypes, job pass 2026-07-11b) : toujours prêt
+  // ici aussi (les 8 jetons existent au chargement du module, voir state.js)
+  // — un `on=` explicite retombe sur OFF pour chaque type absent (même
+  // discipline que decor.*/camp.* ci-dessus), SAUF compat legacy : un lien
+  // partagé d'AVANT ce split ne porte qu'un jeton bare `poi` (l'ancienne
+  // couche unique, toujours ON par défaut, voir urlstate.js) — sa présence
+  // rallume les 8 sous-types (compat "tout ON"), qu'il soit accompagné ou
+  // non de jetons `poi.<type>` explicites.
+  if (onSet) {
+    const legacyPoiAll = onSet.has('poi');
+    for (const t of Object.keys(S.poiTypes)) S.poiTypes[t].on = legacyPoiAll || onSet.has('poi.' + t);
+  }
   // Sous-couches « Par famille » (#82 chunk (b), S.monfam) : application
   // IMMÉDIATE de l'ÉTAT (design §10) — un token `monfam.<f>` CRÉE son
   // entrée même si species/camps (différés) ne sont pas encore là : le

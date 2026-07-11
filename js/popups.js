@@ -5,12 +5,12 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, catLabel, campKindLabel,
-  campDisplayName, chestDisplayName, activableTypeLabel,
+  campLabel, campQualifierChip, chestDisplayName, activableTypeLabel,
   chestHex, chestKindLabel, prettyRegion, ecAttr,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
-import { monsterKeyFor } from './data.js';
+import { monsterKeyFor, locationIndexForId } from './data.js';
 import { visibleQuestSlugs } from './devcontent.js';
 
 /* ── Popups ─────────────────────────────────────────────────── */
@@ -43,6 +43,29 @@ function popupHtml(cat, r, id) {
   // technique brute (qao_*), qui fuitait l'identifiant interne ("qao_radio_
   // red" -> "Radio red") tel quel dans le popup.
   if (cat === 'qao' && r.type) extraHtml = `<p class="pop-extra">${esc(activableTypeLabel(r.type))}</p>`;
+  // POI enrichis (pipeline pass 2026-07-11b — vrais noms InterestPoint.xml,
+  // desc/locTitle/loc joints depuis l'encyclopédie MapMarkers, region cuite) :
+  // le nom réel arrive tout seul via r.name (titre h3 ci-dessous, aucun
+  // changement requis) ; s'y ajoutent — quand présents — le titre de lore
+  // divergent (locTitle, ex. pin "Coal Village" / lore "Great Bones
+  // Village" : 15/156), le paragraphe d'encyclopédie (desc, 32/156,
+  // localisé, scrollable — .pop-desc) et un bouton vers la fiche lore
+  // existante (fiche-location) quand `loc` se résout dans S.locations
+  // (chargement DIFFÉRÉ : le popup est construit paresseusement au clic,
+  // donc quasi toujours résolu ; sinon le bouton est simplement omis, la
+  // course se répare au prochain clic — jamais un bouton mort). La ligne
+  // région vit dans catLine plus bas (pop-cat, même idiome que
+  // searchableChestPopup).
+  if (cat === 'poi') {
+    const locTitleHtml = (r.locTitle && r.locTitle !== r.name)
+      ? `<p class="pop-extra">${esc(tr('poiLoreNamed', r.locTitle))}</p>` : '';
+    const descHtml = r.desc ? `<p class="pop-desc">${esc(r.desc)}</p>` : '';
+    extraHtml = locTitleHtml + descHtml;
+    const locIdx = r.loc ? locationIndexForId(r.loc) : null;
+    if (locIdx != null) {
+      extraBtn = `<button class="act primary" data-act="fiche-location" data-id="${locIdx}">${esc(tr('poiLoreBtn'))}</button>`;
+    }
+  }
   // Coffre placé : bouton fiche complète seulement quand une table de butin
   // exacte est attachée. Pas de badge de type ici : le titre (h3, ci-dessous)
   // EST déjà le type physique localisé (chestDisplayName) — un badge
@@ -61,10 +84,14 @@ function popupHtml(cat, r, id) {
   // le bark générateur de son propre "Hello X") affichait quand même
   // « · 2 quêtes », trompeur.
   const npcQuests = cat === 'npc' ? visibleQuestSlugs(r.quests) : null;
+  // POI : la région nommée cuite (r.region, localisée — pipeline pass
+  // 2026-07-11b) complète la ligne de catégorie, même position que la
+  // région d'un coffre fouillable (searchableChestPopup ci-dessous).
   const catLine = cat === 'chest' ? chestKindLabel(r)
     : catLabel(cat)
       + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
-      + (cat === 'npc' && npcQuests.length ? tr('questCountSuffix', npcQuests.length) : '');
+      + (cat === 'npc' && npcQuests.length ? tr('questCountSuffix', npcQuests.length) : '')
+      + (cat === 'poi' && r.region ? ' · ' + r.region : '');
   // Titre : nom d'affichage localisé pour un coffre (chestDisplayName — le
   // nom brut est un jeton d'asset d'art jamais localisé, voir config.js) ;
   // nettoyage TEXTURING/QItem générique (cleanLabel) pour tout le reste.
@@ -144,8 +171,13 @@ function campPopup(p, n) {
   // affiche au minimum les points de spawn + le butin probable des
   // contenants typés — voir openCampFiche).
   const ficheBtn = `<div class="pop-actions"><button class="act primary" data-act="fiche-camp" data-id="${esc(g.k)}">${esc(tr('campFicheBtn'))}</button></div>`;
+  // Titre : nom EXPÉDIÉ (g.name, pipeline pass 2026-07-11b — kind token
+  // retiré, vocabulaire ffm-* splitté côté pipeline) via campLabel (config.js
+  // — les kinds interactables typés gardent campDisplayName, seul à extraire
+  // le sous-type tonneau/sac/…), + chip qualificatif (— Patrouille /
+  // — Renforcé (PvP)) quand le camp en porte un.
   return `<div class="pop">
-    <h3>${esc(campDisplayName(g.k))}</h3>
+    <h3>${esc(campLabel(g.k, g.kind, g.name))}${campQualifierChip(g.qualifier)}</h3>
     <div class="pop-cat" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}${n > 1 ? esc(tr('pointsHereSuffix', n)) : ''}</div>
     <span class="pop-coords">${fmtCoord(p.x, p.z)} · ${esc(tr('spawnsTotal', g.pts.length))}</span>
     ${extra}${ficheBtn}</div>`;

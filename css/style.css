@@ -525,13 +525,16 @@ body {
 .filter-row-sub.subfilter-featured .flabel { font-weight: 600; color: var(--ink); }
 .filter-row-sub.subfilter-featured:not(.off) .flabel { color: var(--accent-hi); }
 
-/* ── Groupe repliable "Décor" (container re-categorization) ──────────────
-   Même vocabulaire visuel que .filter-row (pastille + libellé + compteur) +
-   chevron d'état (comme .side-sec) — mais PAS de case à cocher sur cette
-   ligne : c'est un simple groupe d'affichage repliable, jamais un master
-   switch qui masquerait ce que chaque sous-famille dit vraiment (le on/off
-   réel vit sur chaque ligne de .subfilter-list en dessous, voir
-   js/sidebar.js buildDecorGroup). Fermé par défaut (pas de [open] posé). */
+/* ── Sous-groupe repliable (.decor-group, js/sidebar.js buildSubGroup) ────
+   CORRECTION VISUELLE utilisateur (2026-07-11, finale) : la ligne du
+   sous-groupe reprend EXACTEMENT le langage visuel des lignes de filtre
+   (pastille colorée + libellé + compteur) — plus JAMAIS de case native
+   visible : la PASTILLE EST la case (l'<input> .subgrp-check lui-même,
+   appearance:none, ci-dessous). Le chevron de pli est un bouton dédié à
+   DROITE (.subgrp-expand, même famille visuelle que .fam-expand) — plus de
+   ::after sur le summary : les zones de clic sont désormais distinctes
+   (pastille/libellé = bascule de cascade, chevron = pli seul, voir
+   buildSubGroup). */
 .decor-group { margin: 1px 0; }
 .decor-group > summary {
   display: flex; align-items: center; gap: 10px;
@@ -542,11 +545,6 @@ body {
 }
 .decor-group > summary::-webkit-details-marker { display: none; }
 .decor-group > summary:hover { background: var(--panel-3); }
-.decor-group > summary .swatch {
-  flex: none; width: 12px; height: 12px; border-radius: 50%;
-  border: 2px solid rgba(8, 12, 18, .7);
-  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px currentColor;
-}
 .decor-group > summary .flabel { font-size: .87rem; flex: 1; }
 .decor-group[open] > summary .flabel { color: var(--accent); }
 .decor-group > summary .fcount {
@@ -556,35 +554,55 @@ body {
   min-width: 2.6em;
   text-align: right;
 }
-.decor-group > summary::after {
-  content: '';
-  width: 7px; height: 7px;
-  border-right: 1.6px solid var(--muted);
-  border-bottom: 1.6px solid var(--muted);
-  transform: rotate(-45deg);
-  transition: transform var(--dur) var(--ease);
-  flex: none;
-}
-.decor-group[open] > summary::after { transform: rotate(45deg); }
 .decor-group .subfilter-list { margin-top: 2px; }
 
-/* ── Cases de CASCADE (IA finale du panneau, 2026-07-11) ─────────────────
-   Une vraie case native dans le <summary> de chaque groupe (.grp-check,
-   index.html) et de chaque sous-groupe (.subgrp-check, js/sidebar.js
-   buildSubGroup) : cocher = tout le sous-arbre, décocher = rien, une partie
-   = état partiel NATIF (input.indeterminate — le visuel standard demandé,
-   jamais un glyphe maison). accent-color reprend l'accent du site. */
-.grp-check, .subgrp-check {
+/* ── Pastille-case de CASCADE des sous-groupes (.subgrp-check) ───────────
+   L'<input type="checkbox"> stylé EN pastille (appearance:none) — même
+   recette exacte que .filter-row .swatch (taille, liseré, lueur), couleur
+   par sous-groupe via --dot (inline, buildSubGroup). États :
+   - coché        → pastille PLEINE (couleur --dot) ;
+   - décoché      → anneau VIDE (même recette que .filter-row.off .swatch) ;
+   - partiel      → pastille demi-teinte (opacity .55 — même visuel que
+                    l'état partiel des lignes famille, .filter-row.partial).
+   (Les en-têtes de GROUPE racine n'ont PLUS de case du tout — l'ancien
+   .grp-check est retiré, voir index.html/js/sidebar.js.) */
+.subgrp-check {
+  appearance: none;
+  -webkit-appearance: none;
   flex: none;
-  width: 13px; height: 13px;
+  width: 12px; height: 12px;
   margin: 0;
-  accent-color: var(--accent);
+  border-radius: 50%;
+  border: 2px solid rgba(8, 12, 18, .7);
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(233, 226, 208, .3);
   cursor: pointer;
+  transition: transform var(--dur) var(--ease);
 }
-.grp-check:focus-visible, .subgrp-check:focus-visible {
+.decor-group > summary:hover .subgrp-check { transform: scale(1.15); }
+.subgrp-check:checked {
+  background: var(--dot, var(--accent));
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px var(--dot, var(--accent));
+}
+.subgrp-check:indeterminate {
+  background: var(--dot, var(--accent));
+  opacity: .55;
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28);
+}
+.subgrp-check:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
+/* Libellé/compteur en retrait quand le sous-groupe est entièrement décoché
+   (classes off/partial posées sur le <summary> par refreshParentChecks —
+   même retrait que .filter-row.off/.partial). */
+.decor-group > summary.off .flabel,
+.decor-group > summary.off .fcount { color: var(--muted); opacity: .55; }
+.decor-group > summary.partial .flabel,
+.decor-group > summary.partial .fcount { color: var(--muted); }
+/* Chevron de pli du sous-groupe : réutilise .fam-expand (voir plus bas),
+   poussé à droite du summary. */
+.subgrp-expand { margin-left: 2px; }
 /* État PARTIEL d'une ligne FAMILLE (sa case cachée porte indeterminate :
    famille décochée mais ≥1 de ses espèces cochée — voir sidebar.js
    refreshParentChecks) : pastille à demi allumée (le fond inline garde la
@@ -668,13 +686,13 @@ body {
 }
 .stock-filter::placeholder { color: var(--muted); }
 .stock-filter:focus-visible { outline: none; border-color: var(--line-strong); }
-/* Sections repliables du panneau (World / Monsters / Harvesting /
-   Interactables + Suivis — IA finale 2026-07-11, remplace les 6 groupes du
-   chunk (a)) : le sommaire reprend exactement le style des h2 existants +
-   un chevron d'état (+ désormais la case de cascade .grp-check, voir
-   ci-dessus), l'état ouvert/replié est persisté PAR data-sec (localStorage,
-   voir sidebar.js) -- même mécanique générique qu'avant le refacto de
-   l'arbre. */
+/* Sections repliables du panneau (World / Monsters / Creeps / Wildlife /
+   Harvesting / Interactables + Suivis — structure finale 2026-07-11) : le
+   sommaire reprend exactement le style des h2 existants + un chevron d'état
+   à droite. En-têtes NON sélectionnables (correction finale utilisateur :
+   AUCUNE case/pastille de cascade au niveau groupe — purs conteneurs
+   plier/déplier, clic = pli natif du <summary>) ; l'état ouvert/replié est
+   persisté PAR data-sec (localStorage, voir sidebar.js). */
 .side-sec > summary {
   list-style: none;
   cursor: pointer;
@@ -1046,6 +1064,37 @@ body {
 }
 .pop .pop-coords { font-family: var(--font-mono); font-size: .72rem; color: var(--core); }
 .pop .pop-extra { margin: 6px 0 0; color: var(--muted); font-size: .78rem; }
+/* Paragraphe d'encyclopédie d'un POI (popup — r.desc, pipeline pass
+   2026-07-11b) : texte long (jusqu'à ~1 000 caractères), scrollé dans son
+   propre cadre plutôt que d'étirer la popup hors écran — même discipline
+   fine-scrollbar que .fiche-scroll. */
+.pop .pop-desc {
+  margin: 7px 0 0;
+  color: var(--ink-dim);
+  font-size: .76rem;
+  line-height: 1.5;
+  max-height: 130px;
+  overflow-y: auto;
+  padding-right: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-4) transparent;
+}
+/* Chip qualificatif de camp (« — Patrouille » / « — Renforcé (PvP) »,
+   config.js campQualifierChip — pipeline pass 2026-07-11b) : suffixe muet
+   du titre/libellé, jamais concurrent du nom lui-même. Posé dans h2/h3 de
+   fiche/popup ET dans les .fr-label des lignes de farm — taille relative
+   (em) pour suivre chaque contexte. */
+.camp-qualifier {
+  color: var(--muted);
+  font-size: .82em;
+  font-variation-settings: 'wght' 420;
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+/* Ligne « Activité : ~N % » de la fiche camp (#93) — le chip lui-même est
+   un .state-chip-dynamic (fait serveur byte-prouvé), ce conteneur ne gère
+   que l'espacement de section. */
+.camp-activity { margin: 0 0 6px; }
 .pop-actions { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
 
 /* ── Système de boutons : primaire (rempli) / secondaire (contour) / ghost (texte) ── */

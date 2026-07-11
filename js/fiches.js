@@ -10,7 +10,7 @@ import {
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campDisplayName, campLootTableName, chestDisplayName,
+  campLabel, campQualifierChip, campModeLabel, campLootTableName, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
 } from './config.js';
@@ -60,7 +60,14 @@ function openCampFiche(key) {
   const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === key);
   if (!g) return;
   S.openFiche = { kind: 'camp', id: key };
-  const name = campDisplayName(key);
+  // Nom EXPÉDIÉ (g.name, pipeline pass 2026-07-11b) via campLabel — les
+  // kinds interactables typés (destroyable/searchable/reactive) gardent le
+  // formateur campDisplayName (sous-type tonneau/sac/… extrait de la clé),
+  // voir config.js. Le chip qualificatif (patrol/buffed) s'ajoute au TITRE
+  // (h2 ci-dessous), jamais fusionné dans `name` (name sert aussi de
+  // data-label de goto, texte brut).
+  const name = campLabel(key, g.kind, g.name);
+  const qualChip = campQualifierChip(g.qualifier);
   const mobs = (det?.mobs || []).map(m => `
     <div class="frow">
       ${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'fr-icon', initials(m.name))}
@@ -81,25 +88,82 @@ function openCampFiche(key) {
   const faunaUnknown = (!mobs && MONSTER_ISH_CAMP_KINDS.has(g.kind))
     ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', 0))}</h3>
         <p class="hint">${stateChip('dynamic')} ${esc(tr('campFaunaUnknownNote'))}</p></div>` : '';
-  const drops = det ? `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(det.drops, 'noLootCatalogued')}</div>` : '';
+  // Butin : seulement quand la fiche détaillée a de la SUBSTANCE (mobs ou
+  // drops). camp_details expédie désormais ~150 entrées mode/activité-SEULES
+  // (mobs/drops vides — #93, pipeline pass 2026-07-11b) : leur coller une
+  // section « Butin » vide («aucun butin catalogué») à chacune serait du
+  // bruit, pas de l'honnêteté — l'ancien comportement (pas de section quand
+  // det était null pour ces camps) est conservé à l'identique.
+  const drops = (det && (det.mobs?.length || det.drops?.length))
+    ? `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(det.drops, 'noLootCatalogued')}</div>` : '';
   const tableName = campLootTableName(key);
   const tableRows = tableName ? lootTableItems(tableName) : null;
   const tableHtml = tableRows ? `<div class="fiche-section"><h3>${esc(tr('probableLootTitle'))}</h3>
     <p class="hint">${esc(tr('probableLootNote', tableName))}</p>
     ${lootRowsHtml(tableRows, 'noLootCatalogued')}</div>` : '';
+  // #93 — activité + présence par mode (camp_details `activity`/`modes`,
+  // voir campPresenceHtml ci-dessous) : formulation SOFT, jamais un timer.
+  const presenceHtml = campPresenceHtml(det);
   openFiche(`
     <div class="fiche-head"><div>
       <div class="fiche-kind" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}</div>
-      <h2>${esc(name)}</h2>
+      <h2>${esc(name)}${qualChip}</h2>
       <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
       ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${g.pts.length}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
     </div></div>
+    ${presenceHtml}
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : faunaUnknown}
     ${drops}
     ${tableHtml}`);
   setFicheHash('camp', key);
+}
+
+/* ── #93 : activité + table de présence par mode (camp fiche) ────────────
+   camp_details.bin expédie (pipeline pass 2026-07-11b) :
+   - `activity` (0–0.95, présent SEULEMENT quand < 1.0) : poids du registre
+     d'apparitions serveur — unité exacte inconnue (absence = toujours actif
+     ou registre absent, jamais distinguable) → ligne douce « Activité :
+     ~N % » en chip affirmatif (state-chip-dynamic : c'est un FAIT serveur
+     byte-prouvé, pas une incertitude) + tooltip honnête. JAMAIS présenté
+     comme un taux de spawn/timer.
+   - `modes` (îles d'Extraction seulement) : poids d'activation par mode de
+     jeu (PvE/PvP/SoloPvE/SoloPvP/SoloPvP_HC, `<mode>@N` = palier de danger
+     N). Table compacte, poids affiché en % (les 4 mobs rares de quête
+     — war-bear/hunger-wolf/death-raven/plague-frogs — lisent ainsi leur
+     4 % sur leur ligne, paliers 10–12). Un poids 0 s'affiche « 0 % »
+     honnêtement (camp de base ABSENT du PvP, byte-prouvé — c'est LA
+     sémantique camp/patrol/buffed, jamais masquée).
+   Entrées mode/activité-SEULES (~150, mobs/drops vides) : cette section est
+   alors tout ce que la fiche détaillée apporte — le reste de la fiche
+   (points, goto) vient du groupe de camp comme avant. */
+const CAMP_MODE_ORDER = ['PvE', 'SoloPvE', 'PvP', 'SoloPvP', 'SoloPvP_HC'];
+function campModeSort(a, b) {
+  const [baseA, tierA] = a.split('@'), [baseB, tierB] = b.split('@');
+  const ia = CAMP_MODE_ORDER.indexOf(baseA), ib = CAMP_MODE_ORDER.indexOf(baseB);
+  if (ia !== ib) return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  return (+tierA || 0) - (+tierB || 0);
+}
+function campWeightPct(w) {
+  const pct = w * 100;
+  return pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct > 0 && pct < 10 ? 1 : 0 }) + ' %';
+}
+function campPresenceHtml(det) {
+  if (!det) return '';
+  const hasActivity = det.activity != null && det.activity < 1;
+  const modes = det.modes ? Object.keys(det.modes).sort(campModeSort) : [];
+  if (!hasActivity && !modes.length) return '';
+  const activityLine = hasActivity
+    ? `<p class="camp-activity"><span class="state-chip state-chip-dynamic" title="${esc(tr('campActivityTitle'))}">${esc(tr('campActivityLine', Math.round(det.activity * 100)))}</span></p>` : '';
+  const modeRows = modes.map(mk => {
+    const [base, tier] = mk.split('@');
+    const label = tier ? tr('campModeTier', campModeLabel(base), tier) : campModeLabel(base);
+    return `<div class="frow"><span class="fr-label">${esc(label)}</span><span class="muted">${esc(campWeightPct(det.modes[mk]))}</span></div>`;
+  }).join('');
+  const modesBlock = modes.length
+    ? `<p class="hint">${esc(tr('campModesHint'))}</p>${modeRows}` : '';
+  return `<div class="fiche-section">${modes.length ? `<h3>${esc(tr('campModesTitle'))}</h3>` : ''}${activityLine}${modesBlock}</div>`;
 }
 
 /* Fiche coffre (S.data.chest, placements tc_* : camp_chest/legacy_chest/
@@ -2787,25 +2851,24 @@ function isGenericFarmPoolItem(drops) {
 
 /* Ligne de camp JOINT (g trouvé dans S.camps) : pastille couleur de kind
    (même teinte que la fiche camp/les couches carte -- CAMP_COLORS), nom
-   d'affichage réel (campDisplayName -- LE formateur partagé, désormais aussi
-   pour la fiche monstre : l'ancien 3ᵉ argument `displayName` qui préférait
-   le nom « déjà cuit » du pipeline (m.camps[].name) est RETIRÉ — ce nom est
-   cassé pour toute clé de vocabulaire non-Kwalat ("Ffm-Island-Monster-
-   Buffed-Wolf-Undead", voir  island_camp_labels_INVESTIGATION.md
-   §1/bonus finding) et campDisplayName strippe maintenant lui-même les
-   préfixes de vocabulaire, en un seul endroit) cliquable vers la fiche camp
-   complète (inchangé), et un bouton « Surligner » qui dessine le VRAI nuage
-   de points de CE camp + vole à ses bornes -- même primitive/même libellé
-   que le bouton de la fiche camp (data-n porte le compte BRUT, jamais
-   formaté : main.js reconstruit ce même libellé au toggle-off via
-   +b.dataset.n, un texte initial formaté différemment du texte de reset
-   aurait clignoté au premier clic). */
+   d'affichage EXPÉDIÉ (g.name — pipeline pass 2026-07-11b, splitter
+   espèce/qualificatif partagé côté pipeline : kind token retiré, vocabulaire
+   ffm-* strippé à la source ; campLabel (config.js) garde le formateur
+   campDisplayName pour les seuls kinds interactables typés, dont le
+   sous-type tonneau/sac/… n'existe que dans la clé) + chip qualificatif
+   (— Patrouille / — Renforcé (PvP), tbl('campQualifier')) quand le camp en
+   porte un, cliquable vers la fiche camp complète (inchangé), et un bouton
+   « Surligner » qui dessine le VRAI nuage de points de CE camp + vole à ses
+   bornes -- même primitive/même libellé que le bouton de la fiche camp
+   (data-n porte le compte BRUT, jamais formaté : main.js reconstruit ce
+   même libellé au toggle-off via +b.dataset.n, un texte initial formaté
+   différemment du texte de reset aurait clignoté au premier clic). */
 function farmCampRow(key, g) {
   const n = g.pts.length;
   const campHex = CAMP_COLORS[g.kind] || '#999';
   return `<div class="frow">
     <span class="rar-dot" style="background:${campHex}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campDisplayName(key))}</span>
+    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campLabel(key, g.kind, g.name))}${campQualifierChip(g.qualifier)}</span>
     <button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${n}">${esc(tr('highlightPointsBtn', n))}</button>
   </div>`;
 }
@@ -2817,28 +2880,28 @@ function farmCampRow(key, g) {
    commentaire était périmé) --, ou S.camps pas encore chargé). Pas de
    compte inventé, pas de bouton Surligner qu'on ne peut pas honorer --
    honnête plutôt que de fabriquer un kind/point count qu'on n'a pas.
-   Libellé : campDisplayName(clé) — plus jamais le c.name « cuit » du
-   pipeline, cassé pour les clés non-Kwalat (même correctif que farmCampRow
-   ci-dessus). Bouton : les x/z d'un camp d'une AUTRE carte sont dans SON
-   repère — l'ancien gotoBtn local panoramiquait la carte ACTIVE vers des
-   coordonnées d'une autre (bug réel, investigation §2) → crossMapBtn
-   (bascule PUIS focus) quand la carte du camp est dérivable de sa clé
-   (ffm-island- → Extraction_Island_large, la seule dérivation prouvée
-   aujourd'hui). TODO(pipeline) : remplacer cette dérivation par le champ
-   `map` (présent dans data/camps.json, jamais copié dans m.camps[]/
-   item.farm[] — investigation §2). Cas S.camps-pas-encore-chargé :
-   se répare tout seul sans code supplémentaire ici, main.js ré-ouvre déjà
-   cette fiche après loadDeferred() (même mécanisme que la course it.
-   questSource/S.monsters documentée plus haut). */
+   Libellé : le nom EXPÉDIÉ (c.name — m.camps[]/item.farm[] rows portent
+   désormais name/qualifier/map/kind, pipeline pass 2026-07-11b) via
+   campLabel + chip qualificatif — même formateur partagé que farmCampRow.
+   Bouton : les x/z d'un camp d'une AUTRE carte sont dans SON repère —
+   l'ancien gotoBtn local panoramiquait la carte ACTIVE vers des coordonnées
+   d'une autre (bug réel, investigation §2) → crossMapBtn (bascule PUIS
+   focus) quand le champ `map` expédié désigne une autre carte connue.
+   (L'ancienne dérivation par préfixe de clé ffm-island- → île est RETIRÉE :
+   le champ `map` du pipeline est la source, plus aucune heuristique.)
+   Cas S.camps-pas-encore-chargé : se répare tout seul sans code
+   supplémentaire ici, main.js ré-ouvre déjà cette fiche après
+   loadDeferred() (même mécanisme que la course it.questSource/S.monsters
+   documentée plus haut). */
 function farmUnjoinedRow(c) {
-  const label = campDisplayName(c.camp);
-  const mid = c.camp.startsWith('ffm-island-') ? 'Extraction_Island_large' : null;
+  const label = campLabel(c.camp, c.kind, c.name);
+  const mid = (c.map && c.map !== S.map) ? c.map : null;
   const btn = (mid && S.maps[mid] && c.x != null)
     ? crossMapBtn(mid, c.x, c.z, label)
     : gotoBtn(c.x, c.z, label);
   return `<div class="frow">
     <span class="fr-icon icon-broken" data-fb="📍"></span>
-    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(label)}</span>
+    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(label)}${campQualifierChip(c.qualifier)}</span>
     ${btn}
   </div>`;
 }
@@ -2863,26 +2926,29 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
    (monsterSpawnHighlightBtn / farmSectionHtml / monsterCampsHtml) l'appellent
    désormais directement par clé. */
 
-/* Bouton « voir tous les spawns » PARTAGÉ (task #79, quest-driven spawn
-   highlighting — REBRANCHÉ par #82 chunk (d), modèle « l'arbre EST le
-   bestiaire ») : le même bouton sur la fiche monstre (monsterCampsHtml) et
-   les cartes d'étape (goalTargetChip kill/kill_collect) n'est plus un aperçu
-   ÉPHÉMÈRE (l'ancien camp-highlight mourait avec la fiche) mais LA MÊME
-   ACTION que la case espèce de l'arbre de gauche : data-act="species-layer"
-   (délégué main.js — toggle S.monsp, persistant jusqu'au décochage, points +
-   zones par camp via le compositeur/js/specieslayer.js, aucun flyTo). Compte
-   affiché = LE résolveur unique (js/pointsets.js speciesPoints, grain
-   espèce — exactement ce que la case allumera), jamais l'union par-variante
-   d'avant (m.camps), qui pouvait diverger de la ligne de l'arbre. Repli
-   honnête : espèce sans camp joint sur la carte active -> chaîne vide,
-   jamais un bouton qui n'allumerait rien (sa ligne d'arbre « 0 camp » reste
-   la voie manuelle). */
+/* Bouton « Afficher <espèce> » PARTAGÉ (task #79, rebranché par #82 chunk
+   (d) ; wording UNIFORMISÉ le 2026-07-11, demande utilisateur : l'ancien
+   verbeux « Voir tous les spawns dans ces camps (4 camps · 926 points) »
+   devient l'affordance compacte « Afficher [Imp executioner] · 926 pts » —
+   nom d'espèce en chip d'entité (ecAttr, couleur monstre), compte MINIMAL
+   (« 926 pts », jamais « N camps » : le mot est banni du wording
+   quêtes/étapes/fiches, concept interne data/panneau). Même action
+   qu'avant, sur la fiche monstre (monsterCampsHtml) et les cartes d'étape
+   (goalTargetChip kill/kill_collect) : LA case espèce de l'arbre de gauche,
+   data-act="species-layer" (délégué main.js — toggle S.monsp, persistant
+   jusqu'au décochage, aucun flyTo). Compte affiché = LE résolveur unique
+   (js/pointsets.js speciesPoints — exactement ce que la case allumera).
+   Nom affiché = l'ESPÈCE (S.species — c'est son nœud d'arbre qui se coche),
+   repli sur le nom de variante. Repli honnête : espèce sans camp joint sur
+   la carte active -> chaîne vide, jamais un bouton qui n'allumerait rien
+   (sa ligne d'arbre « 0 camp » reste la voie manuelle). */
 function monsterSpawnHighlightBtn(m) {
   const spId = m?.species;
   if (!spId) return '';
   const res = speciesPoints(spId);
   if (!res) return '';
-  return `<button class="act ghost" data-act="species-layer" data-species="${esc(spId)}" data-n="${res.nPts}" aria-pressed="${S.monsp[spId]?.on ? 'true' : 'false'}">${esc(tr('monsterHighlightAllSpawns', res.nCamps, res.nPts))}</button>`;
+  const spName = S.species[spId]?.name || m.name;
+  return `<button class="act ghost show-entity-btn" data-act="species-layer" data-species="${esc(spId)}" data-n="${res.nPts}" aria-pressed="${S.monsp[spId]?.on ? 'true' : 'false'}">${esc(tr('showEntityBtn'))} <span class="chip-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(spName)}</span> · ${esc(tr('entityPtsN', res.nPts.toLocaleString(numberLocale())))}</button>`;
 }
 
 function farmSectionHtml(it) {
@@ -3020,22 +3086,27 @@ function containersSectionHtml(it) {
    main.js) -- la demande d'origine ("où sont les imps bleus ?") attend
    l'UNION des nuages réels de TOUS les camps de la créature (4 camps ≈ 900+
    points pour les imps), jamais une poignée de points choisis à la main.
-   m.camps[] porte déjà {camp, name, x, z} PAR CAMP -- une forme strictement
-   identique à it.farm[], donc les MÊMES lignes sont réutilisées telles
-   quelles : farmCampRow (camp joint -- le nom vient de campDisplayName(clé),
-   LE formateur partagé ; l'ancien passage du name « cuit » du pipeline est
-   retiré, il fuyait les clés brutes non-Kwalat « Ffm-Island-Monster-… »,
-   voir island_camp_labels_INVESTIGATION.md) et farmUnjoinedRow (camp d'une
-   autre carte, préfixe ffm-island-* -- 448 lignes réelles sur le catalogue
-   monstre expédié (129/916 monstres, recompté par l'investigation §1 --
-   l'ancien « 449 refs » était périmé), jamais un compte fabriqué ; bouton
-   cross-carte, voir sa doc). Les lignes sœurs camp/patrol/buffed d'une même
+   m.camps[] porte {camp, name, qualifier?, map, kind, x, z} PAR CAMP
+   (pipeline pass 2026-07-11b) -- une forme strictement identique à
+   it.farm[], donc les MÊMES lignes sont réutilisées telles quelles :
+   farmCampRow (camp joint -- le nom vient du `name` EXPÉDIÉ via campLabel,
+   LE formateur partagé : l'ancien name « cuit » cassé pour les clés
+   non-Kwalat, cause du retrait temporaire d'alors, est CORRIGÉ côté
+   pipeline — voir island_camp_labels_INVESTIGATION.md §4) et
+   farmUnjoinedRow (camp d'une autre carte, champ `map` expédié -- 448
+   lignes réelles sur le catalogue monstre expédié (129/916 monstres,
+   recompté par l'investigation §1 -- l'ancien « 449 refs » était périmé),
+   jamais un compte fabriqué ; bouton cross-carte, voir sa doc). Les lignes sœurs camp/patrol/buffed d'une même
    espèce restent des lignes DISTINCTES (leurs nuages de points sont
    réellement distincts, investigation §4(b) -- jamais fusionnées) ; le
-   qualificatif affiché (— Patrol / — Buffed (PvP)) attend le champ pipeline
-   `qualifier`, pas une dérivation client. 0 camp DU TOUT retombe sur la
-   pastille "unknown" déjà en place (unknown_states_DESIGN.md #10, task #67
-   -- comportement inchangé). */
+   qualificatif s'affiche désormais en chip (— Patrouille / — Renforcé
+   (PvP)) depuis le champ pipeline `qualifier` EXPÉDIÉ (pass 2026-07-11b),
+   jamais une dérivation client — les lignes non jointes sont en outre
+   triées nom puis base < patrol < buffed pour que chaque triade se lise
+   d'un bloc (leurs nuages restent distincts, seul l'ORDRE change). 0 camp
+   DU TOUT retombe sur la pastille "unknown" déjà en place
+   (unknown_states_DESIGN.md #10, task #67 -- comportement inchangé). */
+const QUALIFIER_RANK = { patrol: 1, buffed: 2 };
 function monsterCampsHtml(m) {
   const camps = m.camps || [];
   const title = esc(tr('monsterCampsN', camps.length));
@@ -3049,6 +3120,8 @@ function monsterCampsHtml(m) {
     if (g) joined.push({ c, g }); else unjoined.push(c);
   }
   joined.sort((a, b) => b.g.pts.length - a.g.pts.length);
+  unjoined.sort((a, b) => (a.name || a.camp).localeCompare(b.name || b.camp)
+    || (QUALIFIER_RANK[a.qualifier] || 0) - (QUALIFIER_RANK[b.qualifier] || 0));
   // Bouton de groupe (monsterSpawnHighlightBtn, PARTAGÉ avec goalTargetChip
   // -- task #79, rebranché par #82 chunk (d)) : coche la case ESPÈCE de
   // l'arbre (persistant, points + zones) -- une action DIFFÉRENTE du

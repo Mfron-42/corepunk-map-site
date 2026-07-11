@@ -70,6 +70,17 @@ const CATS = {
   camp_chest:       { hex: '#f2a65a', on: true, dense: true },
 };
 const catLabel = key => tbl('cat', key) || key;
+/* Sous-catégories POI (interest_points.bin `poiType`, pipeline pass
+   2026-07-11b — extract_markers.py, ◇ curaté "exactly like campKind... NOT a
+   game-classified taxonomy field", voir  §1 "poiType").
+   8 familles réelles + "other" défensif (0 enregistrement aujourd'hui, jamais
+   affiché -- voir sidebar.js buildPoiSubGroup). Axe = FORME d'icône, très
+   déséquilibré (habitat 71/156 sur Kwalat) : filtre grossier, jamais vendu
+   comme une taxonomie fine (pass4_FRONT_TODO.md §1). UNE seule teinte
+   partagée (CATS.poi.hex) pour les 8 lignes -- une fausse distinction
+   chromatique impliquerait une taxonomie de jeu qui n'existe pas. */
+const POI_TYPES = ['habitat', 'nature', 'fort', 'curiosity', 'transport', 'profession', 'amenity', 'portal'];
+const poiTypeLabel = key => tbl('poiType', key) || pretty(key);
 /* Palette pass (map-legibility task) : mining/herbalism/logging (les 3
    métiers de récolte) recouraient chacun à une teinte qui se fond dans SON
    PROPRE terrain typique -- mining #9ba7c0 (gris-bleu neutre) sur roche
@@ -289,6 +300,50 @@ function campDisplayName(rawKey) {
   return rest ? `${typeLabel} — ${pretty(rest)}` : typeLabel;
 }
 
+/* Nom d'affichage RÉEL d'un camp de référence (pass pipeline 2026-07-11b,
+   island_camp_labels_INVESTIGATION.md) : les groupes de camps (camps.bin) et
+   toute référence à un camp (m.camps[]/item.farm[] rows) expédient désormais
+   un `name` PROPRE côté pipeline (splitter espèce/qualificatif, kind token
+   retiré) -- ce nom remplace l'ancien repli pretty(clé) de campDisplayName()
+   ci-dessus pour les kinds "faune"/récolte (monsters/creeps/wildlife/
+   herbalism/logging/mining/shrines/soulkeeper/guards/quest/event/other) :
+   AVANT cette passe, pretty() ne capitalisait QUE la 1re lettre de la chaîne
+   entière et laissait le token de kind dedans (vérifié : campDisplayName(
+   "creeps-turkey-windreach-woods") -> "Creeps turkey windreach woods",
+   campDisplayName("ffm-island-monster-camp-ghouls-patrol") -> "Monster camp
+   ghouls patrol" -- un vrai défaut visible, jamais l'ambition du design).
+   Les kinds INTERACTABLES typés (destroyable/searchable/reactive) gardent
+   campDisplayName(key) : SEUL lui sait extraire le VRAI sous-type (tonneau
+   explosif, sac de maïs…) via CAMP_TYPE_RULES -- le `name` expédié pour ces
+   camps-là n'est qu'un simple split brut ("Destroyable Windreach Woods"),
+   moins informatif. UNE seule implémentation, consommée par fiches.js
+   (openCampFiche/farmCampRow/farmUnjoinedRow) ET popups.js (campPopup) ET
+   search.js (campSearchLabel) -- jamais re-dérivée par surface. */
+function campLabel(key, kind, shippedName) {
+  if (kind === 'destroyable' || kind === 'searchable' || kind === 'reactive') return campDisplayName(key);
+  return shippedName || campDisplayName(key);
+}
+/* Qualificatif de camp (patrol|buffed -- jeton NEUTRE côté moteur, poids par
+   mode PvP/PvE byte-prouvé, voir island_camp_labels_INVESTIGATION.md §3) :
+   « — Patrouille » / « — Renforcé (PvP) », formulation SOFT (c'est un poids
+   serveur, jamais une garantie de tracé/timer -- voir COORDINATION.md §3.3).
+   campQualifierChip est PARTAGÉ par fiches.js (farmCampRow/farmUnjoinedRow/
+   openCampFiche) ET popups.js (campPopup) : posé ici (module pur, aucune
+   dépendance DOM/état) pour éviter tout import croisé entre ces deux fichiers
+   (fiches.js importe déjà mobLabelHtml depuis popups.js). Pas d'esc() ici :
+   `qualifier` est un jeton d'ENUM fixe ("patrol"/"buffed"), jamais du texte
+   libre saisi par un joueur. */
+const campQualifierLabel = key => tbl('campQualifier', key) || pretty(key);
+function campQualifierChip(qualifier) {
+  return qualifier ? ` <span class="camp-qualifier">— ${campQualifierLabel(qualifier)}</span>` : '';
+}
+/* Libellé d'un mode de jeu de camp_details.bin `modes` (#93, camp_details
+   ships per-mode weights) : jetons PvE/PvP/SoloPvE/SoloPvP/SoloPvP_HC, ou
+   `<mode>@N` (palier de danger N, îles d'Extraction seulement) -- le suffixe
+   de palier est composé par l'appelant (fiches.js campModesHtml), cette
+   fonction ne résout que le token de BASE. */
+const campModeLabel = key => tbl('campMode', key) || pretty(key);
+
 /* Type d'un coffre placé (tc_*) et nature d'un objet de quête activable
    (qao) : le pipeline classifie déjà chaque enregistrement sur le vrai champ
    moteur (world_objects.json chest_type/activable_type — tokens neutres
@@ -456,13 +511,14 @@ function ecAttr(hex, kind) {
 export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank,
   SPECIES_LAYER_HEX_CYCLE, speciesLayerHex,
-  CATS, catLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
+  CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName, ecAttr,
-  campDisplayName, chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
+  campDisplayName, campLabel, campQualifierLabel, campQualifierChip, campModeLabel,
+  chestTypeLabel, activableTypeLabel, chestDisplayName, campLootTableName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,
   prettyRegion, LOOT_TABLE_HEX,
 };

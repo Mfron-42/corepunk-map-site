@@ -21,7 +21,20 @@ function buildHash() {
     // row). readHash() below still tolerates a LEGACY `on=quest` token from
     // an old shared link without crashing (Object.keys(CATS) still finds
     // the key, sets its dead `.on` -- a genuine no-op, nothing reads it).
-    ...Object.entries(CATS).filter(([k, v]) => v.on && k !== 'quest').map(([k]) => k),
+    // 'poi' (config.js CATS.poi) also excluded here, same reasoning as 'quest'
+    // just above: its single on/off flag was replaced by 8 granular
+    // `poiTypes.<type>` tokens (job pass 2026-07-11b, poiType sub-rows under
+    // World — see sidebar.js buildPoiSubGroup). CATS.poi.on is no longer
+    // written by any checkbox (only `.hex` is still read, by chips/popups
+    // that need the POI color) -- serializing its stale value here would
+    // bake a redundant/wrong bare `poi` token into every fresh share link.
+    // readHash() below still tolerates a LEGACY bare `on=...,poi,...` token
+    // (pre-split shared link) as "all 8 sub-types ON" — see router.js.
+    ...Object.entries(CATS).filter(([k, v]) => v.on && k !== 'quest' && k !== 'poi').map(([k]) => k),
+    // Sous-catégories POI (S.poiTypes, job pass 2026-07-11b) : même principe
+    // que decor.*/camp.* ci-dessous — un jeton `poi.<type>` par sous-ligne
+    // actuellement ON (toutes ON par défaut, contrairement à decor/camp).
+    ...Object.entries(S.poiTypes).filter(([, v]) => v.on).map(([k]) => 'poi.' + k),
     // 'quest' excluded here too (camp:quest row retired 2026-07-11 — see
     // sidebar.js buildGroupQuests/router.js applyCampFilters): S.camps.quest
     // is now locked to `on:false` forever (router.js never flips it back on
@@ -96,6 +109,11 @@ function readHash() {
     // for its `.hex` only), so this just sets its now-unread `.on` flag --
     // it drives no renderer and no filter row, and buildHash() never bakes
     // it back into the hash on the next sync. Never crashes either way.
+    // Same no-op tolerance for a legacy bare `on=...,poi,...` token (before
+    // the poiType split, job pass 2026-07-11b): CATS.poi.on gets set here
+    // but no renderer reads it anymore -- router.js applyLocationState is
+    // where the REAL compat lives, expanding a bare `poi` token (or its
+    // absence) into all 8 `S.poiTypes.<type>` flags.
     for (const k of Object.keys(CATS)) CATS[k].on = onSet.has(k);
     S.zonesOn = onSet.has('zones');
     // Contenu dev (feature #13) : état initial déjà résolu au chargement du

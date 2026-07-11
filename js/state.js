@@ -1,6 +1,7 @@
 /* Kwalat — état applicatif unique (S) + persistance localStorage.
    S.lang ne fait que refléter LANG (résolu par js/i18n/index.js). */
 import { LANG } from './i18n/index.js';
+import { POI_TYPES } from './config.js';
 
 const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', sections: 'cpmap_sections' };
 
@@ -34,6 +35,23 @@ const S = {
                             // -> {on, count} — sous-couches "Décor" (chests.bin group="decor"|
                             // "legacy_chest", toutes OFF par défaut), voir data.js
                             // buildDecorGroups() et js/sidebar.js buildDecorGroup()
+  // Sous-catégories POI (poiType, pipeline pass 2026-07-11b — voir config.js
+  // POI_TYPES/js/sidebar.js buildPoiSubGroup) : jeton -> {on}, TOUS ON par
+  // défaut (compat legacy `on=poi` = ancienne couche unique, toujours ON).
+  // GLOBAL (comme monfam/monsp ci-dessous), pas de cache par carte : les 8
+  // jetons existent toujours, seul le compte de points varie par carte
+  // (Kwalat seule à avoir des POI, voir data.js loadCritical/multimap.js).
+  poiTypes: Object.fromEntries(POI_TYPES.map(t => [t, { on: true }])),
+  // Faune sauvage (job pass 2026-07-11b, wildlife_species.bin, 5 locales) :
+  // id d'espèce faunique -> {name, namesAll?, family?, harvestMethod?,
+  // camps:[{camp,name,qualifier?,map,x,z,n}], pts, loot?, lootShared?} — 25
+  // espèces au catalogue, 6 liées à ≥1 camp (déjà jointes via camp_details
+  // `wild:true`, voir pointsets.js wildSpeciesIndex/wildSpeciesOfKind), 19
+  // honnêtement "0 camp" (tortues/poules/oies/…, voir pointsets.js
+  // zeroCampWildlifeSpecies) — display-only, aucune fiche dédiée (même
+  // traitement non-cliquable que les espèces wild déjà listées, voir
+  // sidebar.js speciesRowLi/speciesRep -> [null,null] pour ces ids).
+  wildlifeSpecies: {},
   monfam: {},               // famille de monstre (post-alias, ex. "imp") -> {on} — sous-couches
                             // « Par famille » (#82 chunk (b)), toutes OFF par défaut. SEUL l'état
                             // on/off vit ici (global, survit à la bascule de carte) ; camps/points

@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  catLabel, campDisplayName, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
+  catLabel, campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel,
   locationKindLabel, mapName,
 } from './config.js';
@@ -276,7 +276,12 @@ function buildCrossMapSearch() {
     // wording too, not just its title (issue D, cross-map parity with the
     // active map's questSearchBody()).
     const body = e.terms ? [e.terms] : null;
-    pushSearchEntry(e.label, e.cat, hex, e.x ?? null, e.z ?? null,
+    // Camp d'une autre carte : les entrées search_index expédient désormais
+    // le nom PROPRE + `qualifier` (pipeline pass 2026-07-11b, 8 entrées île)
+    // — même suffixe texte localisé que campSearchLabel ci-dessous.
+    const label = (e.cat === 'camp' && e.qualifier)
+      ? `${e.label} — ${campQualifierLabel(e.qualifier)}` : e.label;
+    pushSearchEntry(label, e.cat, hex, e.x ?? null, e.z ?? null,
       () => crossMapOpen(e), null, null, null, 0, body, { map: e.map, ref: e.ref });
   }
 }
@@ -354,14 +359,22 @@ function buildSearchableChestSearchIndex() {
   });
 }
 
-/* Libellé de recherche d'un camp : nom d'affichage partagé (campDisplayName,
-   js/config.js — type de contenant localisé + reste de clé prettifié, pour
-   que "carotte"/"tonneau"/"pot"/"champignon" trouvent quelque chose). Seule
-   spécificité recherche : les 5 camps "for-delete-*" (restes de dev) sont
-   exclus de l'index entièrement. */
-function campSearchLabel(k) {
-  if (k.includes('for-delete')) return null;   // reste de dev — exclu de la recherche
-  return campDisplayName(k);
+/* Libellé de recherche d'un camp : nom d'affichage partagé (campLabel,
+   js/config.js — nom EXPÉDIÉ propre pour les camps de faune/récolte
+   (pipeline pass 2026-07-11b), formateur campDisplayName conservé pour les
+   kinds interactables typés : type de contenant localisé + reste de clé
+   prettifié, pour que "carotte"/"tonneau"/"pot"/"champignon" trouvent
+   quelque chose) + suffixe qualificatif TEXTE (— Patrouille / — Renforcé
+   (PvP)) quand le groupe en porte un (l'entrée de recherche est du texte
+   plat, pas un chip HTML — même contenu, autre support). Seule spécificité
+   recherche : les 5 camps "for-delete-*" (restes de dev) sont exclus de
+   l'index entièrement (exclusion morte pour les bins racine — le pipeline
+   ne les expédie plus — mais gardée en défense, la donnée canonique les
+   garde et un futur bundle pourrait fuiter). */
+function campSearchLabel(g) {
+  if (g.k.includes('for-delete')) return null;   // reste de dev — exclu de la recherche
+  const base = campLabel(g.k, g.kind, g.name);
+  return g.qualifier ? `${base} — ${campQualifierLabel(g.qualifier)}` : base;
 }
 
 /* Entrées « Camp » ajoutées à l'index une fois camps.json arrivé (chargement
@@ -370,7 +383,7 @@ function campSearchLabel(k) {
 function buildCampSearchIndex() {
   Object.values(S.camps).forEach(st => st.groups.forEach(g => {
     if (!g.pts.length) return;
-    const label = campSearchLabel(g.k);
+    const label = campSearchLabel(g);
     if (label == null) return;
     // Clic → surligne TOUS les points du groupe (pas seulement le premier) :
     // « montre-moi toutes les caisses de maïs », voir showHighlight.

@@ -206,6 +206,14 @@ function renderDense(cat, points, color, popupFor) {
    ville : la couche passe en petits points canvas (même palette) et ne
    repasse aux portraits qu'au-delà. */
 const DOM_MIN_ZOOM = 1.5;
+/* POI : visibilité PAR ENREGISTREMENT (poiType, 8 sous-lignes du sous-groupe
+   World > Points d'intérêt, job pass 2026-07-11b — voir config.js POI_TYPES/
+   sidebar.js buildPoiSubGroup). CATS.poi.on lui-même n'est plus la source de
+   vérité (remplacé par S.poiTypes, un jeton par sous-catégorie) -- même
+   traitement que CATS.quest.on (config.js) : gardé pour son `.hex` seulement,
+   ne pilote plus aucun rendu. Toujours `true` pour tout autre `cat` (npc/
+   workshop -- aucune sous-catégorie de visibilité pour eux). */
+const poiRecordOn = (cat, r) => cat !== 'poi' || !!S.poiTypes[r.poiType]?.on;
 function renderDomDots(cat, g, popupFor, onSelect) {
   const c = CATS[cat];
   const t = worldToPxTransform();
@@ -216,6 +224,7 @@ function renderDomDots(cat, g, popupFor, onSelect) {
     const r = arr[i];
     if (r.x == null || r.z == null) continue;
     if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec qao
+    if (!poiRecordOn(cat, r)) continue;
     const q = fastProject(t, r.x, r.z);
     if (q.x < pb.min.x - padX || q.x > pb.max.x + padX || q.y < pb.min.y - padY || q.y > pb.max.y + padY) continue;
     const id = markerId(cat, i);
@@ -233,7 +242,12 @@ function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
   const g = layers[cat] || (layers[cat] = L.layerGroup().addTo(map));
   g.clearLayers();
   const c = CATS[cat];
-  if (!c || !c.on) return;
+  // 'poi' : au moins une sous-catégorie ON (le gate historique CATS.poi.on
+  // n'est plus écrit par aucune case du panneau -- voir poiRecordOn ci-dessus)
+  // -- pur raccourci perf (évite la boucle si tout est décoché), le filtre
+  // RÉEL par enregistrement se fait plus bas (poiRecordOn).
+  const anyOn = cat === 'poi' ? Object.values(S.poiTypes).some(st => st.on) : (c && c.on);
+  if (!c || !anyOn) return;
   if (map.getZoom() < DOM_MIN_ZOOM) { renderDomDots(cat, g, popupFor, onSelect); return; }
 
   const t = worldToPxTransform();
@@ -248,6 +262,7 @@ function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
     if (r.x == null || r.z == null) continue;   // known only from dialog/quest-slot,
                                                    // no fixed position -- fiche/search only
     if (isHiddenTest(r)) continue;   // contenu dev/test (feature #13) : masqué sauf S.devOn — parité npc/poi/workshop avec qao
+    if (!poiRecordOn(cat, r)) continue;
     const q = fastProject(t, r.x, r.z);
     if (q.x < minX || q.x > maxX || q.y < minY || q.y > maxY) continue;
     const id = markerId(cat, i);
