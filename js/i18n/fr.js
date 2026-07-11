@@ -411,6 +411,9 @@ export default {
       // Voir pins.js + COORDINATION.md §Vocabulaire.
       userFlagTitle: 'Drapeau',
       clearAllFlagsBtn: 'Effacer tous les drapeaux',
+      // Bloc « Mes drapeaux » injecté dans la section Suivis (sidebar.js
+      // renderUserPins, 2026-07-11c) -- même vocabulaire « drapeau », jamais « pin ».
+      userFlagsBlockTitle: 'Mes drapeaux',
       mapDownload9600: 'Carte 9600px',
       mapDownload4800: 'Carte 4800px',
       loadErrorPrefix: msg => `Impossible de charger les données (${msg})`,

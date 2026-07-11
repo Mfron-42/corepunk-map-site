@@ -13,6 +13,7 @@ import {
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
+  speciesLayerHex, familyHexByRank,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -20,7 +21,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js'
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
-import { campGroupByKey, speciesPoints, familyPoints } from './pointsets.js';
+import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
@@ -2391,10 +2392,22 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const chanceInMeta = (t.item_key || t.item_label) ? chanceText : null;
     const metaParts = n => [lvl, chanceInMeta,
       n != null ? tr('entityPtsN', n.toLocaleString(numberLocale())) : null].filter(Boolean).join(' · ');
+    // Teinte PRÉCISE de l'entité (ratifié Q6, spec §9) : la couleur du tag/de
+    // la pastille = la couleur des points EXACTS que la pastille allume = la
+    // pastille de SA ligne d'arbre — jamais la teinte générique du kind.
+    // Famille : le rang de couleur EST l'ordre de monsterFamilies() (tri pts
+    // desc puis nom — pointsets.js familyTable, « cet ORDRE est aussi le rang
+    // de couleur ») ; une famille sans camp joint sur la carte active n'a pas
+    // de rang → MONSTER_HEX, le MÊME repli que sa ligne d'arbre 0-camp
+    // (sidebar.js buildGroupMonsters). Résolution partagée, jamais re-dérivée.
+    const goalFamilyHex = f => {
+      const rank = monsterFamilies().findIndex(r => r.family === f);
+      return rank >= 0 ? familyHexByRank(rank) : MONSTER_HEX;
+    };
     const famRef = f => {
       const res = familyPoints(f);
       return ref({
-        kind: 'family', key: f, label: pretty(f), hex: MONSTER_HEX,
+        kind: 'family', key: f, label: pretty(f), hex: goalFamilyHex(f),
         hasFiche: familyHasMembers(f),
         drawable: true, count: res ? res.nPts : 0,
         drawn: !!S.monfam[f]?.on,
@@ -2407,7 +2420,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         : (famLabel ? ref({ kind: 'family', label: famLabel, hex: MONSTER_HEX, hasFiche: false, drawable: false }) : ''))
       : mk
         ? ref({
-          kind: 'species', key: mk, label: nameLbl, hex: MONSTER_HEX,
+          // Teinte Q6 : l'espèce RÉSOLUE prend la couleur de SA couche
+          // (speciesLayerHex — la même que sa pastille d'arbre sidebar.js:325
+          // et ses points dessinés) ; MONSTER_HEX seulement quand l'id
+          // d'espèce ne résout pas (repli entité-non-résolue, jamais plus).
+          kind: 'species', key: mk, label: nameLbl,
+          hex: spId ? speciesLayerHex(spId) : MONSTER_HEX,
           hasFiche: true,
           drawable: !!spId, count: spPts ? spPts.nPts : 0,
           drawn: !!(spId && S.monsp[spId]?.on),

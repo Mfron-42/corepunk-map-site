@@ -197,6 +197,26 @@ function mountUserFlag(id, x, z) {
   userFlagMarkers.set(id, mk);
   return mk;
 }
+/* Abonnement « liste changée » (remise en place du bloc "Suivi" personnel,
+   demande utilisateur 2026-07-11c : « avant j'avais une section pour mes
+   pins perso, remets mes pins perso dans suivi ») -- sidebar.js s'abonne UNE
+   fois (import-time) pour republier son propre bloc à chaque mutation des
+   drapeaux : ajout/suppression/vidage/bascule de carte (les 4 fonctions
+   ci-dessous notifient toutes en sortie ; renderUserFlags est déjà appelée
+   par main.js au boot et à chaque onMapSwitch -- couvre donc ces deux cas
+   sans qu'aucun appelant n'ait besoin de connaître ce module de plus).
+   Set plutôt qu'un callback unique : robuste à un futur second abonné, coût
+   nul aujourd'hui. */
+const userFlagsListeners = new Set();
+function onUserFlagsChange(cb) { userFlagsListeners.add(cb); }
+function notifyUserFlagsChange() { userFlagsListeners.forEach(cb => cb()); }
+/* Lecture seule des drapeaux de la carte ACTIVE -- copie (jamais le tableau
+   interne à localStorage) : le seul appelant à ce jour (sidebar.js, bloc
+   "Suivi") ne doit muter l'état que via addUserFlag/removeUserFlag/
+   clearAllUserFlags ci-dessous, jamais le tableau retourné ici. */
+function listUserFlags() {
+  return (loadAllUserFlags()[S.map] || []).slice();
+}
 /* (Re)pose tous les drapeaux de la carte ACTIVE depuis localStorage --
    appelée au boot et à chaque bascule de carte (main.js onMapSwitch) : les
    drapeaux sont scopés par carte, jamais affichés hors de la leur. */
@@ -205,6 +225,7 @@ function renderUserFlags() {
   userFlagMarkers.clear();
   const list = loadAllUserFlags()[S.map] || [];
   list.forEach(p => mountUserFlag(p.id, p.x, p.z));
+  notifyUserFlagsChange();
 }
 function addUserFlag(x, z) {
   const all = loadAllUserFlags();
@@ -214,12 +235,14 @@ function addUserFlag(x, z) {
   saveAllUserFlags(all);
   mountUserFlag(id, x, z).openPopup();
   pulse(toLL(x, z));   // même vague de confirmation ponctuelle qu'un goTo, voir plus haut
+  notifyUserFlagsChange();
 }
 function removeUserFlag(id) {
   const all = loadAllUserFlags();
   if (all[S.map]) { all[S.map] = all[S.map].filter(p => p.id !== id); saveAllUserFlags(all); }
   const mk = userFlagMarkers.get(id);
   if (mk) { userFlagLayer?.removeLayer(mk); userFlagMarkers.delete(id); }
+  notifyUserFlagsChange();
 }
 function clearAllUserFlags() {
   const all = loadAllUserFlags();
@@ -227,6 +250,7 @@ function clearAllUserFlags() {
   saveAllUserFlags(all);
   if (userFlagLayer) { map.removeLayer(userFlagLayer); userFlagLayer = null; }
   userFlagMarkers.clear();
+  notifyUserFlagsChange();
 }
 map.on('contextmenu', e => {
   const w = toWorld(e.latlng);
@@ -234,4 +258,7 @@ map.on('contextmenu', e => {
   addUserFlag(w.x, w.z);
 });
 
-export { goTo, setLocator, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags };
+export {
+  goTo, setLocator, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
+  onUserFlagsChange, listUserFlags,
+};

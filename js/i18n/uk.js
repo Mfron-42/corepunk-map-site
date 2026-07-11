@@ -371,6 +371,10 @@ export default {
       // від locatorTitle вище (маркер goto). Див. pins.js.
       userFlagTitle: 'Прапорець',
       clearAllFlagsBtn: 'Прибрати всі прапорці',
+      // Блок «Мої прапорці» в секції «Відстежуване» (sidebar.js
+      // renderUserPins, 2026-07-11c) — той самий словник «прапорець»,
+      // ніколи «pin».
+      userFlagsBlockTitle: 'Мої прапорці',
       mapDownload9600: 'Карта 9600px',
       mapDownload4800: 'Карта 4800px',
       loadErrorPrefix: msg => `Не вдалося завантажити дані (${msg})`,

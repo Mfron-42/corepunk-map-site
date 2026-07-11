@@ -369,6 +369,9 @@ export default {
       // locatorTitle выше (маркер goto). См. pins.js.
       userFlagTitle: 'Флаг',
       clearAllFlagsBtn: 'Убрать все флаги',
+      // Блок «Мои флаги» в секции «Отслеживаемое» (sidebar.js
+      // renderUserPins, 2026-07-11c) — тот же словарь «флаг», никогда «pin».
+      userFlagsBlockTitle: 'Мои флаги',
       mapDownload9600: 'Карта 9600px',
       mapDownload4800: 'Карта 4800px',
       loadErrorPrefix: msg => `Не удалось загрузить данные (${msg})`,

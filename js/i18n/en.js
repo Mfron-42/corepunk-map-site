@@ -417,6 +417,9 @@ export default {
       // and from locatorTitle above (the goto reticle). See pins.js.
       userFlagTitle: 'Flag',
       clearAllFlagsBtn: 'Clear all flags',
+      // Bloc "My flags" injecté dans la section Suivi (sidebar.js
+      // renderUserPins, 2026-07-11c) -- même vocabulaire "flag", jamais "pin".
+      userFlagsBlockTitle: 'My flags',
       mapDownload9600: 'Map 9600px',
       mapDownload4800: 'Map 4800px',
       loadErrorPrefix: msg => `Could not load data (${msg})`,

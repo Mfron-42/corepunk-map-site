@@ -383,6 +383,10 @@ export default {
       // Ver pins.js.
       userFlagTitle: 'Bandera',
       clearAllFlagsBtn: 'Quitar todas las banderas',
+      // Bloque "Mis banderas" inyectado en la sección Seguimiento
+      // (sidebar.js renderUserPins, 2026-07-11c) -- mismo vocabulario
+      // "bandera", nunca "pin".
+      userFlagsBlockTitle: 'Mis banderas',
       mapDownload9600: 'Mapa 9600px',
       mapDownload4800: 'Mapa 4800px',
       loadErrorPrefix: msg => `No se pudieron cargar los datos (${msg})`,

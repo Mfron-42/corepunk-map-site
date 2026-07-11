@@ -6,11 +6,11 @@ import {
   chestDisplayName, chestHex, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
   speciesLayerHex, POI_TYPES, poiTypeLabel,
 } from './config.js';
-import { $, $$, esc, pretty, fold } from './utils.js';
+import { $, $$, esc, fmtCoord, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
-import { goTo } from './pins.js';
+import { goTo, onUserFlagsChange, listUserFlags } from './pins.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
 import {
@@ -82,6 +82,85 @@ function renderTracked() {
     ul.appendChild(li);
   });
 }
+
+/* ── Drapeaux utilisateur dans « Suivi » (remis, demande utilisateur
+   2026-07-11c : « avant j'avais une section pour mes pins perso, remets mes
+   pins perso dans suivi pour que je puisse les voir les delete etc ») ──
+   Bloc CONSTRUIT ici et injecté comme DERNIER enfant de #tracked-section
+   (jamais dans index.html — même discipline que buildSubGroup/
+   buildPoiSubGroup plus bas : ce fichier construit déjà des sous-arbres
+   entiers par JS) : même <details> « Suivi » que les quêtes suivies
+   ci-dessus, donc replié/déplié ensemble, jamais une section séparée.
+   data-act DÉCLARATIF (goto/remove-user-flag/clear-user-flags) plutôt qu'un
+   onclick direct comme renderTracked() ci-dessus : ces 3 actions existent
+   déjà et sont câblées par le délégué global de main.js -- AUCUN nouveau
+   type d'action, contrainte de la mission. Nom affiché : les drapeaux n'ont
+   pas de nom propre (juste x/z, voir pins.js #84) -- même titre générique
+   que leur popup (tr('userFlagTitle'), déjà traduit dans les 5 langues)
+   numéroté dans l'ordre de pose, seul identifiant honnête à ce jour ;
+   coordonnées en tooltip (title natif) plutôt que dans le libellé, pour
+   rester aussi compact qu'une ligne #tracked-list.
+   Live-update : abonnement UNIQUE (import-time, tout en bas de ce bloc) à
+   pins.js::onUserFlagsChange -- notifié par renderUserFlags/addUserFlag/
+   removeUserFlag/clearAllUserFlags, couvre donc le boot, chaque bascule de
+   carte ET chaque geste utilisateur, jamais un sondage.
+   Styles inline sur les lignes/dé/bouton : CSS finale en cours de mission
+   séparée (style.css verrouillé, voir  pins_suivi_css.staged.css)
+   -- réutilise déjà .t-dot/.t-name (idem #tracked-list, migration triviale
+   une fois le sélecteur étendu) et .farm-group-head/.farm-group-label/
+   .act.ghost/.side-sec-count (classes EXISTANTES, aucune CSS neuve requise
+   pour l'en-tête du bloc). */
+function trOr(key, fallback) {
+  const v = tr(key);
+  return v === key ? fallback : v;   // clé pas encore livrée (i18n en cours) -- repli sûr
+}
+let userPinsBox = null;
+function ensureUserPinsBox() {
+  if (userPinsBox && document.body.contains(userPinsBox)) return userPinsBox;
+  const host = document.getElementById('tracked-section');
+  if (!host) return null;
+  const box = document.createElement('div');
+  box.id = 'userpins-block';
+  box.style.marginTop = '12px';
+  box.style.paddingTop = '10px';
+  box.style.borderTop = '1px solid var(--line-soft)';
+  box.innerHTML = `
+    <div class="farm-group-head">
+      <span class="farm-group-label"></span>
+      <span id="userpins-count" class="side-sec-count"></span>
+      <button type="button" class="act ghost" data-act="clear-user-flags"></button>
+    </div>
+    <ul id="userpins-list" class="layer-list"></ul>`;
+  host.appendChild(box);
+  userPinsBox = box;
+  return box;
+}
+function renderUserPins() {
+  const box = ensureUserPinsBox();
+  if (!box) return;
+  const list = listUserFlags();
+  // Liste vide : le bloc entier se masque (jamais un en-tête qui pendrait
+  // seul -- la section « Suivi » elle-même garde de toute façon sa propre
+  // liste de quêtes/son propre hint, jamais dépendante de ce bloc).
+  box.style.display = list.length ? '' : 'none';
+  const ul = box.querySelector('#userpins-list');
+  ul.innerHTML = '';   // TOUJOURS vidé (même liste vide -- jamais une rangée fantôme qui resterait dans un bloc masqué) avant le repli anticipé ci-dessous
+  if (!list.length) return;
+  box.querySelector('.farm-group-label').textContent = trOr('userFlagsBlockTitle', 'My flags');
+  box.querySelector('#userpins-count').textContent = `(${list.length})`;
+  box.querySelector('.act.ghost').textContent = tr('clearAllFlagsBtn');   // clé déjà livrée (popup drapeau, pins.js)
+  list.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.style.cssText = 'display:flex;align-items:center;gap:9px;padding:7px 4px;font-size:.85rem;border-bottom:1px solid var(--line-soft)';
+    const label = `${tr('userFlagTitle')} ${i + 1}`;
+    li.innerHTML = `<span class="t-dot" style="background:var(--core);width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px -1px currentColor;flex:none"></span>
+      <span class="t-name" style="flex:1;cursor:pointer" data-act="goto" data-x="${p.x}" data-z="${p.z}" data-label="${esc(label)}" title="${esc(fmtCoord(p.x, p.z))}">${esc(label)}</span>
+      <button type="button" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:3px 6px;border-radius:var(--radius-s)" aria-label="${esc(tr('removeBtn'))}" data-act="remove-user-flag" data-id="${esc(p.id)}">✕</button>`;
+    ul.appendChild(li);
+  });
+}
+onUserFlagsChange(renderUserPins);
+
 /* ── Filtres (sidebar) ──────────────────────────────────────── */
 /* Badge discret "+N" quand une catégorie a des enregistrements réels sans
    position connue (voir catStats/positionCounts ci-dessous) — jamais un
