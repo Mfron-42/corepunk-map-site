@@ -51,6 +51,16 @@ export default {
       //  unknown_states_DESIGN.md §2 re-check #1).
       filterHiddenTooltip: n => `${n} sans position connue`,
       decorFamiliesTitle: 'Familles de décor',
+      // Sous-groupe « Par famille » sous Monstres & faune (#82 chunk (b),
+      // js/sidebar.js buildMonsterFamilyGroup). familyCampsN : compte de
+      // camps honnête d'une ligne famille — les points d'une famille sont
+      // ceux des CAMPS où elle apparaît (partagés avec tout ce qui y spawn),
+      // jamais « les positions de X » (design §13.1). Les NOMS de famille
+      // affichés restent les tokens bruts du jeu prettifiés (aucune table de
+      // localisation dans les données expédiées — GLOSSARY-PENDING #86,
+      // comme le bestiaire).
+      monsterFamiliesTitle: 'Par famille',
+      familyCampsN: n => `${n} camp${n > 1 ? 's' : ''}`,
       chestTypesAllBtn: 'Tous',
       chestTypesNoneBtn: 'Aucun',
       // Container re-categorization (DATA_CONTRACT.md) : les 2 vraies couches

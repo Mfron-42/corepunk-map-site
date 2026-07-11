@@ -53,6 +53,13 @@ export default {
       // unknown_states_DESIGN.md §2 re-check #1).
       filterHiddenTooltip: n => `${n} sin posición conocida`,
       decorFamiliesTitle: 'Familias de decoración',
+      // Subgrupo "Por familia" bajo Monstruos y fauna (#82 chunk (b),
+      // js/sidebar.js buildMonsterFamilyGroup) — los puntos de una familia
+      // son los de los CAMPAMENTOS donde aparece, nunca "posiciones de X"
+      // (design §13.1). Los nombres de familia mostrados son los tokens del
+      // juego prettificados (GLOSSARY-PENDING #86, como el bestiario).
+      monsterFamiliesTitle: 'Por familia',
+      familyCampsN: n => `${n} campamento${n > 1 ? 's' : ''}`,
       chestTypesAllBtn: 'Todos',
       chestTypesNoneBtn: 'Ninguno',
       // Recategorización de contenedores (DATA_CONTRACT.md): las 2 capas

@@ -54,6 +54,13 @@ export default {
       // re-check #1).
       filterHiddenTooltip: n => `${n} без известной позиции`,
       decorFamiliesTitle: 'Категории декора',
+      // Подгруппа «По семействам» в разделе «Монстры и фауна» (#82 chunk (b),
+      // js/sidebar.js buildMonsterFamilyGroup) — точки семейства = точки
+      // ЛАГЕРЕЙ, где оно появляется, никогда «позиции X» (design §13.1).
+      // Отображаемые имена семейств — сырые токены игры (GLOSSARY-PENDING
+      // #86, как в бестиарии).
+      monsterFamiliesTitle: 'По семействам',
+      familyCampsN: n => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')}`,
       chestTypesAllBtn: 'Все',
       chestTypesNoneBtn: 'Нет',
       // Реорганизация контейнеров (DATA_CONTRACT.md): 2 реальных слоя

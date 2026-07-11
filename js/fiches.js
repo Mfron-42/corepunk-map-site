@@ -2749,7 +2749,8 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
    goalTargetChip (étape de quête kill/kill_collect, "montre-moi les araignées
    concernées"). `m.camps` (voir data/SCHEMA.md monsters.json record shape)
    est l'UNION déjà cuite de tous les camps de la créature ; ce helper ne fait
-   que la jointure vers le vrai nuage de points (allCampGroupsFlat) et compte
+   que la jointure vers le vrai nuage de points (campGroupByKey, résolveur
+   unique js/pointsets.js — même jointure que speciesCampSet, design §3) et compte
    RÉELLEMENT ce qui sera surligné -- jamais le compte brut `m.camps.length`
    quand certains de ces camps n'existent que sur une AUTRE carte (préfixe
    ffm-island-*, non joints ici) : le libellé doit rester honnête ("N camps"
@@ -2831,7 +2832,7 @@ function farmSectionHtml(it) {
 
 /* Section « Apparaît dans » de la fiche monstre (openMonsterFiche) : même
    jointure camp -> vrai nuage de points que farmSectionHtml ci-dessus
-   (allCampGroupsFlat), + un bouton de groupe qui UNIT tous les camps joints
+   (campGroupByKey, résolveur unique js/pointsets.js), + un bouton de groupe qui UNIT tous les camps joints
    du monstre en un seul surlignage (data-ids CSV, handler camp-highlight de
    main.js) -- la demande d'origine ("où sont les imps bleus ?") attend
    l'UNION des nuages réels de TOUS les camps de la créature (4 camps ≈ 900+

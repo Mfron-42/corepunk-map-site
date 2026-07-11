@@ -53,6 +53,13 @@ export default {
       // re-check #1).
       filterHiddenTooltip: n => `${n} без відомої позиції`,
       decorFamiliesTitle: 'Категорії декору',
+      // Підгрупа «За родинами» в розділі «Монстри та фауна» (#82 chunk (b),
+      // js/sidebar.js buildMonsterFamilyGroup) — точки родини = точки
+      // ТАБОРІВ, де вона з'являється, ніколи «позиції X» (design §13.1).
+      // Відображувані назви родин — сирі токени гри (GLOSSARY-PENDING #86,
+      // як у бестіарії).
+      monsterFamiliesTitle: 'За родинами',
+      familyCampsN: n => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')}`,
       chestTypesAllBtn: 'Усі',
       chestTypesNoneBtn: 'Жодного',
       // Реорганізація контейнерів (DATA_CONTRACT.md): 2 реальних шари скринь

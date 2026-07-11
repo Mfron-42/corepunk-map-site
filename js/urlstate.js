@@ -93,11 +93,12 @@ function readHash() {
     // ligne ne fait que reprendre la même clé pour les navigations
     // ultérieures (popstate, hash édité à la main).
     S.devOn = onSet.has('devcontent');
-    // les clés camp.*/decor.* de onSet sont réappliquées une fois les
-    // données correspondantes prêtes (camps : chargement différé, voir
-    // loadDeferred/whenDeferred ; Décor : voir router.js
-    // applyLocationState, appliqué juste après une éventuelle bascule de
-    // carte puisque S.decor en dépend, voir data.js buildDecorGroups).
+    // les clés camp.*/decor.*/monfam.* de onSet sont réappliquées par
+    // router.js applyLocationState (camps : sous whenDeferred, chargement
+    // différé ; Décor : immédiat, juste après une éventuelle bascule de
+    // carte puisque S.decor en dépend, voir data.js buildDecorGroups ;
+    // monfam : immédiat sur l'ÉTAT, le rendu/la ligne se résolvent à
+    // l'arrivée des données différées — #82 chunk (b)).
   }
   const at = p.has('at') ? (([x, z]) => (isNaN(x) || isNaN(z) ? null : { x, z }))(p.get('at').split(',').map(Number)) : null;
   return {
