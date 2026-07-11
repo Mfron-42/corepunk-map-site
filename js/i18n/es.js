@@ -12,21 +12,38 @@ export default {
       filtersAriaLabel: 'Filtros',
       legend: 'Leyenda',
       campsTitle: 'Campamentos y recursos',
-      // Árbol de capas (#82 tramo (a),  unified_layers_DESIGN.md
-      // §2/§11/§12(a)): los 6 grupos fijos de la barra lateral sustituyen a
-      // Leyenda/Campamentos y recursos de arriba (claves conservadas, ya no
-      // referenciadas por ningún data-i18n -- ver index.html) + el futuro
-      // hueco "Filtros anclados" (#82 tramo (d), solo estructural aquí,
-      // siempre oculto). GLOSSARY-PENDING: el diseño solo fija el texto en
-      // FR (mock §2) -- estas cadenas ES son una traducción directa a la
-      // espera del pase de extracción de glosario (#86, ver
-      // COORDINATION.md); revisar aquí cuando llegue.
-      groupPoi: 'Puntos de interés',
-      groupMonsters: 'Monstruos y fauna',
+      // IA FINAL de la barra lateral (2026-07-11): 4 grupos fijos —
+      // groupPoi/groupQuests retirados con sus grupos (filas trasladadas a
+      // World/Interactables, ver js/sidebar.js). GLOSSARY-PENDING.
+      groupMonsters: 'Monstruos',
       groupHarvest: 'Recolección',
-      groupContainers: 'Contenedores e interactivos',
-      groupQuests: 'Misiones',
+      groupContainers: 'Interactuables',
       groupWorld: 'Mundo',
+      // Casillas de cascada (IA final): aria-label compartido de cada
+      // casilla maestra de grupo/subgrupo (js/sidebar.js wireParentCheck).
+      groupToggleAria: 'Marcar o desmarcar todas las capas de este grupo',
+      // Títulos de subgrupos (IA final). Los del grupo Monstruos
+      // (Monsters/Creeps/Wildlife) reutilizan la tabla campKind — espejo
+      // literal de los kinds del motor. GLOSSARY-PENDING.
+      subWorldOthers: 'Otros',
+      subChests: 'Cofres',
+      subDestroyable: 'Destructibles',
+      subInteractives: 'Interactivos',
+      subOther: 'Otros',
+      // Etiquetas de fila (solo visual — los tokens de hash siguen siendo
+      // camp.<kind>): fila kind gruesa del subgrupo Monstruos; guardias con
+      // etiqueta honesta (2 campamentos/12 pts, sin NINGÚN vínculo de
+      // especie/PNJ/botín); «apariciones sin identificar» (pools sin especie
+      // vinculada — el recuento es exactamente lo que dibuja la capa, ver
+      // pointsets.js KIND_REST_ONLY); y el sufijo «(campamentos)» de los
+      // kinds dinámicos colocados junto a props FIJOS en los buckets de
+      // Interactuables. GLOSSARY-PENDING.
+      monsterCampsRow: 'Campamentos de monstruos',
+      guardsRowLabel: 'Guardias (unidad sin identificar)',
+      kindRestRow: 'Apariciones sin identificar',
+      searchSpotsRow: 'Puntos de registro (campamentos)',
+      destroyableCampsRow: 'Destructibles (campamentos)',
+      reactiveCampsRow: 'Interactivos (campamentos)',
       // (pinFiltersTitle retirado con el concepto abandonado de filtros anclados.)
       trackedTitle: 'Seguimiento',
       trackedEmptyHint: 'Fija un marcador con «Seguir» para encontrarlo aquí.',
@@ -52,7 +69,10 @@ export default {
       // resto, simplemente sin clasificar (ver 
       // unknown_states_DESIGN.md §2 re-check #1).
       filterHiddenTooltip: n => `${n} sin posición conocida`,
-      decorFamiliesTitle: 'Familias de decoración',
+      // (decorFamiliesTitle retirada 2026-07-11 con el grupo «Decoración»
+      // disuelto — sus filas viven en los buckets de Interactuables, ver
+      // js/sidebar.js DECOR_BUCKET. decorGroupLabel sigue en uso:
+      // config.js chestKindLabel.)
       // Subgrupo "Por familia" bajo Monstruos y fauna (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup) — los puntos de una familia
       // son los de los CAMPAMENTOS donde aparece, nunca "posiciones de X"
@@ -101,8 +121,10 @@ export default {
       highlightPointsBtn: n => `Resaltar los ${n} puntos`,
       dataGeneratedAt: date => `Datos del ${date}`,
       questMapsLine: names => `Mapas: ${names}`,
-      bestiaryTitle: 'Bestiario',
-      bestiaryLoading: 'Cargando bestiario…',
+      // bestiaryTitle/bestiaryLoading retiradas (2026-07-11) con la propia
+      // sección lateral "Bestiario" (ver js/sidebar.js) -- bestiaryZonesN se
+      // mantiene: sigue en uso por fiches.js openMonsterFiche (sección de
+      // lore de la ficha de monstruo), sin relación con esta sección retirada.
       bestiaryZonesN: n => `${n} zonas`,
       lootTableItemsN: n => `Contenido (${n})`,
       probableLootTitle: 'Botín probable',
@@ -380,8 +402,8 @@ export default {
       // del cliente, y un jefe nombrado real puede superar ampliamente este
       // rango genérico (ver el badge « real » cuando esté disponible).
       statsBossEliteCaveat: 'Columnas « Élite »/« Jefe »: valores genéricos estimados, no confirmados en el juego — algunos jefes nombrados reales son mucho más resistentes (ver el badge « real » cuando exista un registro dedicado para ese monstruo).',
-      bestiaryMapFilterLabel: map => `En este mapa (${map})`,
-      bestiaryMapEmpty: 'Ningún monstruo atribuido a este mapa. Desmarca para mostrar todos.',
+      // (bestiaryMapFilterLabel/bestiaryMapEmpty retiradas 2026-07-11 con la
+      // sección lateral "Bestiario" -- ver bestiaryZonesN más arriba.)
       alwaysGrantedTitle: 'Siempre otorgado',
       choiceGroupTitle: n => `Elección ${n}`,
       orWord: ' o ',

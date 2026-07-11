@@ -568,68 +568,41 @@ body {
 .decor-group[open] > summary::after { transform: rotate(45deg); }
 .decor-group .subfilter-list { margin-top: 2px; }
 
-/* ── Bestiaire (sidebar) ──────────────────────────────────────
-   Familles repliables (details/summary), même vocabulaire visuel que les
-   lignes de filtre (pastille .swatch-like, compteur mono, hover discret). */
-#bestiary-list { margin: 0 0 6px; }
-#bestiary-list .bst-loading { padding: 6px; }
-.bst-family summary {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 6px;
-  border-radius: var(--radius-s);
-  cursor: pointer; user-select: none;
-  list-style: none;
-  transition: background var(--dur) var(--ease);
-}
-.bst-family summary::-webkit-details-marker { display: none; }
-.bst-family summary:hover { background: var(--panel-3); }
-.bst-family summary .swatch {
+/* ── Cases de CASCADE (IA finale du panneau, 2026-07-11) ─────────────────
+   Une vraie case native dans le <summary> de chaque groupe (.grp-check,
+   index.html) et de chaque sous-groupe (.subgrp-check, js/sidebar.js
+   buildSubGroup) : cocher = tout le sous-arbre, décocher = rien, une partie
+   = état partiel NATIF (input.indeterminate — le visuel standard demandé,
+   jamais un glyphe maison). accent-color reprend l'accent du site. */
+.grp-check, .subgrp-check {
   flex: none;
-  width: 12px; height: 12px;
-  border-radius: 50%;
-  border: 2px solid rgba(8, 12, 18, .7);
-  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px currentColor;
+  width: 13px; height: 13px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
-.bst-fam-label { font-size: .87rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bst-family[open] .bst-fam-label { color: var(--accent); }
-.bst-family summary .fcount {
-  font-family: var(--font-mono);
-  font-size: .68rem;
-  color: var(--muted);
-  min-width: 2.6em;
-  text-align: right;
+.grp-check:focus-visible, .subgrp-check:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
-.bst-list { list-style: none; margin: 0 0 6px; padding: 0 0 0 24px; }
-.bst-row {
-  display: flex; align-items: baseline; gap: 7px;
-  padding: 2.5px 4px 2.5px 0;
-  font-size: .78rem;
-  min-width: 0;
-}
-.bst-name:hover { color: var(--accent); text-decoration-color: var(--accent); }
-.bst-row .muted {
-  color: var(--muted); font-size: .66rem;
-  flex: 1; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  text-align: right;
-}
-/* Bouton « voir la zone » d'une ligne de bestiaire : trace le polygone de
-   région sur la carte (n'apparaît que si la zone est dessinable). */
-.bst-zone {
-  flex: none; background: none; border: none; cursor: pointer;
-  color: var(--muted); font-size: .74rem; line-height: 1;
-  padding: 1px 3px; border-radius: var(--radius-s);
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
-}
-.bst-zone:hover { color: var(--accent); background: var(--accent-soft); }
-/* Case de filtre par-carte en tête du bestiaire. */
-.bst-mapfilter {
-  display: flex; align-items: center; gap: 7px;
-  padding: 4px 4px 8px;
-  font-size: .7rem; color: var(--muted); cursor: pointer;
-}
-.bst-mapfilter input { flex: none; accent-color: var(--accent); cursor: pointer; }
-.bst-mapfilter span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* État PARTIEL d'une ligne FAMILLE (sa case cachée porte indeterminate :
+   famille décochée mais ≥1 de ses espèces cochée — voir sidebar.js
+   refreshParentChecks) : pastille à demi allumée (le fond inline garde la
+   couleur famille), libellés en retrait — ni « off » (des points de ses
+   espèces sont bien dessinés) ni pleinement « on ». */
+.filter-row.partial .swatch { opacity: .55; }
+.filter-row.partial .flabel, .filter-row.partial .fcount,
+.filter-row.partial .fam-camps { color: var(--muted); }
+/* Listes imbriquées (liste des familles DANS le sous-groupe Hostiles, IA
+   finale) : indentation adoucie au-delà du premier niveau — sans quoi
+   famille+espèces cumuleraient ~45px de retrait dans un panneau de ~330px. */
+.subfilter-list .subfilter-list { padding-left: 10px; margin-left: 8px; }
+
+/* (Section sidebar « Bestiaire » RETIRÉE 2026-07-11, décision utilisateur —
+   voir js/sidebar.js : l'arbre Monstres & faune couvre déjà le même besoin.
+   Tout le bloc #bestiary-list/.bst-* de cette rubrique a été retiré avec
+   elle ; `.bst-name` avait aussi 2 sélecteurs PARTAGÉS avec `.frow .fr-label`
+   plus bas dans ce fichier (accent d'entité par kind) — nettoyés là-bas.) */
 
 /* ── Suivis ── */
 #tracked-list li {
@@ -675,21 +648,10 @@ body {
 .fiche-scroll::-webkit-scrollbar { width: 8px; }
 .fiche-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
 .fiche-scroll::-webkit-scrollbar-track { background: transparent; }
-/* Liste longue du PANNEAU (bestiaire) : hauteur bornée + défilement
-   interne, même scrollbar fine que les fiches. Les 6 groupes de couches
-   (#82 chunk (a)) restent courts (≤5 lignes visibles) et n'ont pas besoin
-   de cette contrainte pour l'instant -- la classe partagée max-height+
-   scroll listée par le design (#85, ex. le futur sous-groupe "Par famille")
-   n'existe pas encore, à ajouter quand #85 livre. */
-#bestiary-list {
-  max-height: 40vh;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
-}
-#bestiary-list::-webkit-scrollbar { width: 8px; }
-#bestiary-list::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-#bestiary-list::-webkit-scrollbar-track { background: transparent; }
+/* (La liste longue du PANNEAU (#bestiary-list, hauteur bornée + défilement
+   interne) a disparu avec la section sidebar « Bestiaire » elle-même,
+   2026-07-11 -- voir js/sidebar.js. Les 6 groupes de couches restent courts
+   (≤5 lignes visibles) et n'ont toujours pas besoin de cette contrainte.) */
 
 /* Filtre local d'une longue liste de fiche (stock vendeur, table de butin). */
 .stock-filter {
@@ -706,13 +668,13 @@ body {
 }
 .stock-filter::placeholder { color: var(--muted); }
 .stock-filter:focus-visible { outline: none; border-color: var(--line-strong); }
-/* Sections repliables du panneau (Filtres épinglés / Points d'intérêt /
-   Monstres & faune / Récolte / Contenants & interactifs / Quêtes / Monde /
-   Bestiaire / Suivis, #82 chunk (a)) : le sommaire reprend exactement le
-   style des h2 existants + un chevron d'état, l'état ouvert/replié est
-   persisté PAR data-sec (localStorage, voir sidebar.js) -- même mécanique
-   générique qu'avant le refacto de l'arbre, juste appliquée à plus de
-   sections. */
+/* Sections repliables du panneau (World / Monsters / Harvesting /
+   Interactables + Suivis — IA finale 2026-07-11, remplace les 6 groupes du
+   chunk (a)) : le sommaire reprend exactement le style des h2 existants +
+   un chevron d'état (+ désormais la case de cascade .grp-check, voir
+   ci-dessus), l'état ouvert/replié est persisté PAR data-sec (localStorage,
+   voir sidebar.js) -- même mécanique générique qu'avant le refacto de
+   l'arbre. */
 .side-sec > summary {
   list-style: none;
   cursor: pointer;
@@ -1610,7 +1572,7 @@ body {
 .frow .fr-label { flex: 1; min-width: min(45%, 150px); overflow: hidden; text-overflow: ellipsis; }
 /* Affordance PERMANENTE des libellés cliquables (fiches) : souligné pointillé
    ambré discret — au survol seul, le lien était invisible au tactile. */
-.frow .fr-label.link, .bst-name {
+.frow .fr-label.link {
   cursor: pointer;
   transition: color var(--dur) var(--ease);
   text-decoration: underline dotted;
@@ -1780,12 +1742,13 @@ body {
    `[data-kind]`, mais la couleur porte sur le TEXTE cette fois (pas de fond :
    ces éléments ne sont pas des pastilles). Fallback explicite à la couleur
    de repos préexistante de chaque sélecteur (jamais une régression pour un
-   lien non converti) : .frow .fr-label/.bst-name/.link héritent (var(--ink)
-   du body), .goal-target-name pose var(--ink) en dur, .frow .muted pose
-   var(--muted) — donc chacun reprend EXACTEMENT sa propre couleur de base en
-   fallback plutôt qu'un unique repli partagé. */
-.frow .fr-label[data-kind], .bst-name[data-kind] { color: var(--chip-c); }
-.frow .fr-label.link[data-kind]:hover, .bst-name[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
+   lien non converti) : .frow .fr-label/.link héritent (var(--ink) du body),
+   .goal-target-name pose var(--ink) en dur, .frow .muted pose var(--muted)
+   — donc chacun reprend EXACTEMENT sa propre couleur de base en fallback
+   plutôt qu'un unique repli partagé. (.bst-name retiré 2026-07-11 avec la
+   section sidebar « Bestiaire », voir plus haut dans ce fichier.) */
+.frow .fr-label[data-kind] { color: var(--chip-c); }
+.frow .fr-label.link[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
 .goal-target-name[data-kind] { color: var(--chip-c); }
 .goal-target-name.link[data-kind]:hover { color: color-mix(in srgb, var(--chip-c) 82%, white); }
 .frow .muted[data-kind] { color: var(--chip-c); }

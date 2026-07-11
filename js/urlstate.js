@@ -22,7 +22,13 @@ function buildHash() {
     // an old shared link without crashing (Object.keys(CATS) still finds
     // the key, sets its dead `.on` -- a genuine no-op, nothing reads it).
     ...Object.entries(CATS).filter(([k, v]) => v.on && k !== 'quest').map(([k]) => k),
-    ...Object.entries(S.camps).filter(([, v]) => v.on).map(([k]) => 'camp.' + k),
+    // 'quest' excluded here too (camp:quest row retired 2026-07-11 — see
+    // sidebar.js buildGroupQuests/router.js applyCampFilters): S.camps.quest
+    // is now locked to `on:false` forever (router.js never flips it back on
+    // from a legacy hash), so this filter would never emit it anyway — kept
+    // explicit for the same self-documenting reason as the CATS.quest
+    // exclusion just above, not because it's currently reachable.
+    ...Object.entries(S.camps).filter(([k, v]) => v.on && k !== 'quest').map(([k]) => 'camp.' + k),
     // Sous-filtre "Décor" (S.decor, décoché par défaut) — même principe
     // camp.* ci-dessus : chaque famille actuellement cochée est listée
     // telle quelle, voir sidebar.js buildDecorGroup/data.js buildDecorGroups.
@@ -94,7 +100,7 @@ function readHash() {
     S.zonesOn = onSet.has('zones');
     // Contenu dev (feature #13) : état initial déjà résolu au chargement du
     // module (voir state.js initialDevOn(), qui lit ce même jeton pour
-    // éviter une course avec buildSearch()/buildBestiary() au boot) — cette
+    // éviter une course avec buildSearch()/buildFilters() au boot) — cette
     // ligne ne fait que reprendre la même clé pour les navigations
     // ultérieures (popstate, hash édité à la main).
     S.devOn = onSet.has('devcontent');

@@ -2148,7 +2148,29 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // qui n'allumerait rien.
     const spawnBtn = mk ? monsterSpawnHighlightBtn(S.monsters[mk]) : '';
     const spawnRow = spawnBtn ? `<div class="goal-target-row goal-target-row-spawns">${spawnBtn}</div>` : '';
-    return `<div class="goal-target">${itemRow}${relRow}${posRow}${spawnRow}</div>`;
+    // SCOPE ADDITION (2026-07-11, retour utilisateur : « quand je cherche tel
+    // monstre, il me montre toujours des points au pif — il devrait activer
+    // un de ces points [filtres] dont on vient de parler ») : `posRow`
+    // (calculé en tête de fonction, PARTAGÉ par tous les kinds) peut afficher
+    // soit le bouton « Zone estimée » (dynamicPosBadge, search_zone confiance
+    // haute/moyenne — dessine un cercle deviné, jamais les vrais spawns),
+    // soit le texte nu « Position dynamique »/« Position non cataloguée » —
+    // deux affordances qui n'ont plus lieu d'être une fois qu'un point-set
+    // RÉEL existe déjà pour cette cible : le nom (nameSpan ci-dessus,
+    // data-act="fiche-monster"/"family-layer") ET spawnRow (quand l'espèce
+    // est résolue) routent DÉJÀ vers la même couche points de l'arbre
+    // (species-layer, #82 chunk (d) — famille : activateFamilyLayers,
+    // main.js). Sur une cible monstre RÉSOLUE (espèce mk, ou famille via
+    // famTokens), `posRow` disparaît donc purement et simplement — la seule
+    // affordance qui reste est la vraie (points, jamais un cercle deviné).
+    // Gardé UNIQUEMENT quand rien n'est résolu (mk absent ET famille sans
+    // token) : là, aucune autre route n'existe vers une couche carte, posRow
+    // reste le seul repli honnête. Objets/monde/dynamique (autres branches
+    // de cette fonction) gardent `posRow` inchangé — seule cette branche
+    // monstre est concernée.
+    const hasLayerResolution = !!mk || (isFamilyScope && famTokens.length > 0);
+    const monsterPosRow = hasLayerResolution ? '' : posRow;
+    return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}${spawnRow}</div>`;
   }
 
   if (t.kind === 'npc') {

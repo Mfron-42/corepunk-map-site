@@ -407,8 +407,8 @@ function buildZoneSearchIndex() {
    avec un indice "N variantes" quand elle couvre plus d'un groupe (name,level)
    (même idiome que "N raretés" pour les objets ci-dessus) ; clic -> fiche
    (openMonsterFiche) ouverte sur le représentant de l'espèce
-   (canonicalSiteKey — même règle de richesse que la fiche modèle/le
-   bestiaire, voir js/sidebar.js buildBestiary).
+   (canonicalSiteKey — même règle de richesse que la fiche modèle/l'arbre
+   Monstres & faune, voir js/sidebar.js speciesRowLi).
    ALIAS DE RECHERCHE (audit punch #6, "63 lost names") : `species.namesAll`
    liste CHAQUE nom distinct replié dans l'espèce, y compris ceux qu'aucun
    MODÈLE ne partage avec le représentant (ex. "Young Woodraptor"/"Overweight

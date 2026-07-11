@@ -2,22 +2,35 @@
    bestiaire », décision utilisateur 2026-07-11) : l'espèce est le grain le
    plus fin de l'arbre Monstres & faune (sous-ligne d'un nœud famille,
    sidebar.js buildSpeciesSublist). Cocher une espèce allume les POINTS de
-   ses camps (compositeur main.js, priorité espèce > famille > kind) ET une
-   ZONE par camp (enveloppe convexe serrée, langage visuel de la zone
-   ESTIMÉE — même style tireté doux que fiches.js drawGoalZone estimate:true,
-   jamais l'autorité d'un contour confirmé, jamais de flyTo). L'ancien
-   concept « filtre épinglé » (liste séparée, plafond, ✕, hash `pf=`) est
-   RETIRÉ : une espèce cochée est une case de l'arbre comme une autre —
-   dédoublonnage/retrait = la case, hash `on=monsp.<speciesId>` (urlstate.js).
+   ses camps (compositeur main.js, priorité espèce > famille > kind), ET
+   RIEN D'AUTRE. L'ancien concept « filtre épinglé » (liste séparée,
+   plafond, ✕, hash `pf=`) est RETIRÉ : une espèce cochée est une case de
+   l'arbre comme une autre — dédoublonnage/retrait = la case, hash
+   `on=monsp.<speciesId>` (urlstate.js).
+
+   SCOPE ADDITION (2026-07-11, retour utilisateur « points only, no zones ») :
+   la couche ZONE par camp (enveloppe convexe/cercle deviné autour de chaque
+   camp d'une espèce ou famille cochée, langage visuel « zone ESTIMÉE » —
+   même style tireté que fiches.js drawGoalZone estimate:true) est RETIRÉE.
+   Elle scattérait un contour par camp sur TOUTE la carte dès qu'une espèce
+   commune (ex. une famille répandue) était cochée — le rapport « il me
+   montre toujours des points au pif » pointe précisément ce bruit visuel.
+   La machinerie de zone GÉNÉRIQUE (drawGoalZone/convexHull-équivalent pour
+   les objectifs de quête, fiches.js) reste intacte et INCHANGÉE ailleurs
+   dans le code — seul CE module (le hull par camp spécifique aux
+   sélections espèce/famille) est retiré, son seul usage. `renderSpeciesZones`
+   et son implémentation (convexHull/addCampZone/SPECIES_ZONE_STYLE) n'ont
+   donc plus aucun appelant (sidebar.js/main.js ne l'importent plus) et sont
+   supprimés avec elle, plutôt que laissés en code mort.
 
    L'état vit dans S.monsp (state.js, même discipline que S.monfam) ; la
    résolution de points passe par le résolveur UNIQUE js/pointsets.js —
-   jamais re-dérivée ici. Ce module ne possède que : les helpers d'état
-   partagés, le sélecteur du compositeur, et la couche ZONE. */
+   jamais re-dérivée ici. Ce module ne possède plus que : les helpers d'état
+   partagés et le sélecteur du compositeur. */
 import { S } from './state.js';
-import { speciesLayerHex } from './config.js';
-import { map, toLL } from './mapview.js';
-import { speciesCampSet, campGroupByKey } from './pointsets.js';
+import { speciesLayerHex, familyKey } from './config.js';
+import { speciesCampSet } from './pointsets.js';
+import { isHiddenTest } from './devcontent.js';
 
 /* Coche une espèce (clic-double-effet des chips de fiche, bouton « voir les
    spawns » des fiches/étapes — main.js) : ENSURE, jamais un toggle — le
@@ -35,6 +48,28 @@ function toggleSpecies(spId) {
   return st.on;
 }
 const checkedSpeciesIds = () => Object.keys(S.monsp).filter(id => S.monsp[id].on);
+
+/* CASCADE famille → espèces (IA finale du panneau, décision utilisateur
+   2026-07-11 : « quand je coche une category parent ça coche tous les
+   enfants ») : cocher une ligne famille coche AUSSI toutes ses espèces
+   (post-alias familyKey, même filtre isHiddenTest que l'arbre) ; décocher
+   décoche tout. L'état famille (S.monfam) reste une vraie couche du
+   compositeur (couleur famille — elle ne s'affiche plus que sur les camps
+   qu'aucune espèce cochée ne recouvre, priorité espèce > famille inchangée) ;
+   un lien LEGACY `on=monfam.<f>` sans tokens monsp.* restaure donc toujours
+   l'ancien rendu « couleur famille partout » à l'identique. Partagé par la
+   case famille de l'arbre (sidebar.js) ET le chip d'étape de quête à portée
+   famille (main.js activateFamilyLayers) — un seul point de vérité, jamais
+   deux cascades divergentes. */
+function setFamilyOn(family, on) {
+  const fam = familyKey(family);
+  (S.monfam[fam] || (S.monfam[fam] = { on: false })).on = on;
+  for (const [id, sp] of Object.entries(S.species || {})) {
+    if (isHiddenTest(sp)) continue;
+    if (familyKey(sp.family || 'other') !== fam) continue;
+    (S.monsp[id] || (S.monsp[id] = { on: false })).on = on;
+  }
+}
 
 /* Restauration `on=monsp.…` (router.js) — ENSURE-only, à la différence des
    tokens camp/monfam : un token coche/crée son espèce, l'ABSENCE ne décoche
@@ -66,80 +101,7 @@ function speciesCampWinner() {
   return winner;
 }
 
-/* ── Couche ZONE (« points ET zone », flux verbatim du propriétaire) ─────
-   Une enveloppe convexe SERRÉE par camp de chaque espèce cochée — honnête :
-   « les camps où X PEUT apparaître » (les points de spawn ne portent aucune
-   référence d'entité, design §13.1), jamais un périmètre confirmé. AUCUN
-   flyTo, jamais nettoyée par closeFiche (persistante tant que la case l'est,
-   contrairement au highlight/goalZone). Enregistrée dans denseRenderers
-   (main.js) : rejouée à chaque cycle de vie (bascule carte/langue,
-   restauration, arrivée du différé) sans point d'appel supplémentaire — le
-   cache par signature rend les rejeux moveend/zoomend gratuits (les
-   polygones Leaflet se re-projettent seuls). */
-let zoneLayer = null, zoneSig = null, zoneSrcCamps = null;
-const zoneSignature = () => checkedSpeciesIds().join('|');
-
-/* Enveloppe convexe (chaîne monotone d'Andrew) sur les [x,z] bruts du camp. */
-function convexHull(pts) {
-  const P = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  if (P.length < 3) return null;
-  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-  const lower = [];
-  for (const p of P) {
-    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
-    lower.push(p);
-  }
-  const upper = [];
-  for (let i = P.length - 1; i >= 0; i--) {
-    const p = P[i];
-    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
-    upper.push(p);
-  }
-  const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
-  return hull.length >= 3 ? hull : null;
-}
-/* Langage visuel de la zone ESTIMÉE (mêmes constantes que fiches.js
-   drawGoalZone estimate:true : liseré 1.4, tireté « 2 8 », remplissage .06). */
-const SPECIES_ZONE_STYLE = { weight: 1.4, dashArray: '2 8', fillOpacity: .06, interactive: false };
-function addCampZone(group, pts, hex) {
-  const hull = convexHull(pts);
-  if (hull) {
-    L.polygon(hull.map(([x, z]) => toLL(x, z)), { ...SPECIES_ZONE_STYLE, color: hex, fillColor: hex }).addTo(group);
-    return;
-  }
-  // < 3 points (ou colinéaires) : un petit cercle honnête autour du centroïde
-  // — même repli minimal r=35 que le cercle de zone deviné (fiches.js
-  // drawGoalZone), les points eux-mêmes restant la vraie information.
-  let cx = 0, cz = 0, minX = 1 / 0, maxX = -1 / 0, minZ = 1 / 0, maxZ = -1 / 0;
-  for (const [x, z] of pts) {
-    cx += x; cz += z;
-    if (x < minX) minX = x; if (x > maxX) maxX = x;
-    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
-  }
-  cx /= pts.length; cz /= pts.length;
-  const r = Math.max(35, Math.hypot(maxX - minX, maxZ - minZ) / 2);
-  L.circle(toLL(cx, cz), { ...SPECIES_ZONE_STYLE, radius: r, color: hex, fillColor: hex }).addTo(group);
-}
-function renderSpeciesZones() {
-  const sig = zoneSignature();
-  if (zoneSig === sig && zoneSrcCamps === S.camps) return;   // rien n'a changé (cache)
-  zoneSig = sig; zoneSrcCamps = S.camps;
-  if (zoneLayer) { map.removeLayer(zoneLayer); zoneLayer = null; }
-  const g = L.layerGroup();
-  let any = false;
-  for (const id of checkedSpeciesIds()) {
-    const hex = speciesLayerHex(id);
-    for (const key of speciesCampSet(id)) {
-      const grp = campGroupByKey(key);
-      if (!grp || !grp.pts.length) continue;
-      addCampZone(g, grp.pts, hex);
-      any = true;
-    }
-  }
-  if (any) zoneLayer = g.addTo(map);
-}
-
 export {
   ensureSpeciesOn, toggleSpecies, checkedSpeciesIds, applySpeciesTokens,
-  speciesCampWinner, renderSpeciesZones,
+  speciesCampWinner, setFamilyOn,
 };

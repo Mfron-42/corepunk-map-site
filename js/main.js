@@ -25,13 +25,15 @@ import {
   viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
-import { campGroupByKey, monsterFamilies, speciesPoints } from './pointsets.js';
 import {
-  ensureSpeciesOn, toggleSpecies, speciesCampWinner, renderSpeciesZones,
+  campGroupByKey, monsterFamilies, speciesPoints, KIND_REST_ONLY, kindBoundCampKeys,
+} from './pointsets.js';
+import {
+  ensureSpeciesOn, toggleSpecies, speciesCampWinner, setFamilyOn,
 } from './specieslayer.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import {
-  buildFilters, renderTracked, toggleTrack, toggleDone, buildBestiary, revealMonsterNode,
+  buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
 } from './sidebar.js';
 import { syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags } from './pins.js';
@@ -88,20 +90,22 @@ function applyPointHighlight(b, pts, color) {
 function activateSpeciesLayer(spId) {
   ensureSpeciesOn(spId);
   buildFilters();                       // la sous-ligne espèce apparaît (famille auto-dépliée)
-  scheduleRedraw();                     // compositeur (points) — priorité espèce
-  renderSpeciesZones();                 // zones par camp (enveloppes tiretées)
+  scheduleRedraw();                     // compositeur (points) — priorité espèce, POINTS SEULS
   syncHash();                           // `on=monsp.<id>` (lien partageable)
   // Révèle la ligne à GAUCHE (ouvre les <details>, déplie la famille, flash)
   // — jamais de flyTo (le geste caméra reste goto/zone).
   revealMonsterNode('species', spId);
 }
 /* Chip à portée FAMILLE (bound_units.scope, étape de quête) : coche la ou
-   les lignes famille correspondantes — même geste, grain 2 de l'échelle. */
+   les lignes famille correspondantes — même geste, grain 2 de l'échelle.
+   CASCADE (IA finale, 2026-07-11) : cocher une famille coche AUSSI toutes
+   ses espèces (setFamilyOn, specieslayer.js) — exactement le même geste que
+   la case famille de l'arbre, jamais deux sémantiques divergentes. */
 function activateFamilyLayers(fams) {
   let first = null;
   for (const f of fams) {
     if (!f) continue;
-    (S.monfam[f] || (S.monfam[f] = { on: false })).on = true;
+    setFamilyOn(f, true);
     if (!first) first = f;
   }
   if (!first) return;
@@ -232,7 +236,6 @@ document.addEventListener('click', e => {
     b.setAttribute('aria-pressed', String(on));
     buildFilters();
     scheduleRedraw();
-    renderSpeciesZones();
     syncHash();
     if (on) revealMonsterNode('species', spId);
   }
@@ -368,12 +371,10 @@ function registerAllDenseRenderers() {
   // direct : liste vide tant que camps.bin n'est pas arrivé — même
   // dégénérescence silencieuse que l'ancienne boucle qui n'itérait rien).
   registerDense('campComposite', compositeCampPoints, '#888', (p, n) => campPopup(p, n));
-  // Couche ZONE des espèces cochées (#82 chunk (d), js/specieslayer.js) :
-  // enregistrée avec les rendus denses pour être rejouée à CHAQUE cycle de
-  // vie (bascule carte/langue, restauration, arrivée du différé) sans point
-  // d'appel supplémentaire — son cache par signature rend les rejeux
-  // moveend/zoomend gratuits (les polygones Leaflet se re-projettent seuls).
-  denseRenderers.push(renderSpeciesZones);
+  // (L'ancienne couche ZONE des espèces/familles cochées, js/specieslayer.js
+  // renderSpeciesZones, était enregistrée ici — RETIRÉE 2026-07-11, « points
+  // only, no zones » : voir specieslayer.js pour le détail. La couche
+  // POINTS (compositeCampPoints ci-dessus) reste inchangée.)
 }
 
 /* Composite des points de camp — anti double-tracé (design §4.3, contrat :
@@ -406,8 +407,19 @@ function compositeCampPoints() {
   const winner = new Map();      // objet groupe -> hex gagnant
   for (const [kind, st] of Object.entries(S.camps)) {
     const kindHex = st.on ? (CAMP_COLORS[kind] || '#888') : null;
+    // Kinds « reste seulement » (creeps/wildlife — IA finale, miroir des
+    // kinds moteur) : leur ligne de panneau est « Spawns non identifiés »
+    // (compte = camps non joints à une espèce, js/pointsets.js
+    // kindRestPoints) — la couche kind ne dessine donc QUE ces camps-là,
+    // pour que le nombre affiché soit exactement ce qui s'allume (discipline
+    // honest-counter). Les camps JOINTS s'allument par leurs lignes
+    // espèce/famille (priorité espèce > famille inchangée). Voir la note
+    // INTERIM de KIND_REST_ONLY (pointsets.js) pour la dérive assumée des
+    // liens legacy camp.creeps/camp.wildlife.
+    const bound = kindHex && KIND_REST_ONLY.has(kind) ? kindBoundCampKeys(kind) : null;
     for (const g of st.groups) {
-      const hex = spWinner.get(g.k) || famWinner.get(g.k) || kindHex;
+      const hex = spWinner.get(g.k) || famWinner.get(g.k)
+        || (bound && bound.has(g.k) ? null : kindHex);
       if (hex) winner.set(g, hex);
     }
   }
@@ -442,8 +454,11 @@ function renderDataDate() {
    republie TOUT ce qui en dépend en un seul geste, même discipline que
    setLang() plus haut (jamais une mutation isolée qui laisserait une partie
    de l'UI dans l'ancien état) -- couches carte qao/quête (isTest masqué/
-   révélé), recherche (monstres/items/objets de quête/quêtes), bestiaire, et
-   la fiche ouverte si elle affichait des variantes de monstre. N'existe pas
+   révélé), recherche (monstres/items/objets de quête/quêtes), l'arbre
+   Monstres & faune (qui liste aussi les espèces isTest révélées, buildFilters
+   ci-dessous -- la section « Bestiaire » séparée qui recevait ce même appel
+   a été retirée le 2026-07-11, voir js/sidebar.js), et la fiche ouverte si
+   elle affichait des variantes de monstre. N'existe pas
    du tout tant qu'aucun contenu isTest n'est connu (compte à 0 avant que
    items/qao/quête ne soient chargés au tout premier appel du boot -- voir
    points d'appel dans init()/setLang()/loadDeferred().then ci-dessous) :
@@ -463,7 +478,6 @@ function buildDevToggle() {
       registerAllDenseRenderers();
       denseRenderers.forEach(fn => fn());
       buildSearch();
-      buildBestiary();
       // Légende (js/sidebar.js catStats/positionCounts) : le compte affiché
       // par ligne de filtre applique désormais le même isHiddenTest que le
       // rendu carte (honest-counter fix) -- sans ce rebuild, basculer le
@@ -524,7 +538,6 @@ async function setLang(code) {
   loadDeferred().then(() => {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
-    buildBestiary();   // libellés de familles/zones dans la nouvelle langue
     buildDevToggle();  // le compte de monstres isTest n'est connu qu'ici
   });
 }
@@ -562,7 +575,6 @@ async function setLang(code) {
     registerAllDenseRenderers();
     buildFilters();
     buildSearch();
-    buildBestiary();    // filtre par-carte du bestiaire (m.maps ⨯ carte active) — voir sidebar.js
     buildDevToggle();   // compte qao/quête isTest propre à la carte qui vient d'être chargée
     renderUserFlags();  // drapeaux utilisateur (#84) : scopés par carte, S.map vient de changer
   });
@@ -571,7 +583,6 @@ async function setLang(code) {
   buildSearch();
   renderTracked();
   renderDataDate();
-  buildBestiary();   // indication de chargement — repeuplé une fois le différé arrivé
   buildDevToggle();  // compte items/objets de quête/quêtes dispo dès le critique ; monstres ajoutés plus bas
 
   // Téléchargements (si les images assemblées existent)
@@ -628,7 +639,6 @@ async function setLang(code) {
   loadDeferred().then(() => {
     registerAllDenseRenderers();
     denseRenderers.forEach(fn => fn());
-    buildBestiary();
     buildDevToggle();   // le compte de monstres isTest (162) n'est connu qu'ici
     // Une fiche item/PNJ/quête ouverte avant l'arrivée des recettes/vendeurs/
     // monstres (fenêtre de course rare) est simplement rafraîchie avec les

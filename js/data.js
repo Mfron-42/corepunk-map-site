@@ -178,8 +178,9 @@ async function loadDeferred() {
     // "créature" au sens joueur (~224), un cran plus large que `model`
     // ci-dessus (un modèle peut sur-scinder — ex. Imp servant sur 9 modèles
     // d'arme tenue ; une espèce peut au contraire UNIR plusieurs modèles qui
-    // partagent un nom, ex. Troll/Mighty Troll/Overweight Troll). Alimente le
-    // bestiaire (js/sidebar.js buildBestiary), la recherche (js/search.js
+    // partagent un nom, ex. Troll/Mighty Troll/Overweight Troll). Alimente
+    // l'arbre Monstres & faune (js/sidebar.js buildMonsterFamilyGroup, le
+    // grain espèce -- "l'arbre EST le bestiaire"), la recherche (js/search.js
     // buildMonsterSearchIndex — alias namesAll), le sélecteur de variante et
     // monsterKeyFor (js/fiches.js / ci-dessous) — 404-tolérant comme le reste
     // de ce bundle (une carte/build sans ce fichier retombe juste sur les

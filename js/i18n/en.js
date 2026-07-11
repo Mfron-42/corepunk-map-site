@@ -12,20 +12,47 @@ export default {
       filtersAriaLabel: 'Filters',
       legend: 'Legend',
       campsTitle: 'Camps & resources',
-      // Layer tree (#82 chunk (a),  unified_layers_DESIGN.md
-      // §2/§11/§12(a)): the sidebar's 6 fixed groups replace Legend/Camps &
-      // resources above (keys kept, no longer referenced by any data-i18n --
-      // see index.html) + the future "Pinned filters" slot (#82 chunk (d),
-      // structural only here, always hidden). GLOSSARY-PENDING: the design
-      // doc only fixes the FR wording (§2 mock) -- these EN strings are a
-      // straightforward translation pending the glossary-extraction pass
-      // (#86) mentioned in COORDINATION.md; sweep here when it lands.
-      groupPoi: 'Points of interest',
-      groupMonsters: 'Monsters & wildlife',
+      // Layer tree — FINAL sidebar IA (2026-07-11, COORDINATION.md §IA
+      // FINALE, user verbatim): 4 fixed groups (World/Monsters/Harvesting/
+      // Interactables) replace the 6 groups of chunk (a). groupPoi/
+      // groupQuests removed with their groups (rows moved into World/
+      // Interactables — see js/sidebar.js). GLOSSARY-PENDING: group titles
+      // follow the user's verbatim wording; sweep when the glossary
+      // extraction (#86) proves in-game terms.
+      groupMonsters: 'Monsters',
       groupHarvest: 'Harvesting',
-      groupContainers: 'Containers & interactables',
-      groupQuests: 'Quests',
+      groupContainers: 'Interactables',
       groupWorld: 'World',
+      // Cascade checkboxes (final IA): shared aria-label of every group/
+      // sub-group master checkbox (js/sidebar.js wireParentCheck).
+      groupToggleAria: 'Check or uncheck every layer in this group',
+      // Sub-group titles (final IA). The Monsters group's own sub-groups
+      // (Monsters/Creeps/Wildlife) reuse the campKind table — they mirror
+      // the ENGINE's kinds verbatim (user redirect 2026-07-11), never an
+      // invented axis. GLOSSARY-PENDING (bespoke structural labels).
+      subWorldOthers: 'Others',
+      subChests: 'Chests',
+      subDestroyable: 'Destroyable',
+      subInteractives: 'Interactives',
+      subOther: 'Other',
+      // Row-label overrides (display only — hash tokens stay camp.<kind>):
+      // the coarse monsters kind row inside the Monsters sub-group; the
+      // honest guards label (2 camps/12 pts, no species/NPC/loot binding at
+      // all — see interactives_taxonomy_INVESTIGATION.md §5); the honest
+      // "unidentified spawns" row for kind camps with NO species binding
+      // (the generic creeps-<region>/peaceful-animals-* pools — its count
+      // is exactly what the layer draws, see pointsets.js KIND_REST_ONLY);
+      // and the "(camps)" disambiguation of the dynamic-spawn kinds now
+      // sitting next to PLACED decor props inside the same Interactables
+      // buckets. The `searchable` kind gets a genuinely distinct name
+      // ("Search spots") — no more four things all called "searchable"/
+      // "fouillable". GLOSSARY-PENDING (internal level-design tokens).
+      monsterCampsRow: 'Monster camps',
+      guardsRowLabel: 'Guards (unidentified unit)',
+      kindRestRow: 'Unidentified spawns',
+      searchSpotsRow: 'Search spots (camps)',
+      destroyableCampsRow: 'Destroyables (camps)',
+      reactiveCampsRow: 'Interactives (camps)',
       // (pinFiltersTitle removed with the abandoned separate pinned-filters
       // concept -- user decision 2026-07-11, the tree IS the bestiary.)
       trackedTitle: 'Tracked',
@@ -50,7 +77,10 @@ export default {
       // bucket would overclaim for the rest, which is simply unclassified
       // (see  unknown_states_DESIGN.md §2 re-check #1).
       filterHiddenTooltip: n => `${n} without a known position`,
-      decorFamiliesTitle: 'Decor families',
+      // (decorFamiliesTitle removed 2026-07-11 with the dissolved "Decor"
+      // group — its family rows now live inside the Interactables buckets,
+      // see js/sidebar.js DECOR_BUCKET. decorGroupLabel below stays: still
+      // used by config.js chestKindLabel for fiche/popup kind lines.)
       // "By family" sub-group under Monsters & wildlife (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup). familyCampsN: honest camp
       // count for a family row -- a family's points are the points of the
@@ -101,8 +131,10 @@ export default {
       highlightPointsBtn: n => `Highlight all ${n} points`,
       dataGeneratedAt: date => `Data from ${date}`,
       questMapsLine: names => `Maps: ${names}`,
-      bestiaryTitle: 'Bestiary',
-      bestiaryLoading: 'Loading bestiary…',
+      // bestiaryTitle/bestiaryLoading retired (2026-07-11) with the sidebar
+      // "Bestiary" section itself (see js/sidebar.js) -- bestiaryZonesN
+      // stays: still used by fiches.js openMonsterFiche (monster fiche's lore
+      // section), unrelated to this retired section.
       bestiaryZonesN: n => `${n} zones`,
       lootTableItemsN: n => `Contents (${n})`,
       probableLootTitle: 'Likely loot',
@@ -386,8 +418,8 @@ export default {
       // doesn't reproduce from any client data, and a real named boss can run
       // far above this generic range (see the "real" badge when available).
       statsBossEliteCaveat: '"Elite"/"Boss" columns: generic estimated values, not confirmed in-game — some real named bosses are far tougher (see the "real" badge when a dedicated record exists for that monster).',
-      bestiaryMapFilterLabel: map => `On this map (${map})`,
-      bestiaryMapEmpty: 'No monsters attributed to this map. Uncheck to show all.',
+      // (bestiaryMapFilterLabel/bestiaryMapEmpty retired 2026-07-11 with the
+      // sidebar "Bestiary" section -- see bestiaryZonesN above.)
       alwaysGrantedTitle: 'Always granted',
       choiceGroupTitle: n => `Choice ${n}`,
       orWord: ' or ',

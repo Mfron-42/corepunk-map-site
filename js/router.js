@@ -73,10 +73,22 @@ async function applyLocationState() {
   // (couches denses + calque régions) et sur les cases à cocher du panneau.
   toggleZones(S.zonesOn);
   const applyCampFilters = () => {
-    if (onSet) for (const k of Object.keys(S.camps)) S.camps[k].on = onSet.has('camp.' + k);
-    // (renderSpeciesZones est DANS denseRenderers — voir main.js
-    // registerAllDenseRenderers — donc les zones des espèces cochées suivent
-    // ce même forEach une fois camps/species arrivés.)
+    if (onSet) for (const k of Object.keys(S.camps)) {
+      // 'quest' (camp:quest, ~899 points de spawn d'objets de quête) : sa
+      // ligne de filtre a été RETIRÉE (2026-07-11, décision utilisateur —
+      // ces points ne prennent sens qu'en contexte de quête, déjà couverts
+      // par les affordances de fiche quête, voir sidebar.js buildGroupQuests)
+      // mais S.camps.quest EXISTE toujours (la donnée reste, camps.bin la
+      // peuple pour tous les kinds réels sans filtrage — voir data.js
+      // loadDeferred). Un hash LEGACY `on=camp.quest` (lien partagé avant ce
+      // retrait) doit rester un pur no-op : sans cette exclusion, il
+      // rallumerait S.camps.quest.on en permanence, sans plus AUCUNE case
+      // pour l'éteindre (un calque fantôme, pire qu'une simple ligne
+      // fantôme) — jamais réappliqué, même discipline que le no-op
+      // CATS.quest documenté dans urlstate.js.
+      if (k === 'quest') continue;
+      S.camps[k].on = onSet.has('camp.' + k);
+    }
     denseRenderers.forEach(fn => fn());
   };
   if (deferredReady) applyCampFilters(); else whenDeferred(applyCampFilters);

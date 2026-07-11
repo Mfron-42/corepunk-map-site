@@ -6,13 +6,13 @@ const LS = { tracked: 'cpmap_tracked', done: 'cpmap_done', sections: 'cpmap_sect
 
 /* Lecture synchrone du hash pour `devcontent` (feature #13 — contenu isTest
    masqué par défaut) : même principe que LANG ci-dessus (i18n/index.js
-   detectInitialLang), résolu une fois AVANT que buildSearch()/buildBestiary()
+   detectInitialLang), résolu une fois AVANT que buildSearch()/buildFilters()
    ne tournent au boot (main.js init()). Sans ça, un lien partagé avec le tag
    déjà révélé perdrait la course avec urlstate.js readHash() (qui ne
-   s'exécute qu'à la toute fin de applyLocationState()) : la recherche/le
-   bestiaire se construiraient une première fois avec S.devOn encore à son
-   défaut `false`, et resteraient figés ainsi (voir js/devcontent.js pour le
-   reste du filtre, main.js buildDevToggle() pour le bouton). readHash()
+   s'exécute qu'à la toute fin de applyLocationState()) : la recherche/l'arbre
+   Monstres & faune se construiraient une première fois avec S.devOn encore à
+   son défaut `false`, et resteraient figés ainsi (voir js/devcontent.js pour
+   le reste du filtre, main.js buildDevToggle() pour le bouton). readHash()
    reprend la même clé à chaque navigation ultérieure (popstate) — ce
    lecteur-ci ne sert qu'à l'état initial. */
 function initialDevOn() {

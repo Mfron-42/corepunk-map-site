@@ -12,20 +12,48 @@ export default {
       filtersAriaLabel: 'Filtres',
       legend: 'Légende',
       campsTitle: 'Camps & ressources',
-      // Arbre de couches (#82 chunk (a),  unified_layers_DESIGN.md
-      // §2/§11/§12(a)) : les 6 groupes fixes de la sidebar remplacent
-      // Légende/Camps & ressources ci-dessus (clés gardées, plus référencées
-      // par aucun data-i18n -- voir index.html) + le futur emplacement
-      // "Filtres épinglés" (#82 chunk (d), structurel seulement ici,
-      // toujours masqué). Libellés = wording EXACT du design (§2 mock),
-      // vocabulaire déjà tranché par COORDINATION.md §0 pour
-      // "Filtres épinglés" -- aucun GLOSSARY-PENDING sur cette langue.
-      groupPoi: "Points d'intérêt",
-      groupMonsters: 'Monstres & faune',
+      // Arbre de couches — IA FINALE de la sidebar (2026-07-11,
+      // COORDINATION.md §IA FINALE, verbatim utilisateur) : 4 groupes fixes
+      // (World/Monsters/Harvesting/Interactables) remplacent les 6 groupes
+      // du chunk (a). groupPoi/groupQuests retirés avec leurs groupes
+      // (lignes déménagées dans World/Interactables — voir js/sidebar.js).
+      // GLOSSARY-PENDING : titres = wording verbatim de l'utilisateur ;
+      // à balayer quand l'extraction de glossaire (#86) prouvera des termes
+      // du jeu.
+      groupMonsters: 'Monstres',
       groupHarvest: 'Récolte',
-      groupContainers: 'Contenants & interactifs',
-      groupQuests: 'Quêtes',
+      groupContainers: 'Interactables',
       groupWorld: 'Monde',
+      // Cases de cascade (IA finale) : aria-label partagé de chaque case
+      // maîtresse de groupe/sous-groupe (js/sidebar.js wireParentCheck).
+      groupToggleAria: 'Cocher ou décocher toutes les couches de ce groupe',
+      // Titres de sous-groupes (IA finale). Ceux du groupe Monstres
+      // (Monsters/Creeps/Wildlife) réutilisent la table campKind — miroir
+      // VERBATIM des kinds du moteur (redirect utilisateur 2026-07-11),
+      // jamais un axe inventé. GLOSSARY-PENDING (libellés structurels).
+      subWorldOthers: 'Autres',
+      subChests: 'Coffres',
+      subDestroyable: 'Destructibles',
+      subInteractives: 'Interactifs',
+      subOther: 'Autres',
+      // Surcharges de libellé de ligne (affichage seul — les tokens de hash
+      // restent camp.<kind>) : la ligne kind grossière du sous-groupe
+      // Monsters ; le libellé honnête des gardes (2 camps/12 pts, AUCUN
+      // lien espèce/PNJ/butin — interactives_taxonomy_INVESTIGATION.md §5) ;
+      // la ligne honnête « Spawns non identifiés » (pools creeps-<région>/
+      // peaceful-animals-* sans espèce jointe — compte = exactement ce que
+      // la couche dessine, voir pointsets.js KIND_REST_ONLY) ; et la
+      // désambiguïsation « (camps) » des kinds dynamiques rangés à côté de
+      // props PLACÉS dans les buckets Interactables. Le kind `searchable`
+      // reçoit un nom VRAIMENT distinct (« Points de fouille ») — plus
+      // jamais quatre choses nommées « fouillable ». GLOSSARY-PENDING
+      // (tokens internes d'outil de level-design, pas des termes du jeu).
+      monsterCampsRow: 'Camps de monstres',
+      guardsRowLabel: 'Gardes (unité non identifiée)',
+      kindRestRow: 'Spawns non identifiés',
+      searchSpotsRow: 'Points de fouille (camps)',
+      destroyableCampsRow: 'Destructibles (camps)',
+      reactiveCampsRow: 'Interactifs (camps)',
       // (pinFiltersTitle retiré avec le concept abandonné de filtres épinglés
       // séparés — décision utilisateur 2026-07-11, l'arbre EST le bestiaire.)
       trackedTitle: 'Suivis',
@@ -51,7 +79,11 @@ export default {
       // sur-affirmerait pour le reste, simplement non classifié (voir
       //  unknown_states_DESIGN.md §2 re-check #1).
       filterHiddenTooltip: n => `${n} sans position connue`,
-      decorFamiliesTitle: 'Familles de décor',
+      // (decorFamiliesTitle retirée 2026-07-11 avec le groupe « Décor »
+      // dissous — ses lignes famille vivent dans les buckets Interactables,
+      // voir js/sidebar.js DECOR_BUCKET. decorGroupLabel ci-dessous reste :
+      // toujours utilisée par config.js chestKindLabel pour les lignes de
+      // kind des fiches/popups.)
       // Sous-groupe « Par famille » sous Monstres & faune (#82 chunk (b),
       // js/sidebar.js buildMonsterFamilyGroup). familyCampsN : compte de
       // camps honnête d'une ligne famille — les points d'une famille sont
@@ -101,8 +133,10 @@ export default {
       highlightPointsBtn: n => `Surligner les ${n} points`,
       dataGeneratedAt: date => `Données du ${date}`,
       questMapsLine: names => `Cartes : ${names}`,
-      bestiaryTitle: 'Bestiaire',
-      bestiaryLoading: 'Chargement du bestiaire…',
+      // bestiaryTitle/bestiaryLoading retirés (2026-07-11) avec la section
+      // sidebar « Bestiaire » elle-même (voir js/sidebar.js) -- bestiaryZonesN
+      // reste : toujours utilisée par fiches.js openMonsterFiche (section
+      // lore de la fiche monstre), sans rapport avec cette section retirée.
       bestiaryZonesN: n => `${n} zones`,
       lootTableItemsN: n => `Contenu (${n})`,
       probableLootTitle: 'Butin probable',
@@ -386,9 +420,8 @@ export default {
       // du client, et un vrai boss nommé peut afficher bien plus que cette
       // fourchette générique (voir le badge « réel » quand disponible).
       statsBossEliteCaveat: 'Colonnes « Élite »/« Boss » : valeurs génériques estimées, non confirmées en jeu — certains boss nommés réels sont bien plus résistants (voir le badge « réel » quand une fiche dédiée existe pour ce monstre).',
-      // Case de filtre par-carte du bestiaire (map = nom de la carte active).
-      bestiaryMapFilterLabel: map => `Sur cette carte (${map})`,
-      bestiaryMapEmpty: 'Aucun monstre attribué à cette carte. Décochez pour tout afficher.',
+      // (bestiaryMapFilterLabel/bestiaryMapEmpty retirés 2026-07-11 avec la
+      // section sidebar « Bestiaire » -- voir bestiaryZonesN plus haut.)
       alwaysGrantedTitle: 'Toujours donné',
       choiceGroupTitle: n => `Choix ${n}`,
       orWord: ' ou ',
