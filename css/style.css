@@ -109,7 +109,7 @@ body {
 
 /* Titrage : Bahnschrift en graisse variable, condensé par l'espacement des
    lettres plutôt qu'un axe de largeur (compatibilité maximale). */
-.plaque h1, #filters h2, #tracked-section h2, .fiche-kind, .pop-cat,
+.plaque h1, .plaque-sub, #filters h2, #tracked-section h2, .fiche-kind, .pop-cat,
 .hint-box-title, .fiche-sub, .cat-chip, .k-chip, .dl-links a, #panel-toggle,
 .loading p, .goal-num {
   font-variation-settings: 'wght' 680;
@@ -138,11 +138,6 @@ body {
   border-bottom: 1px solid var(--line);
   position: relative;
 }
-.plaque::after {
-  content: '';
-  position: absolute; left: 18px; right: 18px; bottom: 4px;
-  border-bottom: 1px solid var(--line);
-}
 .plaque-top {
   display: flex;
   align-items: center;
@@ -153,16 +148,19 @@ body {
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.5rem;
-  letter-spacing: .13em;
+  line-height: 1.08;
+  letter-spacing: .1em;
   text-transform: uppercase;
   color: var(--accent);
   text-shadow: 0 0 26px rgba(224, 162, 63, .22);
 }
 .plaque-sub {
-  margin: 5px 0 0;
-  font-size: .78rem;
+  margin: 7px 0 0;
+  font-family: var(--font-display);
+  font-size: .66rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
   color: var(--muted);
-  letter-spacing: .05em;
 }
 
 /* ── Sélecteur de langue ── */
@@ -171,19 +169,19 @@ body {
   appearance: none;
   -webkit-appearance: none;
   font-family: var(--font-display);
-  font-size: .68rem;
+  font-size: .7rem;
   font-weight: 680;
-  letter-spacing: .09em;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--accent);
   background: var(--panel-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-s);
-  padding: 5px 22px 5px 9px;
+  padding: 6px 24px 6px 10px;
   cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, var(--accent) 50%),
                     linear-gradient(135deg, var(--accent) 50%, transparent 50%);
-  background-position: right 11px top 55%, right 7px top 55%;
+  background-position: right 12px top 55%, right 8px top 55%;
   background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
   transition: border-color var(--dur) var(--ease), background-color var(--dur) var(--ease);
@@ -218,9 +216,10 @@ body {
   appearance: none;
   -webkit-appearance: none;
   font-family: var(--font-display);
-  font-size: .72rem;
-  font-weight: 640;
-  letter-spacing: .04em;
+  font-size: .7rem;
+  font-weight: 680;
+  letter-spacing: .08em;
+  text-transform: uppercase;
   color: var(--accent);
   background: var(--panel-3);
   border: 1px solid var(--line);
@@ -918,22 +917,35 @@ body {
    plus bas dans ce fichier (accent d'entité par kind) — nettoyés là-bas.) */
 
 /* ── Suivis ── */
-#tracked-list li {
+/* #userpins-list (bloc « Mes drapeaux » injecté dans la même section par
+   sidebar.js renderUserPins, 2026-07-11c) partage EXACTEMENT le vocabulaire
+   de ligne des suivis (.t-dot/.t-name/bouton ✕) : sélecteurs ÉTENDUS plutôt
+   que des règles dupliquées — la seule règle non partagée est li.done
+   (barré), un état de quête suivie qu'un drapeau n'a pas. */
+#tracked-list li, #userpins-list li {
   display: flex; align-items: center; gap: 9px;
   padding: 7px 4px;
   font-size: .85rem;
   border-bottom: 1px solid var(--line-soft);
 }
-#tracked-list .t-name { flex: 1; cursor: pointer; transition: color var(--dur) var(--ease); }
-#tracked-list .t-name:hover { color: var(--accent); }
+#tracked-list .t-name, #userpins-list .t-name { flex: 1; cursor: pointer; transition: color var(--dur) var(--ease); }
+#tracked-list .t-name:hover, #userpins-list .t-name:hover { color: var(--accent); }
 #tracked-list li.done .t-name { text-decoration: line-through; color: var(--muted); }
-#tracked-list .t-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px -1px currentColor; }
-#tracked-list button {
+#tracked-list .t-dot, #userpins-list .t-dot { flex: none; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px -1px currentColor; }
+#tracked-list button, #userpins-list button {
   background: none; border: none; color: var(--muted);
   cursor: pointer; font-size: .9rem; padding: 3px 6px; border-radius: var(--radius-s);
   transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-#tracked-list button:hover { color: var(--danger); background: rgba(224, 100, 92, .12); }
+#tracked-list button:hover, #userpins-list button:hover { color: var(--danger); background: rgba(224, 100, 92, .12); }
+/* Espacement du bloc lui-même : filet au-dessus, même liseré doux que les
+   lignes -- le bloc se masque entièrement à vide (display:none posé par
+   renderUserPins, jamais un en-tête qui pendrait seul). */
+#userpins-block {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
 .hint { font-size: .76rem; color: var(--muted); line-height: 1.5; }
 
 .panel-foot {
@@ -1554,6 +1566,23 @@ body {
   margin: 0 0 8px;
   padding-bottom: 5px;
   border-bottom: 1px solid var(--line-soft);
+}
+/* Accent du palier OVERCLOCKÉ d'une rune (fiches.js scalingSection émet la
+   classe d'accroche `oc-section` sur ce bloc uniquement -- valeurs par rareté
+   décodées via l'opérande 0x62,  : liseré
+   accent + suffixe « OC » en exposant sur le titre, pour que le palier
+   amélioré se lise comme tel et jamais comme les valeurs de base. */
+.oc-section {
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+}
+.oc-section > h3::after {
+  content: ' OC';
+  font-size: .7em;
+  vertical-align: super;
+  letter-spacing: .08em;
+  color: var(--accent);
+  opacity: .85;
 }
 .fiche-journal { font-size: .84rem; line-height: 1.55; color: var(--ink); opacity: .92; }
 /* ── Journal de quête : sorti du tiroir replié, présentation en clair sous

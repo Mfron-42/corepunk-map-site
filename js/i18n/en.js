@@ -582,6 +582,16 @@ export default {
       scalingServerSide: "Doesn't vary with rarity in the client data, for a reason that can't be pinned down from what's extracted.",
       scalingNotLocated: 'Scaling not located in the client data.',
       tierNotRarity: 'Scales by TIER, not by rarity.',
+      // Rune 0x62-table scaling (base + overclocked) + artifact roll-quality
+      // prefixes --  (item hard-numbers pass).
+      overclockScalingTitle: 'Overclocked scaling',
+      overclockNote: 'Enhanced (overclocked) magnitudes, per rune rarity.',
+      overclockServerSide: "This rune has an overclocked variant, but its magnitude isn't stored client-side — it can't be shown as an exact number.",
+      abilityRarityScalingTitle: 'Scaling by rarity',
+      rollQualityTitle: 'Roll quality',
+      rollQualityIntro: 'A higher roll earns a name prefix: a stat rolling in the 33–66% band of its range makes the artifact “Improved” (Tech) / “Strong” (Magic); above 66%, “Reinforced” / “Powerful”.',
+      rollQualityBand3366: 'Improved / Strong (33–66%)',
+      rollQualityBandMore66: 'Reinforced / Powerful (>66%)',
       // "Use effect" section (item_desc_PLAN.md Phase B): a linked ability's
       // own tooltip prose, joined from item.abilities[] at build time (see
       //  build_catalog()). Never a fabricated

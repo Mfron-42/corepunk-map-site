@@ -51,23 +51,28 @@ const Tiles = L.TileLayer.extend({
   getTileUrl: c => `${TILE_BASE}/${activeMap.tile_path}${c.z}/${c.x}_${c.y}.webp`,
 });
 let tileLayer = null;
-/* Edge-fade task (2026-07-11) : la pyramide de tuiles couvre une bounding box
-   RECTANGULAIRE plus grande que le contour réel de chaque carte (îlot Kwalat
-   irrégulier dans une boîte 9600x8320, arènes dont le fragment déborde
-   légèrement le terrain jouable) --  a réécrit
-   CHAQUE tuile de bordure (fond plat de remplissage -> dégradé alpha vers la
-   transparence + désaturation vers CETTE MÊME couleur de fond -- voir
-   css/style.css #map background: #080c12 -- et tuile réelle en bord de trou
-   -> léger fondu directionnel, jamais son contenu masqué). `bounds` élargi à
-   worldBounds.pad(0.12) -- IDENTIQUE au pad de setMaxBounds ci-dessus, pas une
-   nouvelle valeur inventée -- pour que Leaflet redemande/affiche cette bande
-   nouvellement dégradée jusqu'à la même limite que la caméra peut atteindre,
-   au lieu de la couper net à l'ancienne bbox jouable (w x h) : sans ça, la
-   moitié de la fonte serait présente sur disque mais jamais requêtée. Au-delà
-   de cette bordure élargie -- ou pour toute tuile vraiment absente (404) --
-   errorTileUrl (1x1 transparent) laisse voir le fond #map, déjà la même
-   teinte que la fonte : les deux mécanismes (tuile dégradée, puis vide) se
-   raccordent sans coupure visible, à n'importe quel zoom. */
+/* Edge-fade task (2026-07-11, v2) : la pyramide de tuiles couvre une bounding
+   box RECTANGULAIRE plus grande que le contour réel de chaque carte (îlot
+   Kwalat irrégulier dans une boîte 9600x8320, arènes dont le fragment déborde
+   le terrain jouable). Le remplissage de bake (blocs plats olive/gris/noir +
+   débris) est traité en DEUX temps -- voir  :
+     1. SUR DISQUE : chaque tuile de remplissage prouvée est VIDÉE (stub 16px
+        entièrement transparent = le fond #map #080c12 transparaît, identique
+        à une tuile manquante) ; les tuiles réelles coupées en deux par la
+        frontière sont nettoyées au pixel (blocs olive -> transparents) ; les
+        bords de trou gardent leur contenu avec un léger fondu directionnel.
+        Plus de « melt » par tuile (la v1 peignait une teinte + rampe alpha
+        DANS chaque tuile 512px : au dézoom ça donnait une MOSAÏQUE de blocs
+        de teintes légèrement différentes, alignée sur la grille -- rejetée).
+     2. DANS LE NAVIGATEUR (ci-dessous, injectEdgeMask) : UN seul dégradé
+        sombre continu par carte, dessiné en surcouche image au-dessus des
+        tuiles. Comme c'est une image unique (et non N tuiles), le fondu n'a
+        AUCUNE grille ni bande et est identique à tous les zooms.
+   `bounds` de la couche de tuiles reste élargi à worldBounds.pad(0.12)
+   (IDENTIQUE au pad de setMaxBounds ci-dessus) : la surcouche du masque couvre
+   de toute façon toute la zone hors-contenu de façon opaque, donc que Leaflet
+   serve un stub transparent ou l'errorTileUrl au-delà du monde ne change rien
+   -- les deux valent #080c12, la même teinte que le masque et le fond #map. */
 function makeTileLayer() {
   return new Tiles('', {
     tileSize: 512, minNativeZoom: 0, maxNativeZoom: activeMap.tile_max_zoom,
@@ -79,18 +84,61 @@ function makeTileLayer() {
 tileLayer = makeTileLayer();
 tileLayer.addTo(map);
 
+/* ── Masque de bord (edge-fade v2) ─────────────────────────────
+   LE fondu organique : une image RGBA par carte (RGB == #080c12, canal alpha
+   == un fondu de distance signée du CONTOUR extérieur du contenu -- 0 loin à
+   l'intérieur, 1 juste au-delà du contour, sur une bande cosinus dont la
+   largeur suit la taille de la carte), pré-calculée par
+    et livrée dans data/tiles_edge_masks.json
+   (fichier locale-indépendant de haut niveau, comme tiles_meta.json). Posée en
+   imageOverlay sur le rectangle-monde [x0,x1]x[z0,z1] de la carte (converti en
+   LatLng par toLL, la même projection que les tuiles/points), dans un pane
+   dédié z-index 250 : AU-DESSUS des tuiles (tilePane 200) donc il fond leur
+   bord, EN DESSOUS des données (overlayPane 400 -> canvas ; markerPane 600 ;
+   popupPane 700) donc il n'assombrit JAMAIS un point/pin/popup. Non interactif
+   (pointer-events:none) : les clics passent au travers. Le navigateur met
+   l'image à l'échelle en bilinéaire -> fondu lisse à tout zoom, sans grille ni
+   bande (contrairement au « melt » par tuile de la v1). Une carte sans masque
+   (aucun remplissage à fondre) est simplement absente du JSON : pas de
+   surcouche, le contenu s'affiche jusqu'à son bord réel. */
+map.createPane('edgeMask');
+(function () {
+  const p = map.getPane('edgeMask');
+  p.style.zIndex = 250;
+  p.style.pointerEvents = 'none';
+})();
+let edgeMasks = null;         // { maps: { <mapId>: entry }, ... } une fois chargé
+let edgeMaskOverlay = null;   // imageOverlay courant (carte active)
+function applyEdgeMask() {
+  if (edgeMaskOverlay) { map.removeLayer(edgeMaskOverlay); edgeMaskOverlay = null; }
+  const e = edgeMasks && edgeMasks.maps && edgeMasks.maps[activeMap.id];
+  if (!e) return;
+  // Coins monde -> LatLng : NO (haut-gauche, pixel (0,0) de l'image) et SE.
+  const bounds = L.latLngBounds(toLL(e.x0, e.z1), toLL(e.x1, e.z0));
+  edgeMaskOverlay = L.imageOverlay(e.png, bounds, {
+    pane: 'edgeMask', interactive: false, className: 'map-edge-mask',
+  }).addTo(map);
+}
+/* Chargé une fois ; re-appliqué à chaque bascule de carte via
+   applyMapGeometry(). 404/échec toléré : sans masque le site reste
+   fonctionnel (bords tuiles simplement non fondus). */
+fetch('data/tiles_edge_masks.json')
+  .then(r => (r.ok ? r.json() : null))
+  .then(j => { edgeMasks = j; applyEdgeMask(); })
+  .catch(() => {});
+
 /* Vignette de cadrage (polish front, edge-fade task) : assombrit très
    légèrement les coins/bords du VIEWPORT (pas du monde -- un cadre d'écran,
    comme une table de cartographe sous une lampe, cohérent avec la direction
-   déjà posée par css/style.css : "instrument moderne"), pour que la fonte au
-   niveau tuile (ci-dessus) se prolonge visuellement jusqu'au bord de l'écran
-   même quand la zone dégradée réelle est petite à l'écran (zoom arrière,
-   petite arène). Injecté ici (jamais dans css/style.css, propriété d'un autre
-   chantier en cours) : <style> pour la classe, DOM ajouté après tuiles/couches
-   -- non interactif (pointer-events:none), reste sous TOUTE couche de
-   données -- z-index 350, entre tilePane (200) et overlayPane (400, où
-   vit canvasR ci-dessus) -- pour ne jamais assombrir un point canvas, un
-   pin DOM (markerPane 600) ou un popup (700), seulement les tuiles. */
+   déjà posée par css/style.css : "instrument moderne"). Complémentaire du
+   masque de bord (ci-dessus) : le masque fond le bord DU MONDE (espace-monde),
+   la vignette pose un cadre d'ÉCRAN subtil qui reste présent même zoomé au
+   coeur du contenu, là où le masque est loin/absent. Injectée ici (jamais dans
+   css/style.css, propriété d'un autre chantier) : <style> pour la classe, DOM
+   ajouté après tuiles/couches -- non interactif (pointer-events:none), reste
+   sous TOUTE couche de données -- z-index 350, entre tilePane (200) et
+   overlayPane (400, où vit canvasR ci-dessus) -- pour ne jamais assombrir un
+   point canvas, un pin DOM (markerPane 600) ou un popup (700). */
 (function injectEdgeVignette() {
   const style = document.createElement('style');
   style.textContent = `
@@ -501,6 +549,7 @@ function applyMapGeometry() {
   if (tileLayer) map.removeLayer(tileLayer);
   tileLayer = makeTileLayer();
   tileLayer.addTo(map);
+  applyEdgeMask();   // masque de bord propre à la carte active (edge-fade v2)
 }
 
 export {

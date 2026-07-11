@@ -16,7 +16,7 @@ import { isHiddenTest, positionCounts } from './devcontent.js';
 import {
   monsterFamilies, speciesPoints, campGroupByKey, wildSpeciesOfKind, zeroCampWildlifeSpecies, kindRestPoints,
 } from './pointsets.js';
-import { setFamilyOn } from './specieslayer.js';
+import { setFamilyOn, toggleSpecies } from './specieslayer.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -104,12 +104,13 @@ function renderTracked() {
    pins.js::onUserFlagsChange -- notifié par renderUserFlags/addUserFlag/
    removeUserFlag/clearAllUserFlags, couvre donc le boot, chaque bascule de
    carte ET chaque geste utilisateur, jamais un sondage.
-   Styles inline sur les lignes/dé/bouton : CSS finale en cours de mission
-   séparée (style.css verrouillé, voir  pins_suivi_css.staged.css)
-   -- réutilise déjà .t-dot/.t-name (idem #tracked-list, migration triviale
-   une fois le sélecteur étendu) et .farm-group-head/.farm-group-label/
-   .act.ghost/.side-sec-count (classes EXISTANTES, aucune CSS neuve requise
-   pour l'en-tête du bloc). */
+   Styles : 100% classes/sélecteurs EXISTANTS -- lignes .t-dot/.t-name/
+   bouton ✕ via les sélecteurs #tracked-list étendus à #userpins-list +
+   espacement #userpins-block (style.css « Suivis », CSS GO 2026-07-11c) ;
+   en-tête via .farm-group-head/.farm-group-label/.act.ghost/
+   .side-sec-count. Seule la COULEUR du dé reste inline (par-instance,
+   même idiome que renderTracked ci-dessus) ; box.style.display est du
+   COMPORTEMENT (bloc masqué à vide), pas du style dupliqué. */
 function trOr(key, fallback) {
   const v = tr(key);
   return v === key ? fallback : v;   // clé pas encore livrée (i18n en cours) -- repli sûr
@@ -121,9 +122,6 @@ function ensureUserPinsBox() {
   if (!host) return null;
   const box = document.createElement('div');
   box.id = 'userpins-block';
-  box.style.marginTop = '12px';
-  box.style.paddingTop = '10px';
-  box.style.borderTop = '1px solid var(--line-soft)';
   box.innerHTML = `
     <div class="farm-group-head">
       <span class="farm-group-label"></span>
@@ -151,11 +149,10 @@ function renderUserPins() {
   box.querySelector('.act.ghost').textContent = tr('clearAllFlagsBtn');   // clé déjà livrée (popup drapeau, pins.js)
   list.forEach((p, i) => {
     const li = document.createElement('li');
-    li.style.cssText = 'display:flex;align-items:center;gap:9px;padding:7px 4px;font-size:.85rem;border-bottom:1px solid var(--line-soft)';
     const label = `${tr('userFlagTitle')} ${i + 1}`;
-    li.innerHTML = `<span class="t-dot" style="background:var(--core);width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px -1px currentColor;flex:none"></span>
-      <span class="t-name" style="flex:1;cursor:pointer" data-act="goto" data-x="${p.x}" data-z="${p.z}" data-label="${esc(label)}" title="${esc(fmtCoord(p.x, p.z))}">${esc(label)}</span>
-      <button type="button" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.9rem;padding:3px 6px;border-radius:var(--radius-s)" aria-label="${esc(tr('removeBtn'))}" data-act="remove-user-flag" data-id="${esc(p.id)}">✕</button>`;
+    li.innerHTML = `<span class="t-dot" style="background:var(--core)"></span>
+      <span class="t-name" data-act="goto" data-x="${p.x}" data-z="${p.z}" data-label="${esc(label)}" title="${esc(fmtCoord(p.x, p.z))}">${esc(label)}</span>
+      <button type="button" aria-label="${esc(tr('removeBtn'))}" data-act="remove-user-flag" data-id="${esc(p.id)}">✕</button>`;
     ul.appendChild(li);
   });
 }
@@ -791,6 +788,12 @@ function collectActiveTags() {
       if (el.closest('details.decor-group')) continue;   // représentée par la tag de son bucket
       const input = el.querySelector(':scope > .filter-row input');
       if (!input || (!input.checked && !input.indeterminate)) continue;
+      // LÉGENDE VIVANTE (retour user 2026-07-11 soir) : une FAMILLE
+      // PARTIELLE (certaines espèces cochées seulement) ne se tague JAMAIS
+      // elle-même — le bandeau liste EXACTEMENT ce qui est dessiné, donc ses
+      // espèces cochées, une par une (branche espèce + passe d'état S.monsp
+      // ci-dessous). La tag famille = famille ENTIÈRE cochée, rien d'autre.
+      if (el.dataset.fam && !input.checked) continue;
       push({
         sub: false, key: el.dataset.fkey,
         label: el.querySelector('.flabel')?.textContent || el.dataset.fkey,
@@ -798,7 +801,11 @@ function collectActiveTags() {
         partial: input.indeterminate,
       });
     } else {
-      if (el.closest('li[data-fam]')) continue;          // sous-ligne d'une famille : représentée par elle
+      // Sous-ligne espèce d'une famille : représentée par la tag FAMILLE
+      // seulement quand la famille est ENTIÈREMENT cochée ; sinon l'espèce
+      // se tague elle-même (dédupliquée avec la passe d'état par 'sp:').
+      const famLi = el.closest('li[data-fam]');
+      if (famLi && famLi.querySelector(':scope > .filter-row input')?.checked) continue;
       const input = el.querySelector('input');
       if (!input?.checked) continue;
       push({
@@ -807,6 +814,19 @@ function collectActiveTags() {
         hex: el.querySelector('.swatch')?.style.background || '',
       });
     }
+  }
+  // Passe d'ÉTAT (S.monsp) : le bandeau est la légende de la CARTE, jamais
+  // du DOM de l'arbre — une espèce dessinée dont la sous-ligne n'est pas
+  // rendue (famille REPLIÉE : buildSpeciesSublist est paresseux, le repli
+  // retire les <li data-species>) doit quand même se taguer. Dédup 'sp:'
+  // avec la boucle DOM ; une espèce d'une famille entièrement cochée reste
+  // représentée par la tag famille (même règle que la branche DOM).
+  for (const [id, st] of Object.entries(S.monsp || {})) {
+    if (!st?.on) continue;
+    const sp = S.species?.[id];
+    const fam = sp ? familyKey(sp.family || 'other') : null;
+    if (fam && S.monfam[fam]?.on) continue;
+    push({ sp: true, key: id, label: sp?.name || pretty(id), hex: speciesLayerHex(id) });
   }
   return tags;
 }
@@ -832,10 +852,22 @@ function buildTagEl(d) {
   b.setAttribute('aria-label', tr('activeTagRemove', d.label));
   b.addEventListener('click', () => {
     const input = activeTagInput(d);
-    if (!input) return;
-    input.checked = false;
-    input.indeterminate = false;
-    input.dispatchEvent(new Event('change'));
+    if (input) {
+      input.checked = false;
+      input.indeterminate = false;
+      input.dispatchEvent(new Event('change'));
+      return;
+    }
+    // Tag d'espèce issue de la passe d'état (sous-ligne non rendue, famille
+    // repliée) : aucune case DOM à décocher — bascule l'état directement,
+    // mêmes republications que la case (arbre + carte + hash). toggleSpecies
+    // éteint forcément ici : la tag n'existe que couche allumée.
+    if (d.sp) {
+      toggleSpecies(d.key);
+      buildFilters();
+      scheduleRedraw();
+      syncHash();
+    }
   });
   return b;
 }

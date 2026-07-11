@@ -849,6 +849,58 @@ function useEffectSection(it) {
   return `<div class="fiche-section"><h3>${esc(tr('useEffectTitle'))}</h3>${blocks}</div>`;
 }
 
+/* Grille par rareté partagée par les nouveaux blocs de scaling 0x62
+   (rune_ability_scaling / overclock_scaling --  :
+   même rendu EXACT que le bloc rarity_scaling historique de scalingSection
+   (colonnes = codes moteur bruts type AC1/ACP1, volontairement verbatim comme
+   lui -- ce ne sont pas des noms de stats joueur, on n'en invente pas). */
+function rarityColsGridHtml(scaling) {
+  const cols = Object.entries(scaling);
+  const multiCol = cols.length > 1;
+  return cols.flatMap(([col, byRarity]) => RARITY_BANDS.map(r => {
+    const v = byRarity?.[r];
+    if (v == null) return '';
+    const label = multiCol ? `${bandRarityLabel(r)} (${col})` : bandRarityLabel(r);
+    return `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
+  })).join('');
+}
+
+/* Qualité de jet (artefacts uniquement -- ItemPrefix.xml, items_stats_
+   MATRIX.md §4) : le préfixe de nom en jeu ("Amélioré"/"Renforcé" côté Tech,
+   "Fort"/"Puissant" côté Magie) est attribué par la BANDE de jet -- 33-66 %
+   de la plage, ou >66 %. Les SEUILS affichés sont une transformation
+   mécanique exacte des plages déjà livrées (min + 0.33/0.66 × (max-min)) au
+   tier de l'item et à la rareté active du sélecteur de plage de jet ; la
+   famille Tech/Magie et l'agrégation multi-stat sont côté moteur et ne sont
+   JAMAIS tranchées par item ici (l'intro nomme les deux familles) -- on
+   montre la règle et les bornes, pas un verdict fabriqué. Restreint aux
+   stats PRINCIPALES (roll_types 'main') : seules elles sont garanties de
+   rouler. Null-safe intégral (kind/stat_ranges/roll_types absents -> ''). */
+function rollQualitySection(it, key) {
+  if (it.kind !== 'artifact' || !it.stat_ranges) return '';
+  const rollTypes = it.roll_types || {};
+  const mainSids = Object.keys(it.stat_ranges).filter(sid => rollTypes[sid] === 'main');
+  if (!mainSids.length) return '';
+  const tier = it.tier || null;
+  const rarity = activeRollRarity(key);
+  const rows = mainSids.map(sid => {
+    const tiersObj = it.stat_ranges[sid];
+    const tierKeys = (tier && tiersObj[tier]) ? [tier] : Object.keys(tiersObj).sort();
+    return tierKeys.map(tk => {
+      const band = tiersObj[tk][rarity] || tiersObj[tk].common;
+      if (!band || band.min == null || band.max == null || band.min === band.max) return '';
+      const at33 = band.min + 0.33 * (band.max - band.min);
+      const at66 = band.min + 0.66 * (band.max - band.min);
+      const suffix = (mainSids.length > 1 || tierKeys.length > 1)
+        ? ` — ${statLabel(sid)}${tierKeys.length > 1 ? ` (${tk})` : ''}` : '';
+      return `<div class="stat-row-label">${esc(tr('rollQualityBand3366') + suffix)}</div><div class="stat-row-value">≥ ${esc(fmtNum(at33))}</div>`
+        + `<div class="stat-row-label">${esc(tr('rollQualityBandMore66') + suffix)}</div><div class="stat-row-value">≥ ${esc(fmtNum(at66))}</div>`;
+    }).join('');
+  }).join('');
+  if (!rows) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('rollQualityTitle'))}</h3><p class="hint">${esc(tr('rollQualityIntro'))}</p><div class="stat-grid">${rows}</div></div>`;
+}
+
 /* Mise à l'échelle rune (rarity_scaling, 13/24 runes actives décodées) et
    puce (tier_scaling, 1/71 seulement -- combo_crusher) : port_map.md #10.
    EXIGENCE FERME (pas une nuance de style) : un statut "no_template" montre
@@ -874,6 +926,32 @@ function scalingSection(it) {
     // Pastille "unknown" (unknown_states_DESIGN.md #13, task #67) : contenu
     // déjà correct, juste enveloppé dans le composant d'état partagé.
     parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('scalingNotLocated'))}</p></div>`);
+  }
+  // Mise à l'échelle par rareté décodée via l'opérande 0x62 (rune_ability_
+  // scaling,  items_stats_MATRIX.md) :
+  // REPLI pour les runes que le décodage direct abt_active_rune_ n'atteint
+  // pas -- jamais rendu quand rarity_scaling couvre déjà l'axe (même donnée,
+  // deux chemins de décodage ; pas de doublon). Champs absents des bins tant
+  // que la régén ×5 n'a pas eu lieu -> null-safe, rendu inchangé d'ici là.
+  if (!it.rarity_scaling && it.rune_ability_scaling) {
+    const rows = rarityColsGridHtml(it.rune_ability_scaling);
+    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityRarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
+  }
+  // Palier OVERCLOCKÉ (variante améliorée d'une rune active, items_stats_
+  // MATRIX.md §3.1) : valeurs par rareté quand le client les stocke (2/24
+  // aujourd'hui), note honnête quand la variante EXISTE mais que sa magnitude
+  // n'est pas côté client (no_rarity_table -- enregistrement stub/constantes
+  // littérales, 13/24), et RIEN quand la rune n'a pas de variante overclockée
+  // du tout (no_overclock_record, 9/24 -- un vrai "pas de palier", pas un
+  // trou de décodage : distinction ferme, même règle que no_template).
+  // `oc-section` : simple classe d'accroche pour l'accent visuel STAGÉ
+  // (/item_stats_css.staged.css -- style.css est occupé par une
+  // autre mission) ; inerte tant que la règle CSS n'est pas appliquée.
+  if (it.overclock_scaling) {
+    const rows = rarityColsGridHtml(it.overclock_scaling);
+    if (rows) parts.push(`<div class="fiche-section oc-section"><h3>${esc(tr('overclockScalingTitle'))}</h3><div class="stat-grid">${rows}</div><p class="hint">${esc(tr('overclockNote'))}</p></div>`);
+  } else if (it.overclock_status === 'no_rarity_table') {
+    parts.push(`<div class="fiche-section oc-section"><h3>${esc(tr('overclockScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('overclockServerSide'))}</p></div>`);
   }
   if (it.tier_scaling) {
     const rows = ['t1', 't2', 't3'].map(tk => {
@@ -3608,6 +3686,9 @@ function openItemFiche(key) {
   // tier_scaling) -- port_map.md #8/#9/#10, voir les fonctions partagées
   // définies plus haut (rollRangeSection/formulaHtml/scalingSection).
   const rollRangeHtml = rollRangeSection(it, key);
+  // Qualité de jet (préfixes "Amélioré/Renforcé..." -- seuils 33 %/66 % dérivés
+  // des plages livrées, artefacts uniquement ; voir rollQualitySection).
+  const rollQualityHtml = rollQualitySection(it, key);
   const formulaHtmlBlock = it.artifact_formula ? formulaHtml(it.artifact_formula, { rarityNote: true }) : '';
   const scalingHtml = scalingSection(it);
 
@@ -3932,6 +4013,7 @@ function openItemFiche(key) {
     ${containersHtml}
     ${useEffectHtml}
     ${rollRangeHtml}
+    ${rollQualityHtml}
     ${formulaHtmlBlock}
     ${scalingHtml}
     ${usedHtml}

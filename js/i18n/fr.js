@@ -587,6 +587,16 @@ export default {
       scalingServerSide: "Ne varie pas avec la rareté dans les données du client, pour une raison qui n'est pas déterminable depuis ce qui est extrait.",
       scalingNotLocated: 'Mise à l’échelle non localisée dans les données du client.',
       tierNotRarity: 'Évolue par PALIER (tier), pas par rareté.',
+      // Scaling 0x62 des runes (base + overclocké) + préfixes de qualité de
+      // jet des artefacts -- 
+      overclockScalingTitle: 'Mise à l’échelle overclockée',
+      overclockNote: 'Valeurs améliorées (overclockées), par rareté de rune.',
+      overclockServerSide: 'Cette rune a une variante overclockée, mais sa valeur n’est pas stockée côté client — impossible d’afficher un nombre exact.',
+      abilityRarityScalingTitle: 'Mise à l’échelle par rareté',
+      rollQualityTitle: 'Qualité du jet',
+      rollQualityIntro: 'Un meilleur jet accorde un préfixe de nom : une stat dans la tranche 33–66 % de sa plage rend l’artefact « Amélioré » (Tech) / « Fort » (Magie) ; au-delà de 66 %, « Renforcé » / « Puissant ».',
+      rollQualityBand3366: 'Amélioré / Fort (33–66 %)',
+      rollQualityBandMore66: 'Renforcé / Puissant (>66 %)',
       useEffectTitle: 'Effet d’utilisation',
       effectVarRuntimeTooltip: 'Calculé en direct en jeu (pas une valeur fixe)',
       effectVarUnextractedTooltip: 'Valeur pas encore extraite des données du client',

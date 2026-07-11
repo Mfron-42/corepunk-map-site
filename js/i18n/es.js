@@ -563,6 +563,16 @@ export default {
       scalingServerSide: 'No varía con la rareza en los datos del cliente, por un motivo que no se puede determinar a partir de lo extraído.',
       scalingNotLocated: 'Escalado no localizado en los datos del cliente.',
       tierNotRarity: 'Escala por NIVEL (tier), no por rareza.',
+      // Escalado 0x62 de runas (base + overclock) + prefijos de calidad de
+      // tirada de artefactos -- 
+      overclockScalingTitle: 'Escalado overclock',
+      overclockNote: 'Valores mejorados (overclock), por rareza de runa.',
+      overclockServerSide: 'Esta runa tiene una variante overclock, pero su valor no se guarda en el cliente — no se puede mostrar un número exacto.',
+      abilityRarityScalingTitle: 'Escalado por rareza',
+      rollQualityTitle: 'Calidad de tirada',
+      rollQualityIntro: 'Una tirada más alta otorga un prefijo al nombre: una estadística en el rango 33–66 % de su intervalo hace el artefacto «Mejorado» (Tec) / «Fuerte» (Magia); por encima del 66 %, «Reforzado» / «Poderoso».',
+      rollQualityBand3366: 'Mejorado / Fuerte (33–66 %)',
+      rollQualityBandMore66: 'Reforzado / Poderoso (>66 %)',
       useEffectTitle: 'Efecto de uso',
       effectVarRuntimeTooltip: 'Calculado en vivo en el juego (no es un valor fijo)',
       effectVarUnextractedTooltip: 'Valor aún no extraído de los datos del cliente',
