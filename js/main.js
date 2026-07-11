@@ -28,9 +28,8 @@ import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from 
 import {
   campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys,
 } from './pointsets.js';
-import {
-  ensureSpeciesOn, toggleSpecies, speciesCampWinner, setFamilyOn,
-} from './specieslayer.js';
+import { toggleSpecies, speciesCampWinner } from './specieslayer.js';
+import { activateSpeciesLayer, activateFamilyLayers } from './layeractivate.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import {
   buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
@@ -84,36 +83,12 @@ function applyPointHighlight(b, pts, color) {
    existe. Pas de point-set → fiche seule (le state-chip de la fiche dit
    déjà « inconnu ») ; le clic n'est JAMAIS mort. Dédoublonnage = c'est une
    case (re-cliquer re-révèle la ligne déjà cochée) ; retrait = décocher
-   dans l'arbre. Un seul point d'orchestration (même discipline que
-   setLang/buildDevToggle : jamais une mutation qui laisserait une partie de
-   l'UI dans l'ancien état). */
-function activateSpeciesLayer(spId) {
-  ensureSpeciesOn(spId);
-  buildFilters();                       // la sous-ligne espèce apparaît (famille auto-dépliée)
-  scheduleRedraw();                     // compositeur (points) — priorité espèce, POINTS SEULS
-  syncHash();                           // `on=monsp.<id>` (lien partageable)
-  // Révèle la ligne à GAUCHE (ouvre les <details>, déplie la famille, flash)
-  // — jamais de flyTo (le geste caméra reste goto/zone).
-  revealMonsterNode('species', spId);
-}
-/* Chip à portée FAMILLE (bound_units.scope, étape de quête) : coche la ou
-   les lignes famille correspondantes — même geste, grain 2 de l'échelle.
-   CASCADE (IA finale, 2026-07-11) : cocher une famille coche AUSSI toutes
-   ses espèces (setFamilyOn, specieslayer.js) — exactement le même geste que
-   la case famille de l'arbre, jamais deux sémantiques divergentes. */
-function activateFamilyLayers(fams) {
-  let first = null;
-  for (const f of fams) {
-    if (!f) continue;
-    setFamilyOn(f, true);
-    if (!first) first = f;
-  }
-  if (!first) return;
-  buildFilters();
-  scheduleRedraw();
-  syncHash();
-  revealMonsterNode('family', first);
-}
+   dans l'arbre. activateSpeciesLayer/activateFamilyLayers (la composition
+   elle-même) vivent désormais dans js/layeractivate.js — EXTRAITES d'ici
+   (2026-07-11, mission "search activation") pour que js/search.js réutilise
+   EXACTEMENT le même point d'orchestration sur ses résultats espèce/famille,
+   plutôt que d'en re-dériver une seconde copie divergente (main.js n'exporte
+   jamais rien, voir son en-tête). */
 /* Espèce cochable d'un chip monstre (id = clé S.monsters) : la couche vit
    au grain ESPÈCE (référence canonique, COORDINATION.md) — résolue via le
    catalogue puis le résolveur unique ; null quand aucun camp ne joint sur la

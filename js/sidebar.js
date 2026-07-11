@@ -100,6 +100,10 @@ function hiddenBadge(hidden) {
 }
 function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') {
   const li = document.createElement('li');
+  // Clé de couche stampée sur le <li> : identité stable pour le bandeau des
+  // couches actives (renderActiveDots — dédup des copies miroir Creeps,
+  // résolution de l'<input> par clé au moment du clic).
+  li.dataset.fkey = key;
   li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
     <input type="checkbox" ${on ? 'checked' : ''}>
     <span class="swatch" style="background:${hex}"></span>
@@ -627,6 +631,93 @@ function refreshParentChecks() {
     row.classList.toggle('off', !on);
     const input = row.querySelector('input');
     if (input) input.checked = on;
+  }
+  // Bandeau des couches actives : rejoué ici car TOUT chemin de mutation de
+  // couche passe par refreshParentChecks (écouteurs filterRow/espèce directs,
+  // cascades wireParentCheck → buildFilters → rebuildAllGroups, restaurations
+  // layeractivate/router/urlstate → buildFilters).
+  renderActiveDots();
+}
+
+/* ── Pastilles « couches actives » (bandeau sous la recherche, demande
+   utilisateur 2026-07-11) : un point coloré par couche qui PEINT des pins en
+   ce moment — survol = nom (tooltip localisée), clic = masquer — sans
+   re-parcourir tout l'arbre. DÉRIVÉ du DOM de l'arbre (source de vérité
+   unique, jamais un état parallèle), en ORDRE d'arbre (un seul
+   querySelectorAll multi-sélecteur = ordre document) :
+   - sous-groupe à pastille (POI, coffres…) → UN point pour tout le bucket,
+     partiel compris (il peint des pins) — ses lignes internes ne sont jamais
+     doublées ;
+   - ligne filterRow cochée hors bucket (zones/npc/familles/kinds/…) → un
+     point chacune, dédupliquée par clé (copies miroir Creeps) ; famille
+     PARTIELLE incluse en demi-teinte (ses espèces peignent), même
+     vocabulaire .partial que l'arbre ;
+   - ligne ESPÈCE de niveau racine (Wildlife/Creeps) → un point ; les
+     sous-lignes espèce d'une famille sont représentées par leur famille
+     (et leur sublist est de toute façon rendue paresseusement).
+   Clic : l'<input> est résolu par CLÉ AU MOMENT du clic (l'arbre se
+   reconstruit souvent — jamais une référence capturée), décoché puis
+   change → le flux normal de la ligne fait tout le reste (toggle de couche,
+   syncHash, refreshParentChecks → ce bandeau se republie seul). */
+function activeDotInput(d) {
+  if (d.sub) return document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(d.key)}"] .subgrp-check`);
+  if (d.sp) return document.querySelector(`#filters li[data-species="${CSS.escape(d.key)}"] input`);
+  return document.querySelector(`#filters li[data-fkey="${CSS.escape(d.key)}"] input`);
+}
+function renderActiveDots() {
+  const host = document.getElementById('active-dots');
+  if (!host) return;
+  const dots = [];
+  const seen = new Set();
+  const push = d => { const id = (d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); dots.push(d); } };
+  for (const el of document.querySelectorAll('#filters details.decor-group, #filters li[data-fkey], #filters li[data-species]')) {
+    if (el.matches('details.decor-group')) {
+      const input = el.querySelector(':scope > summary .subgrp-check');
+      if (!input || (!input.checked && !input.indeterminate)) continue;
+      push({
+        sub: true, key: el.dataset.subgroup,
+        label: el.querySelector(':scope > summary .flabel')?.textContent || el.dataset.subgroup,
+        hex: input.style.getPropertyValue('--dot').trim(),
+        partial: input.indeterminate,
+      });
+    } else if (el.dataset.fkey) {
+      if (el.closest('details.decor-group')) continue;   // représentée par le point de son bucket
+      const input = el.querySelector(':scope > .filter-row input');
+      if (!input || (!input.checked && !input.indeterminate)) continue;
+      push({
+        sub: false, key: el.dataset.fkey,
+        label: el.querySelector('.flabel')?.textContent || el.dataset.fkey,
+        hex: el.querySelector('.swatch')?.style.background || '',
+        partial: input.indeterminate,
+      });
+    } else {
+      if (el.closest('li[data-fam]')) continue;          // sous-ligne d'une famille : représentée par elle
+      const input = el.querySelector('input');
+      if (!input?.checked) continue;
+      push({
+        sp: true, key: el.dataset.species,
+        label: el.querySelector('.sp-name')?.textContent || el.dataset.species,
+        hex: el.querySelector('.swatch')?.style.background || '',
+      });
+    }
+  }
+  host.innerHTML = '';
+  for (const d of dots) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'adot' + (d.partial ? ' partial' : '');
+    b.style.setProperty('--c', d.hex);
+    const tip = tr('activeDotHide', d.label);
+    b.title = tip;
+    b.setAttribute('aria-label', tip);
+    b.addEventListener('click', () => {
+      const input = activeDotInput(d);
+      if (!input) return;
+      input.checked = false;
+      input.indeterminate = false;
+      input.dispatchEvent(new Event('change'));
+    });
+    host.appendChild(b);
   }
 }
 

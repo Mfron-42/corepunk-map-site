@@ -4,12 +4,12 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  catLabel, campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
-  rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel,
+  campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
+  rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
   locationKindLabel, mapName,
 } from './config.js';
 import { $, esc, fmtCoord, fold, editLe, iconTag, initials, itemGlyph, pretty } from './utils.js';
-import { tr, tbl } from './i18n/index.js';
+import { tr, tbl, numberLocale } from './i18n/index.js';
 import { map, toLL, toggleZones, showHighlight } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
 import { goTo } from './pins.js';
@@ -23,6 +23,8 @@ import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.
 import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
 import { buildFilters } from './sidebar.js';
+import { speciesPoints, monsterFamilies } from './pointsets.js';
+import { activateSpeciesLayer, activateFamilyLayers } from './layeractivate.js';
 
 /* ── Recherche ──────────────────────────────────────────────── */
 /* Bruit technique (abilities/effets/talents internes, jamais des objets
@@ -52,6 +54,12 @@ const CAT_GLYPH = {
   npc: '👤', poi: '📍', quest: '❖', qao: '⚙', workshop: '🛠', camp: '⛺', item: '📦',
   monster: '🐾', zone: '🗺', location: '📖', ability: '✨', event: '⚑', chest: '🧰',
   searchable_chest: '🗝', recipe: '📜', node: '🌿',
+  // Famille (mission "search activation" 2026-07-11) : PAS un monstre précis
+  // — un nœud FAMILLE de l'arbre (2e barreau de l'échelle de précision,
+  // COORDINATION.md). Glyphe distinct du 🐾 espèce, la puce catégorie
+  // (searchCatLabel, "Famille"/"Family"…) porte l'essentiel de la
+  // distinction visuelle (voir buildFamilySearchIndex/renderSearch).
+  family: '🧬',
 };
 const searchCatLabel = key => tbl('searchCat', key) || key;
 let searchIndex = [];
@@ -92,6 +100,16 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
     // de l'icône ; null partout ailleurs (objet à rareté unique ou toute
     // autre catégorie), aucun changement visuel pour eux.
     ring: (opts && opts.ring) || null,
+    // `ctx` (facultatif, mission "search activation" 2026-07-11) : ligne de
+    // CONTEXTE secondaire ("Famille Wolf · 4 camps · 926 pts") — jamais
+    // empilée dans le libellé muted à droite (qui reste court, voir
+    // style.css `#search-results .muted { white-space:nowrap }` — un
+    // débordement horizontal est un risque réel avec famille+points
+    // concaténés là), rendue comme une seconde ligne dédiée par
+    // renderSearch() (même style que .sr-hint). Posé par
+    // buildMonsterSearchIndex (contexte famille d'une espèce du catalogue)
+    // ci-dessous ; null partout ailleurs, aucun changement visuel pour eux.
+    ctx: (opts && opts.ctx) || null,
   };
   if (body && body.length) {
     entry.body = body.filter(Boolean).map(s => { const bn = fold(s); return { text: s, n: bn, words: bn.split(' ') }; });
@@ -220,6 +238,11 @@ function buildSearch() {
   // simple push suffit à chacun.
   whenDeferred(buildCampSearchIndex);
   whenDeferred(buildMonsterSearchIndex);
+  // Familles + faune/creeps (mission "search activation" 2026-07-11) :
+  // mêmes gardes deferredReady (S.species/S.wildlifeSpecies arrivent avec
+  // ce même lot) — voir buildFamilySearchIndex/buildWildSpeciesSearchIndex.
+  whenDeferred(buildFamilySearchIndex);
+  whenDeferred(buildWildSpeciesSearchIndex);
   whenDeferred(buildLocationSearchIndex);
   whenDeferred(buildAbilitySearchIndex);
   whenDeferred(buildEventSearchIndex);
@@ -302,23 +325,33 @@ function crossMapOpen(e) {
    répète souvent des centaines de fois à l'identique — indexer chaque
    marqueur ferait des centaines de doublons pour une seule recherche ; une
    seule entrée par NOM DISTINCT (~130) suffit et reste honnête (aucune
-   position n'est cachée, juste dédoublonnée). Le libellé affiché utilise le
-   nom d'affichage partagé (chestDisplayName, js/config.js — type physique
-   localisé, jamais le jeton d'asset d'art brut), préfixé par le libellé de
-   catégorie déjà traduit (catLabel('chest')) pour que "coffre" (FR) /
-   "chest" (EN) / etc. matche quand même. Plusieurs skins DISTINCTS partagent
-   souvent le même type (ex. 7 noms distincts de Barrel sur Kwalat) — donc,
-   depuis que le libellé affiché est le type seul, plusieurs entrées peuvent
-   désormais se lire pareil (différenciées seulement par leurs coordonnées,
-   affichées à droite de chaque ligne). `opts.ref` (clé stable = nom brut,
-   jamais affichée) est donc OBLIGATOIRE ici : searchDedupKey retombe sinon
-   sur le libellé replié (fold(label)) quand `ref` est absent, et aurait fait
+   position n'est cachée, juste dédoublonnée). Le libellé affiché est le nom
+   d'affichage partagé SEUL (chestDisplayName, js/config.js — type physique
+   localisé, jamais le jeton d'asset d'art brut) : la puce de catégorie
+   affiche déjà "Coffre"/"Chest"/… (searchCat.chest, INCHANGÉE) — préfixer le
+   libellé du même mot ferait doublon, comme aucune autre catégorie de cette
+   liste ne le fait (un PNJ ne s'affiche jamais "PNJ — Bob").
+   RELIC SWEEP (mission "search activation" 2026-07-11, #2) : ce libellé
+   préfixait auparavant chaque entrée avec `catLabel('chest')` — une clé
+   i18n (`cat.chest`) RETIRÉE de toutes les locales quand l'ancienne couche
+   unifiée CATS.chest a été scindée en `searchable_chest`/`camp_chest` (voir
+   config.js, DATA_CONTRACT.md §1/§3.1). `catLabel()` n'a alors plus de
+   traduction à trouver et retombe sur la clé BRUTE, si bien que les 132
+   entrées dédupliquées de cette couche affichaient un "chest —" anglais en
+   dur au-devant du libellé — dans TOUTES les locales, y compris FR/RU/UK/ES
+   (repli silencieux passé inaperçu car "chest" reste un mot anglais
+   plausible en EN). Purgé ici : la fonction ne référence plus aucune clé
+   morte. Plusieurs skins DISTINCTS partagent souvent le même type (ex. 7
+   noms distincts de Barrel sur Kwalat) — donc plusieurs entrées peuvent se
+   lire pareil (différenciées seulement par leurs coordonnées, affichées à
+   droite de chaque ligne). `opts.ref` (clé stable = nom brut, jamais
+   affichée) est donc OBLIGATOIRE ici : searchDedupKey retombe sinon sur le
+   libellé replié (fold(label)) quand `ref` est absent, et aurait fait
    disparaître silencieusement 6 des 7 skins de Barrel (un seul survit à la
    dédup) — régression détectée en vérifiant ce correctif (voir
    dupe_check.json de la passe de vérif). */
 function chestSearchLabel(r) {
-  const rest = chestDisplayName(r);
-  return rest ? `${catLabel('chest')} — ${rest}` : catLabel('chest');
+  return chestDisplayName(r);
 }
 function buildChestSearchIndex() {
   const seen = new Map();
@@ -449,8 +482,10 @@ function buildMonsterSearchIndex() {
     const canon = sp?.canonicalSiteKey;
     const rep = (canon && members.find(([k]) => k === canon)) || members[0];
     const [repKey, repM] = rep;
-    const sub = [repM.level != null ? tr('levelAbbrev', repM.level) : null, repM.family ? pretty(repM.family) : null]
-      .filter(Boolean).join(' · ');
+    // Niveau seul ici — le contexte famille+camps migre vers `ctx` (seconde
+    // ligne dédiée) ci-dessous, mission "search activation" : le répéter
+    // aussi ici ferait doublon (voir la doc `ctx` de pushSearchEntry).
+    const sub = repM.level != null ? tr('levelAbbrev', repM.level) : '';
     const variantsSub = members.length > 1 ? tr('monsterVariantsCount', members.length) : '';
     // Dev marker (feature #13) : seulement quand la variante REPRÉSENTATIVE
     // elle-même est isTest. Une espèce MIXTE (ex. boarmammoth_albion :
@@ -463,9 +498,110 @@ function buildMonsterSearchIndex() {
     // Alias namesAll -- exclut le nom du représentant lui-même (déjà le
     // titre affiché, un doublon dans `body` serait sans effet mais inutile).
     const aliases = (sp?.namesAll || []).filter(nm => fold(nm) !== fold(repM.name));
-    pushSearchEntry(repM.name, 'monster', MONSTER_HEX, null, null, () => openMonsterFiche(repKey),
-      repM.icon ? `icons/${repM.icon}` : null, [sub, variantsSub, devSub].filter(Boolean).join(' · '), '🐾',
-      0, aliases.length ? aliases : null);
+    // Contexte famille + camps (mission "search activation" 2026-07-11 —
+    // « Species rows show their family context ») : "Famille Wolf · 4 camps
+    // · 926 pts", résolu par le résolveur UNIQUE (pointsets.js speciesPoints,
+    // actif-carte, JAMAIS re-dérivé) — exactement la même donnée que la
+    // ligne espèce de l'arbre (sidebar.js speciesRowLi's `res`), les deux
+    // surfaces s'accordent donc toujours.
+    const res = speciesPoints(spId);
+    const campsCtx = res ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale())) : tr('speciesZeroCamps');
+    const ctx = repM.family ? `${tr('speciesFamilyOf', pretty(repM.family))} · ${campsCtx}` : campsCtx;
+    // Clic-double-effet (même modèle EXACT que les chips d'entité de
+    // fiche/quête, décision utilisateur COORDINATION.md — étendu ici à la
+    // recherche, mission "search activation") : ouvre la fiche ET coche le
+    // nœud ESPÈCE de l'arbre (auto-dépliage de sa famille) quand un
+    // point-set existe (js/layeractivate.js activateSpeciesLayer, résolveur
+    // d'orchestration PARTAGÉ avec main.js — jamais une seconde composition
+    // du même geste) ; sinon fiche seule, comme avant cette passe — le clic
+    // n'est jamais mort.
+    const open = () => {
+      openMonsterFiche(repKey);
+      if (res) activateSpeciesLayer(spId);
+    };
+    // Vignette (monster portraits investigation, avenue 2+3 — 78/224
+    // espèces, species.bin `portrait`) : PRIME sur l'icône de variante
+    // (repM.icon, souvent absente/générique) quand elle existe — même
+    // convention `icons/<chemin>` que tout le reste (it.icon/repM.icon
+    // ci-dessus/ci-dessous), le champ porte déjà son propre sous-dossier
+    // (monsters/…, quelques items/… pour les portraits résolus via un nom
+    // d'objet partagé — voir data/SCHEMA.md §monster_species). 146/224
+    // espèces n'en ont encore aucune : repli honnête sur repM.icon puis le
+    // glyphe 🐾, exactement comme avant cette passe.
+    const icon = sp?.portrait ? `icons/${sp.portrait}` : (repM.icon ? `icons/${repM.icon}` : null);
+    pushSearchEntry(repM.name, 'monster', MONSTER_HEX, null, null, open,
+      icon, [sub, variantsSub, devSub].filter(Boolean).join(' · '), null,
+      0, aliases.length ? aliases : null, { ctx });
+  }
+}
+
+/* Familles de monstres (mission "search activation" 2026-07-11 — grain 2 de
+   l'échelle de précision, COORDINATION.md) : une entrée par famille du
+   CATALOGUE GLOBAL (S.species, post-alias familyKey — même univers que
+   buildMonsterSearchIndex ci-dessus), qu'elle ait ou non des camps joints
+   sur la carte active — même honnêteté « 0 camp » que la ligne famille de
+   l'arbre (sidebar.js familyRowLi/l'arbre EST le bestiaire) : une famille
+   sans camp ICI reste listée, jamais absente de la recherche parce qu'elle
+   n'aurait rien à activer sur cette carte précise. Comptage RÉEL tiré du
+   résolveur UNIQUE (pointsets.js monsterFamilies, jamais re-dérivé) pour les
+   familles jointes ; complété par un simple parcours du catalogue pour les
+   familles sans camp (aucun join ici, juste une énumération de noms).
+   AUCUNE fiche « famille » n'existe (chunk (e)) : le clic ne peut donc pas
+   suivre le modèle espèce ci-dessus — il coche la ligne FAMILLE de l'arbre
+   (cascade toutes ses espèces) + la révèle, EXACTEMENT le même geste que le
+   chip family-layer d'une étape de quête (js/layeractivate.js
+   activateFamilyLayers, résolveur d'orchestration PARTAGÉ — jamais une
+   deuxième implémentation du même clic). Visuellement DISTINCT d'une ligne
+   espèce (demande mission #1, « visually distinct row stating it's a family
+   filter ») : même hue MONSTRE (uniformité demandée, #3) mais une puce de
+   catégorie dédiée (searchCat.family, « Famille »/« Family »…) + un glyphe
+   dédié (CAT_GLYPH.family) + une classe de ligne dédiée (voir renderSearch,
+   style.css .sr-family-row) — jamais une seconde couleur qui romprait l'axe
+   couleur = nature d'entité (ONTOLOGY.md #39, config.js ecAttr). */
+function familySearchRows() {
+  const camped = new Map(monsterFamilies().map(f => [f.family, f]));
+  const rows = [...camped.values()];
+  const seen = new Set(camped.keys());
+  for (const sp of Object.values(S.species || {})) {
+    if (isHiddenTest(sp)) continue;
+    const fam = familyKey(sp.family || 'other');
+    if (seen.has(fam)) continue;
+    seen.add(fam);
+    rows.push({ family: fam, nCamps: 0, nPts: 0 });
+  }
+  return rows;
+}
+function buildFamilySearchIndex() {
+  for (const f of familySearchRows()) {
+    const sub = f.nPts ? tr('speciesCampsPts', f.nCamps, f.nPts.toLocaleString(numberLocale())) : tr('speciesZeroCamps');
+    pushSearchEntry(pretty(f.family), 'family', MONSTER_HEX, null, null,
+      () => activateFamilyLayers([f.family]), null, sub, null, 0, null, { ref: 'family:' + f.family });
+  }
+}
+
+/* Faune/creeps (wildlife_species.bin, catalogue GLOBAL ~25 espèces SANS
+   record species.bin — ONTOLOGY.md #11) : mission "search activation" —
+   « searching dinde/turkey surfaces the creeps species similarly ».
+   AUCUNE fiche n'existe pour ces tokens (sidebar.js speciesRowLi : leur nom
+   n'est jamais cliquable dans l'arbre non plus, faute de canonicalSiteKey/
+   spawns) — le clic ENSURE quand même la couche espèce (id = le token
+   moteur partagé S.monsp/hash `monsp.<token>`, voir pointsets.js
+   wildSpeciesIndex, même espace de noms qu'une espèce catalogue) et révèle
+   sa ligne : jamais un clic mort malgré l'absence de fiche, exactement le
+   même geste que le bouton « Afficher » de l'arbre pour ces mêmes lignes.
+   Comptage via le résolveur UNIQUE (pointsets.js speciesPoints, ACTIF-CARTE
+   — même fonction que la ligne de l'arbre) : jamais re-dérivé depuis les
+   champs `camps`/`pts` propres de wildlife_species.bin, qui ne sont PAS
+   scopés à la carte active (ils listent les camps de TOUTES les cartes).
+   Même hue/chip que les espèces catalogue (cat 'monster', uniformité #3) —
+   ce sont des créatures au même titre, seule leur absence de fiche diffère
+   (assumé, comme dans l'arbre). */
+function buildWildSpeciesSearchIndex() {
+  for (const [id, w] of Object.entries(S.wildlifeSpecies || {})) {
+    const res = speciesPoints(id);
+    const sub = res ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale())) : tr('wildlifeZeroCamps');
+    pushSearchEntry(w.name, 'monster', MONSTER_HEX, null, null,
+      () => activateSpeciesLayer(id), null, sub, null, 0, null, { ref: 'wildsp:' + id });
   }
 }
 
@@ -681,6 +817,12 @@ function renderSearch(raw) {
   }
   res.forEach(it => {
     const li = document.createElement('li');
+    // Ligne de contexte (mission "search activation" — species rows show
+    // their family context) : "Famille Wolf · 4 camps · 926 pts", posée par
+    // buildMonsterSearchIndex ci-dessus — même style discret que le
+    // bodyHit ci-dessous (les deux peuvent coexister : un alias trouvé PAR
+    // le corpus n'empêche pas d'afficher aussi le contexte famille).
+    const ctxLine = it.ctx ? `<div class="sr-hint sr-ctx">${esc(it.ctx)}</div>` : '';
     // Indice discret : la quête sort sur un mot de son déroulé, pas de son
     // titre — on montre la phrase qui a matché pour que ce soit lisible.
     const hint = it.bodyHit ? `<div class="sr-hint">${esc(tr('searchBodyHintPrefix'))}${esc(it.bodyHit)}</div>` : '';
@@ -688,13 +830,19 @@ function renderSearch(raw) {
     const otherMap = it.map && it.map !== S.map;
     const mapBadge = otherMap
       ? `<span class="map-badge" title="${esc(tr('mapBadgeTitle', mapName(it.map)))}">${esc(mapName(it.map))}</span>` : '';
+    // Ligne FAMILLE (mission #1) : classe dédiée -- distinction visuelle
+    // légère (liseré + libellé en gras, voir style.css .sr-family-row),
+    // en plus de la puce de catégorie "Famille" -- jamais qu'un seul canal
+    // de distinction pour un rôle de ligne aussi différent (un filtre
+    // d'arbre, pas une entité vers une fiche).
+    if (it.cat === 'family') li.className = 'sr-family-row';
     li.innerHTML = `<div class="sr-row">
       <span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>
       ${iconWithRing(it)}
       <span class="sr-label">${esc(it.label)}</span>
       ${mapBadge}
       <span class="muted">${it.x != null ? fmtCoord(it.x, it.z) : esc(it.sub || '')}</span>
-    </div>${hint}`;
+    </div>${ctxLine}${hint}`;
     li.onclick = () => {
       pushFocusState();   // avant mutation — voir pushFocusState()'s doc
       resBox.hidden = true; $('#search').value = it.label;

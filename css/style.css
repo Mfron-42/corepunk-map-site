@@ -33,6 +33,12 @@
   --radius-m: 10px;
   --ease: cubic-bezier(.4, 0, .2, 1);
   --dur: .18s;
+  /* Barres de défilement (unifiées, demande utilisateur 2026-07-11) : pilule
+     claire translucide — teinte de --ink, jamais un gris opaque — visible sur
+     les panneaux bleu-nuit mais intégrée. Une seule paire de tokens pour TOUT
+     le site (voir le bloc global *::-webkit-scrollbar plus bas). */
+  --sb-thumb: rgba(236, 228, 210, .22);
+  --sb-thumb-hover: rgba(236, 228, 210, .42);
 
   --font-display: 'Bahnschrift', 'Franklin Gothic Medium', 'Arial Narrow', sans-serif;
   --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -61,6 +67,29 @@ body {
 }
 ::selection { background: var(--accent-soft-2); color: var(--ink); }
 
+/* ── Barres de défilement — style GLOBAL unifié ──────────────────────────
+   Remplace les 5 recettes locales dispersées (#panel, #detail, .layer-scroll,
+   .fiche-scroll, .pop-desc) qui divergeaient (7/8/9 px, thumb --panel-4
+   sombre presque invisible) ET couvre les zones qui n'avaient RIEN
+   (#search-results → barre native grise). Pilule fine entièrement arrondie :
+   gouttière de 8 px, liseré transparent de 2 px → trait visible de 4 px,
+   clair (--sb-thumb, teinte de --ink) sur les panneaux bleu-nuit, plus
+   franc au survol. Firefox : scrollbar-width/color posés au même niveau. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-thumb) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); background-clip: padding-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-corner { background: transparent; }
+
 /* Titrage : Bahnschrift en graisse variable, condensé par l'espacement des
    lettres plutôt qu'un axe de largeur (compatibilité maximale). */
 .plaque h1, #filters h2, #tracked-section h2, .fiche-kind, .pop-cat,
@@ -73,8 +102,8 @@ body {
 
 /* ── Panneau légende ── */
 #panel {
-  width: 328px;
-  flex: 0 0 328px;
+  width: 392px;
+  flex: 0 0 392px;
   background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
   border-right: 1px solid var(--line);
   display: flex;
@@ -83,14 +112,9 @@ body {
   overflow-x: hidden;
   z-index: 1100;
   transition: margin-left .3s var(--ease);
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
+  /* (barre de défilement : style global unifié, voir haut de fichier) */
 }
-#panel.hidden { margin-left: -328px; }
-#panel::-webkit-scrollbar { width: 9px; }
-#panel::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-#panel::-webkit-scrollbar-thumb:hover { background: #2a3852; background-clip: padding-box; }
-#panel::-webkit-scrollbar-track { background: transparent; }
+#panel.hidden { margin-left: -392px; }
 
 .plaque {
   padding: 22px 18px 15px;
@@ -405,12 +429,64 @@ body {
   padding-left: 30px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Ligne "Famille" (recherche, mission "search activation" 2026-07-11) : PAS
+   une entité vers une fiche — un FILTRE d'arbre (clic = coche le nœud
+   famille + le révèle, aucune fiche n'ouvre, voir js/search.js
+   buildFamilySearchIndex). La puce de catégorie ("Famille"/"Family"…) porte
+   déjà l'essentiel de la distinction ; ce liseré + le libellé en gras
+   renforcent qu'une ligne de ce type agit différemment du reste de la
+   liste — même esprit que .subfilter-featured plus haut (une ligne qui n'a
+   pas le même rôle le dit aussi à l'œil, pas seulement par son texte). */
+#search-results li.sr-family-row { border-left: 2px solid var(--accent); padding-left: 6px; }
+#search-results li.sr-family-row .sr-label { font-weight: 600; }
 /* « Aucun résultat » : jamais interactif (pas de curseur pointeur/survol),
    ligne principale + suggestion discrète en second niveau. */
 #search-results li.no-results { cursor: default; }
 #search-results li.no-results:hover { background: none; }
 .no-results-main { font-size: .85rem; color: var(--ink); }
 .no-results-hint { font-size: .76rem; color: var(--muted); }
+
+/* ── Pastilles « couches actives » (bandeau sous la recherche) ──────────
+   Un point coloré par couche qui peint des pins en ce moment (rempli par
+   js/sidebar.js renderActiveDots) : même recette visuelle que les .swatch
+   de l'arbre (liseré sombre + halo de sa propre teinte) pour se lire comme
+   la même famille d'objet. Survol : léger agrandissement + ✕ sombre au
+   centre (affordance « masquer ») ; demi-teinte .partial = même vocabulaire
+   que l'état partiel des lignes famille. Vide → masqué (:empty), le bandeau
+   ne réserve jamais d'espace pour rien. */
+#active-dots {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+#active-dots:empty { display: none; }
+.adot {
+  position: relative;
+  flex: none;
+  width: 15px; height: 15px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(8, 12, 18, .7);
+  background: var(--c, var(--accent));
+  box-shadow: 0 0 0 1px rgba(233, 226, 208, .28), 0 0 8px -2px var(--c, var(--accent));
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.adot:hover { transform: scale(1.3); box-shadow: 0 0 0 1px rgba(233, 226, 208, .45), 0 0 10px -1px var(--c, var(--accent)); }
+.adot::after {
+  content: '✕';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8px; line-height: 1; font-weight: 700;
+  color: rgba(8, 12, 18, .92);
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.adot:hover::after, .adot:focus-visible::after { opacity: 1; }
+.adot.partial { opacity: .55; }
+.adot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ── Filtres ── */
 #filters, #tracked-section { padding: 10px 16px 2px; }
@@ -440,13 +516,8 @@ body {
   max-height: 42vh;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
+  /* (barre de défilement : style global unifié, voir haut de fichier) */
 }
-.layer-scroll::-webkit-scrollbar { width: 7px; }
-.layer-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-.layer-scroll::-webkit-scrollbar-thumb:hover { background: #2a3852; background-clip: padding-box; }
-.layer-scroll::-webkit-scrollbar-track { background: transparent; }
 
 .filter-row {
   display: flex; align-items: center; gap: 10px;
@@ -701,13 +772,9 @@ body {
 .fiche-scroll {
   max-height: 45vh;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
   padding-right: 4px;
+  /* (barre de défilement : style global unifié, voir haut de fichier) */
 }
-.fiche-scroll::-webkit-scrollbar { width: 8px; }
-.fiche-scroll::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-.fiche-scroll::-webkit-scrollbar-track { background: transparent; }
 /* (La liste longue du PANNEAU (#bestiary-list, hauteur bornée + défilement
    interne) a disparu avec la section sidebar « Bestiaire » elle-même,
    2026-07-11 -- voir js/sidebar.js. Les 6 groupes de couches restent courts
@@ -811,7 +878,7 @@ body {
 /* ── Bouton panneau ── */
 #panel-toggle {
   position: absolute;
-  top: 14px; left: 342px;
+  top: 14px; left: 406px;
   z-index: 1200;
   width: 40px; height: 40px;
   border-radius: var(--radius-m);
@@ -1118,8 +1185,7 @@ body {
   max-height: 130px;
   overflow-y: auto;
   padding-right: 5px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
+  /* (barre de défilement : style global unifié, voir haut de fichier) */
 }
 /* Chip qualificatif de camp (« — Patrouille » / « — Renforcé (PvP) »,
    config.js campQualifierChip — pipeline pass 2026-07-11b) : suffixe muet
@@ -1187,16 +1253,24 @@ body {
      (voir .frow flex-wrap, .fiche-head min-width:0 ci-dessous) plutôt que de
      déborder et masquer une action à droite. */
   overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: var(--panel-4) transparent;
+  /* (barre de défilement : style global unifié, voir haut de fichier) */
 }
 #detail.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
-#detail::-webkit-scrollbar { width: 9px; }
-#detail::-webkit-scrollbar-thumb { background: var(--panel-4); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; }
-#detail::-webkit-scrollbar-track { background: transparent; }
+/* ✕ ancrée en haut À DROITE (header pass, juillet 2026) : à gauche, elle
+   flottait au-dessus de l'avatar plutôt qu'à côté (orphelin visuel, jamais
+   aligné avec la ligne titre) -- lecture bizarre en tête de fiche. Coin
+   supérieur droit = position conventionnelle d'un panneau qui glisse depuis
+   la droite (déjà le choix du mode mobile ≤520px ci-dessous, pour une autre
+   raison -- collision avec le hamburger -- mais le même geste). `float`
+   reste nécessaire pour que .fiche-head lui réserve sa marge (les boîtes
+   flex ne refluent pas autour d'un flottant comme du texte) ; `position:
+   sticky` (inchangé) la garde visible pendant le défilement d'une longue
+   fiche -- `position:absolute` défilerait AVEC le contenu, contrairement à
+   l'apparence. Survol/focus alignés sur le même vocabulaire que .act.ghost
+   (var(--line-soft)/var(--line-strong)) plutôt qu'un ton --panel-4 isolé. */
 #detail-close {
-  position: sticky; top: 10px;
-  margin-left: 12px;
+  position: sticky; top: 14px;
+  margin: 0 14px 0 0;
   width: 32px; height: 32px;
   background: var(--panel-3);
   color: var(--muted);
@@ -1205,14 +1279,17 @@ body {
   cursor: pointer;
   font-size: 1rem;
   z-index: 10;
-  float: left;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), transform var(--dur) var(--ease);
+  float: right;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-#detail-close:hover { color: var(--ink); background: var(--panel-4); }
+#detail-close:hover { color: var(--ink); background: var(--line-soft); border-color: var(--line-strong); }
 #detail-close:active { transform: scale(.92); }
+#detail-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #detail-body { padding: 14px 18px 28px; clear: none; }
 
-.fiche-head { display: flex; gap: 13px; align-items: center; margin: 4px 0 4px 44px; min-width: 0; }
+/* Marge droite = empreinte de #detail-close (32px + 14px de marge) : même
+   principe que le gutter gauche d'avant, juste retourné avec elle. */
+.fiche-head { display: flex; gap: 13px; align-items: center; margin: 4px 46px 4px 0; min-width: 0; }
 /* La colonne texte de l'en-tête (nature + titre + sous-libellés) peut se
    rétrécir : sans min-width:0 un titre long forçait l'en-tête plus large que
    le panneau (fix E, défense générale). Le titre lui-même peut se couper. */
@@ -2290,10 +2367,11 @@ button.rar-pill:hover {
     width: 100vw; max-width: 100vw;
     border-left: none;
   }
-  /* ✕ à DROITE en mobile : à gauche (base), il entrait en collision avec le
-     hamburger fixe ; sticky conservé (reste visible au défilement). */
+  /* ✕ déjà à droite depuis la base (header pass ci-dessus) -- ce bloc ne
+     resserre plus que la marge (bandeau mobile plus étroit) et bascule le
+     fond en verre dépoli (même chrome que le hamburger/readout flottants
+     par-dessus la carte, cohérent avec la fiche plein écran ici). */
   #detail-close {
-    float: right;
     margin: 8px 10px 0 12px;
     background: var(--glass);
     border-color: var(--line);

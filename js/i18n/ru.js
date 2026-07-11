@@ -11,6 +11,10 @@ export default {
       searchPlaceholder: 'Найти НПС, задание, предмет, монстра…',
       searchAriaLabel: 'Поиск',
       filtersAriaLabel: 'Фильтры',
+      // Полоса активных слоёв (цветные точки под поиском,
+      // js/sidebar.js renderActiveDots).
+      activeDotsLabel: 'Активные слои',
+      activeDotHide: name => `${name} — нажмите, чтобы скрыть`,
       legend: 'Легенда',
       campsTitle: 'Лагеря и ресурсы',
       // ФИНАЛЬНАЯ структура боковой панели (2026-07-11): 4 фиксированные
@@ -93,6 +97,13 @@ export default {
       // — `p` приходит уже отформатированным (locale).
       speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'лагерь', 'лагеря', 'лагерей')} · ${p} тчк`,
       speciesZeroCamps: '0 лагерей на этой карте',
+      // Контекст семейства строки ВИДА в ПОИСКЕ (mission "search activation"
+      // 2026-07-11, отдельно от голого pretty(family) дерева — здесь, без
+      // вложенности, слово "Семейство" должно быть явным): "Семейство Wolf"
+      // — объединяется с speciesCampsPts выше во вторую строку ("Семейство
+      // Wolf · 4 лагеря · 926 тчк", см. js/search.js
+      // buildMonsterSearchIndex `ctx`).
+      speciesFamilyOf: fam => `Семейство ${fam}`,
       // Дикая фауна без лагерей (wildlife_species.bin, pass 2026-07-11b):
       // ГЛОБАЛЬНАЯ формулировка — у этих видов нет лагерей НИ на одной
       // карте, в отличие от speciesZeroCamps (активная карта).
@@ -544,6 +555,12 @@ export default {
       monster: 'Монстр', zone: 'Регион', location: 'Место',
       ability: 'Способность', event: 'Событие', chest: 'Сундук',
       searchable_chest: 'Обыскиваемый сундук', recipe: 'Рецепт', node: 'Узел добычи',
+      // Строка СЕМЕЙСТВА (mission "search activation" 2026-07-11): НЕ
+      // конкретный монстр — фильтр дерева (2-я ступень шкалы точности,
+      // COORDINATION.md). Визуально отличает строку "Семейство Wolf" (чип
+      // "Семейство" + метка "Wolf") от строки вида "Монстр" (чип "Монстр" +
+      // метка "Wolf Alpha").
+      family: 'Семейство',
     },
     // Категории декора (chests.bin group="decor" по family, + "legacy" для
     // group="legacy_chest") — подстроки сворачиваемой группы "Декор"

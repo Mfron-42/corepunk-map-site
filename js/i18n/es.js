@@ -10,6 +10,10 @@ export default {
       searchPlaceholder: 'Buscar un PNJ, una misión, un objeto, un monstruo…',
       searchAriaLabel: 'Búsqueda',
       filtersAriaLabel: 'Filtros',
+      // Franja de capas activas (puntos de color bajo la búsqueda,
+      // js/sidebar.js renderActiveDots).
+      activeDotsLabel: 'Capas activas',
+      activeDotHide: name => `${name} — clic para ocultar`,
       legend: 'Leyenda',
       campsTitle: 'Campamentos y recursos',
       // IA FINAL de la barra lateral (2026-07-11): 4 grupos fijos —
@@ -94,6 +98,13 @@ export default {
       // formateado (locale).
       speciesCampsPts: (n, p) => `${n} campamento${n === 1 ? '' : 's'} · ${p} pts`,
       speciesZeroCamps: '0 campamentos en este mapa',
+      // Contexto de familia de una fila de ESPECIE en la BÚSQUEDA (mission
+      // "search activation" 2026-07-11, distinto del pretty(family) plano
+      // del árbol — aquí, sin anidamiento, la palabra "Familia" debe ser
+      // explícita): "Familia Wolf" — combinado con speciesCampsPts arriba en
+      // una segunda línea ("Familia Wolf · 4 campamentos · 926 pts", ver
+      // js/search.js buildMonsterSearchIndex `ctx`).
+      speciesFamilyOf: fam => `Familia ${fam}`,
       // Fauna sin campamentos (wildlife_species.bin, pass 2026-07-11b):
       // redacción GLOBAL — estas especies no tienen campamento en NINGÚN
       // mapa, a diferencia de speciesZeroCamps (mapa activo).
@@ -559,6 +570,12 @@ export default {
       monster: 'Monstruo', zone: 'Región', location: 'Lugar',
       ability: 'Habilidad', event: 'Evento', chest: 'Cofre',
       searchable_chest: 'Cofre registrable', recipe: 'Receta', node: 'Nodo de recolección',
+      // Fila de FAMILIA (mission "search activation" 2026-07-11): NO es un
+      // monstruo preciso — un filtro de árbol (2.º peldaño de la escala de
+      // precisión, COORDINATION.md). Distingue visualmente la fila "Familia
+      // Wolf" (chip "Familia" + etiqueta "Wolf") de una fila de especie
+      // "Monstruo" (chip "Monstruo" + etiqueta "Wolf Alpha").
+      family: 'Familia',
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable

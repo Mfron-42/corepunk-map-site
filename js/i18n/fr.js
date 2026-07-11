@@ -10,6 +10,11 @@ export default {
       searchPlaceholder: 'Chercher un PNJ, une quête, un objet, un monstre…',
       searchAriaLabel: 'Recherche',
       filtersAriaLabel: 'Filtres',
+      // Bandeau des couches actives (points colorés sous la recherche,
+      // js/sidebar.js renderActiveDots) : libellé du groupe + tooltip d'un
+      // point (survol = nom de la couche, clic = masquer).
+      activeDotsLabel: 'Couches actives',
+      activeDotHide: name => `${name} — cliquer pour masquer`,
       legend: 'Légende',
       campsTitle: 'Camps & ressources',
       // Arbre de couches — IA FINALE de la sidebar (2026-07-11,
@@ -115,6 +120,13 @@ export default {
       // joint sur la carte active reste listée (accès fiche), grisée.
       speciesCampsPts: (n, p) => `${n} camp${n > 1 ? 's' : ''} · ${p} pts`,
       speciesZeroCamps: '0 camp sur cette carte',
+      // Contexte famille d'une ligne ESPÈCE de la RECHERCHE (mission "search
+      // activation" 2026-07-11, distinct du bare pretty(family) affiché
+      // dans l'arbre — ici, sans nesting, le mot "Famille" doit être
+      // explicite) : "Famille Wolf" — combiné à speciesCampsPts ci-dessus
+      // en une seconde ligne ("Famille Wolf · 4 camps · 926 pts", voir
+      // js/search.js buildMonsterSearchIndex `ctx`).
+      speciesFamilyOf: fam => `Famille ${fam}`,
       // Faune 0-camp (wildlife_species.bin, job pass 2026-07-11b) : libellé
       // GLOBAL — ces espèces (tortues/poules/oies…) n'ont de camp sur AUCUNE
       // carte, contrairement à speciesZeroCamps (scopé carte active).
@@ -588,6 +600,12 @@ export default {
       monster: 'Monstre', zone: 'Région', location: 'Lieu',
       ability: 'Capacité', event: 'Événement', chest: 'Coffre',
       searchable_chest: 'Coffre fouillable', node: 'Nœud de récolte',
+      // Ligne FAMILLE de la recherche (mission "search activation"
+      // 2026-07-11) : PAS un monstre précis — un filtre d'arbre (2e barreau
+      // de l'échelle de précision, COORDINATION.md). Distingue visuellement
+      // la ligne "Famille Wolf" (chip "Famille" + libellé "Wolf") d'une
+      // ligne espèce "Monstre" (chip "Monstre" + libellé "Wolf Alpha").
+      family: 'Famille',
     },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"

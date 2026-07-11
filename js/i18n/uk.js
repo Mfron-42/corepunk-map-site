@@ -11,6 +11,10 @@ export default {
       searchPlaceholder: 'Знайти НПС, квест, предмет, монстра…',
       searchAriaLabel: 'Пошук',
       filtersAriaLabel: 'Фільтри',
+      // Смуга активних шарів (кольорові крапки під пошуком,
+      // js/sidebar.js renderActiveDots).
+      activeDotsLabel: 'Активні шари',
+      activeDotHide: name => `${name} — натисніть, щоб приховати`,
       legend: 'Легенда',
       campsTitle: 'Табори та ресурси',
       // ФІНАЛЬНА структура бічної панелі (2026-07-11): 4 фіксовані групи —
@@ -92,6 +96,13 @@ export default {
       // — `p` надходить уже відформатованим (locale).
       speciesCampsPts: (n, p) => `${n} ${pluralSlavic(n, 'табір', 'табори', 'таборів')} · ${p} тчк`,
       speciesZeroCamps: '0 таборів на цій карті',
+      // Контекст родини рядка ВИДУ в ПОШУКУ (mission "search activation"
+      // 2026-07-11, окремо від голого pretty(family) дерева — тут, без
+      // вкладеності, слово "Родина" має бути явним): "Родина Wolf" —
+      // поєднується зі speciesCampsPts вище у другий рядок ("Родина Wolf ·
+      // 4 табори · 926 тчк", див. js/search.js buildMonsterSearchIndex
+      // `ctx`).
+      speciesFamilyOf: fam => `Родина ${fam}`,
       // Дика фауна без таборів (wildlife_species.bin, pass 2026-07-11b):
       // ГЛОБАЛЬНЕ формулювання — ці види не мають таборів на ЖОДНІЙ карті,
       // на відміну від speciesZeroCamps (активна карта).
@@ -545,6 +556,12 @@ export default {
       monster: 'Монстр', zone: 'Регіон', location: 'Місце',
       ability: 'Здібність', event: 'Подія', chest: 'Скриня',
       searchable_chest: 'Обшукувана скриня', recipe: 'Рецепт', node: 'Вузол видобутку',
+      // Рядок РОДИНИ (mission "search activation" 2026-07-11): НЕ конкретний
+      // монстр — фільтр дерева (2-й щабель шкали точності, COORDINATION.md).
+      // Візуально відрізняє рядок "Родина Wolf" (чіп "Родина" + мітка
+      // "Wolf") від рядка виду "Монстр" (чіп "Монстр" + мітка "Wolf
+      // Alpha").
+      family: 'Родина',
     },
     // Категорії декору (chests.bin group="decor" за family, + "legacy" для
     // group="legacy_chest") — підрядки згортної групи "Декор"

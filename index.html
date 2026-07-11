@@ -33,6 +33,14 @@
       <ul id="search-results" hidden></ul>
     </div>
 
+    <!-- Pastilles « couches actives » (demande utilisateur 2026-07-11) : un
+         point coloré par couche qui peint des pins en ce moment — survol =
+         nom, clic = masquer sans re-parcourir l'arbre. Rempli/rejoué par
+         js/sidebar.js renderActiveDots() (dérivé du DOM de l'arbre, jamais
+         un état parallèle) ; masqué par CSS quand vide (:empty). -->
+    <div id="active-dots" role="group" aria-label="Couches actives"
+         data-i18n-attr="aria-label:activeDotsLabel"></div>
+
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
       <!-- ARBRE FINAL du panneau gauche (2026-07-11, corrections utilisateur
            du même jour — supersède les « 4 groupes + miroir de kinds ») :

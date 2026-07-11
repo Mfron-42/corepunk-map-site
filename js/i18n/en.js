@@ -10,6 +10,11 @@ export default {
       searchPlaceholder: 'Search an NPC, a quest, an item, a monster…',
       searchAriaLabel: 'Search',
       filtersAriaLabel: 'Filters',
+      // Active-layers strip (colored dots under the search box,
+      // js/sidebar.js renderActiveDots): group label + per-dot tooltip
+      // (hover = layer name, click = hide).
+      activeDotsLabel: 'Active layers',
+      activeDotHide: name => `${name} — click to hide`,
       legend: 'Legend',
       campsTitle: 'Camps & resources',
       // Layer tree — FINAL sidebar IA (2026-07-11, COORDINATION.md §IA
@@ -109,6 +114,13 @@ export default {
       // camp on the active map stays listed (fiche access), muted.
       speciesCampsPts: (n, p) => `${n} camp${n === 1 ? '' : 's'} · ${p} pts`,
       speciesZeroCamps: '0 camps on this map',
+      // Family context of a SEARCH species row (mission "search activation"
+      // 2026-07-11, distinct from the bare pretty(family) shown in the
+      // tree — here, with no nesting, the word "Family" must be explicit):
+      // "Family Wolf" — combined with speciesCampsPts above into one second
+      // line ("Family Wolf · 4 camps · 926 pts", see js/search.js
+      // buildMonsterSearchIndex `ctx`).
+      speciesFamilyOf: fam => `Family ${fam}`,
       // 0-camp wildlife (wildlife_species.bin, job pass 2026-07-11b): GLOBAL
       // wording — these species (turtles/hens/geese…) have camps on NO map,
       // unlike speciesZeroCamps (scoped to the active map).
@@ -583,6 +595,12 @@ export default {
       monster: 'Monster', zone: 'Region', location: 'Place',
       ability: 'Ability', event: 'Event', chest: 'Chest',
       searchable_chest: 'Searchable chest', node: 'Gathering node',
+      // FAMILY row (mission "search activation" 2026-07-11): NOT a precise
+      // monster — a tree filter (rung 2 of the precision ladder,
+      // COORDINATION.md). Visually distinguishes the "Family Wolf" row
+      // (chip "Family" + label "Wolf") from a species "Monster" row (chip
+      // "Monster" + label "Wolf Alpha").
+      family: 'Family',
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
