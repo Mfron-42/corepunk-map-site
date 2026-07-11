@@ -38,6 +38,7 @@ import { syncHash, pushFocusState, unfocus } from './urlstate.js';
 import { goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags } from './pins.js';
 import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
+import './analytics.js';
 
 // Toggle du bouton « Surligner les N points » -- identité trackée par
 // ÉLÉMENT bouton (pas par clé de camp) depuis la section « Comment farmer »
