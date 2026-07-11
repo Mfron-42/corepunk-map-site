@@ -194,13 +194,17 @@ function liveDrawn(desc) {
 
 /* Remplissage de la pastille (§2.1) : null = pas de pastille ; sinon
    'empty' ⊘ (dessinable mais 0 point sur la carte active — honnête, toujours
-   montré) / 'partial' ◐ / 'on' ● / 'off' ○. Le 0-point (⊘) PRIME : une
-   référence dessinable avec 0 point ici n'est jamais « pas de pastille ». */
+   montré) / 'empty-on' (⊘ ALLUMÉ : la couche est cochée mais n'a rien à
+   dessiner ICI — feedback QA 2026-07-11 : un clic qui mute l'état sans
+   aucun retour visuel est interdit, l'état dessiné se lit TOUJOURS, même à
+   0 point) / 'partial' ◐ / 'on' ● / 'off' ○. Le 0-point (⊘) PRIME sur la
+   forme : une référence dessinable avec 0 point ici n'est jamais « pas de
+   pastille » — mais il ne masque plus l'état. */
 function refFill(desc) {
   if (!isDrawable(desc)) return null;
-  if (desc.count === 0) return 'empty';
-  if (desc.partial) return 'partial';
   const drawn = desc.drawn !== undefined ? desc.drawn : liveDrawn(desc);
+  if (desc.count === 0) return drawn ? 'empty-on' : 'empty';
+  if (desc.partial) return 'partial';
   return drawn ? 'on' : 'off';
 }
 
@@ -250,7 +254,7 @@ function tagHtml(p, name) {
   if (p.fill == null) {
     return `<span class="ref-tag ref-tag-inert">${word}</span>`;
   }
-  const on = p.fill === 'on';
+  const on = p.fill === 'on' || p.fill === 'empty-on';
   const cntSuffix = p.count != null ? ` · ${tr('entityPtsN', p.count)}` : '';
   const title = `${on ? uiRef('refDrawHide', name) : uiRef('refDrawShow', name)}${cntSuffix}`;
   const aria = `${on ? uiRef('refDrawHide', name) : uiRef('refDrawShow', name)}${cntSuffix}`;

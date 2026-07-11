@@ -713,6 +713,38 @@ function refreshParentChecks() {
   // cascades wireParentCheck → buildFilters → rebuildAllGroups, restaurations
   // layeractivate/router/urlstate → buildFilters).
   renderActiveTags();
+  syncEntityRefDots();
+}
+
+/* Pastilles EntityRef affichées HORS de l'arbre (fiche ouverte, futures
+   surfaces) : trois vues, UN état (spec mapref §5.3) — après toute mutation
+   de couche, les pastilles E relisent S.* EN PLACE, sans attendre une
+   réouverture de fiche (retour QA 2026-07-11, corroboré ×3 tranches :
+   aria-pressed/remplissage figés jusqu'au re-rendu — clic sans retour
+   visuel). Branché ici, dans le MÊME entonnoir que l'arbre et le bandeau.
+   Résolution espèce : une ref de but porte la clé de FICHE (mk) — même
+   dérivation mk→species que le routeur ref-draw (main.js). Les remplissages
+   ⊘ gardent leur forme honnête (empty ⇄ empty-on), ◐ reste tel quel. */
+function syncEntityRefDots() {
+  for (const btn of document.querySelectorAll('.ref[data-mode="E"] [data-act="ref-draw"]')) {
+    const d = btn.closest('.ref').dataset;
+    let on = null;
+    if (d.kind === 'species') { const sp = S.monsters?.[d.key]?.species || d.key; on = !!S.monsp[sp]?.on; }
+    else if (d.kind === 'family') {
+      const fams = (d.family || d.key || '').split(',').filter(Boolean);
+      on = fams.length > 0 && fams.every(f => S.monfam[f]?.on);
+    } else {
+      const k = d.subrole || d.key;
+      if (k && S.camps && S.camps[k] !== undefined) on = !!S.camps[k]?.on;
+    }
+    if (on === null) continue;
+    btn.setAttribute('aria-pressed', String(on));
+    const bub = btn.querySelector('.ref-bubble');
+    if (!bub) continue;
+    const f = bub.dataset.fill;
+    if (f === 'empty' || f === 'empty-on') bub.dataset.fill = on ? 'empty-on' : 'empty';
+    else if (f !== 'partial') bub.dataset.fill = on ? 'on' : 'off';
+  }
 }
 
 /* ── Bandeau « couches actives » — LÉGENDE en tags (sous la recherche,

@@ -2774,6 +2774,10 @@ span.ref-tag { cursor: default; }
   box-shadow: inset 0 0 0 1.5px rgba(233, 226, 208, .3);
   opacity: .5;
 }
+/* ⊘ ALLUMÉ (couche cochée, 0 point sur CETTE carte) : pleine mais à
+   demi-éteinte — l'état dessiné reste lisible même sans rien à dessiner ici
+   (retour QA 2026-07-11 : jamais un clic sans retour visuel). */
+.ref-bubble[data-fill="empty-on"] { opacity: .55; }
 /* ⊘ « 0 point sur cette carte » : la référence entière se grise honnêtement
    (même retrait que .sp-zero/.fam-zero dans l'arbre), jamais masquée. */
 .ref-empty .ref-tag, .ref-empty .ref-label, .ref-empty .ref-meta { opacity: .6; }
@@ -2812,3 +2816,8 @@ button.ref-label:focus-visible { outline: 2px solid var(--accent); outline-offse
    « lvl 5–20 · 926 pts ») — jamais rognée au bord du tiroir. */
 .goal-target .ref { flex-wrap: wrap; min-width: 0; }
 .goal-target .ref .ref-label { text-align: left; }
+/* …SAUF dans les listes de chips (nœuds acceptés, membres de série) : le
+   repli DANS une référence orpheline le tag de son nom (retour QA — pire cas
+   a_fortune_forewarned ×10 nœuds). Ces refs n'ont pas de méta : atomiques —
+   c'est la LISTE qui replie entre les refs, jamais l'intérieur d'une ref. */
+.goal-target .reward-chips .ref, .goal-target-compact .ref { flex-wrap: nowrap; }

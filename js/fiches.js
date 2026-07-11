@@ -2121,7 +2121,6 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   if (!base) return '';
   const name = disambiguatedItemName(base, key, currentQuestItemDisambig);
   const icon = it?.icon ? `icons/${it.icon}` : null;
-  const approxSup = approx ? '<sup>≈</sup>' : '';
   const qiFlag = key ? currentQuestItemFlags?.get(key) : undefined;
   const isQuest = qiFlag !== undefined ? qiFlag : (hint !== undefined ? hint : (it ? it.kind === 'quest_item' : null));
   // EntityRef (vague 1) : l'ancien badge k-chip détaché ([Objet de quête]/
@@ -2134,14 +2133,20 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   // L'icône du catalogue reste en chrome de ligne (identité visuelle),
   // AVANT la référence.
   const kind = isQuest ? 'quest_item' : (it && isRecipeKind(it) ? 'recipe' : 'item');
+  // Teinte (Q6 + retour QA) : la rareté pour un VRAI item (sa teinte
+  // précise) ; un item de QUÊTE n'a pas de rareté signifiante → la teinte
+  // qao de son kind (défaut du builder quand hex est nul), jamais le gris
+  // de rareté commune. « ≈ » (compte approximatif) voyage dans le suffixe
+  // méta de la référence — plus jamais un glyphe orphelin à côté du tag.
   const itemRef = ref({
     kind,
     key: key || null,
     label: name,
-    hex: it ? itemEcHex(it) : null,
+    hex: it && kind !== 'quest_item' ? itemEcHex(it) : null,
     hasFiche: !!it,
+    meta: approx ? '≈' : null,
   });
-  return `<div class="goal-target-row goal-target-item">${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}${itemRef}${approxSup}${extraBadge || ''}</div>`;
+  return `<div class="goal-target-row goal-target-item">${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}${itemRef}${extraBadge || ''}</div>`;
 }
 /* Relation row for a receive_reward mechanism target whose `reward_of`
    (geo.py's _resolve_target_mech) names at least one quest OTHER than the
@@ -2221,8 +2226,13 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // routeur ne vise que des coordonnées finies). Sans rien : dynamicPosBadge
   // inchangé (états d'honnêteté — sa zone de recherche est elle-même devenue
   // une référence [Région ●], voir dynamicPosBadge).
+  // Libellé de la [Position ●] : AUCUN (forme nue ratifiée §1.2 — « a bare
+  // [Position(●)] is all-bubble ») : l'ancien libellé reprenait la phrase
+  // d'objectif affichée juste au-dessus (retour QA ×2 : duplication visible).
+  // La bascule cross-carte garde son libellé (le nom de la carte cible est
+  // une information, pas une répétition).
   const posRow = `<div class="goal-target-row goal-target-row-pos">${
-    t.x != null ? ref({ kind: 'position', pos: { x: posX, z: posZ }, label: label || '', subrole: posCat || null })
+    t.x != null ? ref({ kind: 'position', pos: { x: posX, z: posZ }, label: '', subrole: posCat || null })
       : t.map ? ref({ kind: 'position', pos: { x: null, z: null, map: t.map }, label: mapName(t.map) })
         : dynamicPosBadge(t, regionHint)
   }</div>`;
@@ -2310,11 +2320,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const differing = !!(t.item_key && t.item_key !== t.key);
     const primaryKey = differing ? t.item_key : (t.item_key || t.key);
     const approxForItem = t.item_key ? t.item_approx : t.approx;
-    // EntityRef (vague 1) : l'ancien badge k-chip « Activable » devient un
-    // tag de kind inerte [Objet] (mode N : pas de pastille tant que les
-    // couches qao.<type> du chunk (c) n'existent pas — dégradation honnête
-    // prévue par la spec §8, jamais une pastille qui n'allumerait rien).
-    const activableBadge = ref({ kind: 'qao', mode: 'N' });
+    // (Retour QA 2026-07-11, 23 occurrences : le tag [Objet] SANS libellé ni
+    // pastille lisait comme un élément cassé — l'ancien badge « Activable »
+    // ne se traduit plus en badge muet : le kind qao voyage désormais avec
+    // la PASTILLE DE POSITION de l'objet — voir objPosRow au retour de la
+    // branche — une seule référence qui dit à la fois « objet » et « ici ».)
     // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
     // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
     // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
@@ -2322,7 +2332,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // clic d'un chip objet devra cocher la ligne de SON type (placements
     // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
     // t.label — 45), même clic-double-effet que les chips monstre.
-    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, differing ? '' : activableBadge);
+    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem);
     let relRow = '';
     // Quand la référence objet porte ELLE-MÊME la pastille de position
     // (locate), la ligne position séparée disparaît — une seule affordance
@@ -2346,7 +2356,9 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
             ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
           </div>`;
       } else {
-        relRow = `<div class="goal-target-row goal-target-row-rel">${activableBadge}<span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+        // Conteneur anonyme : le verbe honnête seul (« obtenu ici ») — plus
+        // jamais un badge de kind sans nom à côté (retour QA).
+        relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
       }
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
@@ -2365,7 +2377,13 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: label || '' })}
       </div>`;
     }
-    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posInRef ? '' : posRow}</div>`;
+    // Position d'un OBJET : la référence porte le kind honnête [Objet ●]
+    // (locate) au lieu de la [Position ●] générique — le placement EST
+    // l'objet activable (l'information de l'ex-badge, portée par la pastille).
+    const objPosRow = posInRef ? '' : (t.x != null
+      ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
+      : posRow);
+    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${objPosRow}</div>`;
   }
 
   if (t.kind === 'monster') {
