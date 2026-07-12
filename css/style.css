@@ -905,6 +905,25 @@ body {
 .filter-row.partial .swatch { opacity: .55; }
 .filter-row.partial .flabel, .filter-row.partial .fcount,
 .filter-row.partial .fam-camps { color: var(--muted); }
+
+/* ── Surbrillance de ligne ACTIVE (TASK 2, retour user 2026-07-12 : « quand je
+   clique à gauche pour cocher un dot […] le toggle du monstre ou autre dans les
+   sous-catégories ne passe pas en surbrillance ») ─────────────────────────────
+   L'investigation headless prouve que TOUTE ligne met bien à jour sa classe
+   .off + son remplissage de pastille au basculement (aucun type de ligne cassé
+   fonctionnellement). Le vrai manque : l'état ACTIF n'était signalé QUE par le
+   remplissage de la pastille (9 px) + l'opacité du libellé — trop subtil dans
+   les sous-catégories indentées, d'où « ne passe pas en surbrillance ». Un
+   liseré d'accent à GAUCHE marque désormais toute ligne active d'un coup d'œil.
+   Fix de CLASSE (une seule règle, TOUS les types : filtre, sous-filtre, espèce,
+   sous-groupe) — jamais une instance. box-shadow (pas background) → coexiste
+   sans conflit avec .filter-row:hover. Lignes off/partielles/0-camp exclues
+   (rien d'allumé à signaler ; la demi-teinte partielle garde son propre code). */
+.filter-row:not(.off):not(.partial):not(.fam-zero),
+.species-row:not(.off):not(.sp-zero),
+.decor-group > summary:not(.off):not(.partial) {
+  box-shadow: inset 2px 0 0 0 var(--accent);
+}
 /* Listes imbriquées (liste des familles DANS le sous-groupe Hostiles, IA
    finale) : indentation adoucie au-delà du premier niveau — sans quoi
    famille+espèces cumuleraient ~45px de retrait dans un panneau de ~330px. */
@@ -1535,6 +1554,21 @@ body {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* ── En-tête de fiche remanié (TASK 1, owner 2026-07-12) : le TITRE h2 porte
+   la pastille toggle (refDot) + le nom coloré dans la teinte PRÉCISE (Q6, via
+   --ref-c), et le détail kind/niveau passe SOUS lui (sous-titre muet, sans
+   répéter le nom). Le sous-titre est désormais TOUJOURS muet (var(--muted)) :
+   la couleur d'identité vit sur le titre, pas en double sur les deux lignes. */
+.fiche-head-main { min-width: 0; }
+.fiche-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fiche-title-name { color: var(--ref-c, var(--ink)); min-width: 0; overflow-wrap: anywhere; }
+.fiche-head-main .fiche-kind { margin-top: 3px; }
+.fiche-title .ref { flex: none; }
 /* ── Pastille « quête expliquée » (layout rework, juillet 2026) ───────
    Sous le titre, avant la ligne donneur. Deux variantes volontairement
    dissymétriques : le cas normal (333 quêtes sur 335) doit presque se fondre
@@ -2874,3 +2908,20 @@ button.ref-label:focus-visible { outline: 2px solid var(--accent); outline-offse
    a_fortune_forewarned ×10 nœuds). Ces refs n'ont pas de méta : atomiques —
    c'est la LISTE qui replie entre les refs, jamais l'intérieur d'une ref. */
 .goal-target .reward-chips .ref, .goal-target-compact .ref { flex-wrap: nowrap; }
+
+/* ── Pastille toggle d'EN-TÊTE de fiche (refDot, TASK 1) ──────────────────────
+   La MÊME pastille d'état (.ref-bubble : ● dessiné / ○ dessinable-éteint) que
+   l'arbre/les chips/la légende — une seule recette, un seul état (syncEntity-
+   RefDots la resynchronise comme les autres) — mais SANS la pilule de kind :
+   le mot de kind vit dans le sous-titre, le NOM est le titre h2 coloré à côté.
+   Bouton NU (pas de fond/bordure de pilule), pastille agrandie à l'échelle du
+   titre, aire de clic confortable. Placé APRÈS le bloc .ref-tag pour gagner en
+   source (même spécificité button.*). */
+button.ref-dot-btn {
+  padding: 2px;
+  background: none;
+  border-color: transparent;
+  border-radius: 50%;
+}
+button.ref-dot-btn:hover { background: color-mix(in srgb, var(--ref-c) 15%, transparent); border-color: transparent; }
+.ref-dot-btn .ref-bubble { width: 11px; height: 11px; }

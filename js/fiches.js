@@ -25,7 +25,7 @@ import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies } from './
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
-import { ref } from './mapref.js';
+import { ref, refDot } from './mapref.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -41,6 +41,43 @@ import { ref } from './mapref.js';
    FAUNE a un sens -- un camp de minerai/herboristerie n'a simplement aucune
    créature à lister, ce n'est pas un trou de donnée. */
 const MONSTER_ISH_CAMP_KINDS = new Set(['monsters', 'creeps', 'wildlife']);
+
+/* ── En-tête de fiche PARTAGÉ (TASK 1, owner 2026-07-12) ─────────────────────
+   Toute fiche du tiroir de droite montre le MÊME en-tête : un TITRE h2 coloré
+   dans la teinte PRÉCISE de l'entité (Q6) précédé — quand l'entité est
+   dessinable — d'une pastille toggle (refDot), puis un SOUS-TITRE muet SOUS le
+   titre portant le kind/le détail SANS répéter le nom (« (●) Scolopendra » /
+   « Lvl 20 », plus jamais « SCOLOPENDRA · LVL 20 » au-dessus d'un « Scolopendra »
+   en doublon). L'ordre est inversé par rapport à l'ancien en-tête (titre
+   d'abord, détail dessous).
+   La pastille (refDot) — présente UNIQUEMENT quand il y a réellement quelque
+   chose à afficher sur la carte active (règle owner 2026-07-12 « pas de dot si
+   aucune position connue à afficher » ; le ⊘ « dessinable mais 0 point ici »
+   n'est plus émis pour ces affordances, l'appelant gate `drawable`) :
+     - couche PERSISTANTE (espèce/famille, mode E) : ⇔ speciesPoints/familyPoints
+       non nul ; bascule la couche d'arbre, reste synchronisée depuis n'importe
+       quelle surface (syncEntityRefDots §5.3) ;
+     - LOCATE (npc/camp/lieu/coffre, mode L, Q7) : ⇔ une position connue ;
+       bascule un pin persistant (S.locates), listé dans le bandeau-légende,
+       retirable — l'équivalent honnête le plus proche pour une entité mono-
+       point sans couche d'arbre ;
+     - kind non dessinable (objet/recette/quête/butin/capacité/nœud) : jamais
+       de pastille — titre coloré seul.
+   Signature — { avatar (HTML icône/mosaïque, '' si aucun), name (texte brut,
+   échappé ici), hex (teinte précise du titre = celle de la pastille), dot
+   (descripteur refDot ou null), sub (HTML du sous-titre déjà composé, SANS le
+   nom), nameSuffix (HTML collé au nom : chip qualificatif/générique/dev),
+   below (HTML sous le sous-titre : coords, ligne donneur, badge…) }. */
+function ficheHeader({ avatar = '', name, hex = null, dot = null, sub = '', nameSuffix = '', below = '' }) {
+  const dotHtml = dot ? refDot(dot) : '';
+  const style = hex ? ` style="--ref-c:${hex}"` : '';
+  return `<div class="fiche-head">${avatar}
+    <div class="fiche-head-main">
+      <h2 class="fiche-title"${style}>${dotHtml}<span class="fiche-title-name">${esc(name)}</span>${nameSuffix}</h2>
+      ${sub ? `<div class="fiche-kind">${sub}</div>` : ''}
+      ${below}
+    </div></div>`;
+}
 /* Ligne muette « niv <min>–<max> ×N · <attaque> » d'une ligne de faune de
    camp (camp_details `mobs[]`, folded PAR ESPÈCE — task #80) : `lvl`/`lvlMax`
    sont la fourchette de niveau RÉELLE de cette espèce dans CE camp précis
@@ -110,14 +147,24 @@ function openCampFiche(key) {
   // #93 — activité + présence par mode (camp_details `activity`/`modes`,
   // voir campPresenceHtml ci-dessous) : formulation SOFT, jamais un timer.
   const presenceHtml = campPresenceHtml(det);
+  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré (teinte du kind de camp) + pastille
+  // LOCATE (mode L, Q7) sur le point REPRÉSENTATIF du camp (g.pts[0]) quand il
+  // a des points — bascule un pin persistant listé dans la légende (remplace
+  // l'ex-surlignage transitoire campRef self:true, kill-list §7.2, folded ici :
+  // jamais deux affordances). Le bouton « Voir sur la carte » (goto, vol
+  // caméra sans pin) reste, distinct du pin persistant.
+  const campDot = g.pts.length
+    ? { kind: 'camp', mode: 'L', key, label: name, hex: CAMP_COLORS[g.kind] || '#999',
+        drawable: true, pos: { x: g.pts[0][0], z: g.pts[0][1] } }
+    : null;
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}</div>
-      <h2>${esc(name)}${qualChip}</h2>
-      <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
+    ${ficheHeader({
+      name, hex: CAMP_COLORS[g.kind] || '#999', dot: campDot, nameSuffix: qualChip,
+      sub: `${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}`,
+      below: `<span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span>`,
+    })}
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
-      ${g.pts.length ? campRef(key, g, { self: true }) : ''}
     </div></div>
     ${presenceHtml}
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : faunaUnknown}
@@ -203,10 +250,13 @@ function openChestFiche(i) {
   const chestCat = r.group === 'camp_chest' ? 'camp_chest'
     : r.group === 'legacy_chest' ? 'decor:legacy'
       : (r.group === 'decor' && r.family) ? 'decor:' + r.family : null;
+  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré (teinte réelle du coffre) + pastille
+  // LOCATE (mode L, Q7) sur sa position quand connue — pin persistant retirable.
+  const chestDot = r.x != null
+    ? { kind: 'chest', mode: 'L', key: 'chest:' + i, label: name, hex: chestHex(r), drawable: true, pos: { x: r.x, z: r.z } }
+    : null;
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${chestHex(r)}">${esc(chestKindLabel(r))}</div>
-      <h2>${esc(name)}</h2></div></div>
+    ${ficheHeader({ name, hex: chestHex(r), dot: chestDot, sub: esc(chestKindLabel(r)) })}
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, name, chestCat)}
     </div></div>
@@ -229,10 +279,14 @@ function openSearchableChestFiche(k) {
   S.openFiche = { kind: 'searchable_chest', id: k };
   const region = prettyRegion(r.region);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
+  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré + pastille LOCATE (mode L, Q7) sur
+  // sa position — pin persistant retirable ; le sous-titre porte la région.
+  const scDot = r.x != null
+    ? { kind: 'searchable_chest', mode: 'L', key: r.k, label: tr('searchableChestTitle'),
+        hex: CATS.searchable_chest.hex, drawable: true, pos: { x: r.x, z: r.z } }
+    : null;
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${CATS.searchable_chest.hex}">${esc(region)}</div>
-      <h2>${esc(tr('searchableChestTitle'))}</h2></div></div>
+    ${ficheHeader({ name: tr('searchableChestTitle'), hex: CATS.searchable_chest.hex, dot: scDot, sub: esc(region) })}
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
     </div></div>
@@ -256,9 +310,7 @@ function openLootTableFiche(label) {
   S.openFiche = { kind: 'loot', id: label };
   const sorted = [...rows].sort((a, b) => (b.g - a.g) || ((b.w ?? 0) - (a.w ?? 0)));
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${LOOT_TABLE_HEX}">${esc(tr('lootTableKind'))}</div>
-      <h2>${esc(label)}</h2></div></div>
+    ${ficheHeader({ name: label, hex: LOOT_TABLE_HEX, sub: esc(tr('lootTableKind')) })}
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
       ${sorted.length > 30 ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : ''}
       <div class="fiche-scroll">${lootRowsHtml(sorted, 'noLootCatalogued')}</div></div>`);
@@ -283,10 +335,10 @@ function openNodeFiche(key) {
   const hex = nodeHex(n);
   const tierLine = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
   const genericChip = n.generic ? ` ${stateChip('unknown', tr('nodeGenericNote'))}` : '';
+  // Nœud de récolte : AUCUNE pastille (mode N — le lien nœud→point n'existe pas
+  // côté client, byte-prouvé ; la couche de récolte est le relais dessinable).
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${hex}">${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}</div>
-      <h2>${esc(n.name)}${genericChip}</h2></div></div>
+    ${ficheHeader({ name: n.name, hex, nameSuffix: genericChip, sub: `${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}` })}
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>`);
   setFicheHash(null);
 }
@@ -945,7 +997,7 @@ function scalingSection(it) {
     parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('scalingNotLocated'))}</p></div>`);
   }
   // Mise à l'échelle par rareté décodée via l'opérande 0x62 (rune_ability_
-  // scaling,  items_stats_MATRIX.md) :
+  // scaling, valeurs jointes côté données) :
   // REPLI pour les runes que le décodage direct abt_active_rune_ n'atteint
   // pas -- jamais rendu quand rarity_scaling couvre déjà l'axe (même donnée,
   // deux chemins de décodage ; pas de doublon). Champs absents des bins tant
@@ -1161,7 +1213,13 @@ function openMonsterFiche(key) {
   // données, aucune traduction supplémentaire requise).
   const zones = m.zones || [];
   const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
-  const kindBits = [m.family ? pretty(m.family) : null, m.level != null ? tr('levelAbbrev', m.level) : null,
+  // Sous-titre SANS répéter le NOM (TASK 1, owner) : le token famille ne s'y
+  // affiche plus quand il est identique au nom de l'espèce (« Scolopendra »
+  // famille == « Scolopendra » titre → doublon supprimé, il ne reste que
+  // « Lvl 20 ») ; une vraie famille distincte (« Rat » pour un « Rat King »)
+  // reste, elle n'est pas redondante.
+  const famBit = (m.family && fold(pretty(m.family)) !== fold(m.name)) ? pretty(m.family) : null;
+  const kindBits = [famBit, m.level != null ? tr('levelAbbrev', m.level) : null,
     m.attack ? monsterAttackLabel(m.attack) : null, zoneTxt ? `📍 ${zoneTxt}` : null].filter(Boolean);
   // Affordance « Voir la zone » : dessine le(s) polygone(s) de région sur la
   // carte (zones_geo, propre à Kwalat) — n'apparaît que quand au moins une des
@@ -1196,32 +1254,25 @@ function openMonsterFiche(key) {
   // honnêtement "inconnu" (le joueur a sa réponse immédiatement, sans
   // scroller au travers de sections qui ne l'intéressent pas encore).
   const campsHtml = monsterCampsHtml(m);
-  // EntityRef (vague 2) : LE toggle d'union espèce vit désormais dans l'en-tête
-  // de la fiche (kill-list §7.2 : l'ex-bouton monsterSpawnHighlightBtn/
-  // « Afficher · N pts » qui vivait en tête de monsterCampsHtml est SUPPRIMÉ).
-  // `[Espèce(●)] Nom · N pts` — la pastille bascule la couche espèce (l'UNION
-  // réelle de tous les camps de la créature, exactement ce que la case espèce
-  // de l'arbre allume ; ref-draw `species` résout key→species) ; teinte
-  // PRÉCISE (speciesLayerHex, Q6) ; libellé en clair (on est déjà sur sa
-  // page). N'apparaît que quand l'espèce a des points sur la carte active
-  // (parité stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
-  // PRINCIPE (retour user 2026-07-12, classe corrigée partout) : une couche
-  // PERSISTANTE (espèce/famille — elle a une ligne d'arbre qui existe toujours)
-  // est TOUJOURS dessinable dès que l'entité résout ; 0 point sur la carte
-  // active = pastille ⊘ grisée, JAMAIS un toggle qui s'évapore (l'ancien
-  // `spUnionRes ? … : ''` masquait toute l'affordance pour un monstre errant
-  // sans camp fixe — Scolopendra — et se lisait comme « pas de couche »). Le
-  // ⊘ dit honnêtement « espèce dessinable, rien à tracer ICI » (§2.1). Ne
-  // gater le dessinable sur l'existence de points que pour du LOCATE (L-mode,
-  // rien à localiser) ou un surlignage transitoire (campRef), jamais pour une
-  // couche d'arbre.
+  // EN-TÊTE PARTAGÉ (TASK 1) : LE toggle d'union espèce est désormais la
+  // PASTILLE de l'en-tête (kill-list §7.2 : l'ex-bouton monsterSpawnHighlightBtn/
+  // « Afficher · N pts » ET l'ex-ligne speciesToggleRow séparée SUPPRIMÉS — plus
+  // de toggle en double). La pastille bascule la couche espèce (l'UNION réelle
+  // de tous les camps de la créature = ce que la case espèce de l'arbre allume ;
+  // ref-draw `species` résout key→species) ; teinte PRÉCISE (speciesLayerHex,
+  // Q6, la même que le titre). RÈGLE OWNER 2026-07-12 : la pastille n'apparaît
+  // QUE quand l'espèce a réellement des points sur la carte active
+  // (`drawable: !!spUnionRes`) — un monstre errant sans camp fixe (Scolopendra,
+  // `camps:[]`, 0 point ici) rend un titre coloré SANS pastille, honnête « rien
+  // à tracer ici » (le ⊘ est abandonné pour ces affordances : une pastille qui
+  // ne bascule rien est inutile). Reste synchronisée depuis n'importe quelle
+  // surface via syncEntityRefDots (§5.3).
   const spUnionRes = speciesPoints(spId);
-  const speciesToggle = ref({
+  const speciesDot = {
     kind: 'species', key, label: species?.name || m.name,
     hex: speciesLayerHex(spId), hasFiche: false,
-    drawable: true, count: spUnionRes ? spUnionRes.nPts : 0, drawn: !!S.monsp[spId]?.on,
-  });
-  const speciesToggleRow = `<div class="fiche-section"><div class="pop-actions">${speciesToggle}</div></div>`;
+    drawable: !!spUnionRes, count: spUnionRes ? spUnionRes.nPts : 0, drawn: !!S.monsp[spId]?.on,
+  };
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   const statsHtml = monsterStatsSection(m);
@@ -1288,13 +1339,14 @@ function openMonsterFiche(key) {
   // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
   // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
   openFiche(`
-    <div class="fiche-head">${iconTag(icon, 'fiche-avatar', initials(m.name))}
-      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}${devMark}</div>
-      <h2>${esc(m.name)}</h2></div></div>
+    ${ficheHeader({
+      avatar: iconTag(icon, 'fiche-avatar', initials(m.name)),
+      name: m.name, hex: speciesLayerHex(spId), dot: speciesDot,
+      sub: `${esc(kindLine)}${devMark}`,
+    })}
     ${zoneBtnHtml}
     ${variantSelectHtml}
     ${rawRecordsHtml}
-    ${speciesToggleRow}
     ${campsHtml}
     ${tagsHtml}
     ${statsHtml}
@@ -1385,27 +1437,21 @@ function openFamilyFiche(famKey) {
   const head = withPortraits.length
     ? `<div class="fam-mosaic">${withPortraits.slice(0, 6).map(({ sp }) => iconTag(`icons/${sp.portrait}`, 'fam-mosaic-cell', initials(sp.name))).join('')}</div>`
     : `<span class="fiche-avatar icon-broken" data-fb="🐾"></span>`;
-  // « Afficher la famille sur la carte » : même action que la ligne famille
-  // de l'arbre (family-layer, cascade) ; n'apparaît que quand la famille a
-  // RÉELLEMENT des points sur la carte active (familyPoints), jamais un
-  // bouton qui n'allumerait rien.
-  // EntityRef (vague 2) : l'ex-bouton « Afficher la famille » (familyLayerActivateBtn,
-  // kill-list §7.2) devient le toggle `[Famille(●)] Nom · N pts` — la pastille
-  // bascule les lignes famille de l'arbre (ref-draw `family` → cascade des
-  // espèces) ; teinte PRÉCISE de la famille (familyLayerHex, Q6, la même que
-  // les points/l'arbre) ; libellé en clair (on est déjà sur sa page).
-  // N'apparaît que quand la famille a des points sur la carte active (parité
-  // stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
-  // Couche PERSISTANTE famille : TOUJOURS dessinable (même principe que le
-  // toggle espèce ci-dessus — retour user 2026-07-12) ; ⊘ grisé quand 0 point
-  // sur la carte active, jamais un toggle qui disparaît.
+  // EN-TÊTE PARTAGÉ (TASK 1) : le toggle famille est la PASTILLE de l'en-tête
+  // (l'ex-bouton familyLayerActivateBtn ET l'ex-ligne mapSection séparée sont
+  // SUPPRIMÉS, kill-list §7.2 — plus de toggle en double). La pastille bascule
+  // les lignes famille de l'arbre (ref-draw `family` → cascade des espèces) ;
+  // teinte PRÉCISE de la famille (familyLayerHex, Q6, la même que le titre/les
+  // points/l'arbre). RÈGLE OWNER 2026-07-12 : présente UNIQUEMENT quand la
+  // famille a réellement des points sur la carte active (`drawable: !!famRes`)
+  // — sinon titre coloré sans pastille (le ⊘ est abandonné pour ces
+  // affordances). Synchronisée depuis toute surface (syncEntityRefDots §5.3).
   const famRes = familyPoints(fam);
-  const famToggle = ref({
+  const famDot = {
     kind: 'family', key: fam, family: fam, label: pretty(fam),
     hex: familyLayerHex(fam), hasFiche: false,
-    drawable: true, count: famRes ? famRes.nPts : 0, drawn: !!S.monfam[fam]?.on,
-  });
-  const mapSection = `<div class="fiche-section"><div class="pop-actions">${famToggle}</div></div>`;
+    drawable: !!famRes, count: famRes ? famRes.nPts : 0, drawn: !!S.monfam[fam]?.on,
+  };
   // Membres : portrait/glyphe + référence `[Espèce(●)] Nom` (la pastille
   // remplace l'ex-bouton « Afficher · N pts » PAR MEMBRE, kill-list §7.2 :
   // elle bascule SA couche de spawn ; nom souligné → fiche espèce quand une
@@ -1424,10 +1470,7 @@ function openFamilyFiche(famKey) {
     </div>`;
   }).join('');
   openFiche(`
-    <div class="fiche-head">${head}
-      <div><div class="fiche-kind" style="color:${MONSTER_HEX}">${esc(kindLine)}</div>
-      <h2>${esc(pretty(fam))}</h2></div></div>
-    ${mapSection}
+    ${ficheHeader({ avatar: head, name: pretty(fam), hex: familyLayerHex(fam), dot: famDot, sub: esc(kindLine) })}
     <div class="fiche-section"><h3>${esc(tr('familyMembersTitle', members.length))}</h3>${memberRows}</div>
     ${familyScopeQuestRows(fam)}`);
   setFicheHash('family', fam);
@@ -1450,10 +1493,15 @@ function openLocationFiche(idx) {
     ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm =>
         `<div class="frow">${speciesRef({ key: fm.key, name: fm.name, meta: fm.level != null ? tr('levelAbbrev', fm.level) : '' })}</div>`
       ).join('')}</div>` : '';
+  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré + pastille LOCATE (mode L, Q7) sur
+  // la position quand connue (38/208 lieux ont un pin _ip) — pin persistant
+  // retirable ; sinon titre coloré seul. Le bouton « Voir sur la carte » (goto)
+  // reste, distinct du pin.
+  const locDot = l.x != null
+    ? { kind: 'location', mode: 'L', key: idx, label: l.title, hex: LOCATION_HEX, drawable: true, pos: { x: l.x, z: l.z } }
+    : null;
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${LOCATION_HEX}">${esc(locationKindLabel(l.kind))}</div>
-      <h2>${esc(l.title)}</h2></div></div>
+    ${ficheHeader({ name: l.title, hex: LOCATION_HEX, dot: locDot, sub: esc(locationKindLabel(l.kind)) })}
     ${l.x != null ? `<div class="fiche-section"><div class="pop-actions">
       <button class="act primary" data-act="goto" data-x="${l.x}" data-z="${l.z}" data-label="${esc(l.title)}">${esc(tr('viewOnMapBtn'))}</button>
     </div></div>` : ''}
@@ -1478,9 +1526,7 @@ function openAbilityFiche(key) {
   const formulaHtmlBlock = a.formula ? formulaHtml(a.formula) : '';
   const scalingHtml = scalingSection(a);
   openFiche(`
-    <div class="fiche-head"><div>
-      <div class="fiche-kind" style="color:${ABILITY_HEX}">${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}</div>
-      <h2>${esc(a.name)}</h2></div></div>
+    ${ficheHeader({ name: a.name, hex: ABILITY_HEX, sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
     ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(a.desc)}</p></div>` : ''}
     ${tagsHtml}
     ${formulaHtmlBlock}
@@ -1706,8 +1752,7 @@ function drawGoalZone(sz, { estimate = false } = {}) {
    Jointure sur S.camps (la carte ACTIVE seulement, voir data.js
    loadDeferred/registerAllDenseRenderers) par clé stripée du préfixe
    fulfillment-manager-/ffm-island- — IDENTIQUE au strip que déjà
-   build_site_data.py::camp_details()/extract_markers.py::scan_camps()
-   appliquent pour construire cette même clé `g.k` (voir DATA_CONTRACT.md).
+   appliqué côté données pour construire cette même clé `g.k`.
    Renvoie null quand le camp n'existe pas sur la carte active (quête listée
    sur plusieurs cartes mais dont cette zone précise vit géographiquement sur
    une autre, camp non encore chargé, ou aucun point dans la bbox) — jamais
@@ -1953,10 +1998,22 @@ function openNpcFiche(idx) {
         <summary>${esc(tr('dialogsN', dialogueLines.length))}</summary>
         ${dialogueLines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')}
       </details></div>` : '';
+  // EN-TÊTE PARTAGÉ (TASK 1 + clarification owner) : un PNJ précis a une
+  // position mais AUCUNE couche d'arbre persistante — son affordance carte
+  // honnête est un pin LOCATE (mode L, Q7) : `[NPC(●)] Nom` où la pastille
+  // épingle/retire ce PNJ sur la carte (pin persistant listé dans la légende).
+  // Présente ⇔ une position est connue (r.x != null) ; sinon titre coloré seul
+  // (rien à localiser). Le bouton « Voir sur la carte » (goto) reste, distinct.
+  const npcDot = r.x != null
+    ? { kind: 'npc', mode: 'L', key: `npc:${idx}`, label: r.name, hex: CATS.npc.hex, drawable: true, pos: { x: r.x, z: r.z } }
+    : null;
   openFiche(`
-    <div class="fiche-head">${iconTag(img, 'fiche-avatar', initials(r.name))}
-      <div><div class="fiche-kind" style="color:${CATS.npc.hex}">${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}</div><h2>${esc(r.name)}</h2>
-      ${posLine}${variantLine}</div></div>
+    ${ficheHeader({
+      avatar: iconTag(img, 'fiche-avatar', initials(r.name)),
+      name: r.name, hex: CATS.npc.hex, dot: npcDot,
+      sub: `${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}`,
+      below: `${posLine}${variantLine}`,
+    })}
     <div class="fiche-section">
       <div class="pop-actions">
         ${mapBtn}
@@ -2072,16 +2129,16 @@ function familyLayerHex(fam) {
 /* Référence ESPÈCE `[Espèce(●)] Nom` par clé de spawn. La pastille EST la
    couche espèce de l'arbre (ref-draw `species` → le routeur main.js résout
    key→S.monsters[key].species puis toggleSpecies — jamais re-dérivé ici).
-   DESSINABLE ⇔ l'espèce RÉSOUT (elle a toujours sa ligne d'arbre, donc sa
-   couche) : une espèce sans camp joint sur la carte active (monstre errant
-   comme le Scolopendra, spawn dynamique, `camps:[]`) garde son dot ⊘ grisé —
-   JAMAIS pas-de-pastille (retour user 2026-07-12 : un `[Monster]` sans dot
-   se lit comme « pas de catégorie » ; ⊘ dit honnêtement « espèce dessinable,
-   0 point sur CETTE carte », règle ratifiée §2.1). L'ancien `!!spRes` (parité
-   avec l'ex-bouton vide) masquait le dot à tort. Teinte PRÉCISE de l'espèce
-   (speciesLayerHex, Q6) quand elle résout, MONSTER_HEX en repli. Nom souligné
-   ⇔ le monstre résout au catalogue. `spId` : repli de clé de couche (fiche
-   famille — le routeur fait `S.monsters[key]?.species || key`). */
+   DESSINABLE ⇔ l'espèce a RÉELLEMENT des points sur la carte active
+   (`drawable: !!spRes`, spRes = speciesPoints(sp)) — RÈGLE OWNER 2026-07-12 :
+   « pas de dot si aucune position connue à afficher sur la map ». Une espèce
+   sans camp joint ici (monstre errant comme le Scolopendra, `camps:[]`, 0
+   point) rend `[Monster] Nom` SANS pastille — titre coloré + nom souligné,
+   honnête « rien à tracer ici » ; le ⊘ « dessinable mais 0 point » est
+   abandonné pour ces affordances (une pastille qui ne bascule rien est
+   inutile). Teinte PRÉCISE de l'espèce (speciesLayerHex, Q6) quand elle résout,
+   MONSTER_HEX en repli. Nom souligné ⇔ le monstre résout au catalogue.
+   `spId` : repli de clé de couche (fiche famille — routeur : `S.monsters[key]?.species || key`). */
 function speciesRef({ key = null, spId = null, name, hex = null, meta = '' }) {
   const m = key ? S.monsters[key] : null;
   const sp = spId || (m ? m.species : null);
@@ -2092,7 +2149,7 @@ function speciesRef({ key = null, spId = null, name, hex = null, meta = '' }) {
     label: name,
     hex: hex || (sp ? speciesLayerHex(sp) : MONSTER_HEX),
     hasFiche: !!m,
-    drawable: !!sp,
+    drawable: !!spRes,
     count: spRes ? spRes.nPts : 0,
     drawn: !!(sp && S.monsp[sp]?.on),
     meta,
@@ -2702,7 +2759,10 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     //     (monsterSpawnHighlightBtn/familyLayerActivateBtn, kill-list §7.2) :
     //     même action (case espèce/famille de l'arbre, ref-draw → main.js),
     //     état lu du même S.monsp/S.monfam, compte au survol + suffixe méta ;
-    //     0 point sur la carte active → ⊘ honnête (jamais pas-de-pastille) ;
+    //     RÈGLE OWNER 2026-07-12 : présente ⇔ points RÉELS sur la carte active
+    //     (`drawable: !!spPts` / `!!res`) — 0 point ici → AUCUNE pastille (titre
+    //     coloré + nom souligné seuls, le ⊘ est abandonné : une pastille qui ne
+    //     bascule rien est inutile) ;
     //   - le NOM souligné remplace l'ancien span data-act (fiche monstre/
     //     famille) — souligné ⇔ la fiche résout vraiment (mk/membres, jamais
     //     un lien deviné, mêmes gardes qu'avant) ;
@@ -2743,7 +2803,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       return ref({
         kind: 'family', key: f, label: pretty(f), hex: goalFamilyHex(f),
         hasFiche: familyHasMembers(f),
-        drawable: true, count: res ? res.nPts : 0,
+        drawable: !!res, count: res ? res.nPts : 0,
         drawn: !!S.monfam[f]?.on,
         meta: metaParts(res ? res.nPts : null),
       });
@@ -2761,7 +2821,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
           kind: 'species', key: mk, label: nameLbl,
           hex: spId ? speciesLayerHex(spId) : MONSTER_HEX,
           hasFiche: true,
-          drawable: !!spId, count: spPts ? spPts.nPts : 0,
+          drawable: !!spPts, count: spPts ? spPts.nPts : 0,
           drawn: !!(spId && S.monsp[spId]?.on),
           meta: metaParts(spPts ? spPts.nPts : null),
         })
@@ -3248,9 +3308,10 @@ function openDialogueFiche(q, slug) {
     : `<p class="hint">${esc(tr('noResults'))}</p>`;
   const giverRow = q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, ni)}</div>` : '';
   openFiche(`
-    <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name))}
-      <div><div class="fiche-kind">${esc(tr('dialogueFicheKind'))}</div><h2>${esc(q.name)}</h2>
-      ${giverRow}</div></div>
+    ${ficheHeader({
+      avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name)),
+      name: q.name, hex: CATS.quest.hex, sub: esc(tr('dialogueFicheKind')), below: giverRow,
+    })}
     <div class="fiche-section">
       <h3>${esc(tr('dialogueHeading'))}</h3>
       <p class="hint">${esc(tr('dialogueNote'))}</p>
@@ -3431,11 +3492,14 @@ function openQuestFiche(slug) {
     ? `<div class="fiche-section"><details class="fiche-dialogs"><summary>${esc(tr('onMapTitleN', (q.actors || []).length))}</summary>${actorRows}</details></div>` : '';
 
   openFiche(`
-    <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
-      <div><div class="fiche-kind" style="color:${CATS.quest.hex}">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
-      ${explainBadge}
+    ${ficheHeader({
+      avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver)),
+      name: q.name, hex: CATS.quest.hex,
+      sub: esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : '')),
+      below: `${explainBadge}
       ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: false })}</div>` : ''}
-      ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
+      ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}`,
+    })}
     <div class="fiche-section"><div class="pop-actions">
       ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
       ${zoneBtn}
@@ -3949,10 +4013,12 @@ function openRecipeFiche(key) {
   // autre, jamais une phrase réinventée séparément.
   const containersHtml = containersSectionHtml(it);
   openFiche(`
-    <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
-      <div><div class="fiche-kind" style="color:${RECIPE_HEX}">${esc(tr('recipeTitle'))}${it.prof ? ' · ' + esc(professionLabel(it.prof)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${devMark}</div>
-      <h2>${esc(it.name)}</h2>
-      ${craftsHtml}</div></div>
+    ${ficheHeader({
+      avatar: iconTag(icon, 'fiche-avatar', itemGlyph(it)),
+      name: it.name, hex: RECIPE_HEX,
+      sub: `${esc(tr('recipeTitle'))}${it.prof ? ' · ' + esc(professionLabel(it.prof)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${devMark}`,
+      below: craftsHtml,
+    })}
     ${ingredientsHtml}
     ${containersHtml}
     ${questsHtml}`);
@@ -4326,12 +4392,14 @@ function openItemFiche(key) {
   // interne (Use-effect/formule/farm/chips d'état/titres désambiguïsés) --
   // seul l'ORDRE change, plus le chip [Recette] qui est net-new.
   openFiche(`
-    <div class="fiche-head">${iconTag(icon, 'fiche-avatar', itemGlyph(it))}
-      <div><div class="fiche-kind" style="color:${kindHex}">${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}</div>
-      <h2>${esc(titleName)}</h2>
-      ${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
+    ${ficheHeader({
+      avatar: iconTag(icon, 'fiche-avatar', itemGlyph(it)),
+      name: titleName, hex: kindHex,
+      sub: `${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}`,
+      below: `${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}
-      ${recipeChipHtml}</div></div>
+      ${recipeChipHtml}`,
+    })}
     ${raritySelectHtml}
     ${descHtml}
     ${enhancementHtml}

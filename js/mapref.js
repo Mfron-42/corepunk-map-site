@@ -334,6 +334,36 @@ function ref(desc) {
   return `<span ${wrapAttrs(desc, p)}>${tagHtml(p, name)}${labelHtml(p)}${p.meta ? `<span class="ref-meta">${esc(p.meta)}</span>` : ''}</span>`;
 }
 
+/* refDot(desc) → SEULEMENT la pastille toggle (le contrat DOM `.ref` + le
+   bouton `ref-draw` + `.ref-bubble`), SANS mot de kind ni libellé — pour
+   l'EN-TÊTE DE FICHE (TASK 1) où le NOM est le titre h2 séparé (coloré) et le
+   mot de kind vit dans le sous-titre. Même cœur (refParts/refFill/wrapAttrs)
+   qu'un ref() complet → UNE seule source d'état : la pastille d'en-tête se
+   resynchronise via syncEntityRefDots (sélecteur `.ref[data-mode] [data-act=
+   "ref-draw"]`, indépendant de la présence du mot/libellé) et se route par la
+   MÊME délégation (initMapRefDelegation) qu'une pastille d'arbre/de chip —
+   aucune sémantique parallèle.
+   Renvoie '' quand la référence n'est PAS dessinable (règle owner 2026-07-12 :
+   pas de pastille s'il n'y a AUCUNE position/point à afficher sur la carte
+   active — une pastille qui ne bascule rien est inutile) : l'en-tête n'affiche
+   alors qu'un titre coloré, sans pastille. L'appelant gate `drawable` sur
+   l'existence réelle de points (speciesPoints/familyPoints) ou de position
+   (locate) — le ⊘ « dessinable mais 0 point ici » n'est plus émis pour ces
+   pastilles d'affordance. */
+function refDot(desc) {
+  if (!desc || !desc.kind) return '';
+  const p = refParts(desc);
+  if (p.fill == null) return '';                 // non dessinable → aucune pastille
+  const name = (desc.label != null && desc.label !== '') ? desc.label : p.word;
+  const on = p.fill === 'on' || p.fill === 'empty-on';
+  const cntSuffix = desc.count != null ? ` · ${tr('entityPtsN', desc.count)}` : '';
+  const title = `${on ? uiRef('refDrawHide', name) : uiRef('refDrawShow', name)}${cntSuffix}`;
+  return `<span ${wrapAttrs(desc, p)}>`
+    + `<button type="button" class="ref-tag ref-dot-btn" data-act="ref-draw" aria-pressed="${on}"`
+    + ` title="${esc(title)}" aria-label="${esc(title)}">`
+    + `<span class="ref-bubble" data-fill="${p.fill}"></span></button></span>`;
+}
+
 /* refEl(desc) → nœud DOM (légende/arbre impératifs — vague 6). Même cœur. */
 function refEl(desc) {
   const t = document.createElement('template');
@@ -384,4 +414,4 @@ function initMapRefDelegation(rootEl, handlers = {}) {
   });
 }
 
-export { ref, refEl, refList, refKindLabel, refKindColor, locateRefKey, initMapRefDelegation };
+export { ref, refDot, refEl, refList, refKindLabel, refKindColor, locateRefKey, initMapRefDelegation };
