@@ -6,7 +6,7 @@ import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, catLabel, campKindLabel,
   campLabel, campQualifierChip, chestDisplayName, activableTypeLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr,
+  chestHex, chestKindLabel, prettyRegion, ecAttr, speciesLayerHex,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, npcIconUrl, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
@@ -142,12 +142,16 @@ function mobLabelHtml(m, cls) {
   // la plus proche de CE niveau, pas un repli arbitraire (canonicalSiteKey
   // pourrait être un niveau tout autre, ex. 20, pour un mob de camp niv 2).
   const mk = monsterKeyFor(m.key, m.name, m.lvl);
-  // Couleur d'entité (task #77) : c'est toujours un monstre, qu'il soit
-  // résolu vers sa fiche ou non (même parti pris que npcChip -- la teinte
-  // affirme le KIND, pas la cliquabilité, déjà portée par .link/data-act).
+  // Couleur d'entité : la teinte PRÉCISE de l'ESPÈCE (speciesLayerHex, Q6 — la
+  // MÊME que son titre de fiche, sa ligne d'arbre et ses points carte), pas
+  // l'ambre-rouge plat MONSTER_HEX ; repli MONSTER_HEX tant que l'espèce n'est
+  // pas résolue (S.monsters différé). La teinte affirme le KIND+l'identité, pas
+  // la cliquabilité (portée par .link/data-act).
+  const spId = mk ? S.monsters?.[mk]?.species : null;
+  const hex = spId ? speciesLayerHex(spId) : MONSTER_HEX;
   return mk
-    ? `<span class="${cls} link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(m.name)}</span>`
-    : `<span class="${cls}"${ecAttr(MONSTER_HEX, 'monster')}>${esc(m.name)}</span>`;
+    ? `<span class="${cls} link"${ecAttr(hex, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(m.name)}</span>`
+    : `<span class="${cls}"${ecAttr(hex, 'monster')}>${esc(m.name)}</span>`;
 }
 
 function campPopup(p, n) {
@@ -157,6 +161,8 @@ function campPopup(p, n) {
   if (det?.mobs?.length) {
     extra = `<div class="pop-mobs">${det.mobs.slice(0, 4).map(m => {
       const mk = monsterKeyFor(m.key, m.name, m.lvl);
+      const spId = mk ? S.monsters?.[mk]?.species : null;
+      const hex = spId ? speciesLayerHex(spId) : MONSTER_HEX;   // teinte précise d'espèce (Q6)
       const attrs = mk ? ` data-act="fiche-monster" data-id="${esc(mk)}"` : '';
       // Fourchette de niveau du camp (m.lvlMax, folded-row polish task #80)
       // quand elle diffère de m.lvl -- même idiome que openCampFiche/
@@ -164,7 +170,7 @@ function campPopup(p, n) {
       const lvlTxt = m.lvl != null
         ? (m.lvlMax != null && m.lvlMax !== m.lvl ? tr('levelRangeAbbrev', m.lvl, m.lvlMax) : tr('levelAbbrev', m.lvl))
         : '';
-      return `<span class="chip"${ecAttr(MONSTER_HEX, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${lvlTxt ? ` <i>${esc(lvlTxt)}</i>` : ''}</span>`;
+      return `<span class="chip"${ecAttr(hex, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${lvlTxt ? ` <i>${esc(lvlTxt)}</i>` : ''}</span>`;
     }).join('')}</div>`;
   }
   // Fiche TOUJOURS accessible (même sans fiche camp détaillée : la fiche

@@ -8,7 +8,7 @@
    coordonnées, hooks de bascule de carte, init. Seul module qui importe
    tout le monde ; aucune logique métier propre. */
 import { S } from './state.js';
-import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyHexByRank } from './config.js';
+import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyLayerHex } from './config.js';
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
@@ -494,7 +494,7 @@ function compositeCampPoints() {
   for (let i = 0; i < fams.length; i++) {
     const f = fams[i];
     if (!S.monfam[f.family]?.on) continue;
-    const hex = familyHexByRank(i);
+    const hex = familyLayerHex(f.family);
     for (const k of f.campKeys) if (!famWinner.has(k)) famWinner.set(k, hex);
   }
   // (2) gagnant par GROUPE de camp : ESPÈCE cochée (chunk (d) — première

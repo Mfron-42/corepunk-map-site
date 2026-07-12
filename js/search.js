@@ -6,7 +6,7 @@ import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
-  locationKindLabel, mapName,
+  locationKindLabel, mapName, entityColor,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty } from './utils.js';
 import { tr, tbl, numberLocale } from './i18n/index.js';
@@ -282,9 +282,13 @@ function buildSearch() {
   // repli honnête : un résultat de recherche montre donc l'icône DE CETTE
   // entité, jamais une générique ni celle d'un voisin (owner : "en tapant un
   // nom je tombe sur la MAUVAISE icône"). r.icon absent -> null -> initiales.
-  S.data.npc.forEach((r, i) => push(r.name, 'npc', CATS.npc.hex, r.x, r.z, () => openNpcFiche(i),
+  // La puce de catégorie d'une ligne de recherche = le TAG de kind : elle porte
+  // l'ANCRE du kind (entityColor(cat, null), LA source unique — byte-égale à
+  // CATS[cat].hex), exactement comme la pilule d'une réf à deux tons ; l'identité
+  // de l'entité est portée par son icône/portrait + son nom, pas par la puce.
+  S.data.npc.forEach((r, i) => push(r.name, 'npc', entityColor('npc', null), r.x, r.z, () => openNpcFiche(i),
     npcIconUrl(r.icon), r.x == null ? tr('posUnknown') : null, initials(r.name), 0, null, { pinCat: 'npc' }));
-  S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'poi' }));
+  S.data.poi.forEach(r => push(r.name, 'poi', entityColor('poi', null), r.x, r.z, null, null, null, null, 0, null, { pinCat: 'poi' }));
   // Une quête sans x/z (giver et acteurs tous sans position extraite — ex.
   // les quêtes de Prison Island, cf. questNoPos) reste indexée : le clic
   // ouvre sa fiche exactement comme d'habitude (openQuestFiche tolère déjà
@@ -302,11 +306,11 @@ function buildSearch() {
   // « Contenu dev » (main.js buildDevToggle) n'a pas été cliqué.
   S.data.quest.forEach(q => {
     if (isHiddenTest(q)) return;
-    push(q.name, 'quest', CATS.quest.hex, q.x, q.z, () => openQuestFiche(q.slug),
+    push(q.name, 'quest', entityColor('quest', null), q.x, q.z, () => openQuestFiche(q.slug),
       null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug, pinCat: 'quest' });
   });
-  S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', CATS.qao.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'qao' }); });
-  S.data.workshop.forEach(r => push(r.name, 'workshop', CATS.workshop.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'workshop' }));
+  S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', entityColor('qao', null), r.x, r.z, null, null, null, null, 0, null, { pinCat: 'qao' }); });
+  S.data.workshop.forEach(r => push(r.name, 'workshop', entityColor('workshop', null), r.x, r.z, null, null, null, null, 0, null, { pinCat: 'workshop' }));
   // Base de données objets : icône + rareté, pas de position (fiche seule).
   // Bruit technique (ab_/ef_/… , is_test) déprioritisé au profit des objets joueur.
   // Sous-libellé : rareté/nature + type d'arme court (ex. "Rare · Pistolet")

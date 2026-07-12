@@ -6,14 +6,14 @@
    ici aussi. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, LOCATION_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
+  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
-  speciesLayerHex, familyLayerHex,
+  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
+  speciesLayerHex, familyLayerHex, entityColor,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -310,7 +310,7 @@ function openLootTableFiche(label) {
   S.openFiche = { kind: 'loot', id: label };
   const sorted = [...rows].sort((a, b) => (b.g - a.g) || ((b.w ?? 0) - (a.w ?? 0)));
   openFiche(`
-    ${ficheHeader({ name: label, hex: LOOT_TABLE_HEX, sub: esc(tr('lootTableKind')) })}
+    ${ficheHeader({ name: label, hex: entityColor('loot', label), sub: esc(tr('lootTableKind')) })}
     <div class="fiche-section"><h3>${esc(tr('lootTableItemsN', sorted.length))}</h3>
       ${sorted.length > 30 ? `<input class="stock-filter" type="search" placeholder="${esc(tr('stockFilterPlaceholder'))}">` : ''}
       <div class="fiche-scroll">${lootRowsHtml(sorted, 'noLootCatalogued')}</div></div>`);
@@ -1519,11 +1519,12 @@ function openLocationFiche(idx) {
   // la position quand connue (38/208 lieux ont un pin _ip) — pin persistant
   // retirable ; sinon titre coloré seul. Le bouton « Voir sur la carte » (goto)
   // reste, distinct du pin.
+  const locHex = entityColor('location', l.title);
   const locDot = l.x != null
-    ? { kind: 'location', mode: 'L', key: idx, label: l.title, hex: LOCATION_HEX, drawable: true, pos: { x: l.x, z: l.z } }
+    ? { kind: 'location', mode: 'L', key: idx, label: l.title, hex: locHex, drawable: true, pos: { x: l.x, z: l.z } }
     : null;
   openFiche(`
-    ${ficheHeader({ name: l.title, hex: LOCATION_HEX, dot: locDot, sub: esc(locationKindLabel(l.kind)) })}
+    ${ficheHeader({ name: l.title, hex: locHex, dot: locDot, sub: esc(locationKindLabel(l.kind)) })}
     ${l.x != null ? `<div class="fiche-section"><div class="pop-actions">
       <button class="act primary" data-act="goto" data-x="${l.x}" data-z="${l.z}" data-label="${esc(l.title)}">${esc(tr('viewOnMapBtn'))}</button>
     </div></div>` : ''}
@@ -1548,7 +1549,7 @@ function openAbilityFiche(key) {
   const formulaHtmlBlock = a.formula ? formulaHtml(a.formula) : '';
   const scalingHtml = scalingSection(a);
   openFiche(`
-    ${ficheHeader({ name: a.name, hex: ABILITY_HEX, sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
+    ${ficheHeader({ name: a.name, hex: entityColor('ability', a.name), sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
     ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(a.desc)}</p></div>` : ''}
     ${tagsHtml}
     ${formulaHtmlBlock}
@@ -2026,13 +2027,17 @@ function openNpcFiche(idx) {
   // épingle/retire ce PNJ sur la carte (pin persistant listé dans la légende).
   // Présente ⇔ une position est connue (r.x != null) ; sinon titre coloré seul
   // (rien à localiser). Le bouton « Voir sur la carte » (goto) reste, distinct.
+  // Nuance PRÉCISE de CE PNJ (entityColor, LA source unique) — le même ambre
+  // que sa réf/son chip/son pin partout : « npc + Zarnok = un jaune précis pour
+  // Zarnok », jamais l'ambre plat de catégorie.
+  const npcHex = entityColor('npc', r.name);
   const npcDot = r.x != null
-    ? { kind: 'npc', mode: 'L', key: `npc:${idx}`, label: r.name, hex: CATS.npc.hex, drawable: true, pos: { x: r.x, z: r.z } }
+    ? { kind: 'npc', mode: 'L', key: `npc:${idx}`, label: r.name, hex: npcHex, drawable: true, pos: { x: r.x, z: r.z } }
     : null;
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(img, 'fiche-avatar', initials(r.name)),
-      name: r.name, hex: CATS.npc.hex, dot: npcDot,
+      name: r.name, hex: npcHex, dot: npcDot,
       sub: `${esc(tr('npcCat'))}${r.vendor ? esc(tr('vendorSuffix')) : ''}`,
       below: `${posLine}${variantLine}`,
     })}
@@ -2090,27 +2095,10 @@ function qtyChipList(list) {
   return (list || []).map(qtyItemChip).join('');
 }
 
-/* Chip PNJ (fiche-header identity pass + task #70) : même composant que les
-   chips objet ci-dessus (`.chip`/`.chip-icon`, généralisés en base dans
-   style.css pour vivre aussi bien empilée dans un `<div class="reward-chips">`
-   en bloc -- l'en-tête de fiche quête/dialogue, "donné par" -- que directement
-   EN LIGNE dans une phrase -- la ligne d'obtention d'objet, "donné par
-   [chip]", puisqu'un `<div>` ne peut de toute façon pas s'imbriquer dans un
-   `<p>`). Icône : le portrait de PIN RÉEL du PNJ (icons/npc_map/<leaf>.png --
-   la même source qu'openNpcFiche/les lignes vendeur), jamais une icône
-   générique, quand `ni` résout un PNJ connu de la carte active ; repli
-   glyphe d'initiales (iconTag) sinon. Cliquable (data-act=fiche-npc)
-   seulement quand résolu -- jamais un lien deviné, le nom reste affiché
-   honnêtement en texte stylé sinon (jamais un lien mort). Couleur d'entité
-   (task #77) : CATS.npc.hex, posée que le PNJ soit résolu ou non -- c'est
-   TOUJOURS un PNJ, la teinte n'affirme rien sur la cliquabilité (déjà portée
-   par data-act/le curseur), jamais un lien deviné pour autant. */
-function npcChip(name, ni) {
-  const rec = ni >= 0 ? S.data.npc[ni] : null;
-  const icon = npcIconUrl(rec?.icon);
-  const attrs = ni >= 0 ? ` data-act="fiche-npc" data-id="npc:${ni}"` : '';
-  return `<span class="chip"${ecAttr(CATS.npc.hex, 'npc')}${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
-}
+/* (Chip PNJ retiré : toute citation de PNJ passe désormais par npcRef —
+   `[PNJ(●)] Nom`, épinglable quand une position est connue ; le dernier
+   appelant, l'en-tête de dialogue-bark, a migré vers cette réf pinnable, comme
+   la ligne donneur de quête.) */
 
 /* Chip nœud de récolte (#81, gn_* -- S.nodes) : même composant `.chip` que
    itemChip/npcChip ci-dessus, ouvre la fiche nœud (openNodeFiche). Teinte =
@@ -3318,18 +3306,15 @@ function openDialogueFiche(q, slug) {
   const linesHtml = lines.length
     ? lines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')
     : `<p class="hint">${esc(tr('noResults'))}</p>`;
-  const giverRow = q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, ni)}</div>` : '';
-  // EN-TÊTE (TASK 1) : même pastille LOCATE que la fiche quête — un bark PNJ
-  // porte la position de son personnage (giverPin) : `(●) <bark>` l'épingle sur
-  // la carte quand cette position est connue, sinon titre coloré seul.
-  const dlgDot = giverPin && giverPin.x != null
-    ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: CATS.quest.hex,
-        drawable: true, pos: { x: giverPin.x, z: giverPin.z } }
-    : null;
+  // EN-TÊTE (consolidation owner 2026-07-12, même règle que la fiche quête) :
+  // le donneur du bark est épinglé par SA réf `[PNJ(●)] <donneur>` (locate:true,
+  // pin primaire), pas par une pastille de titre redondante — le titre reste
+  // coloré, sans pastille (le bark n'a pas de position propre distincte du PNJ).
+  const giverRow = q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni, locate: true })}</div>` : '';
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name)),
-      name: q.name, hex: CATS.quest.hex, dot: dlgDot, sub: esc(tr('dialogueFicheKind')), below: giverRow,
+      name: q.name, hex: entityColor('quest', q.name), sub: esc(tr('dialogueFicheKind')), below: giverRow,
     })}
     <div class="fiche-section">
       <h3>${esc(tr('dialogueHeading'))}</h3>
@@ -3495,18 +3480,25 @@ function openQuestFiche(slug) {
   const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
   const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
   const giverCatAttr = giverCat ? ` data-cat="${giverCat}"` : '';
-  // EN-TÊTE PARTAGÉ (TASK 1, exemple phare owner) : une quête PORTE la position
-  // de son DONNEUR — `(●) Facing the Flame` épingle/retire ce donneur sur la
-  // carte (pin LOCATE persistant, mode L/Q7, listé dans le bandeau-légende et
-  // retirable), la MÊME affordance que les fiches PNJ/camp/lieu/coffre. Présente
-  // ⇔ une position de donneur RÉELLE est connue — MÊMES gardes que le bouton
-  // « Voir le donneur » plus bas (q.x connu ET pas une position dérivée d'une
-  // zone) ; sinon titre coloré seul (règle owner « pas de dot sans position »).
-  // Vise le pin PNJ réel quand résolu (giverX/giverZ, comme le bouton) ; le nom
-  // du pin = le nom de la quête (refDot data-label). Le bouton « Voir le
-  // donneur » (vol caméra ponctuel) reste, distinct du pin persistant.
-  const questDot = (q.x != null && q.posSource !== 'zone')
-    ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: CATS.quest.hex,
+  // Nuance PRÉCISE de CETTE quête (entityColor, source unique) — même violet
+  // que sa réf/son chip partout.
+  const questHex = entityColor('quest', q.name);
+  // EN-TÊTE (owner 2026-07-12, consolidation des affordances de donneur) : une
+  // quête se lit sur le PIN de son donneur. Quand ce donneur est un PNJ résolu
+  // AVEC position (giverRefPinnable), la réf `[PNJ(●)] <donneur>` sous le titre
+  // devient LE pin PRIMAIRE (locate:true, épingle/retire, centre la caméra) —
+  // « make the giver ref the primary pin ». On SUPPRIME alors les deux
+  // affordances redondantes qui visaient le même point : la pastille du TITRE
+  // (questDot) ET le bouton « Voir le donneur » (l'épinglage centre déjà). Le
+  // titre reste coloré, sans pastille (comme une fiche objet). REPLI seulement
+  // quand le donneur n'est PAS épinglable par sa réf (nom non résolu à un pin,
+  // mais q.x connu hors-zone) : la pastille du titre + le bouton restent la
+  // SEULE affordance carte (label = nom de quête). Jamais deux pins pour le
+  // même donneur (redondance signalée par l'owner). */
+  const giverRefPinnable = giverNi >= 0 && giverPin && giverPin.x != null;
+  const questPosFallback = !giverRefPinnable && q.x != null && q.posSource !== 'zone';
+  const questDot = questPosFallback
+    ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: questHex,
         drawable: true, pos: { x: giverX, z: giverZ } }
     : null;
   const explainBadge = questExplainedBadge(q);
@@ -3527,14 +3519,14 @@ function openQuestFiche(slug) {
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver)),
-      name: q.name, hex: CATS.quest.hex, dot: questDot,
+      name: q.name, hex: questHex, dot: questDot,
       sub: esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : '')),
       below: `${explainBadge}
-      ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: false })}</div>` : ''}
+      ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: true })}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}`,
     })}
     <div class="fiche-section"><div class="pop-actions">
-      ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
+      ${questPosFallback ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
       ${zoneBtn}
       <button class="act" data-act="track" data-id="quest:${esc(slug)}">${esc(tr('trackBtn'))}</button>
       <button class="act" data-act="done" data-id="quest:${esc(slug)}">${esc(tr('doneBtn'))}</button>
@@ -3560,8 +3552,8 @@ function openQuestFiche(slug) {
    rareté, ou RECIPE_HEX + la bonne fiche si la clé résout en fait à un
    pseudo-item recette, voir itemFicheAct/itemEcHex/itemEcKind) ; une ligne
    "fiche-loot" (openItemFiche's dropsHtml -- le libellé est le nom d'une
-   TABLE de butin, pas d'un autre item) porte LOOT_TABLE_HEX. Pas de couleur
-   pour une ligne sans lien (rien à distinguer). */
+   TABLE de butin, pas d'un autre item) porte la nuance de sa table (entityColor
+   'loot', ancrée sur LOOT_TABLE_HEX). Pas de couleur pour une ligne sans lien. */
 function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
   const it = linkAct === 'fiche-item' ? S.items[linkId] : null;
   // EntityRef (vague 2) : le lien de butin devient une référence — `[Item]`/

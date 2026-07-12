@@ -455,9 +455,7 @@ const familyHexByRank = i => MONSTER_FAMILY_HEX_CYCLE[((i % 8) + 8) % 8];
    peuvent partager une teinte (8 teintes), assumé : le libellé désambiguïse. */
 function familyLayerHex(fam) {
   const k = familyKey(fam) || String(fam || '');
-  let h = 5381;
-  for (let i = 0; i < k.length; i++) h = ((h * 33) ^ k.charCodeAt(i)) >>> 0;
-  return MONSTER_FAMILY_HEX_CYCLE[h % MONSTER_FAMILY_HEX_CYCLE.length];
+  return MONSTER_FAMILY_HEX_CYCLE[djb2(k) % MONSTER_FAMILY_HEX_CYCLE.length];
 }
 
 /* Teintes des couches ESPÈCE (#82 chunk (d), modèle « l'arbre EST le
@@ -476,9 +474,132 @@ const SPECIES_LAYER_HEX_CYCLE = [
   '#5edff2', '#7d8ff2', '#a35ef2', '#f25edf',
 ];
 function speciesLayerHex(spId) {
+  return SPECIES_LAYER_HEX_CYCLE[djb2(String(spId)) % SPECIES_LAYER_HEX_CYCLE.length];
+}
+
+/* ── entityColor — LA couleur d'entité DÉTERMINISTE (source UNIQUE) ───────────
+   « Pour la couleur déterministe, prends le nom complet — tag + nom » (owner) :
+   le KIND fixe une teinte d'ANCRE (npc→ambre, quête→violet, monstre→sa
+   teinte…, reprise des constantes existantes — JAMAIS une couleur neuve), et un
+   hash du `seed` (le nom/la clé STABLE de l'entité) choisit une NUANCE
+   déterministe DANS la bande de ce kind. Ainsi « npc + rien = l'ambre catégorie
+   (tous les PNJ) ; npc + Zarnok = un ambre PRÉCIS pour Zarnok », mais tout PNJ
+   reste « couleur PNJ ». Même (kind, seed) → même hex TOUJOURS
+   (×sessions/cartes/langues/surfaces) : un joueur reconnaît une entité à sa
+   nuance PARTOUT — arbre, titre de fiche, refs, chips, popups (la cohérence que
+   l'owner réclame ; corrige la classe de bug « même entité, deux couleurs selon
+   le contexte »). LA source : refKindColor (mapref.js), les titres de fiche, les
+   chips et les popups y délèguent tous — aucune surface ne calcule sa couleur.
+   Présentation à DEUX TONS (voir mapref.js refKindBaseColor + style.css --ref-kc)
+   : le TAG porte l'ancre du kind (--ref-kc), le NOM + la pastille portent la
+   nuance précise (--ref-c = ce que renvoie entityColor). Une réf de CATÉGORIE
+   (`[Npc] All`, seed absent) rend l'ancre EXACTE des deux côtés → mono-ton.
+
+   Règles par famille de kind :
+   - species / family : DÉLÈGUENT aux palettes d'IDENTITÉ dédiées
+     (speciesLayerHex / familyLayerHex — cycle « arc-en-ciel » nécessaire à la
+     distinction mutuelle des couches sur la carte, ratifié Q6) ; jamais
+     re-nuancées ici (déjà précises par identité).
+   - kinds à AXE SÉMANTIQUE (objet=rareté, nœud=métier, camp=sous-rôle,
+     coffre=type) : leur teinte PORTE un sens (RARITY/nodeHex/CAMP_COLORS/
+     chestHex fournis par l'appelant) — jamais une nuance par identité qui
+     diluerait l'axe ; entityColor renvoie leur ancre telle quelle.
+   - kinds d'IDENTITÉ à teinte plate (npc, quête, poi, atelier, qao, zone, lieu,
+     capacité, table de butin) : ancre du kind + nuance par identité. */
+function djb2(s) {
   let h = 5381;
-  for (let i = 0; i < spId.length; i++) h = ((h * 33) ^ spId.charCodeAt(i)) >>> 0;
-  return SPECIES_LAYER_HEX_CYCLE[h % SPECIES_LAYER_HEX_CYCLE.length];
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h >>> 0;
+}
+/* Teinte d'ANCRE d'un kind — pointe TOUJOURS vers une constante existante
+   (CATS/CAMP_COLORS/ZONE/…), jamais une couleur inventée. Rend null quand le
+   kind n'a pas d'ancre propre décidable ici (objet → rareté ; camp/harvest sans
+   sous-rôle) : l'appelant fournit alors la teinte précise, l'ancre = cette
+   teinte (mono-ton). Réplique 1:1 les défauts de l'ancien registre KINDS. */
+function kindBaseHex(kind, subrole) {
+  switch (kind) {
+    case 'species': case 'family': return MONSTER_HEX;
+    case 'npc':          return CATS.npc.hex;
+    case 'poi':          return CATS.poi.hex;
+    case 'workshop':     return CATS.workshop.hex;
+    case 'quest':        return CATS.quest.hex;
+    case 'qao': case 'quest_item': return CATS.qao.hex;
+    case 'chest':        return CATS.searchable_chest.hex;
+    case 'zone':         return ZONE_HEX;
+    case 'location':     return LOCATION_HEX;
+    case 'ability':      return ABILITY_HEX;
+    case 'recipe': case 'node': return RECIPE_HEX;
+    case 'loot':         return LOOT_TABLE_HEX;
+    case 'shrine':       return CAMP_COLORS.shrines;
+    case 'soulkeeper':   return CAMP_COLORS.soulkeeper;
+    case 'guard':        return CAMP_COLORS.guards;
+    case 'destructible': return CAMP_COLORS.destroyable;
+    case 'reactive':     return CAMP_COLORS.reactive;
+    case 'camp': case 'harvest': return subrole ? (CAMP_COLORS[subrole] || null) : null;
+    default: return null;
+  }
+}
+/* Kinds dont la teinte porte un SENS (axe sémantique) — jamais nuancés par
+   identité : l'appelant fournit RARITY/nodeHex/CAMP_COLORS/chestHex, entityColor
+   n'en renvoie que l'ANCRE (mono-ton, la teinte EST déjà l'information). */
+const SEMANTIC_COLOR_KINDS = new Set([
+  'item', 'quest_item', 'node', 'camp', 'shrine', 'soulkeeper',
+  'guard', 'destructible', 'reactive', 'harvest', 'chest',
+]);
+/* #rrggbb → {h(0-360), s,l(0-100)} et retour. Standard, sans dépendance. */
+function hexToHsl(hex) {
+  const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex || '');
+  if (!m) return { h: 0, s: 0, l: 50 };
+  const r = parseInt(m[1], 16) / 255, g = parseInt(m[2], 16) / 255, b = parseInt(m[3], 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  const l = (max + min) / 2;
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  return { h, s: s * 100, l: l * 100 };
+}
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const hx = v => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${hx(r)}${hx(g)}${hx(b)}`;
+}
+/* Nuance DANS la bande du kind : variation SURTOUT de luminosité (se lit comme
+   « une nuance de » — intentionnel, jamais un quasi-doublon qui semblerait un
+   bug), + un peu de saturation, + un LÉGER décalage de teinte (±13°) borné pour
+   rester reconnaissablement « la couleur du kind » (owner : « garde-la dans la
+   bande reconnaissable du kind »). Luminosité bornée [46,74] : lisible en fond
+   sombre ET clair (jamais délavée ni noyée). 3 axes tirés de bits DISJOINTS du
+   hash → indépendants, bonne dispersion. */
+function entityShade(baseHex, seed) {
+  const { h, s, l } = hexToHsl(baseHex);
+  const hh = djb2(seed);
+  const u = shift => ((hh >>> shift) & 31) / 31;                 // 0..1
+  const nh = ((h + (u(0) - 0.5) * 26) % 360 + 360) % 360;        // ±13°
+  const nl = Math.max(46, Math.min(74, l + (u(5) - 0.5) * 26));  // ±13, borné
+  const ns = Math.max(45, Math.min(92, s + (u(10) - 0.5) * 32)); // ±16, borné
+  return hslToHex(nh, ns, nl);
+}
+/* LA fonction. `seed` = identité stable de l'entité (nom/clé) ; falsy →
+   catégorie/non résolue → ancre EXACTE (byte-égale à la constante du kind). */
+function entityColor(kind, seed, opts = {}) {
+  if (kind === 'species') return seed ? speciesLayerHex(String(seed)) : MONSTER_HEX;
+  if (kind === 'family')  return seed ? familyLayerHex(String(seed)) : MONSTER_HEX;
+  const base = kindBaseHex(kind, opts.subrole);
+  if (seed == null || seed === '' || SEMANTIC_COLOR_KINDS.has(kind)) return base || 'var(--muted)';
+  return base ? entityShade(base, String(seed)) : 'var(--muted)';
 }
 
 /* ── Accent d'entité (task #77, entity-color coherence) ──────────────────
@@ -501,7 +622,7 @@ function ecAttr(hex, kind) {
 
 export {
   KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank, familyLayerHex,
-  SPECIES_LAYER_HEX_CYCLE, speciesLayerHex,
+  SPECIES_LAYER_HEX_CYCLE, speciesLayerHex, entityColor, kindBaseHex,
   CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,

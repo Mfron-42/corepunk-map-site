@@ -37,10 +37,7 @@
    dessiné lu en direct sur S.* (§5.1) — la pastille ne détient jamais d'état
    privé (§5.3, garantie du même-état). */
 import { S } from './state.js';
-import {
-  CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX,
-  RECIPE_HEX, LOOT_TABLE_HEX,
-} from './config.js';
+import { entityColor, kindBaseHex } from './config.js';
 import { tr, tbl } from './i18n/index.js';
 import { esc, pretty } from './utils.js';
 
@@ -85,43 +82,44 @@ const ct = k => tbl('cat', k);              // NPCs/Workshops/… (catégorie, p
 /* ── Registre des kinds (§3) ────────────────────────────────────────────────
    Chaque kind → { word(desc,plural), fiche (défaut has-fiche), mode (cycle de
    vie de tracé par défaut : E persistant-entité / C persistant-catégorie /
-   L localise / N jamais dessinable), hex (teinte §3 par défaut ; l'appelant
-   surcharge via desc.hex pour les teintes propres à l'entité — rareté d'objet,
-   couche d'espèce…) }.
+   L localise / N jamais dessinable) }.
    `word` renvoie le mot localisé : `plural` (vrai en mode catégorie) choisit
    la forme « tout » (pluriel), sinon la forme « un » (singulier) — c'est le
    pluriel/singulier du mot de kind qui porte la distinction tout-vs-un (§2.2),
-   la pastille restant un pur indicateur d'état. Une teinte `hex` peut être une
-   fonction(desc) (camp/harvest dépendent du sous-rôle). */
+   la pastille restant un pur indicateur d'état.
+   COULEUR : plus AUCUNE teinte n'est stockée ici — refKindColor/refKindBaseColor
+   délèguent à entityColor/kindBaseHex (config.js), LA source unique (le KIND
+   fixe l'ancre du tag, l'IDENTITÉ la nuance du nom/de la pastille). L'appelant
+   peut toujours forcer la teinte précise via desc.hex (espèce/famille/rareté). */
 const KINDS = {
   // ── Dessinable + fiche (triple capacité) ──
-  species:      { word: (d, pl) => pl ? ck('monsters') : sc('monster'), fiche: true, mode: 'E', hex: MONSTER_HEX },
-  family:       { word: () => sc('family'),                             fiche: true, mode: 'E', hex: MONSTER_HEX },
-  camp:         { word: () => sc('camp'),                               fiche: true, mode: 'E', hex: d => CAMP_COLORS[d.subrole] || '#888' },
-  npc:          { word: (d, pl) => pl ? ct('npc') : sc('npc'),          fiche: true, mode: 'E', hex: CATS.npc.hex },
-  workshop:     { word: (d, pl) => pl ? ct('workshop') : sc('workshop'), fiche: true, mode: 'C', hex: CATS.workshop.hex },
-  poi:          { word: (d, pl) => pl ? ct('poi') : sc('poi'),          fiche: true, mode: 'C', hex: CATS.poi.hex },
-  zone:         { word: () => sc('zone'),                               fiche: false, mode: 'L', hex: ZONE_HEX },  // souligné une fois la fiche région livrée (vague R)
-  qao:          { word: (d, pl) => pl ? ct('qao') : sc('qao'),          fiche: false, mode: 'C', hex: CATS.qao.hex },
-  chest:        { word: () => sc('chest'),                              fiche: true, mode: 'C', hex: CATS.searchable_chest.hex },
-  shrine:       { word: () => ck('shrines'),                            fiche: false, mode: 'C', hex: CAMP_COLORS.shrines },
-  soulkeeper:   { word: () => ck('soulkeeper'),                         fiche: false, mode: 'C', hex: CAMP_COLORS.soulkeeper },
-  guard:        { word: () => ck('guards'),                             fiche: false, mode: 'C', hex: CAMP_COLORS.guards },
-  destructible: { word: () => ck('destroyable'),                        fiche: false, mode: 'C', hex: CAMP_COLORS.destroyable },
-  reactive:     { word: () => ck('reactive'),                           fiche: false, mode: 'C', hex: CAMP_COLORS.reactive },
-  harvest:      { word: d => ck(d.subrole) || sc('node'),               fiche: false, mode: 'C', hex: d => CAMP_COLORS[d.subrole] || RECIPE_HEX },
-  node:         { word: () => sc('node'),                               fiche: true, mode: 'N', hex: RECIPE_HEX },
+  species:      { word: (d, pl) => pl ? ck('monsters') : sc('monster'), fiche: true, mode: 'E' },
+  family:       { word: () => sc('family'),                             fiche: true, mode: 'E' },
+  camp:         { word: () => sc('camp'),                               fiche: true, mode: 'E' },
+  npc:          { word: (d, pl) => pl ? ct('npc') : sc('npc'),          fiche: true, mode: 'E' },
+  workshop:     { word: (d, pl) => pl ? ct('workshop') : sc('workshop'), fiche: true, mode: 'C' },
+  poi:          { word: (d, pl) => pl ? ct('poi') : sc('poi'),          fiche: true, mode: 'C' },
+  zone:         { word: () => sc('zone'),                               fiche: false, mode: 'L' },  // souligné une fois la fiche région livrée (vague R)
+  qao:          { word: (d, pl) => pl ? ct('qao') : sc('qao'),          fiche: false, mode: 'C' },
+  chest:        { word: () => sc('chest'),                              fiche: true, mode: 'C' },
+  shrine:       { word: () => ck('shrines'),                            fiche: false, mode: 'C' },
+  soulkeeper:   { word: () => ck('soulkeeper'),                         fiche: false, mode: 'C' },
+  guard:        { word: () => ck('guards'),                             fiche: false, mode: 'C' },
+  destructible: { word: () => ck('destroyable'),                        fiche: false, mode: 'C' },
+  reactive:     { word: () => ck('reactive'),                           fiche: false, mode: 'C' },
+  harvest:      { word: d => ck(d.subrole) || sc('node'),               fiche: false, mode: 'C' },
+  node:         { word: () => sc('node'),                               fiche: true, mode: 'N' },
   // ── Fiche seule (tag + libellé souligné, PAS de pastille) ──
-  item:         { word: () => sc('item'),                               fiche: true, mode: 'N', hex: null },
-  quest_item:   { word: () => tr('questItemBadge'),                     fiche: true, mode: 'N', hex: CATS.qao.hex },
-  recipe:       { word: () => sc('recipe'),                             fiche: true, mode: 'N', hex: RECIPE_HEX },
-  quest:        { word: () => sc('quest'),                              fiche: true, mode: 'N', hex: CATS.quest.hex },
-  location:     { word: () => sc('location'),                           fiche: true, mode: 'N', hex: LOCATION_HEX },
-  loot:         { word: () => kindWord('loot'),                         fiche: true, mode: 'N', hex: LOOT_TABLE_HEX },
-  ability:      { word: () => sc('ability'),                            fiche: true, mode: 'N', hex: ABILITY_HEX },
+  item:         { word: () => sc('item'),                               fiche: true, mode: 'N' },
+  quest_item:   { word: () => tr('questItemBadge'),                     fiche: true, mode: 'N' },
+  recipe:       { word: () => sc('recipe'),                             fiche: true, mode: 'N' },
+  quest:        { word: () => sc('quest'),                              fiche: true, mode: 'N' },
+  location:     { word: () => sc('location'),                           fiche: true, mode: 'N' },
+  loot:         { word: () => kindWord('loot'),                         fiche: true, mode: 'N' },
+  ability:      { word: () => sc('ability'),                            fiche: true, mode: 'N' },
   // ── Localise / libellé seul (pas de fiche) ──
-  position:     { word: () => kindWord('position'),                     fiche: false, mode: 'L', hex: null },
-  players:      { word: () => kindWord('players'),                      fiche: false, mode: 'N', hex: null },
+  position:     { word: () => kindWord('position'),                     fiche: false, mode: 'L' },
+  players:      { word: () => kindWord('players'),                      fiche: false, mode: 'N' },
 };
 
 /* Mode de tracé effectif (surcharge desc.mode possible, sinon défaut du kind,
@@ -141,17 +139,28 @@ function refKindLabel(kind, { plural = false, subrole = null } = {}) {
   return w || pretty(kind);
 }
 
-/* Teinte de la référence — helper EXPORTÉ. Priorité : teinte propre à
-   l'entité fournie par l'appelant (desc.hex — rareté/espèce/famille, même
-   source que le pin/filtre carte) > défaut §3 du kind > var(--muted) (jamais
-   un attribut vide, même garde qu'itemColor). Jamais une couleur inventée
-   ici : le composant ne fait que router vers une source existante. */
+/* Teinte PRÉCISE de la référence (--ref-c : le NOM + la pastille) — helper
+   EXPORTÉ. Priorité : teinte propre à l'entité fournie par l'appelant
+   (desc.hex — rareté/espèce/famille, même source que le pin/filtre carte) >
+   entityColor(kind, IDENTITÉ) (config.js, LA source unique : ancre du kind +
+   nuance par identité). L'IDENTITÉ = le nom (desc.label) sinon la clé ; une réf
+   de CATÉGORIE (mode C) n'a PAS d'identité → seed nul → ancre exacte du kind
+   (mono-ton). Jamais une couleur inventée ici : on ne fait que router. */
 function refKindColor(desc) {
   if (desc.hex) return desc.hex;
-  const spec = KINDS[desc.kind];
-  const c = spec && spec.hex;
-  const hex = typeof c === 'function' ? c(desc) : c;
-  return hex || 'var(--muted)';
+  const seed = refMode(desc) === 'C'
+    ? null
+    : (desc.label != null && desc.label !== '' ? desc.label
+      : (desc.key != null && desc.key !== '' ? String(desc.key) : null));
+  return entityColor(desc.kind, seed, { subrole: desc.subrole });
+}
+/* Teinte d'ANCRE du kind (--ref-kc : le TAG) — présentation à deux tons : la
+   pilule de kind porte la couleur CATÉGORIE (uniforme pour tous les PNJ, toutes
+   les quêtes…), le nom/la pastille portent la nuance précise de l'entité. Pour
+   les kinds sans ancre propre décidable (objet=rareté, camp sans sous-rôle) :
+   repli sur la teinte précise → tag = nom (mono-ton, jamais un tag gris). */
+function refKindBaseColor(desc) {
+  return kindBaseHex(desc.kind, desc.subrole) || refKindColor(desc);
 }
 
 /* Has-fiche : le libellé est souligné ⇔ une page existe (§1.1). En mode
@@ -263,6 +272,7 @@ function refParts(desc) {
     kind: desc.kind,
     mode,
     color: refKindColor(desc),
+    kindColor: refKindBaseColor(desc),
     word: refKindLabel(desc.kind, { plural, subrole: desc.subrole }),
     fiche: hasFiche(desc),
     fill: refFill(desc),
@@ -323,7 +333,10 @@ function wrapAttrs(desc, p) {
     // pleines portent déjà leur nom dans `.ref-label`).
     p.mode === 'L' && p.label ? `data-label="${esc(p.label)}"` : '',
     provAttrs(desc),
-    `style="--ref-c:${p.color}"`,
+    // Deux tons : --ref-c = teinte PRÉCISE de l'entité (nom + pastille) ;
+    // --ref-kc = ancre du KIND (tag). Émis même quand identiques (catégorie /
+    // kind sans ancre → mono-ton visuel, aucune régression).
+    `style="--ref-c:${p.color};--ref-kc:${p.kindColor}"`,
   ];
   return a.filter(Boolean).join(' ');
 }

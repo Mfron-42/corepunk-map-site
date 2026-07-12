@@ -2819,10 +2819,16 @@ button.rar-pill:hover {
   align-items: center;
   gap: 5px;
   --ref-c: var(--muted);
+  /* Deux tons : --ref-kc = teinte d'ANCRE du KIND (le tag). Repli sur --ref-c
+     si non posée → mono-ton (aucune régression pour un ancien appel). */
+  --ref-kc: var(--ref-c);
   vertical-align: baseline;
 }
 /* Le tag : pilule teintée (même recette que .k-chip/.cat-chip). Bouton quand
-   la référence est dessinable (data-act=ref-draw) ; span inerte sinon. */
+   la référence est dessinable (data-act=ref-draw) ; span inerte sinon.
+   Porte l'ANCRE du kind (--ref-kc) : « yellow for the npc kind » (owner) — la
+   pilule est identique pour toutes les entités d'un même kind (ancre catégorie
+   scannable), le NOM + la pastille portent la nuance précise de l'entité. */
 .ref-tag {
   display: inline-flex;
   align-items: center;
@@ -2835,15 +2841,15 @@ button.rar-pill:hover {
   line-height: 1.3;
   padding: 3px 7px;
   border-radius: 4px;
-  color: var(--ref-c);
-  background: color-mix(in srgb, var(--ref-c) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ref-c) 42%, transparent);
+  color: var(--ref-kc);
+  background: color-mix(in srgb, var(--ref-kc) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ref-kc) 42%, transparent);
 }
 button.ref-tag {
   cursor: pointer;
   transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
 }
-button.ref-tag:hover { border-color: var(--ref-c); background: color-mix(in srgb, var(--ref-c) 24%, transparent); }
+button.ref-tag:hover { border-color: var(--ref-kc); background: color-mix(in srgb, var(--ref-kc) 24%, transparent); }
 button.ref-tag:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 span.ref-tag { cursor: default; }
 .ref-kindword { white-space: nowrap; }
