@@ -499,6 +499,10 @@ export default {
       // vraie valeur serveur ~350 000) -- ce chiffre fabriqué est retiré,
       // remplacé par ce simple aveu. Voir js/fiches.js monsterStatsSection.
       statsServerNote: 'Statistiques précises résolues côté serveur (indisponibles dans les données du client).',
+      bossHpBadge: 'boss',
+      bossBaseHpLabel: 'PV de base',
+      bossLiveHpLabel: 'PV réels (est.)',
+      bossDifficultyNote: "Ce boss a son propre PV de base (issu des données du jeu). PV réels = base × un multiplicateur de difficulté côté serveur — environ 9 à 10× au niveau 20 (ex. un boss de donjon ≈ 226 000). Le multiplicateur exact est assigné par le serveur : c'est une estimation, jamais un total réel figé.",
       // Badge « calculé » : stats issues de la formule de mise à l'échelle du
       // jeu (décodée byte-exact, voir 
       // pas une estimation.

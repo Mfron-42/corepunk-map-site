@@ -507,6 +507,10 @@ export default {
       // number is removed, replaced by this plain admission. See
       // js/fiches.js monsterStatsSection.
       statsServerNote: 'Precise stats are resolved server-side (not available in the client data).',
+      bossHpBadge: 'boss',
+      bossBaseHpLabel: 'Base HP',
+      bossLiveHpLabel: 'Live HP (est.)',
+      bossDifficultyNote: "This boss has its own base HP (from the game data). Live HP = base × a server-side difficulty multiplier — about 9–10× at level 20 (e.g. a dungeon boss ≈ 226,000). The exact multiplier is assigned server-side, so this is an estimate, never an exact live total.",
       computedStatsBadge: 'computed (game formula)',
       statsPerTierNote: 'Difficulty tier assigned server-side — range shown per tier (easy → boss).',
       // Honest caveat on the Elite/Boss columns (monsters.md finding #2):

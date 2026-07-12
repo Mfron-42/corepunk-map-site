@@ -553,6 +553,28 @@ function monsterStatsSection(m) {
   if (m.statsProvenance === 'record_fixed_sibling' && m.stats && Object.keys(m.stats).length) {
     return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${stateChip('fixed')}</h3>${statsGridHtml(m.stats)}</div>`;
   }
+  // 2-ter. Boss sur-mesure (recalibration 2026-07-12, 3 vraies valeurs de PV
+  //    observées en jeu) : la fourchette générique par palier est FAUSSE pour
+  //    eux (elle donne le même ~34k à TOUT mob niv20, alors que l'Armored
+  //    Troll fait 226 429 et le Young Woodraptor 260 084). Chaque boss porte
+  //    son PROPRE PV de base byte-exact (statsBossDifficulty.base_hp — Troll
+  //    22 330, Woodraptor 28 718) ; le PV réel = base × un multiplicateur de
+  //    difficulté SERVEUR (bande ~9-10× validée au niveau 20 sur les 3
+  //    observations). On affiche la base exacte + la bande estimée (au niveau
+  //    20 seulement, là où elle est prouvée), jamais un total « réel » figé
+  //    qu'on ne connaît pas côté client (honnêteté : le multiplicateur est
+  //    serveur, le client ne l'étiquette que par BDL 1-3 / paliers de loot).
+  if (m.statsBossDifficulty?.base_hp != null) {
+    const bd = m.statsBossDifficulty;
+    const band = S.meta?.bossDifficulty?.level20_multiplier_band;
+    const liveRow = (band && m.level === 20)
+      ? `<div class="frow"><span class="muted">${esc(tr('bossLiveHpLabel'))}</span><b>≈ ${esc(fmtNum(bd.base_hp * band[0]))} – ${esc(fmtNum(bd.base_hp * band[1]))}</b></div>`
+      : '';
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('bossHpBadge'))}</span></h3>
+      <div class="frow"><span class="muted">${esc(tr('bossBaseHpLabel'))}</span><b>${esc(fmtNum(bd.base_hp))}</b></div>
+      ${liveRow}
+      <p class="hint">${esc(tr('bossDifficultyNote'))}</p></div>`;
+  }
   // 3. formula_range : fourchette par palier (les vrais nombres du jeu pour
   //    chaque palier à ce niveau) + provenance repliable optionnelle.
   const sf = S.meta?.statFormula;

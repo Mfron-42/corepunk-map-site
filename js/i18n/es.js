@@ -482,6 +482,10 @@ export default {
       // servidor de ~350.000) — esa cifra inventada se elimina, reemplazada
       // por esta simple advertencia. Ver js/fiches.js monsterStatsSection.
       statsServerNote: 'Las estadísticas precisas se resuelven en el servidor (no disponibles en los datos del cliente).',
+      bossHpBadge: 'jefe',
+      bossBaseHpLabel: 'PV base',
+      bossLiveHpLabel: 'PV reales (est.)',
+      bossDifficultyNote: 'Este jefe tiene su propio PV base (de los datos del juego). PV reales = base × un multiplicador de dificultad del servidor — unos 9-10× a nivel 20 (p. ej. un jefe de mazmorra ≈ 226 000). El multiplicador exacto lo asigna el servidor: es una estimación, nunca un total real fijo.',
       computedStatsBadge: 'calculado (fórmula del juego)',
       statsPerTierNote: 'Nivel de dificultad asignado en el servidor — rango según el nivel (fácil → jefe).',
       // Advertencia honesta sobre las columnas Élite/Jefe (monsters.md finding
