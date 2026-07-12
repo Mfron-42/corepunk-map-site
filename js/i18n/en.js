@@ -373,8 +373,11 @@ export default {
       // path at all (the dominant case for a genuine quest item) -- the
       // quest goal that actually resolved this item is the only true source.
       obtainDuringQuestTitle: 'How to obtain',
-      obtainViaKill: name => `By killing ${name}`,
-      obtainViaInteract: label => `By interacting with ${label}`,
+      // EntityRef wave 2: verb-only PREFIXES — the target now renders as its
+      // own `[Species(●)]`/`[Object]` ref right after (owner: "By killing
+      // [Monster(●)] Imp Witch"), never interpolated into the sentence.
+      obtainViaKill: 'By killing',
+      obtainViaInteract: 'By interacting with',
       // Mechanism decode job B: quest_source_of extension (harvest/reward_of/
       // world -- given_by reuses ui.givenByPlain, container reuses
       // obtainViaInteract above, see build_site_data.py + fiches.js openItemFiche).
@@ -616,6 +619,22 @@ export default {
       effectVarUnextractedTooltip: 'Value not yet extracted from client data',
       effectVarBaseTooltip: 'Value for a base character — scales with your stats',
       effectVarFormulaTooltip: 'Depends on your stats (decoded formula shown)',
+      // Rune/chip effect lines (effect-lines pass, 2026-07-11): the item's
+      // real effect sentence(s) for the base / upgraded / overclocked
+      // variants (byte-proven 0x4b68 variant joins) and chip talent tiers.
+      // A per-rarity token renders the decoded 4-tuple inline, never one
+      // invented number; a variant whose magnitudes live server-side says
+      // so explicitly (same honesty family as overclockServerSide).
+      effectLinesTitle: 'Effect & variants',
+      enhancementEffectTitle: 'Enhancement effect',
+      variantBase: 'Base',
+      variantUpgraded: 'Upgraded',
+      variantOverclocked: 'Overclocked',
+      variantTierT1: 'Tier T1',
+      variantTierT2: 'Tier T2',
+      variantTierT3: 'Tier T3',
+      variantServerSide: 'This variant exists in the game data, but its magnitudes are stored server-side — no exact numbers can be shown.',
+      effectVarPerRarityTooltip: 'Decoded value per rarity (Common / Uncommon / Rare / Epic)',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',

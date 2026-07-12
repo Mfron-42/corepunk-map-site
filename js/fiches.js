@@ -117,7 +117,7 @@ function openCampFiche(key) {
       <span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span></div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
-      ${g.pts.length ? `<button class="act ghost" data-act="camp-highlight" data-id="${esc(key)}" data-n="${g.pts.length}">${esc(tr('highlightPointsBtn', g.pts.length))}</button>` : ''}
+      ${g.pts.length ? campRef(key, g, { self: true }) : ''}
     </div></div>
     ${presenceHtml}
     ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : faunaUnknown}
@@ -811,6 +811,23 @@ function effectVarChip(u) {
   if (u.kind === 'formula') {
     return `<span class="effect-var-inline effect-var-formula" title="${esc(`${tr('effectVarFormulaTooltip')} — ${u.token}`)}">${esc(u.formula)}</span>`;
   }
+  // kind "per_rarity" (effect-lines pass) : la valeur du token est un
+  // 4-uplet PAR RARETÉ décodé (colonne abt_active_rune_ 4 lignes, jamais un
+  // chiffre unique inventé) — rendu inline « 2 / 3 / 4 / 5 » dans l'ordre
+  // Commun→Épique, chaque valeur teintée de sa rareté, tooltip explicite.
+  if (u.kind === 'per_rarity' && u.values) {
+    const vals = RARITY_BANDS.map(r => u.values[r]).filter(v => v != null);
+    const inner = RARITY_BANDS.map(r => {
+      const v = u.values[r];
+      if (v == null) return '';
+      const hex = RARITY[capitalize(r)]?.hex || 'var(--muted)';
+      return `<span style="color:${hex}">${esc(fmtNum(v))}</span>`;
+    }).filter(Boolean).join('<span class="effect-var-sep">/</span>');
+    const title = `${tr('effectVarPerRarityTooltip')} — ${RARITY_BANDS.map(r => `${bandRarityLabel(r)}: ${u.values[r] ?? '—'}`).join(', ')}`;
+    return vals.length
+      ? `<span class="effect-var-inline effect-var-rarity" title="${esc(title)}">${inner}</span>`
+      : `<span class="effect-var effect-var-unknown" title="${esc(tr('effectVarUnextractedTooltip'))}">?</span>`;
+  }
   const runtime = u.kind === 'runtime';
   const cls = runtime ? 'effect-var effect-var-runtime' : 'effect-var effect-var-unknown';
   const label = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');
@@ -964,6 +981,86 @@ function scalingSection(it) {
   return parts.join('');
 }
 
+/* ── Effet d'amélioration (AdditionalDescription d'Items.xml, décodé par la
+   passe boss-heads 2026-07-11) : la ligne « Enhancement effect: … » des
+   trophées têtes de boss (vol de vie on-hit, réduction des autos reçues…) —
+   texte localisé VERBATIM du client, jamais reformulé ni chiffré au-delà de
+   ce que la ligne dit elle-même (le mécanisme précis est côté serveur). */
+function enhancementSection(it) {
+  if (!it.additionalDesc) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('enhancementEffectTitle'))}</h3>
+    <p class="use-effect-text">${esc(it.additionalDesc).replace(/\n/g, '<br>')}</p></div>`;
+}
+
+/* ── Lignes d'effet des runes & puces (effect-lines pass, 2026-07-11) ─────
+   it.effectLines = jointures byte-prouvées item → enregistrements de
+   variante (champs 0x4b68 : base / améliorée(upgraded) / overclockée ;
+   paliers T1-T3 des talents de puce par stem) + textes localisés résolus au
+   build (tooltips ConstAbilityNames via le code 0x56f3, buffs Effects.xml
+   via le registre ViewModels) avec substitution honnête : chaque {{token}}
+   non résolu reste une pastille (effectVarChip), chaque valeur par rareté
+   une pastille 4 couleurs — jamais un chiffre inventé. Une variante « vide »
+   (stub client, magnitudes serveur) rend une note explicite, même règle que
+   overclockServerSide. */
+const VARIANT_LABEL_KEY = {
+  base: 'variantBase', upgraded: 'variantUpgraded', overclocked: 'variantOverclocked',
+  tier_t1: 'variantTierT1', tier_t2: 'variantTierT2', tier_t3: 'variantTierT3',
+};
+const VARIANT_ORDER = { base: 0, tier_t1: 1, tier_t2: 2, tier_t3: 3, upgraded: 4, overclocked: 5 };
+
+function effectLinesSection(it) {
+  const el = it.effectLines;
+  if (!el?.variants?.length) return '';
+  const variants = [...el.variants].sort((a, b) =>
+    (VARIANT_ORDER[a.variant] ?? 9) - (VARIANT_ORDER[b.variant] ?? 9));
+  // une variante peut arriver en PLUSIEURS lignes de jointure (texte de buff
+  // côté effet + tooltip côté capacité, ex. runes actives) — un seul en-tête
+  // par variante, corps concaténés dans l'ordre trié.
+  const seenVariant = new Set();
+  const blocks = variants.map(v => {
+    const labelKey = VARIANT_LABEL_KEY[v.variant];
+    const label = labelKey ? tr(labelKey) : v.variant;
+    const showHeader = !seenVariant.has(v.variant);
+    seenVariant.add(v.variant);
+    const nameBit = v.name && v.name !== it.name ? ` — ${esc(v.name)}` : '';
+    let body = '';
+    for (const t of v.texts || []) {
+      const html = effectResolvedTextHtml({ resolvedDesc: t.text, unresolved: t.unresolved });
+      if (!html && !t.name) continue;
+      const buffName = t.name && t.name !== v.name && t.name !== it.name
+        ? `<span class="effect-line-buff">${esc(t.name)}</span> ` : '';
+      body += `<p class="use-effect-text">${buffName}${html}</p>`;
+    }
+    if (v.formula) {
+      body += `<p class="use-effect-text formula-line"><code>${esc(v.formula)}</code></p>`;
+    }
+    if (v.byRarity) {
+      const rows = rarityColsGridHtml(v.byRarity);
+      if (rows) body += `<div class="stat-grid">${rows}</div>`;
+    }
+    if (v.params) {
+      // face numérique brute d'une variante sans texte localisé : les
+      // paramètres scalaires pliés de SON enregistrement (codes moteur
+      // verbatim, même discipline que rarityColsGridHtml — pas des noms de
+      // stats joueur, on n'en invente pas).
+      const rows = Object.entries(v.params).map(([c, val]) =>
+        `<div class="stat-row-label">${esc(c)}</div><div class="stat-row-value">${esc(fmtNum(val))}</div>`).join('');
+      if (rows) body += `<div class="stat-grid">${rows}</div>`;
+    }
+    if (!body) {
+      // variante attestée par les octets mais au contenu côté serveur —
+      // l'énoncer vaut mieux qu'une ligne absente (même famille de note
+      // honnête qu'overclockServerSide).
+      body = `<p class="hint">${stateChip('unknown')} ${esc(tr('variantServerSide'))}</p>`;
+    }
+    const ocCls = v.variant === 'overclocked' ? ' oc-section' : '';
+    const header = showHeader ? `<h4 class="fiche-sub">${esc(label)}${nameBit}</h4>` : '';
+    return `<div class="effect-line-variant${ocCls}">${header}${body}</div>`;
+  }).join('');
+  if (!blocks) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('effectLinesTitle'))}</h3>${blocks}</div>`;
+}
+
 /* ── Espèce de monstre + sélecteur de niveau/variante (task #80, monster-
    model overhaul part 2 -- remplace l'ancien sélecteur par MODÈLE, feature
    #12) ─────
@@ -1099,6 +1196,23 @@ function openMonsterFiche(key) {
   // honnêtement "inconnu" (le joueur a sa réponse immédiatement, sans
   // scroller au travers de sections qui ne l'intéressent pas encore).
   const campsHtml = monsterCampsHtml(m);
+  // EntityRef (vague 2) : LE toggle d'union espèce vit désormais dans l'en-tête
+  // de la fiche (kill-list §7.2 : l'ex-bouton monsterSpawnHighlightBtn/
+  // « Afficher · N pts » qui vivait en tête de monsterCampsHtml est SUPPRIMÉ).
+  // `[Espèce(●)] Nom · N pts` — la pastille bascule la couche espèce (l'UNION
+  // réelle de tous les camps de la créature, exactement ce que la case espèce
+  // de l'arbre allume ; ref-draw `species` résout key→species) ; teinte
+  // PRÉCISE (speciesLayerHex, Q6) ; libellé en clair (on est déjà sur sa
+  // page). N'apparaît que quand l'espèce a des points sur la carte active
+  // (parité stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
+  const spUnionRes = speciesPoints(spId);
+  const speciesToggle = spUnionRes ? ref({
+    kind: 'species', key, label: species?.name || m.name,
+    hex: speciesLayerHex(spId), hasFiche: false,
+    drawable: true, count: spUnionRes.nPts, drawn: !!S.monsp[spId]?.on,
+  }) : '';
+  const speciesToggleRow = speciesToggle
+    ? `<div class="fiche-section"><div class="pop-actions">${speciesToggle}</div></div>` : '';
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   const statsHtml = monsterStatsSection(m);
@@ -1124,21 +1238,20 @@ function openMonsterFiche(key) {
   // e.g. "Imp Brain (Executioner)") and the quest name are pre-localized,
   // no client-side lookup/race involved -- S.items is only consulted here
   // for the icon/clickability of the item chip (eager/critical bundle, safe).
+  // EntityRef (vague 2) : `[Item]` (objet lâché) + `[Quête]` (la quête qui le
+  // demande) — le tag [Quête] remplace le badge k-chip détaché ; souligné ⇔
+  // résout au catalogue.
   const questDropsHtml = m.questDrops?.length
     ? `<div class="fiche-section"><h3>${esc(tr('monsterQuestItemsTitle'))}</h3>${m.questDrops.map(d => {
         const dit = S.items[d.item_key];
         const dicon = dit?.icon ? `icons/${dit.icon}` : null;
-        const itemLabel = dit
-          ? `<span class="fr-label link"${ecAttr(itemEcHex(dit), itemEcKind(dit))} data-act="${itemFicheAct(dit)}" data-id="${esc(d.item_key)}">${esc(d.item_name)}</span>`
-          : `<span class="fr-label">${esc(d.item_name)}</span>`;
-        const questLabel = S.quests.has(d.quest_slug)
-          ? `<span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(d.quest_slug)}">${esc(d.quest_name)}</span>`
-          : `<span class="fr-label">${esc(d.quest_name)}</span>`;
+        const itemKind = dit && isRecipeKind(dit) ? 'recipe' : (dit?.kind === 'quest_item' ? 'quest_item' : 'item');
+        const itemRefHtml = ref({ kind: itemKind, key: d.item_key, label: d.item_name, hex: dit && itemKind !== 'quest_item' ? itemEcHex(dit) : null, hasFiche: !!dit });
+        const questRefHtml = ref({ kind: 'quest', key: S.quests.has(d.quest_slug) ? d.quest_slug : null, label: d.quest_name, hasFiche: S.quests.has(d.quest_slug) });
         return `<div class="frow">
           ${iconTag(dicon, 'fr-icon', itemGlyph(dit))}
-          ${itemLabel}
-          <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-          ${questLabel}
+          ${itemRefHtml}
+          ${questRefHtml}
         </div>`;
       }).join('')}</div>` : '';
 
@@ -1152,10 +1265,11 @@ function openMonsterFiche(key) {
   }</div>`;
 
   const loreIdx = loreIndexFor(key);
+  // EntityRef (vague 2) : entrée bestiaire/lore = `[Lieu] Titre` (ref location).
   const loreHtml = loreIdx != null ? `<div class="fiche-section"><h3>${esc(tr('loreEntryTitle'))}</h3>
     <div class="frow">
       <span class="fr-icon icon-broken" data-fb="📖"></span>
-      <span class="fr-label link"${ecAttr(LOCATION_HEX, 'location')} data-act="fiche-location" data-id="${loreIdx}">${esc(S.locations[loreIdx].title)}</span>
+      ${ref({ kind: 'location', key: loreIdx, label: S.locations[loreIdx].title, hasFiche: true })}
     </div></div>` : '';
 
   // Ordre de la fiche (manager feedback, task #80/#79) : identité (tête,
@@ -1171,6 +1285,7 @@ function openMonsterFiche(key) {
     ${zoneBtnHtml}
     ${variantSelectHtml}
     ${rawRecordsHtml}
+    ${speciesToggleRow}
     ${campsHtml}
     ${tagsHtml}
     ${statsHtml}
@@ -1237,9 +1352,7 @@ function familyScopeQuestRows(fam) {
       if (!bu || !bu.scope || bu.scope === 'species') continue;
       if (!(bu.families || []).map(familyKey).includes(fam)) continue;
       seen.add(slug);
-      rows.push(`<div class="frow">
-        <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
-      </div>`);
+      rows.push(`<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}</div>`);
       break;
     }
   }
@@ -1267,26 +1380,35 @@ function openFamilyFiche(famKey) {
   // de l'arbre (family-layer, cascade) ; n'apparaît que quand la famille a
   // RÉELLEMENT des points sur la carte active (familyPoints), jamais un
   // bouton qui n'allumerait rien.
-  const famBtn = familyLayerActivateBtn([fam]);
-  const mapSection = famBtn ? `<div class="fiche-section"><div class="pop-actions">${famBtn}</div></div>` : '';
-  // Membres : portrait/glyphe + nom cliquable -> fiche espèce + fourchette
-  // niveau muette + son propre « Afficher · N pts » (species-layer).
+  // EntityRef (vague 2) : l'ex-bouton « Afficher la famille » (familyLayerActivateBtn,
+  // kill-list §7.2) devient le toggle `[Famille(●)] Nom · N pts` — la pastille
+  // bascule les lignes famille de l'arbre (ref-draw `family` → cascade des
+  // espèces) ; teinte PRÉCISE de la famille (familyLayerHex, Q6, la même que
+  // les points/l'arbre) ; libellé en clair (on est déjà sur sa page).
+  // N'apparaît que quand la famille a des points sur la carte active (parité
+  // stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
+  const famRes = familyPoints(fam);
+  const famToggle = famRes ? ref({
+    kind: 'family', key: fam, family: fam, label: pretty(fam),
+    hex: familyLayerHex(fam), hasFiche: false,
+    drawable: true, count: famRes.nPts, drawn: !!S.monfam[fam]?.on,
+  }) : '';
+  const mapSection = famToggle ? `<div class="fiche-section"><div class="pop-actions">${famToggle}</div></div>` : '';
+  // Membres : portrait/glyphe + référence `[Espèce(●)] Nom` (la pastille
+  // remplace l'ex-bouton « Afficher · N pts » PAR MEMBRE, kill-list §7.2 :
+  // elle bascule SA couche de spawn ; nom souligné → fiche espèce quand une
+  // clé de spawn résout). `spId: id` garantit la résolution de couche même
+  // sans clé de spawn (le routeur fait key→species) ; niveau en méta.
   const memberRows = members.map(({ id, sp }) => {
     const repKey = speciesRepKey(sp);
     const icon = sp.portrait ? `icons/${sp.portrait}` : null;
-    const nameHtml = repKey
-      ? `<span class="fr-label link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(repKey)}">${esc(sp.name)}</span>`
-      : `<span class="fr-label"${ecAttr(MONSTER_HEX, 'monster')}>${esc(sp.name)}</span>`;
     const mLvl = sp.levelMin != null
       ? (sp.levelMax != null && sp.levelMax !== sp.levelMin ? tr('levelRangeAbbrev', sp.levelMin, sp.levelMax) : tr('levelAbbrev', sp.levelMin))
       : '';
     const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
-    const showBtn = monsterSpawnHighlightBtn({ species: id, name: sp.name });
     return `<div class="frow fam-member">
       ${iconTag(icon, 'fr-icon', initials(sp.name))}
-      ${nameHtml}${devMark}
-      ${mLvl ? `<span class="muted">${esc(mLvl)}</span>` : ''}
-      ${showBtn ? `<span class="fam-member-show">${showBtn}</span>` : ''}
+      ${speciesRef({ key: repKey, spId: id, name: sp.name, meta: mLvl })}${devMark}
     </div>`;
   }).join('');
   openFiche(`
@@ -1309,14 +1431,13 @@ function openLocationFiche(idx) {
   const l = S.locations[idx];
   if (!l) return;
   S.openFiche = { kind: 'location', id: idx };
+  // EntityRef (vague 2) : `[Espèce(●)] Nom` (speciesRef) — la pastille bascule
+  // la couche espèce (quand des points existent sur la carte active), le nom
+  // souligné ouvre la fiche monstre quand la clé résout ; niveau en méta.
   const monstersHtml = l.monsters?.length
-    ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm => {
-        const known = S.monsters[fm.key];
-        return `<div class="frow">
-          <span class="fr-label${known ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${known ? ` data-act="fiche-monster" data-id="${esc(fm.key)}"` : ''}>${esc(fm.name)}</span>
-          <span class="muted">${fm.level != null ? tr('levelAbbrev', fm.level) : ''}</span>
-        </div>`;
-      }).join('')}</div>` : '';
+    ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm =>
+        `<div class="frow">${speciesRef({ key: fm.key, name: fm.name, meta: fm.level != null ? tr('levelAbbrev', fm.level) : '' })}</div>`
+      ).join('')}</div>` : '';
   openFiche(`
     <div class="fiche-head"><div>
       <div class="fiche-kind" style="color:${LOCATION_HEX}">${esc(locationKindLabel(l.kind))}</div>
@@ -1745,14 +1866,15 @@ function vendorStockSection(vendorKey) {
     // pass) — dot + texte coloré coexistent déjà partout ailleurs sur le
     // site (npcChip icône + liseré, k-chip badge + nom de quête…), garder ce
     // seul endroit neutre aurait fait une exception isolée, pas une règle.
-    const rar = it && RARITY[it.rarity];
-    const dot = rar ? `<span class="rar-dot" style="background:${rar.hex}" title="${esc(rarityLabel(it.rarity))}"></span>` : '';
-    const label = it
-      ? `<span class="fr-label link"${ecAttr(itemEcHex(it), itemEcKind(it))} data-act="${itemFicheAct(it)}" data-id="${esc(key)}">${esc(name)}</span>`
-      : `<span class="fr-label">${esc(name)}</span>`;
+    // EntityRef (vague 2) : `[Item]`/`[Recipe]` — la teinte du tag PORTE déjà
+    // la rareté (Q6, itemEcHex), remplaçant à la fois l'ex-rar-dot et le lien
+    // fr-label ; souligné ⇔ résout ; pas de pastille (un article de stock n'a
+    // rien à dessiner).
+    const kind = it && isRecipeKind(it) ? 'recipe' : 'item';
+    const itemRef = ref({ kind, key, label: name, hex: it ? itemEcHex(it) : null, hasFiche: !!it });
     return `<div class="frow" data-n="${esc(fold(name))}">
       ${iconTag(icon, 'fr-icon', itemGlyph(it))}
-      ${dot}${label}
+      ${itemRef}
       ${priceHtml(price)}
     </div>`;
   }).join('');
@@ -1773,13 +1895,12 @@ function openNpcFiche(idx) {
   // 2 lignes qui, cliquées, ouvraient une fiche vide. Révélé avec le contenu
   // dev (S.devOn), exactement comme partout ailleurs.
   const visibleSlugs = visibleQuestSlugs(r.quests);
+  // EntityRef (vague 2) : chaque quête donnée = `[Quête] Nom` (le tag remplace
+  // le badge k-chip détaché ; souligné → fiche quête). Le bouton carte
+  // (gotoBtn) reste — il vise la position de la quête (= ce donneur).
   const quests = visibleSlugs.map(slug => {
     const q = S.quests.get(slug);
-    return q ? `<div class="frow">
-      <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-      <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
-      ${gotoBtn(q.x, q.z, q.name)}
-    </div>` : '';
+    return q ? `<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}${gotoBtn(q.x, q.z, q.name)}</div>` : '';
   }).join('');
   // Some NPCs are known only from dialog/quest-slot text, with no world
   // placement or map pin at all (site/js/i18n.js's generic posUnknown, same
@@ -1916,6 +2037,97 @@ function nodeChip(nk) {
   return `<span class="chip"${ecAttr(nodeHex(n), 'node')}${attrs}>${esc(label)}</span>`;
 }
 
+/* ── Constructeurs de références EntityRef PARTAGÉS (vague 2) ────────────────
+   Les fiches croisées (« En tuant X », « donné par », lignes de farm, membres
+   de famille…) citaient jusqu'ici les entités via 8 classes-wrapper divergentes
+   (.link/.fr-label/.chip/.ec-name…). Ces 3 constructeurs les ramènent au SEUL
+   composant `[Kind(●)] Nom` (mapref.js ref()), avec la MÊME résolution de
+   teinte précise (Q6) et de couche que les blocs d'objectif (vague 1) — jamais
+   re-dérivée par surface. Honnêteté préservée : non résolu → libellé en clair
+   teinté (Q8), jamais un lien deviné. */
+
+/* Teinte PRÉCISE d'une famille (Q6, spec §9) : le rang de couleur EST l'ordre
+   de monsterFamilies() (tri points desc puis nom — la même que sa ligne
+   d'arbre et ses points composites) ; une famille sans camp joint sur la carte
+   active n'a pas de rang → MONSTER_HEX (repli famille-non-résolue, identique à
+   sa ligne d'arbre 0-camp). LA source unique, partagée par goalTargetChip
+   (cible à portée famille) et openFamilyFiche — jamais re-dérivée. */
+function familyLayerHex(fam) {
+  const rank = monsterFamilies().findIndex(r => r.family === fam);
+  return rank >= 0 ? familyHexByRank(rank) : MONSTER_HEX;
+}
+
+/* Référence ESPÈCE `[Espèce(●)] Nom` par clé de spawn. La pastille EST la
+   couche espèce de l'arbre (ref-draw `species` → le routeur main.js résout
+   key→S.monsters[key].species puis toggleSpecies — jamais re-dérivé ici) ;
+   dessinable ⇔ l'espèce a des points sur la carte active (speciesPoints),
+   sinon pas de pastille (parité stricte avec l'ex-bouton vide « 0 camp »).
+   Teinte PRÉCISE de l'espèce (speciesLayerHex, Q6) quand elle résout,
+   MONSTER_HEX en repli. Nom souligné ⇔ le monstre résout au catalogue.
+   `spId` (id d'espèce) : repli de clé de couche quand aucune clé de spawn ne
+   résout mais que la couche existe (fiche famille — le routeur fait
+   `S.monsters[key]?.species || key`). */
+function speciesRef({ key = null, spId = null, name, hex = null, meta = '' }) {
+  const m = key ? S.monsters[key] : null;
+  const sp = spId || (m ? m.species : null);
+  const spRes = sp ? speciesPoints(sp) : null;
+  return ref({
+    kind: 'species',
+    key: key || sp || null,
+    label: name,
+    hex: hex || (sp ? speciesLayerHex(sp) : MONSTER_HEX),
+    hasFiche: !!m,
+    drawable: !!spRes,
+    count: spRes ? spRes.nPts : 0,
+    drawn: !!(sp && S.monsp[sp]?.on),
+    meta,
+  });
+}
+
+/* Référence PNJ `[PNJ(●)] Nom` — LA forme partagée par toute surface-phrase
+   qui cite un PNJ précis (donné par / récompense de / donneur d'en-tête /
+   acteurs de quête). `ni` (npcIndexByName) donne le pin réel (S.data.npc[ni])
+   → nom souligné ⇔ résolu, pastille LOCATE ⇔ une position est connue ET
+   `locate` demandé. `locate:false` = référence d'IDENTITÉ seule (pas de
+   pastille), pour les surfaces qui ont déjà leur propre affordance carte
+   (en-tête « Voir le donneur », cellule de position des acteurs) — jamais deux
+   localisateurs pour le même PNJ. Teinte CATS.npc.hex, jamais un lien deviné. */
+function npcRef(name, { ni, locate = true } = {}) {
+  if (!name) return '';
+  const idx = ni != null ? ni : npcIndexByName(name);
+  const rec = idx >= 0 ? S.data.npc[idx] : null;
+  const canPing = locate && !!(rec && rec.x != null);
+  return ref({
+    kind: 'npc', key: idx >= 0 ? `npc:${idx}` : null, label: name,
+    hasFiche: idx >= 0,
+    mode: canPing ? 'L' : undefined,
+    drawable: canPing,
+    pos: canPing ? { x: rec.x, z: rec.z } : undefined,
+    subrole: canPing ? 'npc' : null,
+  });
+}
+
+/* Référence CAMP `[Camp(●)] Nom` — lignes de farm (fiche objet/monstre) et
+   en-tête de fiche camp. La pastille est le TOGGLE de surlignage de CE camp
+   (showHighlight de ses points + centrage caméra, routé par main.js ref-draw
+   `camp`) : l'équivalent honnête le plus proche de l'ex-bouton camp-highlight —
+   un camp individuel n'a AUCUN nœud d'arbre, son tracé n'existe que comme
+   surlignage transitoire single-slot (voir main.js). Teinte CAMP_COLORS[kind]
+   (Q6, la couleur de ses points). Nom souligné → fiche camp, SAUF `self` (on
+   est déjà sur sa page → libellé en clair teinté, Q8). `drawn:false` explicite :
+   le surlignage est transitoire (jamais persisté, effacé à la fermeture de
+   fiche) — même fidélité que l'ancien bouton dont le libellé se réinitialisait
+   à chaque rendu. Le chip qualificatif (— Patrouille…) reste à l'appelant. */
+function campRef(key, g, { self = false } = {}) {
+  const n = g.pts.length;
+  return ref({
+    kind: 'camp', key,
+    label: campLabel(key, g.kind, g.name, g.subtype),
+    hex: CAMP_COLORS[g.kind] || '#999',
+    hasFiche: !self, drawable: n > 0, drawn: false, count: n,
+  });
+}
+
 /* Désambiguïsation des items de quête « même nom » (quest-guide-feature plan
    sec 5.2/6.4 : imp_brain_hunt liste 3× "Imp Brain", visuellement identiques
    sans ça). Best-effort : items.json::archetype (ex. "Brain Imp Executioner")
@@ -2035,17 +2247,24 @@ function questItemRow(qi, regionHint) {
   const baseName = cleanLabel(cat?.name || qi.label);
   const name = disambiguatedItemName(baseName, qi.key || qi, currentQuestItemDisambig);
   const icon = cat?.icon ? `icons/${cat.icon}` : null;
-  const badgeHex = qi.isQuestItem ? CATS.qao.hex : CATS.workshop.hex;
-  const badgeLabel = qi.isQuestItem ? tr('questItemBadge') : tr('gameItemBadge');
   const bits = [];
   if (cat && !qi.isQuestItem) {
     if (cat.soldBy?.length) bits.push(tr('soldTag'));
     if (cat.recipes?.length) bits.push(tr('craftableTag'));
     if (cat.drops?.length) bits.push(tr('lootTag'));
   }
-  const label = cat
-    ? `<span class="fr-label link"${ecAttr(itemEcHex(cat), itemEcKind(cat))} data-act="${itemFicheAct(cat)}" data-id="${esc(qi.key)}">${esc(name)}</span>`
-    : `<span class="fr-label">${esc(name)}</span>`;
+  // EntityRef (vague 2) : l'ex-k-chip ([Objet de quête]/[Objet du jeu]) + le
+  // lien fr-label deviennent UNE référence `[Quest Item]`/`[Item]`/`[Recipe]`
+  // (le tag EST le badge — même vocabulaire que goalTargetItemRow). Teinte
+  // itemEcHex (rareté/recette) sauf objet de quête (teinte qao par défaut du
+  // kind) ; souligné ⇔ résout au catalogue ; pas de pastille (un item n'a rien
+  // à dessiner, le placement éventuel vit dans posBit à côté).
+  const kind = qi.isQuestItem ? 'quest_item' : (cat && isRecipeKind(cat) ? 'recipe' : 'item');
+  const itemRef = ref({
+    kind, key: qi.key || null, label: name,
+    hex: cat && kind !== 'quest_item' ? itemEcHex(cat) : null,
+    hasFiche: !!cat,
+  });
   // craft:true (geo.py's craft-only pre-check, propagated onto this exact
   // item row by import_quests.py -- e.g. no_witnesses_to_glory's "Savory
   // mushroom soup"): this goal is fulfilled by CRAFTING, never a spawn --
@@ -2055,29 +2274,18 @@ function questItemRow(qi, regionHint) {
   // craft pre-check) -- the flag wins regardless, a fabricated position is
   // exactly what this whole pass exists to prevent.
   const craftBit = qi.craft ? `<span class="muted">${esc(tr('goalCraftLabel'))}</span>` : '';
-  // givenBy (import_quests.py, geo.py's given_by_giver): this exact item is
-  // handed over by the quest's own giver (dialogue/turn-in grant), never
-  // found in the world -- named + linked to the giver's fiche when
-  // resolvable on the active map (same npcIndexByName lookup as
-  // goalTargetChip's own given_by_giver branch), plain text otherwise
-  // (never a guessed link).
-  const ni = qi.givenBy ? npcIndexByName(qi.givenBy) : -1;
-  // Couleur d'entité (task #77) : seul le NOM du PNJ prend la teinte npc,
-  // pas le verbe "donné par" qui l'entoure -- .ec-name est une classe utilitaire
-  // dédiée à ce cas (une sous-chaîne colorée dans un span plus large déjà
-  // cliquable/muted dans son ensemble), voir style.css.
+  // givenBy (given_by_giver) : EntityRef (vague 2) — « donné par [PNJ(●)] »
+  // (npcRef) remplace l'ex-span .ec-name inline ; nom souligné + pastille
+  // locate ⇔ résolu sur la carte active, jamais un lien deviné.
   const givenByBit = qi.givenBy
-    ? (ni >= 0
-      ? `<span class="muted link" data-act="fiche-npc" data-id="npc:${ni}">${esc(tr('goalGivenByLabel'))} <span class="ec-name"${ecAttr(CATS.npc.hex, 'npc')}>${esc(qi.givenBy)}</span></span>`
-      : `<span class="muted">${esc(tr('goalGivenByLabel'))} ${esc(qi.givenBy)}</span>`)
+    ? `<span class="muted">${esc(tr('goalGivenByLabel'))}</span> ${npcRef(qi.givenBy)}`
     : '';
   const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
     ? (qi.x != null ? gotoBtn(qi.x, qi.z, name) : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint))
     : '';
   return `<div class="frow">
     ${iconTag(icon, 'fr-icon', itemGlyph(cat))}
-    <span class="k-chip" style="--chip-c:${badgeHex}">${badgeLabel}</span>
-    ${label}
+    ${itemRef}
     ${bits.length ? `<span class="muted">${bits.join(' · ')}</span>` : ''}
     ${craftBit}
     ${givenByBit}
@@ -3092,31 +3300,30 @@ function openQuestFiche(slug) {
     // connu de la carte active ; monstre idem vers sa fiche bestiaire —
     // navigation quête → PNJ/monstre sans repasser par la recherche.
     const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
-    let labelHtml = `<span class="fr-label">${esc(aLabel)}</span>`;
-    if (ni >= 0) {
-      labelHtml = `<span class="fr-label link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(aLabel)}</span>`;
+    // EntityRef (vague 2) : l'ex-badge k-chip + lien deviennent une référence
+    // d'IDENTITÉ `[PNJ]`/`[Espèce]`/`[Objet]` — SANS pastille : la cellule de
+    // position (posCell) juste à côté est l'affordance carte propre à CET
+    // acteur PLACÉ (jamais une couche espèce-entière). Nom souligné ⇔ résolu
+    // (mêmes gardes/sources qu'avant : npcIndexByName / monsterKeyFor). Un
+    // acteur "mob" (créature — jamais "monster", qui est le kind de cible
+    // RÉSOLUE de geo.py) porte la teinte espèce précise ; un kind non reconnu
+    // (rare) garde une identité générique, aucun kind EntityRef ne mappant un
+    // type d'acteur arbitraire (justifié, jamais un faux tag).
+    let actorRef;
+    if (a.kind === 'npc') {
+      actorRef = npcRef(aLabel, { ni, locate: false });
     } else if (a.kind === 'mob') {
-      // BUG FIX (quest-guide-feature plan sec 5.3): q.actors[].kind is built
-      // straight from slots[].kind (import_quests.py), which only ever uses
-      // the ACTOR vocabulary value "mob" for a creature -- "monster" is
-      // exclusively the RESOLVED goal-target kind (geo.py). This branch
-      // checked the wrong string and was dead code for every quest, 100% of
-      // the time: every mob actor rendered as plain, non-clickable text even
-      // though monsterKeyFor() (already imported, already correct) resolves
-      // most of them immediately.
       const mk = monsterKeyFor(null, a.label);
-      if (mk) labelHtml = `<span class="fr-label link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(aLabel)}</span>`;
+      const spId = mk ? S.monsters[mk]?.species : null;
+      actorRef = ref({ kind: 'species', key: mk || null, label: aLabel, hex: spId ? speciesLayerHex(spId) : MONSTER_HEX, hasFiche: !!mk, drawable: false });
+    } else if (a.kind === 'object') {
+      actorRef = ref({ kind: 'qao', mode: 'N', label: aLabel });
+    } else {
+      actorRef = `<span class="k-chip" style="--chip-c:#8d99ae">${esc(actorKindLabel(a.kind))}</span> <span class="fr-label">${esc(aLabel)}</span>`;
     }
-    // Couleur d'entité (task #77) : le badge de kind d'acteur distinguait déjà
-    // PNJ/Activable (CATS.npc/CATS.qao) mais confondait un acteur "mob"
-    // (créature, voir le correctif juste au-dessus) avec le générique #8d99ae
-    // -- un acteur monstre porte désormais MONSTER_HEX, cohérent avec le lien
-    // qu'il ouvre (fiche-monster) juste à côté.
-    const actorHex = a.kind === 'npc' ? CATS.npc.hex : a.kind === 'object' ? CATS.qao.hex : a.kind === 'mob' ? MONSTER_HEX : '#8d99ae';
     return `
     <div class="frow">
-      <span class="k-chip" style="--chip-c:${actorHex}">${a.kind === 'object' ? tr('activableBadge') : actorKindLabel(a.kind)}</span>
-      ${labelHtml}
+      ${actorRef}
       ${posCell}
     </div>`;
   }).join('');
@@ -3175,9 +3382,10 @@ function openQuestFiche(slug) {
         ${(q.dialogs.npc || []).map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')}
         ${(q.dialogs.player || []).map(l => `<p class="dlg dlg-player">${esc(l)}</p>`).join('')}
       </details></div>` : '';
+  // EntityRef (vague 2) : quêtes liées = références `[Quête] Nom` (le tag
+  // remplace le badge k-chip détaché ; souligné → fiche quête).
   const related = (q.related || []).filter(s => S.quests.has(s)).map(s =>
-    `<div class="frow"><span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-     <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(s)}">${esc(S.quests.get(s).name)}</span></div>`).join('');
+    `<div class="frow">${ref({ kind: 'quest', key: s, label: S.quests.get(s).name, hasFiche: true })}</div>`).join('');
   const zoneBtn = S.zonesQuest[slug]
     ? `<button class="act ghost" data-act="zone-view" data-id="${esc(slug)}">${esc(tr('viewZoneBtn'))}</button>` : '';
   // « Voir le donneur » : même correctif que les actorRows ci-dessus -- vise
@@ -3211,7 +3419,7 @@ function openQuestFiche(slug) {
     <div class="fiche-head">${iconTag(avatar, 'fiche-avatar', initials(q.giver))}
       <div><div class="fiche-kind" style="color:${CATS.quest.hex}">${esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : ''))}</div><h2>${esc(q.name)}</h2>
       ${explainBadge}
-      ${q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, giverNi)}</div>` : ''}
+      ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: false })}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}</div></div>
     <div class="fiche-section"><div class="pop-actions">
       ${q.x != null && q.posSource !== 'zone' ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
@@ -3244,14 +3452,23 @@ function openQuestFiche(slug) {
    pour une ligne sans lien (rien à distinguer). */
 function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
   const it = linkAct === 'fiche-item' ? S.items[linkId] : null;
-  const act = it ? itemFicheAct(it) : linkAct;
-  const ecHtml = it ? ecAttr(itemEcHex(it), itemEcKind(it)) : linkAct === 'fiche-loot' ? ecAttr(LOOT_TABLE_HEX, 'loot') : '';
-  const labelHtml = linkAct
-    ? `<span class="fr-label link"${ecHtml} data-act="${act}" data-id="${esc(linkId)}">${esc(label)}</span>`
-    : `<span class="fr-label">${esc(label)}</span>`;
+  // EntityRef (vague 2) : le lien de butin devient une référence — `[Item]`/
+  // `[Recipe]` (teinte rareté/recette) pour une ligne objet, `[Loot table]`
+  // pour une ligne table de butin (openItemFiche dropsHtml). Souligné ⇔ la clé
+  // résout au catalogue ; pas de pastille (ni item ni table n'a de placement).
+  // Sans lien (linkAct absent) : libellé en clair, comme avant.
+  let refHtml;
+  if (linkAct === 'fiche-item') {
+    const kind = it && isRecipeKind(it) ? 'recipe' : 'item';
+    refHtml = ref({ kind, key: linkId, label, hex: it ? itemEcHex(it) : null, hasFiche: !!it });
+  } else if (linkAct === 'fiche-loot') {
+    refHtml = ref({ kind: 'loot', key: linkId, label, hasFiche: true });
+  } else {
+    refHtml = `<span class="fr-label">${esc(label)}</span>`;
+  }
   // data-n : nom replié pour le filtre local des longues listes (voir le
   // listener .stock-filter posé sur le drawer plus haut).
-  return `<div class="frow" data-n="${esc(fold(label))}">${iconTag(icon, 'fr-icon', glyph || '📦')}${labelHtml}${rateHtml || ''}</div>`;
+  return `<div class="frow" data-n="${esc(fold(label))}">${iconTag(icon, 'fr-icon', glyph || '📦')}${refHtml}${rateHtml || ''}</div>`;
 }
 
 /* Fiche item : taux de drop (garanti / % séparés), vendeurs (+ position),
@@ -3358,13 +3575,12 @@ function isGenericFarmPoolItem(drops) {
    elle-même garde son propre bouton de surlignage — l'exception cohérente,
    voir main.js camp-highlight). */
 function farmCampRow(key, g) {
-  const n = g.pts.length;
-  const campHex = CAMP_COLORS[g.kind] || '#999';
-  return `<div class="frow">
-    <span class="rar-dot" style="background:${campHex}" title="${esc(campKindLabel(g.kind))}"></span>
-    <span class="fr-label link"${ecAttr(campHex, 'camp')} data-act="fiche-camp" data-id="${esc(key)}">${esc(campLabel(key, g.kind, g.name, g.subtype))}${campQualifierChip(g.qualifier)}</span>
-    <span class="muted">${esc(tr('entityPtsN', n.toLocaleString(numberLocale())))}</span>
-  </div>`;
+  // EntityRef (vague 2) : `[Camp(●)] Nom · N pts` (campRef) — la pastille
+  // remplace l'ex-rar-dot ET l'ex-bouton de surlignage par camp (elle bascule
+  // le surlignage de CE camp, main.js ref-draw `camp`), le nom souligné ouvre
+  // la fiche camp, le compte passe dans le suffixe méta. Chip qualificatif
+  // (— Patrouille…) appendu, comme avant.
+  return `<div class="frow">${campRef(key, g)}${campQualifierChip(g.qualifier)}</div>`;
 }
 
 /* Ligne de repli : camp NON trouvé dans S.camps (carte différente --
@@ -3391,16 +3607,25 @@ function farmUnjoinedRow(c) {
   // c.subtype : absent des lignes m.camps[]/it.farm[] actuelles (le
   // pipeline ne le cuit que sur les GROUPES camps.bin) — repli honnête sur
   // le `name`/kind expédiés, jamais une re-détection front.
+  // EntityRef (vague 2) : `[Camp(●)] Nom` — teinte CAMP_COLORS[kind] posée
+  // (corrige le trou d'ecAttr historique §4.8.3). Le camp n'est PAS sur la
+  // carte active (préfixe ffm-island-*, ou S.camps pas encore chargé) → aucun
+  // surlignage possible ici : la pastille est un pin LOCATE cross-carte (mode
+  // L) quand une position + une carte connue existent (bascule vers cette
+  // carte puis épingle — main.js ref-draw mode L), sinon aucune pastille (rien
+  // à viser honnêtement). Nom souligné → fiche camp ; suffixe méta = nom de la
+  // carte cible (l'info que portait l'ex-bouton cross-carte).
   const label = campLabel(c.camp, c.kind, c.name, c.subtype);
-  const mid = (c.map && c.map !== S.map) ? c.map : null;
-  const btn = (mid && S.maps[mid] && c.x != null)
-    ? crossMapBtn(mid, c.x, c.z, label)
-    : gotoBtn(c.x, c.z, label);
-  return `<div class="frow">
-    <span class="fr-icon icon-broken" data-fb="📍"></span>
-    <span class="fr-label link" data-act="fiche-camp" data-id="${esc(c.camp)}">${esc(label)}${campQualifierChip(c.qualifier)}</span>
-    ${btn}
-  </div>`;
+  const mid = (c.map && c.map !== S.map && S.maps[c.map]) ? c.map : null;
+  const canPing = c.x != null;
+  const campRefHtml = ref({
+    kind: 'camp', key: c.camp, label, hex: CAMP_COLORS[c.kind] || '#999',
+    hasFiche: true,
+    mode: canPing ? 'L' : undefined, drawable: canPing,
+    pos: canPing ? { x: c.x, z: c.z, map: mid || undefined } : undefined,
+    meta: mid ? `· ${mapName(mid)}` : '',
+  });
+  return `<div class="frow">${campRefHtml}${campQualifierChip(c.qualifier)}</div>`;
 }
 
 /* Plafonne à FARM_ROW_CAP lignes visibles + tiroir « +N » -- même idiome
@@ -3418,56 +3643,17 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
    aplati re-cherché en .find() O(n) par clé) a migré vers le résolveur de
    points UNIQUE js/pointsets.js (#82 chunk (b), design §3) — même lookup
    (index paresseux campGroupByKey, partagé avec le compositeur de rendu, le
-   handler camp-highlight de main.js et les sous-couches famille), jamais
-   re-dérivé par surface. Les 3 consommateurs historiques ci-dessous
-   (monsterSpawnHighlightBtn / farmSectionHtml / monsterCampsHtml) l'appellent
-   désormais directement par clé. */
+   surlignage de camp de main.js et les sous-couches famille), jamais
+   re-dérivé par surface. Les consommateurs historiques ci-dessous
+   (campRef / farmSectionHtml / monsterCampsHtml) l'appellent désormais
+   directement par clé. */
 
-/* Bouton « Afficher <espèce> » PARTAGÉ (task #79, rebranché par #82 chunk
-   (d) ; wording UNIFORMISÉ le 2026-07-11, demande utilisateur : l'ancien
-   verbeux « Voir tous les spawns dans ces camps (4 camps · 926 points) »
-   devient l'affordance compacte « Afficher [Imp executioner] · 926 pts » —
-   nom d'espèce en chip d'entité (ecAttr, couleur monstre), compte MINIMAL
-   (« 926 pts », jamais « N camps » : le mot est banni du wording
-   quêtes/étapes/fiches, concept interne data/panneau). Même action
-   qu'avant, sur la fiche monstre (monsterCampsHtml) et les cartes d'étape
-   (goalTargetChip kill/kill_collect) : LA case espèce de l'arbre de gauche,
-   data-act="species-layer" (délégué main.js — toggle S.monsp, persistant
-   jusqu'au décochage, aucun flyTo). Compte affiché = LE résolveur unique
-   (js/pointsets.js speciesPoints — exactement ce que la case allumera).
-   Nom affiché = l'ESPÈCE (S.species — c'est son nœud d'arbre qui se coche),
-   repli sur le nom de variante. Repli honnête : espèce sans camp joint sur
-   la carte active -> chaîne vide, jamais un bouton qui n'allumerait rien
-   (sa ligne d'arbre « 0 camp » reste la voie manuelle). */
-function monsterSpawnHighlightBtn(m) {
-  const spId = m?.species;
-  if (!spId) return '';
-  const res = speciesPoints(spId);
-  if (!res) return '';
-  const spName = S.species[spId]?.name || m.name;
-  return `<button class="act ghost show-entity-btn" data-act="species-layer" data-species="${esc(spId)}" data-n="${res.nPts}" aria-pressed="${S.monsp[spId]?.on ? 'true' : 'false'}">${esc(tr('showEntityBtn'))} <span class="chip-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(spName)}</span> · ${esc(tr('entityPtsN', res.nPts.toLocaleString(numberLocale())))}</button>`;
-}
-
-/* « Afficher la famille sur la carte » — miroir FAMILLE de monsterSpawnHighlightBtn
-   (task #79/#82 chunk (d)/(e)) : coche la/les ligne(s) FAMILLE de l'arbre
-   (data-act="family-layer", délégué main.js — activateFamilyLayers, cascade de
-   toutes les espèces). Compte = union des points via le résolveur UNIQUE
-   (familyPoints par famille, sommés — jamais re-dérivé). Repli honnête :
-   aucune famille avec un camp joint sur la carte active -> chaîne vide (jamais
-   un bouton qui n'allumerait rien). `fams` = jetons post-alias familyKey. */
-function familyLayerActivateBtn(fams) {
-  const toks = [...new Set((fams || []).map(familyKey).filter(Boolean))];
-  if (!toks.length) return '';
-  let nPts = 0, any = false, on = false;
-  for (const f of toks) {
-    const res = familyPoints(f);
-    if (res) { nPts += res.nPts; any = true; }
-    if (S.monfam[f]?.on) on = true;
-  }
-  if (!any) return '';
-  const label = toks.map(pretty).join(' / ');
-  return `<button class="act ghost show-entity-btn" data-act="family-layer" data-family="${esc(toks.join(','))}" data-n="${nPts}" aria-pressed="${on ? 'true' : 'false'}">${esc(tr('showEntityBtn'))} <span class="chip-name"${ecAttr(MONSTER_HEX, 'monster')}>${esc(label)}</span> · ${esc(tr('entityPtsN', nPts.toLocaleString(numberLocale())))}</button>`;
-}
+/* (Les ex-boutons « Afficher <espèce/famille> · N pts » — sont SUPPRIMÉS,
+   kill-list §7.2 : la pastille du tag `[Espèce(●)]`/`[Famille(●)]` EST désormais
+   le toggle (en-tête de fiche monstre/famille, membres de famille, cibles
+   d'objectif — speciesRef/famToggle ci-dessus et goalTargetChip). Leurs
+   handlers de couche correspondants ont été retirés de main.js avec leur
+   dernier émetteur ; la pastille passe par ref-draw. */
 
 function farmSectionHtml(it) {
   if (!it.farm?.length) {
@@ -3556,15 +3742,13 @@ function harvestedOnHtml(it) {
        sur ce qu'il montre.
      - searchable_chest : les 487 placements RÉELS existent (searchable_chests.bin)
        mais la rareté est décidée côté serveur au spawn (jamais dérivable
-       client, voir openSearchableChestFiche's own note) -- surligner ne peut
+       client, voir openSearchableChestFiche's own note) -- le tracé ne peut
        donc honnêtement allumer que la couche ENTIÈRE, jamais un sous-
-       ensemble par rareté fabriqué (data-act="chest-layer-highlight",
-       main.js -- même bookkeeping de toggle que camp-highlight).
-       CONSERVÉ par la purge des surlignages par camp (2026-07-11) : ce
-       bouton n'est PAS un surlignage par camp — il montre la couche
-       ENTIÈRE des 487 placements (celle du nœud d'arbre Interactables >
-       Chests > Coffres fouillables, ON par défaut), choix jugé cohérent
-       avec la règle « action carte = référence à un toggle de gauche ». */
+       ensemble par rareté fabriqué. La référence CATÉGORIE `[Chest(●)]`
+       (EntityRef vague 2, kill-list §7.2) bascule cette couche entière (le
+       nœud d'arbre Interactables > Chests > Coffres fouillables, ON par
+       défaut) — pas un surlignage transitoire ni un sous-ensemble par rareté,
+       cohérent avec « action carte = référence à un toggle de gauche ». */
 function containerChanceText(ch) {
   const pct = ch * 100;
   if (pct < 1) return tr('containerChanceBelowOne');
@@ -3590,12 +3774,18 @@ function containersSectionHtml(it) {
         <p class="hint">${esc(tr('containerCampChestHint'))}</p>
         ${campRows.map(containerRow).join('')}
       </div>` : '';
+  // EntityRef (vague 2, kill-list §7.2) : l'ex-bouton de surlignage de la
+  // couche coffres (transitoire, 487 placements réels) devient la référence
+  // CATÉGORIE `[Chest(●)]` — la pastille bascule la couche d'arbre « Coffres
+  // fouillables » (fkey `searchable_chest`, ON par défaut ; ref-draw `chest` →
+  // vrai toggle de la case, main.js), état lu EN DIRECT de CATS.searchable_chest.on.
+  // Pas de fiche (catégorie, exception no-page ratifiée §3.5).
   const searchN = (S.data.searchable_chest || []).length;
-  const searchHighlightBtn = searchRows.length && searchN
-    ? `<button class="act ghost" data-act="chest-layer-highlight" data-n="${searchN}">${esc(tr('highlightPointsBtn', searchN))}</button>` : '';
+  const searchToggle = searchRows.length && searchN
+    ? ref({ kind: 'chest', mode: 'C', fkey: 'searchable_chest', drawn: CATS.searchable_chest.on, count: searchN }) : '';
   const searchBlock = searchRows.length
     ? `<div class="farm-group">
-        <div class="farm-group-head"><span class="farm-group-label" style="color:${CATS.searchable_chest.hex}">${esc(tr('searchableChestTitle'))}</span>${searchHighlightBtn}</div>
+        <div class="farm-group-head"><span class="farm-group-label" style="color:${CATS.searchable_chest.hex}">${esc(tr('searchableChestTitle'))}</span>${searchToggle}</div>
         ${searchRows.map(containerRow).join('')}
       </div>` : '';
   return `<div class="fiche-section"><h3>${esc(tr('containersTitle'))}</h3>${campBlock}${searchBlock}</div>`;
@@ -3603,15 +3793,14 @@ function containersSectionHtml(it) {
 
 /* Section « Apparaît dans » de la fiche monstre (openMonsterFiche) : même
    jointure camp -> vrai nuage de points que farmSectionHtml ci-dessus
-   (campGroupByKey, résolveur unique js/pointsets.js), + LE toggle ESPÈCE
-   (monsterSpawnHighlightBtn, data-act="species-layer" — la case de l'arbre
-   de gauche, persistante) comme SEULE action carte de la section -- la
+   (campGroupByKey, résolveur unique js/pointsets.js). Le toggle ESPÈCE d'union
+   (la référence `[Espèce(●)]` de l'EN-TÊTE de la fiche, EntityRef vague 2 :
+   pastille = couche espèce de l'arbre) est LA seule action carte de couche -- la
    demande d'origine ("où sont les imps bleus ?") attend l'UNION des nuages
    réels de TOUS les camps de la créature (4 camps ≈ 900+ points pour les
    imps) : c'est exactement ce que la couche espèce allume. Les lignes de
-   camp en dessous sont INFORMATIVES (nom + « N pts » + lien fiche camp,
-   farmCampRow — leurs boutons de surlignage éphémère par camp sont retirés,
-   règle canonique 2026-07-11, voir farmCampRow).
+   camp ci-dessous sont des références `[Camp(●)]` (farmCampRow/farmUnjoinedRow) :
+   pastille = surlignage transitoire de CE camp, nom souligné → fiche camp.
    m.camps[] porte {camp, name, qualifier?, map, kind, x, z} PAR CAMP
    (pipeline pass 2026-07-11b) -- une forme strictement identique à
    it.farm[], donc les MÊMES lignes sont réutilisées telles quelles :
@@ -3648,20 +3837,18 @@ function monsterCampsHtml(m) {
   joined.sort((a, b) => b.g.pts.length - a.g.pts.length);
   unjoined.sort((a, b) => (a.name || a.camp).localeCompare(b.name || b.camp)
     || (QUALIFIER_RANK[a.qualifier] || 0) - (QUALIFIER_RANK[b.qualifier] || 0));
-  // Bouton de groupe (monsterSpawnHighlightBtn, PARTAGÉ avec goalTargetChip
-  // -- task #79, rebranché par #82 chunk (d)) : coche la case ESPÈCE de
-  // l'arbre (persistant, points + zones) -- une action DIFFÉRENTE du
-  // « Surligner » éphémère par camp des lignes en dessous, donc plus
-  // d'omission à ≤1 camp joint (l'ancien bouton-union dupliquait exactement
-  // le highlight de la ligne unique ; celui-ci non).
-  const spawnToggle = monsterSpawnHighlightBtn(m);
-  const highlightAllBtn = spawnToggle ? `<div class="pop-actions">${spawnToggle}</div>` : '';
+  // EntityRef (vague 2) : l'ex-bouton d'union espèce (monsterSpawnHighlightBtn,
+  // kill-list §7.2) est RETIRÉ d'ici — il vit désormais dans l'en-tête de la
+  // fiche (openMonsterFiche `speciesToggleRow`, `[Espèce(●)]` : la pastille du
+  // tag de tête EST le toggle d'union). Les lignes ci-dessous sont des
+  // références `[Camp(●)]` (farmCampRow/farmUnjoinedRow), leur pastille
+  // basculant le surlignage de CE camp.
   const rowsHtml = farmCapRows(
     [...joined.map(r => ({ row: r, joined: true })), ...unjoined.map(c => ({ row: c, joined: false }))],
     x => x.joined ? farmCampRow(x.row.c.camp, x.row.g) : farmUnjoinedRow(x.row),
     n => tr('farmMoreCampsN', n),
   );
-  return `<div class="fiche-section"><h3>${title}</h3>${highlightAllBtn}${rowsHtml}</div>`;
+  return `<div class="fiche-section"><h3>${title}</h3>${rowsHtml}</div>`;
 }
 
 /* Bloc(s) « ingrédients » d'une recette -- UN bloc par référence ATTEIGNABLE
@@ -3738,7 +3925,7 @@ function openRecipeFiche(key) {
         if (!q) return '';
         return `<div class="frow">
           <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
-          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+          ${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}
         </div>`;
       }).join('')}</div>` : '';
   // Schéma trouvable en coffre (#65, 240 stubs recette) : MÊME composant que
@@ -3791,6 +3978,10 @@ function openItemFiche(key) {
   // Effet(s) de la/des capacité(s) liée(s) (item_desc_PLAN.md Phase B) --
   // jointure déjà faite au build (it.useEffect), rendue ici seulement.
   const useEffectHtml = useEffectSection(it);
+  // Effet d'amélioration (têtes de boss & co.) + lignes d'effet des runes/
+  // puces (base/améliorée/overclockée/paliers) — effect-lines pass.
+  const enhancementHtml = enhancementSection(it);
+  const effectLinesHtml = effectLinesSection(it);
 
   // Plages de jet/DPS d'arme (stat_ranges/weapon_dps), formule d'artefact
   // T3 (artifact_formula) et mise à l'échelle rune/puce (rarity_scaling/
@@ -3833,12 +4024,12 @@ function openItemFiche(key) {
         const ni = npcIndexByName(n.name);
         const rec = ni >= 0 ? S.data.npc[ni] : null;
         const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
-        const label = ni >= 0
-          ? `<span class="fr-label link"${ecAttr(CATS.npc.hex, 'npc')} data-act="fiche-npc" data-id="npc:${ni}">${esc(n.name)}</span>`
-          : `<span class="fr-label"${ecAttr(CATS.npc.hex, 'npc')}>${esc(n.name)}</span>`;
+        // EntityRef (vague 2) : `[PNJ] Nom` (npcRef, IDENTITÉ seule — le bouton
+        // carte gotoBtn ci-dessous reste l'affordance de position du marchand,
+        // pas de double localisateur). Portrait conservé en chrome de ligne.
         return `<div class="frow">
           ${iconTag(icon, 'fr-icon', initials(n.name))}
-          ${label}
+          ${npcRef(n.name, { ni, locate: false })}
           ${gotoBtn(n.x, n.z, n.name, 'npc')}
         </div>`;
       }).join('');
@@ -3934,7 +4125,6 @@ function openItemFiche(key) {
       let viaLine = '';
       if (qs.via === 'kill') {
         const viaName = qs.monster_name || null;
-        const viaText = viaName ? esc(tr('obtainViaKill', viaName)) : '';
         // The clickable upgrade (monster fiche link) legitimately CAN'T
         // resolve before S.monsters loads -- monsterKeyFor guards it exactly
         // like every other such link in this file (actorRows, goalTargetChip);
@@ -3943,20 +4133,28 @@ function openItemFiche(key) {
         // race is unavoidable (S.monsters itself has to exist to know the
         // fiche does), so it degrades to plain text instead, never a dead link.
         const viaMonsterKey = qs.monster_key ? monsterKeyFor(qs.monster_key, qs.monster_name) : null;
-        viaLine = viaText
-          ? `<p class="hint">${viaMonsterKey
-              ? `<span class="link"${ecAttr(MONSTER_HEX, 'monster')} data-act="fiche-monster" data-id="${esc(viaMonsterKey)}">${viaText}</span>`
-              : viaText}</p>`
+        // EntityRef (vague 2, exemple ratifié verbatim de l'owner : « By
+        // killing Imp Witch → By killing [Monster(●)] Imp Witch (full color of
+        // imp witch) ») : le verbe seul (obtainViaKill, devenu un PRÉFIXE
+        // i18n) + une référence [Espèce(●)] Nom dans la teinte PRÉCISE de
+        // l'espèce (Q6, speciesRef), la pastille basculant SA couche de spawn.
+        // Non résolu (monster_key absent, ou espèce hors carte active) → tag +
+        // nom en clair teinté (Q8), jamais un lien deviné.
+        viaLine = viaName
+          ? `<p class="hint">${esc(tr('obtainViaKill'))} ${speciesRef({ key: viaMonsterKey, name: viaName })}</p>`
           : '';
       } else if (qs.via === 'container') {
         // collect_from_object (renamed from the old generic "interact" --
         // same wording, see build_site_data.py's own comment on the rename).
-        // TODO(chunk (c), #82 chunk (d) evolved model): once the per-TYPE qao
-        // sub-rows ship, this line should check the matching type row
-        // (placements join by folded object_label -- 47/186 measured), same
-        // click-double-effect as the monster chips. No tree node exists for
-        // it today.
-        viaLine = qs.object_label ? `<p class="hint">${esc(tr('obtainViaInteract', qs.object_label))}</p>` : '';
+        // EntityRef (vague 2, exemple ratifié : « By interacting with Beeswax →
+        // By interacting with [Object(●)] Beeswax ») : verbe seul
+        // (obtainViaInteract, devenu PRÉFIXE i18n) + référence [Objet] Nom. PAS
+        // de pastille : aucun nœud qao par type n'existe encore (chunk (c) non
+        // livré) et ce mécanisme ne byte-joint aucune position — honnête (rien
+        // à dessiner), le tag nomme le kind sans prétendre à un placement.
+        viaLine = qs.object_label
+          ? `<p class="hint">${esc(tr('obtainViaInteract'))} ${ref({ kind: 'qao', mode: 'N', label: cleanLabel(qs.object_label) })}</p>`
+          : '';
       } else if (qs.via === 'harvest') {
         viaLine = `<p class="hint">${esc(tr('obtainViaHarvest', professionLabel(capitalize(qs.profession))))}</p>`;
       } else if (qs.via === 'given_by') {
@@ -3970,8 +4168,11 @@ function openItemFiche(key) {
         // text reuses goalGivenByLabel ("given by") -- only the chip carries
         // the click/link now, never a guessed link when the NPC isn't
         // resolvable (npcChip degrades to a plain styled name honestly).
+        // EntityRef (vague 2) : le donneur devient `[PNJ(●)] Nom` (npcRef) —
+        // nom souligné ⇔ résolu sur la carte active, pastille LOCATE ⇔ position
+        // connue (aucun bouton carte séparé ici → la pastille EST l'affordance).
         viaLine = qs.npc
-          ? `<p class="hint">${esc(tr('goalGivenByLabel'))} ${npcChip(qs.npc, qs.npc ? npcIndexByName(qs.npc) : -1)}</p>`
+          ? `<p class="hint">${esc(tr('goalGivenByLabel'))} ${npcRef(qs.npc)}</p>`
           : '';
       } else if (qs.via === 'reward_of') {
         // receive_reward: granted via a DIFFERENT quest's own turn-in NPC
@@ -3983,24 +4184,27 @@ function openItemFiche(key) {
         // given_by above (task #70). Quest name: kept as a `.link`-styled
         // span (now visibly affordant too, see the generalized `.link` CSS
         // rule) rather than a second chip -- never a guessed/fabricated link.
-        const givenBit = qs.npc ? `${esc(tr('goalGivenByLabel'))} ${npcChip(qs.npc, npcIndexByName(qs.npc))}` : '';
+        // EntityRef (vague 2) : `[PNJ(●)]` (donneur de l'AUTRE quête, npcRef) +
+        // `[Quête] Nom` (la quête dont l'achèvement l'accorde). Le kind-tag
+        // [Quête] remplace le mot « quête » de l'ancien fragment
+        // (obtainViaRewardOfQuest) ; souligné ⇔ la quête résout, jamais deviné.
+        const givenBit = qs.npc ? `${esc(tr('goalGivenByLabel'))} ${npcRef(qs.npc)}` : '';
         const rqSlug = qs.quests?.[0];
         const rqName = qs.quest_names?.[0] || (rqSlug ? pretty(rqSlug) : null);
-        const rqSpan = rqName
-          ? (rqSlug && S.quests.has(rqSlug)
-              ? `<span class="link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(rqSlug)}">${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`
-              : `<span>${esc(tr('obtainViaRewardOfQuest', rqName))}</span>`)
+        const rqResolved = !!(rqSlug && S.quests.has(rqSlug));
+        const rqRef = rqName
+          ? ref({ kind: 'quest', key: rqResolved ? rqSlug : null, label: rqName, hasFiche: rqResolved })
           : '';
-        const bits = [givenBit, rqSpan].filter(Boolean);
+        const bits = [givenBit, rqRef].filter(Boolean);
         viaLine = bits.length ? `<p class="hint">${bits.join(' — ')}</p>` : '';
       } else if (qs.via === 'world') {
         viaLine = `<p class="hint">${esc(tr('obtainViaWorld'))}</p>`;
       }
+      // EntityRef (vague 2) : la ligne d'identité de la quête source (ex-k-chip
+      // + ex-fr-label) devient une seule référence `[Quête] Nom` (le tag
+      // remplace le badge détaché).
       questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
-        <div class="frow">
-          <span class="k-chip" style="--chip-c:${CATS.quest.hex}">${esc(tr('questCat'))}</span>
-          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(qs.quest)}">${esc(srcQuest.name)}</span>
-        </div>
+        <div class="frow">${ref({ kind: 'quest', key: qs.quest, label: srcQuest.name, hasFiche: true })}</div>
         ${viaLine}
       </div>`;
     }
@@ -4012,7 +4216,7 @@ function openItemFiche(key) {
         if (!q) return '';
         return `<div class="frow">
           <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
-          <span class="fr-label link"${ecAttr(CATS.quest.hex, 'quest')} data-act="fiche-quest" data-id="${esc(slug)}">${esc(q.name)}</span>
+          ${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}
         </div>`;
       }).join('')}</div>` : '';
 
@@ -4115,6 +4319,7 @@ function openItemFiche(key) {
       ${recipeChipHtml}</div></div>
     ${raritySelectHtml}
     ${descHtml}
+    ${enhancementHtml}
     ${questSourceHtml}
     ${obtainStatusHtml}
     ${vendorsHtml}
@@ -4122,6 +4327,7 @@ function openItemFiche(key) {
     ${farmHtml}
     ${harvestedOnHtmlBlock}
     ${containersHtml}
+    ${effectLinesHtml}
     ${useEffectHtml}
     ${rollRangeHtml}
     ${rollQualityHtml}

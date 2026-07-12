@@ -343,8 +343,10 @@ export default {
       containerChanceBelowOne: 'hasta < 1 %',
       soldByTitle: 'Vendido por',
       obtainDuringQuestTitle: 'Cómo obtenerlo',
-      obtainViaKill: name => `Matando a ${name}`,
-      obtainViaInteract: label => `Interactuando con ${label}`,
+      // EntityRef wave 2: prefijos de verbo solo — el objetivo se renderiza
+      // como su propia referencia `[Species(●)]`/`[Object]` justo después.
+      obtainViaKill: 'Matando a',
+      obtainViaInteract: 'Interactuando con',
       // Extensión de quest_source_of, decodificación de mecanismo, tarea B
       // (harvest/reward_of/world -- given_by reutiliza ui.givenByPlain,
       // container reutiliza obtainViaInteract de arriba, ver
@@ -584,6 +586,17 @@ export default {
       effectVarUnextractedTooltip: 'Valor aún no extraído de los datos del cliente',
       effectVarBaseTooltip: 'Valor para un personaje base — escala con tus estadísticas',
       effectVarFormulaTooltip: 'Depende de tus estadísticas (se muestra la fórmula decodificada)',
+      // Líneas de efecto de runas/chips (effect-lines pass, 2026-07-11).
+      effectLinesTitle: 'Efecto y variantes',
+      enhancementEffectTitle: 'Efecto de mejora',
+      variantBase: 'Base',
+      variantUpgraded: 'Mejorada',
+      variantOverclocked: 'Overclockeada',
+      variantTierT1: 'Nivel T1',
+      variantTierT2: 'Nivel T2',
+      variantTierT3: 'Nivel T3',
+      variantServerSide: 'Esta variante existe en los datos del juego, pero sus magnitudes se almacenan en el servidor — no se pueden mostrar números exactos.',
+      effectVarPerRarityTooltip: 'Valor decodificado por rareza (Común / Poco común / Rara / Épica)',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',

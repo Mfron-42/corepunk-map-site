@@ -44,39 +44,51 @@ import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
 import './analytics.js';
 
-// Toggle du bouton « Surligner les N points » -- identité trackée par
-// ÉLÉMENT bouton (pas par clé de camp) depuis la section « Comment farmer »
-// de la fiche objet (farm_spot_UX_DESIGN.md étape 6.2) : une fiche camp n'a
-// jamais qu'UNE seule instance de ce bouton (l'ancienne clé suffisait), mais
-// une fiche objet peut désormais en afficher plusieurs à la fois (une par
-// ligne de camp + une par groupe « Surligner tout » qui union plusieurs
-// camps) -- retrouver LEQUEL était actif pour réinitialiser son libellé
-// exige l'élément lui-même, pas une chaîne qui peut être partagée par
-// plusieurs boutons rendus simultanément.
-let highlightedBtn = null;
-
-/* Bascule de surlignage PARTAGÉE (highlight = aperçu éphémère, un seul à la
-   fois — COORDINATION.md) : factorisée hors de 'camp-highlight' ci-dessous
-   pour que 'chest-layer-highlight' (#65, fiches.js containersSectionHtml)
-   participe au MÊME bookkeeping `highlightedBtn` plutôt que de dupliquer le
-   toggle -- cliquer l'un désactive proprement le libellé de l'autre s'il
-   était actif, comme deux boutons camp-highlight le faisaient déjà entre eux. */
-function applyPointHighlight(b, pts, color) {
-  if (highlightedBtn === b && hasHighlight()) {
+/* ── Surlignage transitoire d'UN camp (EntityRef vague 2) ────────────────────
+   Un camp individuel (fiche camp / lignes de farm) n'a AUCUN nœud d'arbre : son
+   tracé n'existe que comme surlignage transitoire single-slot — l'équivalent
+   honnête le plus proche de l'ex-bouton de surlignage de camp (retiré,
+   kill-list §7.2 ; idem l'ex-surlignage de couche coffres). La référence `[Camp(●)]`
+   (fiches.js campRef) bascule le surlignage de SES points ; showHighlight centre
+   aussi la caméra. Single-slot (showHighlight efface le précédent), effacé à la
+   fermeture de fiche (fiches.js closeFiche → clearHighlight). `highlightedCampKey`
+   mémorise le camp en avant pour (a) basculer OFF au re-clic, (b) éteindre la
+   pastille de l'autre camp quand on change. L'état n'est PAS persisté (rendu
+   initial toujours OFF — parité stricte avec l'ancien bouton dont le libellé se
+   réinitialisait à chaque rendu) : on reflète l'état sur la pastille CLIQUÉE
+   (aria-pressed + remplissage), même geste que l'ex-handler species-layer
+   flippait son bouton. */
+let highlightedCampKey = null;
+function setCampRefBubble(el, on) {
+  const tag = el?.querySelector('.ref-tag');
+  const bub = el?.querySelector('.ref-bubble');
+  if (tag) tag.setAttribute('aria-pressed', String(on));
+  // ne jamais écraser un état ⊘ (0 point ici) — un camp surlignable a toujours
+  // des points, mais garde défensive symétrique du refFill de mapref.js.
+  if (bub && bub.dataset.fill !== 'empty' && bub.dataset.fill !== 'empty-on') {
+    bub.setAttribute('data-fill', on ? 'on' : 'off');
+  }
+}
+function toggleCampHighlight(info) {
+  const g = info.key ? campGroupByKey(info.key) : null;
+  if (!g) return;
+  if (highlightedCampKey === info.key && hasHighlight()) {
     clearHighlight();
-    b.textContent = tr('highlightPointsBtn', +b.dataset.n || 0);
-    highlightedBtn = null;
+    highlightedCampKey = null;
+    setCampRefBubble(info.el, false);
     return;
   }
+  const pts = g.pts.map(([x, z]) => ({ x, z }));
   if (!pts.length) return;
-  showHighlight(pts, color || '#888');
-  // Un AUTRE bouton était actif (ex. on bascule de la ligne d'un camp au
-  // bouton « Surligner tout » de son groupe, ou d'un camp à un contenant) :
-  // son libellé doit revenir à l'état par défaut, jamais rester bloqué sur
-  // « Masquer ».
-  if (highlightedBtn && highlightedBtn !== b) highlightedBtn.textContent = tr('highlightPointsBtn', +highlightedBtn.dataset.n || 0);
-  highlightedBtn = b;
-  b.textContent = tr('hideHighlightBtn');
+  // un AUTRE camp était en avant : éteindre sa pastille (si encore dans le
+  // drawer) avant d'allumer le nouveau (single-slot, comme l'ancien bouton).
+  if (highlightedCampKey && highlightedCampKey !== info.key) {
+    const prev = document.querySelector(`#detail .ref[data-kind="camp"][data-key="${CSS.escape(highlightedCampKey)}"]`);
+    if (prev) setCampRefBubble(prev, false);
+  }
+  showHighlight(pts, CAMP_COLORS[g.kind] || '#888');
+  highlightedCampKey = info.key;
+  setCampRefBubble(info.el, true);
 }
 
 /* ── Couches espèce/famille (#82 chunk (d)) : orchestration d'un geste ────
@@ -149,31 +161,12 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-searchable-chest') openSearchableChestFiche(id);
   else if (b.dataset.act === 'fiche-recipe') openRecipeFiche(id);
   else if (b.dataset.act === 'fiche-node') openNodeFiche(id);
-  else if (b.dataset.act === 'camp-highlight') {
-    // « Montre-moi TOUS les points de CE camp » — toggle : un second clic
-    // efface le surlignage sans fermer la fiche. SEUL usage restant : le
-    // bouton de la FICHE CAMP elle-même (openCampFiche — une fiche camp qui
-    // surligne ses propres points est cohérente, exception documentée). Les
-    // anciens boutons PAR CAMP des fiches monstre/objet (farmCampRow) et le
-    // « Surligner tout » d'union `data-ids` (farmSectionHtml) sont RETIRÉS
-    // (règle canonique 2026-07-11 : toute action carte = une référence à un
-    // toggle de l'arbre de gauche — l'action de section est le toggle
-    // ESPÈCE data-act="species-layer" ; un camp individuel n'a pas de nœud
-    // d'arbre → sa ligne devient informative). Le support data-ids est
-    // supprimé avec ses appelants.
-    const g = id ? campGroupByKey(id) : null;
-    if (!g) return;
-    applyPointHighlight(b, g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888');
-  }
-  else if (b.dataset.act === 'chest-layer-highlight') {
-    // Ligne « Coffre fouillable » d'un groupe de contenants (#65,
-    // fiches.js containersSectionHtml) : la rareté n'est PAS dérivable par
-    // placement (décidée côté serveur au spawn, voir openSearchableChestFiche's
-    // own note) -- seule la couche ENTIÈRE des 487 vrais placements peut
-    // s'allumer honnêtement, jamais un sous-ensemble par rareté fabriqué.
-    const pts = (S.data.searchable_chest || []).map(r => ({ x: r.x, z: r.z }));
-    applyPointHighlight(b, pts, CATS.searchable_chest.hex);
-  }
+  // (Les ex-handlers de surlignage transitoire par camp / de la couche
+  // coffres — RETIRÉS, kill-list §7.2 : la pastille des références
+  // `[Camp(●)]`/`[Chest(●)]` (fiches.js campRef/containersSectionHtml) porte
+  // désormais le geste, routée par ref-draw ci-dessous. Les ex-handlers de
+  // couche espèce/famille sont pareillement retirés — leurs pastilles
+  // `[Espèce(●)]`/`[Famille(●)]` passent par ref-draw.)
   else if (b.dataset.act === 'roll-rarity') setRollRarity(id, b.dataset.r);
   else if (b.dataset.act === 'zone-view') flyToQuestZone(id);
   else if (b.dataset.act === 'goal-zone-view') viewGoalZone(b.dataset.zi);
@@ -210,28 +203,6 @@ document.addEventListener('click', e => {
   // focus/historique que les drapeaux (pas de pushFocusState/unfocus),
   // l'autre voie de retrait étant la pastille/le ✕ du bandeau-légende.
   else if (b.dataset.act === 'remove-locate-pin') removeLocatePin(b.dataset.id);
-  // Bouton « voir tous les spawns » des fiches monstre/étapes de quête
-  // (#82 chunk (d) — fiches.js monsterSpawnHighlightBtn, rebranché) : la
-  // MÊME action que la case espèce de l'arbre, en TOGGLE — persistant
-  // jusqu'au décochage, plus jamais un aperçu éphémère qui meurt avec la
-  // fiche (pas de pushFocusState : aucun focus ne change).
-  else if (b.dataset.act === 'species-layer') {
-    const spId = b.dataset.species;
-    if (!spId) return;
-    const on = toggleSpecies(spId);
-    b.classList.toggle('on', on);
-    b.setAttribute('aria-pressed', String(on));
-    buildFilters();
-    scheduleRedraw();
-    syncHash();
-    if (on) revealMonsterNode('species', spId);
-  }
-  // Chip à portée FAMILLE (étape de quête, bound_units.scope="family"/
-  // "families" — fiches.js goalTargetChip) : pas de fiche famille (chunk
-  // (e)), le clic coche la/les lignes famille — jamais un clic mort.
-  else if (b.dataset.act === 'family-layer') {
-    activateFamilyLayers((b.dataset.family || '').split(',').filter(Boolean));
-  }
 });
 
 /* ── EntityRef (◇) : l'UNIQUE délégué du composant js/mapref.js ──────────────
@@ -313,6 +284,21 @@ initMapRefDelegation(document, {
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la
         // zone », key = index dans currentGoalZones de la fiche ouverte).
         if (info.kind === 'zone' && info.subrole === 'goal-zone') { viewGoalZone(info.key); break; }
+        // Camp individuel (mode E) — surlignage transitoire self-toggle (vague
+        // 2, remplace l'ex-surlignage de camp, kill-list §7.2) : un camp n'a
+        // aucun nœud d'arbre. Un camp CROSS-carte (farmUnjoinedRow) est mode L →
+        // il tombe dans le traitement locate ci-dessous, jamais ici.
+        if (info.kind === 'camp' && info.mode !== 'L') { toggleCampHighlight(info); break; }
+        // Catégorie « Coffres fouillables » (mode C, vague 2, remplace
+        // l'ex-surlignage de couche coffres) : VRAI toggle de la case (checkbox,
+        // .click() bascule dans les DEUX sens — contrairement à
+        // activateCategoryNode, ensure-only, du repli catégorie générique
+        // plus bas ; la couche est ON par défaut, il faut pouvoir l'éteindre).
+        if (info.kind === 'chest' && info.fkey) {
+          const input = document.querySelector(`#filters li[data-fkey="${CSS.escape(info.fkey)}"] input`);
+          if (input) input.click();
+          break;
+        }
         // Locate (mode L) — TOGGLE (Q7, spec §9, ratifié 2026-07-11 soir,
         // supersède le one-shot goTo de §2.4) : position / qao placé / PNJ
         // épinglé / centroïde de zone. Membre du jeu S.locates → RETRAIT du

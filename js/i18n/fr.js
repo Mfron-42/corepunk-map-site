@@ -371,8 +371,10 @@ export default {
       containerChanceBelowOne: "jusqu'à < 1 %",
       soldByTitle: 'Vendu par',
       obtainDuringQuestTitle: 'Comment obtenir',
-      obtainViaKill: name => `En tuant ${name}`,
-      obtainViaInteract: label => `En interagissant avec ${label}`,
+      // EntityRef vague 2 : PRÉFIXES verbe seul — la cible se rend en référence
+      // `[Espèce(●)]`/`[Objet]` juste après, jamais interpolée dans la phrase.
+      obtainViaKill: 'En tuant',
+      obtainViaInteract: 'En interagissant avec',
       // Extension quest_source_of, passe décodage mécanisme job B (harvest/
       // reward_of/world -- given_by réutilise ui.givenByPlain, container
       // réutilise obtainViaInteract ci-dessus, voir build_site_data.py +
@@ -608,6 +610,23 @@ export default {
       effectVarUnextractedTooltip: 'Valeur pas encore extraite des données du client',
       effectVarBaseTooltip: 'Valeur pour un personnage de base — évolue avec vos stats',
       effectVarFormulaTooltip: 'Dépend de vos stats (formule décodée affichée)',
+      // Lignes d'effet runes/puces (effect-lines pass, 2026-07-11) : les
+      // phrases d'effet réelles de l'objet pour les variantes base /
+      // améliorée / overclockée (jointures 0x4b68 prouvées à l'octet) et les
+      // paliers de talent des puces. Un token par rareté rend le 4-uplet
+      // décodé en ligne, jamais un chiffre unique inventé ; une variante aux
+      // magnitudes côté serveur le dit explicitement (même famille
+      // d'honnêteté qu'overclockServerSide).
+      effectLinesTitle: 'Effet et variantes',
+      enhancementEffectTitle: 'Effet d’amélioration',
+      variantBase: 'Base',
+      variantUpgraded: 'Améliorée',
+      variantOverclocked: 'Overclockée',
+      variantTierT1: 'Palier T1',
+      variantTierT2: 'Palier T2',
+      variantTierT3: 'Palier T3',
+      variantServerSide: 'Cette variante existe dans les données du jeu, mais ses valeurs sont stockées côté serveur — impossible d’afficher des nombres exacts.',
+      effectVarPerRarityTooltip: 'Valeur décodée par rareté (Commun / Peu commun / Rare / Épique)',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',

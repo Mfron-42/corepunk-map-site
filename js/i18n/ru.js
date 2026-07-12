@@ -330,8 +330,10 @@ export default {
       containerChanceBelowOne: 'до < 1 %',
       soldByTitle: 'Продаётся у',
       obtainDuringQuestTitle: 'Как получить',
-      obtainViaKill: name => `Убив ${name}`,
-      obtainViaInteract: label => `Взаимодействуя с ${label}`,
+      // EntityRef wave 2: префиксы-глаголы — цель рендерится собственной
+      // ссылкой `[Species(●)]`/`[Object]` сразу после.
+      obtainViaKill: 'Убив',
+      obtainViaInteract: 'Взаимодействуя с',
       // Расширение quest_source_of, декодирование механизма, задача B
       // (harvest/reward_of/world -- given_by переиспользует ui.givenByPlain,
       // container переиспользует obtainViaInteract выше, см. build_site_data.py
@@ -568,6 +570,17 @@ export default {
       effectVarUnextractedTooltip: 'Значение ещё не извлечено из данных клиента',
       effectVarBaseTooltip: 'Значение для базового персонажа — растёт с вашими характеристиками',
       effectVarFormulaTooltip: 'Зависит от ваших характеристик (показана декодированная формула)',
+      // Строки эффектов рун/чипов (effect-lines pass, 2026-07-11).
+      effectLinesTitle: 'Эффект и варианты',
+      enhancementEffectTitle: 'Эффект улучшения',
+      variantBase: 'База',
+      variantUpgraded: 'Улучшенная',
+      variantOverclocked: 'Разогнанная',
+      variantTierT1: 'Уровень T1',
+      variantTierT2: 'Уровень T2',
+      variantTierT3: 'Уровень T3',
+      variantServerSide: 'Этот вариант есть в данных игры, но его величины хранятся на сервере — точные числа показать невозможно.',
+      effectVarPerRarityTooltip: 'Декодированное значение по редкости (Обычная / Необычная / Редкая / Эпическая)',
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
