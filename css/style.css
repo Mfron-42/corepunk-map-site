@@ -1523,8 +1523,13 @@ body {
 #detail-body { padding: 14px 18px 28px; clear: none; }
 
 /* Marge droite = empreinte de #detail-close (32px + 14px de marge) : même
-   principe que le gutter gauche d'avant, juste retourné avec elle. */
-.fiche-head { display: flex; gap: 13px; align-items: center; margin: 4px 46px 4px 0; min-width: 0; }
+   principe que le gutter gauche d'avant, juste retourné avec elle.
+   Alignement HAUT (revue layout owner 2026-07-12 « icône en haut, titre et
+   pastille alignés en haut avec l'icône ») : l'icône ancre le coin supérieur,
+   le titre (avec sa pastille de tête) et le sous-titre s'alignent sur le HAUT
+   de l'icône plutôt que de flotter centrés verticalement contre elle — plus net
+   à lire, surtout quand le titre tient sur une seule ligne. */
+.fiche-head { display: flex; gap: 13px; align-items: flex-start; margin: 4px 46px 4px 0; min-width: 0; }
 /* La colonne texte de l'en-tête (nature + titre + sous-libellés) peut se
    rétrécir : sans min-width:0 un titre long forçait l'en-tête plus large que
    le panneau (fix E, défense générale). Le titre lui-même peut se couper. */
@@ -1559,7 +1564,11 @@ body {
    --ref-c), et le détail kind/niveau passe SOUS lui (sous-titre muet, sans
    répéter le nom). Le sous-titre est désormais TOUJOURS muet (var(--muted)) :
    la couleur d'identité vit sur le titre, pas en double sur les deux lignes. */
-.fiche-head-main { min-width: 0; }
+/* Léger décalage du haut : la boîte-icône a bordure+padding (le pixel du
+   portrait commence ~4px sous le bord de sa boîte), donc la 1ʳᵉ ligne du titre
+   s'aligne optiquement sur le HAUT visible de l'icône, pas sur le bord de sa
+   boîte (align-items:flex-start seul laisserait le titre 3–4px trop haut). */
+.fiche-head-main { min-width: 0; padding-top: 4px; }
 .fiche-title {
   display: flex;
   align-items: center;

@@ -67,6 +67,11 @@ export default {
       // level-design tokens).
       guardsRowLabel: 'Guards (unidentified unit)',
       kindRestRow: 'Unidentified spawns',
+      // Wildlife group only: the generic peaceful/wild fauna pools bind no
+      // client-side species (roster resolved server-side) — but the spawn ZONES
+      // are real, so this is a first-class « Peaceful animals » layer, not a
+      // « missing data » count.
+      wildlifeRestRow: 'Peaceful animals',
       searchSpotsRow: 'Search spots (camps)',
       destroyableCampsRow: 'Destroyables (camps)',
       reactiveCampsRow: 'Interactives (camps)',

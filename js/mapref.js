@@ -314,6 +314,14 @@ function wrapAttrs(desc, p) {
     desc.subrole ? `data-subrole="${esc(desc.subrole)}"` : '',
     desc.pos ? `data-x="${esc(String(desc.pos.x))}" data-z="${esc(String(desc.pos.z))}"${desc.pos.map ? ` data-map="${esc(desc.pos.map)}"` : ''}` : '',
     desc.zone != null ? `data-zone="${esc(String(desc.zone))}"` : '',
+    // Nom de l'entité porté sur le conteneur pour les refs LOCATE (mode L) :
+    // une pastille d'EN-TÊTE (refDot) n'a PAS de `.ref-label` d'où relire le
+    // nom, donc le pin déposé (et sa tag de légende) retomberait sur le mot de
+    // kind (« Quête »/« PNJ ») au lieu du nom réel (« Facing the Flame »/
+    // « Zugg Clankwhistle »). data-label le fournit à readRefInfo → même nom
+    // partout : titre, pin, bandeau-légende. Émis seulement en mode L (les refs
+    // pleines portent déjà leur nom dans `.ref-label`).
+    p.mode === 'L' && p.label ? `data-label="${esc(p.label)}"` : '',
     provAttrs(desc),
     `style="--ref-c:${p.color}"`,
   ];
@@ -397,7 +405,10 @@ function readRefInfo(wrap) {
     x: d.x != null ? +d.x : null,
     z: d.z != null ? +d.z : null,
     map: d.map || null,
-    label: (wrap.querySelector('.ref-label') || {}).textContent || null,
+    // Nom : le `.ref-label` (refs pleines) d'abord, sinon data-label (pastilles
+    // d'en-tête refDot, sans libellé rendu) — le pin locate garde ainsi le NOM
+    // de l'entité, jamais le mot de kind (voir wrapAttrs data-label).
+    label: (wrap.querySelector('.ref-label') || {}).textContent || wrap.dataset.label || null,
     el: wrap,
   };
 }

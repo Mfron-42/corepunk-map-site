@@ -470,7 +470,17 @@ function appendKindRestRow(ul, kind) {
   if (!st) return;
   const rest = kindRestPoints(kind);
   if (!rest.nPts) return;
-  ul.appendChild(filterRow('camp:' + kind, tr('kindRestRow'), CAMP_COLORS[kind] || '#888',
+  // Groupe Wildlife : les pools de faune paisible/sauvage génériques
+  // (peaceful-animals-<région> / wild-animal-<région>, ~8000 points) ne portent
+  // AUCUN roster d'espèce côté client (attribué côté serveur, prouvé côté
+  // données) — mais leurs ZONES de spawn sont bien réelles. La ligne devient donc
+  // une couche À PART ENTIÈRE « Animaux paisibles » (wildlifeRestRow), pas un
+  // « Spawns non identifiés » qui se lit comme une donnée manquante. Pour
+  // monsters/creeps, « non identifiés » reste juste (un mob sans espèce jointe).
+  // Même mécanique inchangée (kindRestPoints, jeton camp.<kind>, couleur du pool
+  // CAMP_COLORS[kind]) et même intégration légende (filterRow → collectActiveTags).
+  const label = tr(kind === 'wildlife' ? 'wildlifeRestRow' : 'kindRestRow');
+  ul.appendChild(filterRow('camp:' + kind, label, CAMP_COLORS[kind] || '#888',
     rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, 'filter-row-sub'));
 }
 
@@ -767,6 +777,27 @@ function syncEntityRefDots() {
     btn.setAttribute('aria-pressed', String(on));
     const bub = btn.querySelector('.ref-bubble');
     if (bub && bub.dataset.fill !== 'partial') bub.dataset.fill = on ? 'on' : 'off';
+  }
+  // Pastilles mode C (catégorie : ex. `[Chests(●)]` de la section « contenants »
+  // d'une fiche objet, fiches.js containersSectionHtml). L'état dessiné d'une
+  // catégorie est celui de SA LIGNE D'ARBRE (la même source que le bandeau
+  // collectActiveTags lit) : on relit la case cochée/indéterminée par fkey. SANS
+  // cette passe, la pastille restait FIGÉE à son état de build — cliquer la
+  // pastille route vers la case d'arbre (main.js ref-draw chest→input.click),
+  // qui basculait bien la couche + l'arbre + la légende, mais la pastille de la
+  // fiche « ne savait plus si elle était cochée » (retour owner 2026-07-12).
+  for (const btn of document.querySelectorAll('.ref[data-mode="C"] [data-act="ref-draw"]')) {
+    const d = btn.closest('.ref').dataset;
+    if (!d.fkey) continue;
+    const input = document.querySelector(`#filters li[data-fkey="${CSS.escape(d.fkey)}"] input`);
+    if (!input) continue;
+    const on = input.checked, partial = input.indeterminate;
+    btn.setAttribute('aria-pressed', String(on || partial));
+    const bub = btn.querySelector('.ref-bubble');
+    if (!bub) continue;
+    const f = bub.dataset.fill;
+    if (f === 'empty' || f === 'empty-on') bub.dataset.fill = on ? 'empty-on' : 'empty';
+    else bub.dataset.fill = partial ? 'partial' : (on ? 'on' : 'off');
   }
 }
 

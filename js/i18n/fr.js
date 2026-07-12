@@ -72,6 +72,11 @@ export default {
       // (tokens internes d'outil de level-design, pas des termes du jeu).
       guardsRowLabel: 'Gardes (unité non identifiée)',
       kindRestRow: 'Spawns non identifiés',
+      // Groupe Wildlife seulement : les pools de faune paisible/sauvage
+      // génériques ne lient AUCUNE espèce côté client (roster côté serveur) —
+      // mais les ZONES de spawn sont réelles, donc une couche à part entière
+      // « Animaux paisibles », pas un compte « donnée manquante ».
+      wildlifeRestRow: 'Animaux paisibles',
       searchSpotsRow: 'Points de fouille (camps)',
       destroyableCampsRow: 'Destructibles (camps)',
       reactiveCampsRow: 'Interactifs (camps)',

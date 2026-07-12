@@ -51,6 +51,11 @@ export default {
       // Interactuables. GLOSSARY-PENDING.
       guardsRowLabel: 'Guardias (unidad sin identificar)',
       kindRestRow: 'Apariciones sin identificar',
+      // Solo grupo Wildlife: los pools genéricos de fauna pacífica/salvaje no
+      // vinculan ninguna especie del lado cliente (roster del lado servidor),
+      // pero las ZONAS de aparición son reales — capa propia « Animales
+      // pacíficos », no un recuento de « datos faltantes ».
+      wildlifeRestRow: 'Animales pacíficos',
       searchSpotsRow: 'Puntos de registro (campamentos)',
       destroyableCampsRow: 'Destructibles (campamentos)',
       reactiveCampsRow: 'Interactivos (campamentos)',

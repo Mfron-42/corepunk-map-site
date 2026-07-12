@@ -3307,10 +3307,17 @@ function openDialogueFiche(q, slug) {
     ? lines.map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')
     : `<p class="hint">${esc(tr('noResults'))}</p>`;
   const giverRow = q.giver ? `<div class="reward-chips quest-giver-row">${npcChip(q.giver, ni)}</div>` : '';
+  // EN-TÊTE (TASK 1) : même pastille LOCATE que la fiche quête — un bark PNJ
+  // porte la position de son personnage (giverPin) : `(●) <bark>` l'épingle sur
+  // la carte quand cette position est connue, sinon titre coloré seul.
+  const dlgDot = giverPin && giverPin.x != null
+    ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: CATS.quest.hex,
+        drawable: true, pos: { x: giverPin.x, z: giverPin.z } }
+    : null;
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name)),
-      name: q.name, hex: CATS.quest.hex, sub: esc(tr('dialogueFicheKind')), below: giverRow,
+      name: q.name, hex: CATS.quest.hex, dot: dlgDot, sub: esc(tr('dialogueFicheKind')), below: giverRow,
     })}
     <div class="fiche-section">
       <h3>${esc(tr('dialogueHeading'))}</h3>
@@ -3476,6 +3483,20 @@ function openQuestFiche(slug) {
   const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
   const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
   const giverCatAttr = giverCat ? ` data-cat="${giverCat}"` : '';
+  // EN-TÊTE PARTAGÉ (TASK 1, exemple phare owner) : une quête PORTE la position
+  // de son DONNEUR — `(●) Facing the Flame` épingle/retire ce donneur sur la
+  // carte (pin LOCATE persistant, mode L/Q7, listé dans le bandeau-légende et
+  // retirable), la MÊME affordance que les fiches PNJ/camp/lieu/coffre. Présente
+  // ⇔ une position de donneur RÉELLE est connue — MÊMES gardes que le bouton
+  // « Voir le donneur » plus bas (q.x connu ET pas une position dérivée d'une
+  // zone) ; sinon titre coloré seul (règle owner « pas de dot sans position »).
+  // Vise le pin PNJ réel quand résolu (giverX/giverZ, comme le bouton) ; le nom
+  // du pin = le nom de la quête (refDot data-label). Le bouton « Voir le
+  // donneur » (vol caméra ponctuel) reste, distinct du pin persistant.
+  const questDot = (q.x != null && q.posSource !== 'zone')
+    ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: CATS.quest.hex,
+        drawable: true, pos: { x: giverX, z: giverZ } }
+    : null;
   const explainBadge = questExplainedBadge(q);
   const journalHtml = questJournalSection(q);
   // « Sur la carte » (acteurs de la quête, positionnés ou non) : PAS
@@ -3494,7 +3515,7 @@ function openQuestFiche(slug) {
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver)),
-      name: q.name, hex: CATS.quest.hex,
+      name: q.name, hex: CATS.quest.hex, dot: questDot,
       sub: esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : '')),
       below: `${explainBadge}
       ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: false })}</div>` : ''}
