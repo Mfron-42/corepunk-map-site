@@ -50,10 +50,13 @@ const S = {
   // camps:[{camp,name,qualifier?,map,x,z,n}], pts, loot?, lootShared?} — 25
   // espèces au catalogue, 6 liées à ≥1 camp (déjà jointes via camp_details
   // `wild:true`, voir pointsets.js wildSpeciesIndex/wildSpeciesOfKind), 19
-  // honnêtement "0 camp" (tortues/poules/oies/…, voir pointsets.js
-  // zeroCampWildlifeSpecies) — display-only, aucune fiche dédiée (même
-  // traitement non-cliquable que les espèces wild déjà listées, voir
-  // sidebar.js speciesRowLi/speciesRep -> [null,null] pour ces ids).
+  // honnêtement "0 camp" (tortues/poules/oies/…) — display-only, aucune
+  // fiche dédiée. Depuis le retrait du groupe « Faune sauvage » (2026-07-12),
+  // ces espèces 0-camp ne sont PLUS dans l'arbre : elles restent trouvables
+  // par la RECHERCHE (search.js buildWildSpeciesSearchIndex, direct depuis ce
+  // catalogue). Les espèces wild liées à un camp (creeps) gardent leur ligne
+  // non-cliquable dans l'arbre (sidebar.js speciesRowLi/speciesRep ->
+  // [null,null] pour ces ids).
   wildlifeSpecies: {},
   monfam: {},               // famille de monstre (post-alias, ex. "imp") -> {on} — sous-couches
                             // « Par famille » (#82 chunk (b)), toutes OFF par défaut. SEUL l'état

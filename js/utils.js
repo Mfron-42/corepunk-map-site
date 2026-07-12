@@ -61,6 +61,18 @@ document.addEventListener('error', e => {
   t.replaceWith(span);
 }, true);
 
+/* URL de l'icône d'un PNJ (son portrait de pin rond, icons/npc_map/<leaf>.png).
+   SOURCE UNIQUE de la résolution d'icône PNJ : la fiche, la popup de carte, les
+   puces PNJ ET les résultats de recherche appellent tous CE point, pour qu'une
+   même entité montre TOUJOURS le même portrait — le SIEN — sur chaque surface,
+   ou le même repli honnête d'initiales (jamais l'icône d'un voisin). `leaf` est
+   le nom de fichier nu porté par l'entité ; absent -> null (iconTag pose alors
+   le glyphe d'initiales). Tout leaf réel dispose de son PNG à cet emplacement
+   (garanti côté données) ; s'il manquait, iconTag bascule sur les initiales. */
+function npcIconUrl(leaf) {
+  return leaf ? `icons/npc_map/${encodeURIComponent(leaf)}.png` : null;
+}
+
 /* Normalisation de recherche : minuscules, accents pliés (é→e), tout
    séparateur ramené à l'espace — « quete », « QUÊTE » et « quête »
    deviennent la même clé. Le filtre final gardait uniquement [a-z0-9] :
@@ -114,4 +126,4 @@ function editLe(a, b, maxD) {
 const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '')
   .replace(/\b[\w]+(?:_[\w]+)+\b/g, m => m.replace(/_+/g, ' '));
 
-export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, reduceMotion, fold, editLe, cleanLabel };
+export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, npcIconUrl, reduceMotion, fold, editLe, cleanLabel };

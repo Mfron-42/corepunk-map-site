@@ -15,7 +15,7 @@ import {
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
   speciesLayerHex, familyHexByRank,
 } from './config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty, capitalize, cleanLabel } from './utils.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js';
 import { clearLocator } from './pins.js';
@@ -1641,7 +1641,7 @@ function heroAvatar(iconPath) {
    2) repli HeroAvatars (heroAvatar ci-dessus, déjà gardé contre Dwarf_dark) ;
    3) repli glyphe d'initiales (iconTag, universel, posé par l'appelant). */
 function questGiverAvatar(q, giverPin) {
-  if (giverPin?.icon) return `icons/npc_map/${encodeURIComponent(giverPin.icon)}.png`;
+  if (giverPin?.icon) return npcIconUrl(giverPin.icon);
   return heroAvatar(q.giverIcon || q.actors?.find(a => a.kind === 'npc')?.icon);
 }
 
@@ -1966,7 +1966,7 @@ function openNpcFiche(idx) {
   const r = S.data.npc[idx];
   if (!r) return;
   S.openFiche = { kind: 'npc', id: idx };
-  const img = r.icon ? `icons/npc_map/${encodeURIComponent(r.icon)}.png` : null;
+  const img = npcIconUrl(r.icon);
   // Seulement les quêtes RÉELLEMENT visibles : un dialogue-bark hello_*/info_*
   // (isTest+isDialogue) que ce PNJ « donne » ne compte pas comme une quête et
   // n'apparaît pas ici par défaut (voir devcontent.js visibleQuestSlugs) —
@@ -2107,7 +2107,7 @@ function qtyChipList(list) {
    par data-act/le curseur), jamais un lien deviné pour autant. */
 function npcChip(name, ni) {
   const rec = ni >= 0 ? S.data.npc[ni] : null;
-  const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
+  const icon = npcIconUrl(rec?.icon);
   const attrs = ni >= 0 ? ` data-act="fiche-npc" data-id="npc:${ni}"` : '';
   return `<span class="chip"${ecAttr(CATS.npc.hex, 'npc')}${attrs}>${iconTag(icon, 'chip-icon', initials(name))}${esc(name)}</span>`;
 }
@@ -4147,7 +4147,7 @@ function openItemFiche(key) {
       const npcRows = npcs.slice(0, 6).map(n => {
         const ni = npcIndexByName(n.name);
         const rec = ni >= 0 ? S.data.npc[ni] : null;
-        const icon = rec?.icon ? `icons/npc_map/${encodeURIComponent(rec.icon)}.png` : null;
+        const icon = npcIconUrl(rec?.icon);
         // EntityRef (vague 2) : `[PNJ] Nom` (npcRef, IDENTITÉ seule — le bouton
         // carte gotoBtn ci-dessous reste l'affordance de position du marchand,
         // pas de double localisateur). Portrait conservé en chrome de ligne.

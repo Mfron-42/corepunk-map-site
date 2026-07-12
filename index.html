@@ -29,11 +29,19 @@
 
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
       <!-- ARBRE FINAL du panneau gauche (2026-07-11, corrections utilisateur
-           du même jour — supersède les « 4 groupes + miroir de kinds ») :
-           6 groupes fixes — World / Monsters / Creeps / Wildlife /
-           Harvesting / Interactables. Monsters/Creeps/Wildlife sont montés
-           au NIVEAU RACINE (l'imbrication « Monsters > Monsters > Camps de
-           monstres » jugée confuse par l'utilisateur est retirée).
+           du même jour — supersède les « 4 groupes + miroir de kinds » ;
+           groupe Wildlife retiré 2026-07-12) :
+           5 groupes fixes — World / Monsters / Creeps / Harvesting /
+           Interactables. Monsters/Creeps sont montés au NIVEAU RACINE
+           (l'imbrication « Monsters > Monsters > Camps de monstres » jugée
+           confuse par l'utilisateur est retirée). Le groupe « Faune
+           sauvage » (Wildlife) est RETIRÉ (décision propriétaire 2026-07-12 :
+           « wildthings n'a que des animaux paisibles ») : sa seule couche
+           dessinable, « Animaux paisibles » (le pool camp:wildlife), a migré
+           dans World (voir js/sidebar.js buildGroupWorld) ; les espèces
+           fauniques 0-camp (tortues/vache/…) quittent l'arbre avec le groupe
+           mais restent trouvables par la recherche (search.js
+           buildWildSpeciesSearchIndex, source S.wildlifeSpecies).
            Les en-têtes de groupe ne sont PAS sélectionnables (décision
            utilisateur, correction finale) : AUCUNE case/pastille de cascade
            au niveau groupe — titre + chevron droit natifs (<summary>), purs
@@ -56,10 +64,6 @@
       <details class="side-sec" data-sec="group-creeps" open>
         <summary><h2 data-i18n="groupCreeps">Creeps</h2></summary>
         <ul id="group-creeps-list" class="layer-list layer-scroll"></ul>
-      </details>
-      <details class="side-sec" data-sec="group-wildlife" open>
-        <summary><h2 data-i18n="groupWildlife">Faune sauvage</h2></summary>
-        <ul id="group-wildlife-list" class="layer-list layer-scroll"></ul>
       </details>
       <details class="side-sec" data-sec="group-harvest" open>
         <summary><h2 data-i18n="groupHarvest">Récolte</h2></summary>

@@ -1008,8 +1008,9 @@ body {
 }
 .stock-filter::placeholder { color: var(--muted); }
 .stock-filter:focus-visible { outline: none; border-color: var(--line-strong); }
-/* Sections repliables du panneau (World / Monsters / Creeps / Wildlife /
-   Harvesting / Interactables + Suivis — structure finale 2026-07-11) : le
+/* Sections repliables du panneau (World / Monsters / Creeps /
+   Harvesting / Interactables + Suivis — structure finale 2026-07-11,
+   groupe Wildlife retiré 2026-07-12) : le
    sommaire reprend exactement le style des h2 existants + un chevron d'état
    à droite. En-têtes NON sélectionnables (correction finale utilisateur :
    AUCUNE case/pastille de cascade au niveau groupe — purs conteneurs

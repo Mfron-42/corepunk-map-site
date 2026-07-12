@@ -8,7 +8,7 @@ import {
   campLabel, campQualifierChip, chestDisplayName, activableTypeLabel,
   chestHex, chestKindLabel, prettyRegion, ecAttr,
 } from './config.js';
-import { esc, fmtCoord, iconTag, initials, cleanLabel } from './utils.js';
+import { esc, fmtCoord, iconTag, initials, npcIconUrl, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor, locationIndexForId } from './data.js';
 import { visibleQuestSlugs } from './devcontent.js';
@@ -26,7 +26,7 @@ function actionBtns(id, extra = '') {
 function popupHtml(cat, r, id) {
   const c = CATS[cat];
   let icon = '';
-  if (cat === 'npc') icon = iconTag(r.icon ? `icons/npc_map/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
+  if (cat === 'npc') icon = iconTag(npcIconUrl(r.icon), 'pop-icon', initials(r.name));
   if (cat === 'poi') icon = iconTag(r.icon ? `icons/interest_points/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
   let extraBtn = '', extraHtml = '';
   if (cat === 'npc') {

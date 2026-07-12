@@ -213,11 +213,12 @@ async function loadDeferred() {
     // le reste de ce lot différé.
     fetchJson(dataPath('nodes.bin')).catch(() => ({})),
     // Faune sauvage curatée (job pass 2026-07-11b, site/data/<lang>/
-    // wildlife_species.bin — voir data/SCHEMA.md, js/state.js S.wildlifeSpecies,
-    // js/pointsets.js zeroCampWildlifeSpecies, js/sidebar.js buildKindGroup) :
+    // wildlife_species.bin — voir data/SCHEMA.md, js/state.js S.wildlifeSpecies) :
     // catalogue GLOBAL (indépendant de la carte, comme species.bin), jamais
-    // une couche carte propre — alimente les sous-lignes espèce du sous-
-    // groupe Wildlife (les 19 espèces sans camp restent listées, "0 camp").
+    // une couche carte propre. Depuis le retrait du groupe « Faune sauvage »
+    // (2026-07-12), ces espèces 0-camp ne sont plus listées dans l'arbre —
+    // elles restent trouvables par la RECHERCHE (js/search.js
+    // buildWildSpeciesSearchIndex les indexe direct depuis S.wildlifeSpecies).
     // 404-tolérant comme le reste de ce lot différé.
     fetchJson(dataPath('wildlife_species.bin')).catch(() => ({})),
     // Libellés ⚑ officiels des jetons de classification (class_labels.bin,

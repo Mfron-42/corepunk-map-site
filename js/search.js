@@ -8,7 +8,7 @@ import {
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
   locationKindLabel, mapName,
 } from './config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, pretty } from './utils.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty } from './utils.js';
 import { tr, tbl, numberLocale } from './i18n/index.js';
 import { map, toLL, toggleZones, showHighlight } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
@@ -277,8 +277,13 @@ function buildSearch() {
   // recherche). camp/coffre-skin gardent le réticule : leur clic déclenche
   // déjà son propre mécanisme de surlignage (showHighlight, voir
   // buildCampSearchIndex/buildChestSearchIndex), pas un pin unique.
+  // Icône = le PORTRAIT PROPRE du PNJ (npcIconUrl, exactement la même source
+  // que sa fiche/popup/puce — voir utils.js), plus le glyphe d'initiales en
+  // repli honnête : un résultat de recherche montre donc l'icône DE CETTE
+  // entité, jamais une générique ni celle d'un voisin (owner : "en tapant un
+  // nom je tombe sur la MAUVAISE icône"). r.icon absent -> null -> initiales.
   S.data.npc.forEach((r, i) => push(r.name, 'npc', CATS.npc.hex, r.x, r.z, () => openNpcFiche(i),
-    null, r.x == null ? tr('posUnknown') : null, initials(r.name), 0, null, { pinCat: 'npc' }));
+    npcIconUrl(r.icon), r.x == null ? tr('posUnknown') : null, initials(r.name), 0, null, { pinCat: 'npc' }));
   S.data.poi.forEach(r => push(r.name, 'poi', CATS.poi.hex, r.x, r.z, null, null, null, null, 0, null, { pinCat: 'poi' }));
   // Une quête sans x/z (giver et acteurs tous sans position extraite — ex.
   // les quêtes de Prison Island, cf. questNoPos) reste indexée : le clic
