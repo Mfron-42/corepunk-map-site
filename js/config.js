@@ -444,6 +444,21 @@ const MONSTER_FAMILY_HEX_CYCLE = [
   '#49cddf', '#4969df', '#8c49df', '#df49cd',
 ];
 const familyHexByRank = i => MONSTER_FAMILY_HEX_CYCLE[((i % 8) + 8) % 8];
+/* Teinte d'une FAMILLE — assignation DÉTERMINISTE par IDENTITÉ (hash djb2 de
+   la clé de famille post-alias, exactement comme speciesLayerHex ci-dessous),
+   stable ×sessions/cartes/langues/surfaces. Remplace l'ancien rang de liste
+   (familyHexByRank(rang) via monsterFamilies()) qui GLISSAIT selon le contexte
+   de tri — la fiche et l'arbre calculaient alors des rangs différents pour la
+   MÊME famille → deux couleurs (bug user 2026-07-12 « Mutant rat page ≠ Mutant
+   rat à gauche »). LA source unique de la couleur d'une famille, partagée par
+   l'arbre, la fiche, les chips d'objectif et toute référence — deux familles
+   peuvent partager une teinte (8 teintes), assumé : le libellé désambiguïse. */
+function familyLayerHex(fam) {
+  const k = familyKey(fam) || String(fam || '');
+  let h = 5381;
+  for (let i = 0; i < k.length; i++) h = ((h * 33) ^ k.charCodeAt(i)) >>> 0;
+  return MONSTER_FAMILY_HEX_CYCLE[h % MONSTER_FAMILY_HEX_CYCLE.length];
+}
 
 /* Teintes des couches ESPÈCE (#82 chunk (d), modèle « l'arbre EST le
    bestiaire ») : cycle dédié, volontairement plus clair/saturé que
@@ -485,7 +500,7 @@ function ecAttr(hex, kind) {
 }
 
 export {
-  KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank,
+  KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank, familyLayerHex,
   SPECIES_LAYER_HEX_CYCLE, speciesLayerHex,
   CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,

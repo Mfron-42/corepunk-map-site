@@ -2,7 +2,7 @@
    (tracked/fait) et bouton d'affichage du panneau. */
 import { S, LS, save } from './state.js';
 import {
-  CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyHexByRank,
+  CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyLayerHex,
   chestDisplayName, chestHex, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
   speciesLayerHex, POI_TYPES, poiTypeLabel,
 } from './config.js';
@@ -657,7 +657,7 @@ const decorLeavesOfCategory = cat => decorFamsOfCategory(cat).map(decorLeaf);
    teinte de rang que dans l'arbre, jamais une couche dupliquée). */
 function famsOfKind(kind) {
   return monsterFamilies()
-    .map((f, i) => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyHexByRank(i) }))
+    .map(f => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyLayerHex(f.family) }))
     .filter(f => [...f.campKeys].some(k => campGroupByKey(k)?.kind === kind));
 }
 /* Kinds de camp de chaque bucket Interactables — DÉRIVÉS de la catégorie
@@ -1211,8 +1211,8 @@ function buildGroupMonsters() {
   }
   const withCamps = new Set(fams.map(f => f.family));
   const zeroFams = [...byFam.keys()].filter(f => !withCamps.has(f)).sort();
-  for (const [i, f] of fams.entries()) ul.appendChild(familyRowLi(f.family, f, familyHexByRank(i), true));
-  for (const fam of zeroFams) ul.appendChild(familyRowLi(fam, { nCamps: 0, nPts: 0 }, MONSTER_HEX, true));
+  for (const f of fams) ul.appendChild(familyRowLi(f.family, f, familyLayerHex(f.family), true));
+  for (const fam of zeroFams) ul.appendChild(familyRowLi(fam, { nCamps: 0, nPts: 0 }, familyLayerHex(fam), true));
   appendKindRestRow(ul, 'monsters');
 }
 /* ── Groupe « Creeps » (racine) : lignes famille MIROIR jointes au kind

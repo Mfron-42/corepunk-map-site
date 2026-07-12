@@ -13,7 +13,7 @@ import {
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, LOOT_TABLE_HEX, ecAttr, familyKey,
-  speciesLayerHex, familyHexByRank,
+  speciesLayerHex, familyLayerHex,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -2137,16 +2137,12 @@ function nodeChip(nk) {
    re-dérivée par surface. Honnêteté préservée : non résolu → libellé en clair
    teinté (Q8), jamais un lien deviné. */
 
-/* Teinte PRÉCISE d'une famille (Q6, spec §9) : le rang de couleur EST l'ordre
-   de monsterFamilies() (tri points desc puis nom — la même que sa ligne
-   d'arbre et ses points composites) ; une famille sans camp joint sur la carte
-   active n'a pas de rang → MONSTER_HEX (repli famille-non-résolue, identique à
-   sa ligne d'arbre 0-camp). LA source unique, partagée par goalTargetChip
-   (cible à portée famille) et openFamilyFiche — jamais re-dérivée. */
-function familyLayerHex(fam) {
-  const rank = monsterFamilies().findIndex(r => r.family === fam);
-  return rank >= 0 ? familyHexByRank(rank) : MONSTER_HEX;
-}
+/* Teinte PRÉCISE d'une famille : familyLayerHex (config.js) — hash djb2
+   DÉTERMINISTE de la clé de famille, la MÊME couleur partout (arbre, titre de
+   fiche, chips d'objectif, refs), sur toutes cartes/langues/sessions. Remplace
+   l'ancien rang-de-liste qui glissait selon le contexte de tri (bug user
+   2026-07-12 « fiche ≠ arbre » pour la même famille). Importée, jamais
+   re-dérivée. */
 
 /* Référence ESPÈCE `[Espèce(●)] Nom` par clé de spawn. La pastille EST la
    couche espèce de l'arbre (ref-draw `species` → le routeur main.js résout
@@ -2811,15 +2807,9 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // Teinte PRÉCISE de l'entité (ratifié Q6, spec §9) : la couleur du tag/de
     // la pastille = la couleur des points EXACTS que la pastille allume = la
     // pastille de SA ligne d'arbre — jamais la teinte générique du kind.
-    // Famille : le rang de couleur EST l'ordre de monsterFamilies() (tri pts
-    // desc puis nom — pointsets.js familyTable, « cet ORDRE est aussi le rang
-    // de couleur ») ; une famille sans camp joint sur la carte active n'a pas
-    // de rang → MONSTER_HEX, le MÊME repli que sa ligne d'arbre 0-camp
-    // (sidebar.js buildGroupMonsters). Résolution partagée, jamais re-dérivée.
-    const goalFamilyHex = f => {
-      const rank = monsterFamilies().findIndex(r => r.family === f);
-      return rank >= 0 ? familyHexByRank(rank) : MONSTER_HEX;
-    };
+    // Famille : familyLayerHex (hash déterministe de la clé), LA MÊME couleur
+    // que sa ligne d'arbre et sa fiche, quel que soit le contexte de tri.
+    const goalFamilyHex = familyLayerHex;
     const famRef = f => {
       const res = familyPoints(f);
       return ref({
