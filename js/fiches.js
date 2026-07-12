@@ -2059,14 +2059,17 @@ function familyLayerHex(fam) {
 
 /* Référence ESPÈCE `[Espèce(●)] Nom` par clé de spawn. La pastille EST la
    couche espèce de l'arbre (ref-draw `species` → le routeur main.js résout
-   key→S.monsters[key].species puis toggleSpecies — jamais re-dérivé ici) ;
-   dessinable ⇔ l'espèce a des points sur la carte active (speciesPoints),
-   sinon pas de pastille (parité stricte avec l'ex-bouton vide « 0 camp »).
-   Teinte PRÉCISE de l'espèce (speciesLayerHex, Q6) quand elle résout,
-   MONSTER_HEX en repli. Nom souligné ⇔ le monstre résout au catalogue.
-   `spId` (id d'espèce) : repli de clé de couche quand aucune clé de spawn ne
-   résout mais que la couche existe (fiche famille — le routeur fait
-   `S.monsters[key]?.species || key`). */
+   key→S.monsters[key].species puis toggleSpecies — jamais re-dérivé ici).
+   DESSINABLE ⇔ l'espèce RÉSOUT (elle a toujours sa ligne d'arbre, donc sa
+   couche) : une espèce sans camp joint sur la carte active (monstre errant
+   comme le Scolopendra, spawn dynamique, `camps:[]`) garde son dot ⊘ grisé —
+   JAMAIS pas-de-pastille (retour user 2026-07-12 : un `[Monster]` sans dot
+   se lit comme « pas de catégorie » ; ⊘ dit honnêtement « espèce dessinable,
+   0 point sur CETTE carte », règle ratifiée §2.1). L'ancien `!!spRes` (parité
+   avec l'ex-bouton vide) masquait le dot à tort. Teinte PRÉCISE de l'espèce
+   (speciesLayerHex, Q6) quand elle résout, MONSTER_HEX en repli. Nom souligné
+   ⇔ le monstre résout au catalogue. `spId` : repli de clé de couche (fiche
+   famille — le routeur fait `S.monsters[key]?.species || key`). */
 function speciesRef({ key = null, spId = null, name, hex = null, meta = '' }) {
   const m = key ? S.monsters[key] : null;
   const sp = spId || (m ? m.species : null);
@@ -2077,7 +2080,7 @@ function speciesRef({ key = null, spId = null, name, hex = null, meta = '' }) {
     label: name,
     hex: hex || (sp ? speciesLayerHex(sp) : MONSTER_HEX),
     hasFiche: !!m,
-    drawable: !!spRes,
+    drawable: !!sp,
     count: spRes ? spRes.nPts : 0,
     drawn: !!(sp && S.monsp[sp]?.on),
     meta,
