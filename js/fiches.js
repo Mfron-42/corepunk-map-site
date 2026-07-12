@@ -1205,14 +1205,23 @@ function openMonsterFiche(key) {
   // PRÉCISE (speciesLayerHex, Q6) ; libellé en clair (on est déjà sur sa
   // page). N'apparaît que quand l'espèce a des points sur la carte active
   // (parité stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
+  // PRINCIPE (retour user 2026-07-12, classe corrigée partout) : une couche
+  // PERSISTANTE (espèce/famille — elle a une ligne d'arbre qui existe toujours)
+  // est TOUJOURS dessinable dès que l'entité résout ; 0 point sur la carte
+  // active = pastille ⊘ grisée, JAMAIS un toggle qui s'évapore (l'ancien
+  // `spUnionRes ? … : ''` masquait toute l'affordance pour un monstre errant
+  // sans camp fixe — Scolopendra — et se lisait comme « pas de couche »). Le
+  // ⊘ dit honnêtement « espèce dessinable, rien à tracer ICI » (§2.1). Ne
+  // gater le dessinable sur l'existence de points que pour du LOCATE (L-mode,
+  // rien à localiser) ou un surlignage transitoire (campRef), jamais pour une
+  // couche d'arbre.
   const spUnionRes = speciesPoints(spId);
-  const speciesToggle = spUnionRes ? ref({
+  const speciesToggle = ref({
     kind: 'species', key, label: species?.name || m.name,
     hex: speciesLayerHex(spId), hasFiche: false,
-    drawable: true, count: spUnionRes.nPts, drawn: !!S.monsp[spId]?.on,
-  }) : '';
-  const speciesToggleRow = speciesToggle
-    ? `<div class="fiche-section"><div class="pop-actions">${speciesToggle}</div></div>` : '';
+    drawable: true, count: spUnionRes ? spUnionRes.nPts : 0, drawn: !!S.monsp[spId]?.on,
+  });
+  const speciesToggleRow = `<div class="fiche-section"><div class="pop-actions">${speciesToggle}</div></div>`;
   const tagsHtml = m.tags?.length
     ? `<div class="fiche-section reward-chips">${m.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   const statsHtml = monsterStatsSection(m);
@@ -1387,13 +1396,16 @@ function openFamilyFiche(famKey) {
   // les points/l'arbre) ; libellé en clair (on est déjà sur sa page).
   // N'apparaît que quand la famille a des points sur la carte active (parité
   // stricte avec l'ancien bouton, jamais un toggle qui n'allume rien).
+  // Couche PERSISTANTE famille : TOUJOURS dessinable (même principe que le
+  // toggle espèce ci-dessus — retour user 2026-07-12) ; ⊘ grisé quand 0 point
+  // sur la carte active, jamais un toggle qui disparaît.
   const famRes = familyPoints(fam);
-  const famToggle = famRes ? ref({
+  const famToggle = ref({
     kind: 'family', key: fam, family: fam, label: pretty(fam),
     hex: familyLayerHex(fam), hasFiche: false,
-    drawable: true, count: famRes.nPts, drawn: !!S.monfam[fam]?.on,
-  }) : '';
-  const mapSection = famToggle ? `<div class="fiche-section"><div class="pop-actions">${famToggle}</div></div>` : '';
+    drawable: true, count: famRes ? famRes.nPts : 0, drawn: !!S.monfam[fam]?.on,
+  });
+  const mapSection = `<div class="fiche-section"><div class="pop-actions">${famToggle}</div></div>`;
   // Membres : portrait/glyphe + référence `[Espèce(●)] Nom` (la pastille
   // remplace l'ex-bouton « Afficher · N pts » PAR MEMBRE, kill-list §7.2 :
   // elle bascule SA couche de spawn ; nom souligné → fiche espèce quand une
