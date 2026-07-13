@@ -166,6 +166,64 @@ function creepsBlock(cr) {
   return section(tr('regionWildlifeTitle'), inner);
 }
 
+/* ── Familles distinctives (haut niveau) — Lot 3 / TIER_ZONE_INVESTIGATION §5 ──
+   Le `levelRange` dérivé d'une zone est ~uniforme (1-20 / 6-20) donc PEU
+   discriminant → on ne l'affiche PAS à plat (verdict de l'enquête). LE signal
+   utile, lui, est l'affinité FAMILLE↔RÉGION haut-niveau : quelques familles
+   (golem, dendroïdes) n'ont QUE des bandes de palier 16-20 et ne sont donc
+   placées que dans des régions spécifiques, contrairement à imp/leaf/boar
+   (bande dès 6, réparties partout). On lit ce signal côté FRONT sur des données
+   DÉJÀ expédiées : la bande de palier par camp vit dans camp_details.bin
+   (`tierBand.bands`, dérivée du nommage OFFICIEL des tables de butin lt_camp_
+   chest_*), la présence par région dans zones_contents (`camps.items`). Un
+   camp est « haut-niveau distinctif » quand TOUTES ses bandes sont ≥ 16. */
+const HIGH_BAND_MIN = 16;
+function bandBounds(s) {
+  const m = /(\d+)\s*-\s*(\d+)/.exec(String(s == null ? '' : s));
+  return m ? { lo: +m[1], hi: +m[2] } : null;
+}
+/* Bande {lo,hi} d'un camp SI elle est entièrement ≥ 16 (sinon null : famille
+   répartie/bas-niveau). Source unique = S.campDetails (chargé au même lot
+   différé que zones_contents — repli null honnête si pas encore là). */
+function campHighBand(campKey) {
+  const bands = S.campDetails && S.campDetails[campKey] && S.campDetails[campKey].tierBand
+    && S.campDetails[campKey].tierBand.bands;
+  if (!bands) return null;
+  const bs = Object.values(bands).map(bandBounds).filter(Boolean);
+  if (!bs.length || bs.some(b => b.lo < HIGH_BAND_MIN)) return null;
+  return { lo: Math.min(...bs.map(b => b.lo)), hi: Math.max(...bs.map(b => b.hi)) };
+}
+/* Chip NON cliquable : famille + sa bande de palier haut-niveau. Comme
+   countChip, un signal agrégé n'est pas une entité adressable (les camps
+   eux-mêmes sont déjà des `[Camp(●)]` ouvrables dans le seau Monstres). */
+function distinctFamChip(fam, b) {
+  const band = b.lo === b.hi ? String(b.lo) : `${b.lo}-${b.hi}`;
+  return `<span class="region-count-chip distinct-fam-chip">`
+    + `<span class="region-cc-label">${esc(pretty(fam))}</span>`
+    + `<span class="distinct-fam-band">${esc(band)}</span></span>`;
+}
+function distinctiveFamiliesBlock(contents) {
+  const items = (contents.camps && contents.camps.items) || [];
+  const byFam = new Map();   // famille -> {lo,hi} fusionné sur ses camps
+  for (const it of items) {
+    if (!it || (it.kind !== 'monsters' && it.kind !== 'creeps') || !it.family) continue;
+    const hb = campHighBand(it.camp);
+    if (!hb) continue;
+    const cur = byFam.get(it.family);
+    byFam.set(it.family, cur ? { lo: Math.min(cur.lo, hb.lo), hi: Math.max(cur.hi, hb.hi) } : hb);
+  }
+  if (!byFam.size) return '';   // repli honnête : aucune section pour une région sans famille haut-niveau
+  // Badge DÉRIVÉ : la bande vient du nommage officiel des tables de butin, mais
+  // l'affinité « distinctive DANS cette région » est notre inférence (placement
+  // point-en-polygone × bande), jamais un champ déclaré par la zone.
+  const prov = badge({ axis: 'provenance', value: 'derived', extra: tr('regionDistinctFamDerivedNote') });
+  const chips = [...byFam.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([fam, b]) => distinctFamChip(fam, b)).join('');
+  return section(tr('regionDistinctFamTitle'),
+    `<p class="hint region-distinct-note">${prov} ${esc(tr('regionDistinctFamHint'))}</p>`
+    + `<div class="region-count-chips">${chips}</div>`);
+}
+
 const OBJ_FAMILY_KEY = {
   chest: 'regionObjChest', craft_bench: 'regionObjCraftBench',
   quest_active_object: 'regionObjQuestObject', reactive: 'regionObjReactive',
@@ -231,6 +289,10 @@ function openRegionFiche(zoneRef) {
     : null;
 
   const blocks = [
+    // « Familles distinctives (haut niveau) » EN TÊTE (Lot 3) quand la région en
+    // a : c'est le signal discriminant, à la place du levelRange plat ~uniforme
+    // (jamais affiché — verdict TIER_ZONE_INVESTIGATION). Absent = repli honnête.
+    distinctiveFamiliesBlock(contents),
     campsBlock(contents.camps),
     monstersBlock(contents.monsters),
     creepsBlock(contents.creeps),

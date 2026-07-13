@@ -103,6 +103,12 @@ function openChestFiche(i) {
   // faux tracé). ICÔNE réelle du coffre (chestIconUrl, 694) ou glyphe honnête.
   const zoneRef = r.zone
     ? `<div class="fiche-region">${ref({ kind: 'zone', label: r.zone, hasFiche: false, drawable: false })}</div>` : '';
+  // Sous-titre = chestKindLabel SEUL (coffre de camp / décor par famille /
+  // legacy). Le vocabulaire de SEAU (Lot 2) vit sur la surface de DÉCOUVERTE
+  // (sous-libellé de recherche « Seau · Type ») : sur la fiche, le titre porte
+  // déjà le type physique (chestDisplayName) et le sous-titre l'axe de skin —
+  // y préfixer le seau tripleerait la classification ET casse le contrat testé
+  // « ligne de kind camp_chest = Coffre de camp » (_verify_container_recat).
   openFiche(`
     ${ficheHeader({ avatar: iconTag(chestIconUrl(r), 'fiche-avatar', CHEST_GLYPH), name, hex: chestHex(r), dot: chestDot, sub: esc(chestKindLabel(r)), below: zoneRef })}
     ${chestTimersHtml(r)}

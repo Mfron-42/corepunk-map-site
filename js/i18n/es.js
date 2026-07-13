@@ -482,6 +482,7 @@ export default {
       // nodes.bin) -- nombre + nivel + profesión + sus propias filas de
       // botín (lootRowsHtml).
       nodeFicheKind: 'Nodo de recolección',
+      nodeTierTip: t => `Nivel de recolección ${t}`,
       // generic:true (9/30 tipos de nodo): no existe localización en el
       // juego para este registro interno -- nota honesta al estilo
       // state-chip, nunca un nombre localizado inventado.
@@ -653,6 +654,9 @@ export default {
       regionGoalsHere: n => `${n} ${n > 1 ? 'misiones tienen' : 'misión tiene'} un objetivo en esta región`,
       regionUnresolvedN: n => `+${n} más, especie sin identificar`,
       regionProbableTitle: 'Aparición conjunta probable',
+      regionDistinctFamTitle: 'Familias distintivas (alto nivel)',
+      regionDistinctFamHint: 'Familias presentes aquí que solo aparecen en bandas de alto nivel (16-20).',
+      regionDistinctFamDerivedNote: 'La banda de botín es oficial; la afinidad regional se deriva de la ubicación de los campamentos × banda.',
       regionNone: 'Nada catalogado aquí.',
       regionEmpty: 'Aún no hay nada catalogado en esta región.',
       regionObjChest: 'Cofres',

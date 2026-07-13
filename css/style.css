@@ -2549,6 +2549,25 @@ button.rar-pill:hover {
 .disposition-badge--hostile  { color: var(--danger); background: rgba(224, 100, 92, .14); border: 1px solid rgba(224, 100, 92, .4); }
 .disposition-badge--other    { color: var(--muted); background: transparent; border: 1px dashed var(--muted); }
 
+/* NodeTierBadge (Lot 1) — chip de PALIER de récolte (T1-T3), MÊME registre que
+   .disposition-badge (classification de domaine, pas un Badge d'honnêteté).
+   Couleur pilotée par la variable inline --tier-c (rampe NODE_TIER_HEX,
+   config.js nodeTierHex) : une seule règle sert les 3+ paliers, jamais une
+   classe par palier. Se pose à côté d'un nom de fiche/chip/ligne de recherche. */
+.node-tier-badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-display);
+  font-size: .6rem; letter-spacing: .06em; text-transform: uppercase;
+  border-radius: 4px; padding: 1px 7px; cursor: help; vertical-align: middle;
+  color: var(--tier-c);
+  background: color-mix(in srgb, var(--tier-c) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tier-c) 45%, transparent);
+}
+/* Dans une ligne de résultat de recherche / un chip de fiche : petit retrait
+   pour ne pas coller au libellé voisin. */
+.sr-row .node-tier-badge { margin-left: 2px; }
+.reward-chips .node-tier-badge { margin-left: -2px; }
+
 /* DensityBar — le NOMBRE affiché est réel (nuage COMPLET, jamais positions[0]) ;
    la barre est RELATIVE au camp le plus dense de la carte active (le badge
    « dérivé » juste à côté le dit). */
@@ -2652,6 +2671,20 @@ button.rar-pill:hover {
 }
 .region-camp-row .badge, .region-camp-row .ref-meta { flex: none; }
 .region-unresolved, .region-goals-here { margin: 4px 0 0; }
+
+/* Familles distinctives haut-niveau (Lot 3) : réutilise .region-count-chip, mais
+   la « valeur » n'est pas un compte — c'est la BANDE de palier (« 16-20 »), en
+   accent ambré (le même registre « niveau/palier » que .tierband-vals), pour
+   signaler « haut niveau » sans réutiliser la puce numérique de comptage. */
+.distinct-fam-chip { --chip-c: var(--accent-hi); }
+.distinct-fam-band {
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 600;
+  color: var(--accent-hi);
+  background: var(--accent-soft);
+  border-radius: 999px; padding: 0 7px; text-align: center;
+}
+.region-distinct-note { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; }
+.region-distinct-note .badge { flex: none; }
 
 /* Navigation de série de quêtes (blueprint §2.4) : prev/position/suivant dans
    l'en-tête de fiche quête. DORMANTE tant que `sequence` ne porte pas une vraie

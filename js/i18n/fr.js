@@ -500,6 +500,7 @@ export default {
       // Fiche de référence « nœud de récolte » (#81, site/data/<lang>/nodes.bin)
       // -- nom + palier + métier + ses propres lignes de butin (lootRowsHtml).
       nodeFicheKind: 'Nœud de récolte',
+      nodeTierTip: t => `Palier de récolte ${t}`,
       // generic:true (9/30 types de nœud) : aucune localisation en jeu
       // n'existe pour cette fiche interne -- pastille state-chip honnête,
       // jamais un faux nom localisé inventé.
@@ -685,6 +686,9 @@ export default {
       regionGoalsHere: n => `${n} quête${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} un objectif dans cette région`,
       regionUnresolvedN: n => `+${n} de plus, espèce non identifiée`,
       regionProbableTitle: 'Co-apparition probable',
+      regionDistinctFamTitle: 'Familles distinctives (haut niveau)',
+      regionDistinctFamHint: 'Familles présentes ici qui n’apparaissent qu’en bandes de haut niveau (16-20).',
+      regionDistinctFamDerivedNote: 'La bande de butin est officielle ; l’affinité régionale est dérivée du placement des camps × bande.',
       regionNone: 'Rien de catalogué ici.',
       regionEmpty: 'Rien de catalogué dans cette région pour l’instant.',
       regionObjChest: 'Coffres',

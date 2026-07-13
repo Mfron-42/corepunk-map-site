@@ -526,6 +526,9 @@ export default {
       // Gathering-node reference fiche (#81, site/data/<lang>/nodes.bin) --
       // name + tier + profession + its own harvest drop rows (lootRowsHtml).
       nodeFicheKind: 'Gathering node',
+      // Node-tier badge tooltip (Lot 1, config.js nodeTierBadge): the T1-T3
+      // gathering tier promoted from plain subtitle text to a coloured chip.
+      nodeTierTip: t => `Gathering tier ${t}`,
       // generic:true (9/30 node types): no in-game localization exists for
       // this internal record anywhere in the client -- state-chip-style
       // note, never a fabricated display name.
@@ -719,6 +722,14 @@ export default {
       regionGoalsHere: n => `${n} quest${n > 1 ? 's' : ''} have an objective in this region`,
       regionUnresolvedN: n => `+${n} more, species not identified`,
       regionProbableTitle: 'Probable co-spawn',
+      // Distinctive high-level families (Lot 3, zone.js): the useful zone signal
+      // is family↔region affinity — a few families (golem, dendroids) carry only
+      // 16-20 loot bands and thus sit only in specific regions. Shown instead of
+      // the flat, near-uniform derived levelRange. Derived badge: the band is
+      // official (loot-table naming), the "distinctive here" affinity is ours.
+      regionDistinctFamTitle: 'Distinctive families (high level)',
+      regionDistinctFamHint: 'Families placed here that only appear in high-level (16-20) bands.',
+      regionDistinctFamDerivedNote: 'The loot band is official; the region affinity is derived from camp placement × band.',
       regionNone: 'None catalogued here.',
       regionEmpty: 'Nothing catalogued in this region yet.',
       regionObjChest: 'Chests',

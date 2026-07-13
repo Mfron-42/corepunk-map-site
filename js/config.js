@@ -2,7 +2,7 @@
    catégories de couches et résolveurs de libellés (tokens neutres du jeu →
    libellé localisé via tbl()). Aucun état mutable ici. */
 import { tbl, tr } from './i18n/index.js';
-import { pretty } from './utils.js';
+import { pretty, esc } from './utils.js';
 import { gameLabel } from './classlabels.js';
 
 /* ── Constantes ─────────────────────────────────────────────── */
@@ -177,7 +177,25 @@ const dispositionHex = d => DISPOSITION_HEX[d] || 'var(--muted)';
    métier (nodeHex ci-dessus) : le métier dit QUOI, le palier dit COMBIEN.
    Consommée par la future fiche nœud enrichie (vague E′c-5). */
 const NODE_TIER_HEX = ['#9a8c78', '#b08d57', '#c9a24a', '#e0b93f', '#f2d06b'];
-const nodeTierHex = t => NODE_TIER_HEX[Math.max(0, Math.min(NODE_TIER_HEX.length - 1, (t | 0) - 1))] || RECIPE_HEX;
+/* nodes.bin `tier` est une CHAÎNE ("T1"/"T2"/"T3", suffixe de clé gn_*_t\d) ;
+   nodeTierNum en extrait l'entier (le point d'entrée de la rampe/du badge).
+   Repli 0 = palier non résolu (course de chargement différé). */
+const nodeTierNum = t => { const m = /(\d+)/.exec(String(t == null ? '' : t)); return m ? +m[1] : 0; };
+const nodeTierHex = t => NODE_TIER_HEX[Math.max(0, Math.min(NODE_TIER_HEX.length - 1, nodeTierNum(t) - 1))] || RECIPE_HEX;
+/* Badge de PALIER de nœud (Lot 1 — GRANULARITY_AUDIT #2 : le tier T1-T3 des 30
+   nœuds nodes.bin était SOUS-surfacé en simple sous-titre texte et la rampe
+   NODE_TIER_HEX restait scaffoldée-inutilisée). Micro-étiquette de
+   CLASSIFICATION de domaine, colorée par la rampe métallique (T1 bronze mat →
+   T3+ or clair) — MÊME registre visuel que .disposition-badge/.roster-qual
+   (chips de domaine), délibérément DISTINCT de la famille .badge d'HONNÊTETÉ
+   (provenance) : un palier est une donnée du jeu, jamais une revendication de
+   provenance. Rendu partout où un nœud se montre (fiche/recherche/chip), source
+   de couleur UNIQUE (nodeTierHex). '' quand le palier est absent/non résolu. */
+function nodeTierBadge(tier) {
+  const n = nodeTierNum(tier);
+  if (!n) return '';
+  return `<span class="node-tier-badge" style="--tier-c:${nodeTierHex(tier)}" title="${esc(tr('nodeTierTip', tier))}">${esc(tier)}</span>`;
+}
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 /* Statistiques de monstre (stats_decoded / stat_curve) — voir
@@ -443,6 +461,26 @@ function chestKindLabel(r) {
   return `${tr('decorGroupLabel')} — ${decorFamilyLabel(r.family)}`;
 }
 
+/* ── Seau (bucket) d'interactable — vocabulaire PARTAGÉ arbre/recherche/fiche
+   (Lot 2 — GRANULARITY_AUDIT #3). Les ~18 valeurs de `type` (Barrel/Boxes/
+   Cabinet/Kitchen/Corpse/Papers…, chestTypeLabel) et les ~24 subtypes de la
+   source apparaissaient À PLAT (sous-titre de recherche, titre de fiche) sans
+   le seau auquel l'objet appartient. L'arbre latéral les range déjà sous 4
+   seaux DÉRIVÉS de la `category` OFFICIELLE cuite (interactable.chests/
+   destroyable/reactive/other → sidebar.js buildGroupContainers) ; ce résolveur
+   expose EXACTEMENT ce même vocabulaire de seau (mêmes clés i18n subChests/
+   subDestroyable/subInteractives/subOther) aux surfaces à plat, pour qu'un
+   "Cabinet" se lise partout « Interactives · Cabinet » — jamais un 5ᵉ
+   vocabulaire parallèle. Repli honnête sur le seau « Autres » pour toute
+   catégorie hors des 4 (aucun record aujourd'hui, garde défensive). */
+const INTERACTABLE_BUCKET_KEY = {
+  'interactable.chests': 'subChests',
+  'interactable.destroyable': 'subDestroyable',
+  'interactable.reactive': 'subInteractives',
+  'interactable.other': 'subOther',
+};
+const interactableBucketLabel = category => tr(INTERACTABLE_BUCKET_KEY[category] || 'subOther');
+
 /* Prettification du `region` d'un coffre fouillable (searchable_chests.bin —
    aucun libellé fourni par les données, voir  §4) :
    "ripplecrop-fields" -> "Ripplecrop Fields". Même esprit neutre que
@@ -674,7 +712,8 @@ export {
   SPECIES_LAYER_HEX_CYCLE, speciesLayerHex, entityColor, kindBaseHex,
   CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  REGION_HEX, DISPOSITION_HEX, dispositionHex, NODE_TIER_HEX, nodeTierHex,
+  REGION_HEX, DISPOSITION_HEX, dispositionHex, NODE_TIER_HEX, nodeTierHex, nodeTierNum, nodeTierBadge,
+  INTERACTABLE_BUCKET_KEY, interactableBucketLabel,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,

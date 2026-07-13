@@ -6,7 +6,7 @@ import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
-  locationKindLabel, mapName, entityColor,
+  locationKindLabel, mapName, entityColor, nodeTierBadge, interactableBucketLabel,
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty } from './utils.js';
 import { tr, tbl, numberLocale } from './i18n/index.js';
@@ -219,6 +219,11 @@ function pushSearchEntry(label, cat, hex, x, z, open, icon, sub, glyph, bias, bo
     // buildMonsterSearchIndex (contexte famille d'une espèce du catalogue)
     // ci-dessous ; null partout ailleurs, aucun changement visuel pour eux.
     ctx: (opts && opts.ctx) || null,
+    // `tierBadge` (facultatif, Lot 1) : HTML pré-rendu d'un badge de palier de
+    // nœud (nodeTierBadge — chip coloré, déjà échappé). Rendu par renderSearch()
+    // AVANT le sous-libellé muté d'une ligne de nœud, pour surfacer le tier T1-T3
+    // là aussi (même vocabulaire visuel que la fiche/le chip) ; null ailleurs.
+    tierBadge: (opts && opts.tierBadge) || null,
   };
   // `body[i]` accepte soit une chaîne brute (repli historique -- coffres/
   // alias de monstre/digest de quête cross-carte, voir BODY_WEIGHT plus bas :
@@ -557,6 +562,17 @@ function buildChestSearchIndex() {
     // heuristique sur le nom.
     const typeLabel = r.type ? chestTypeLabel(r.type) : null;
     const body = r.type ? [typeLabel, r.type] : null;
+    // Vocabulaire de SEAU partagé avec l'arbre (Lot 2) : le sous-libellé ne
+    // montre plus le `type` À PLAT ("Cabinet") mais « Seau · Type »
+    // (« Interactives · Cabinet ») — le même seau (interactable.category cuite)
+    // que le sous-groupe de l'arbre latéral. Dédup honnête quand le type EST le
+    // seau (un skin sci_fi « Chest » du seau « Coffres » n'affiche pas
+    // « Coffres · Coffre »). Repli sur le seau seul quand le type manque (~44).
+    const bucketLabel = r.category ? interactableBucketLabel(r.category) : null;
+    const subParts = (bucketLabel && typeLabel && fold(bucketLabel) === fold(typeLabel))
+      ? [typeLabel]
+      : [bucketLabel, typeLabel];
+    const chestSub = subParts.filter(Boolean).join(' · ') || null;
     // Couleur RÉELLE (chestHex — camp_chest/décor par famille/legacy, voir
     // config.js) : un skin d'asset donné (r.name) est TOUJOURS de la même
     // group/family, donc homogène pour tout le lot dédupliqué ci-dessus.
@@ -572,7 +588,7 @@ function buildChestSearchIndex() {
         pts: S.data.chest.filter(c => c.name === r.name).map(c => ({ x: c.x, z: c.z })),
         hex: chestHex(r), label: lbl, kind: 'chest', refKind: 'chest', map: S.map,
       })),
-      null, typeLabel, null, 0, body, { ref: 'chest:' + r.name });
+      null, chestSub, null, 0, body, { ref: 'chest:' + r.name });
   });
 }
 
@@ -964,8 +980,12 @@ function buildEventSearchIndex() {
    qui mentirait sur la nature du contenu (réel, juste non localisé). */
 function buildNodeSearchIndex() {
   Object.entries(S.nodes || {}).forEach(([key, n]) => {
-    const sub = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
-    pushSearchEntry(n.name, 'node', nodeHex(n), null, null, () => openNodeFiche(key), null, sub, '🌿');
+    // Palier promu du texte de sous-libellé (« T3 · Herbalism ») à un BADGE
+    // coloré (opts.tierBadge, Lot 1) ; le sous-libellé ne garde que le métier —
+    // le tier n'est plus une chaîne EN plate, il porte sa couleur de rampe.
+    const sub = n.prof ? professionLabel(n.prof) : null;
+    pushSearchEntry(n.name, 'node', nodeHex(n), null, null, () => openNodeFiche(key), null, sub, '🌿',
+      0, null, { tierBadge: nodeTierBadge(n.tier) });
   });
 }
 
@@ -1506,7 +1526,10 @@ function renderSearch(raw) {
       // fixe »…) ; la COORDONNÉE séparée disparaît — la pastille porte
       // désormais la position (owner 2026-07-13, « plus de Position séparée »).
       const metaHtml = it.sub ? `<span class="muted">${esc(it.sub)}</span>` : '';
-      rowInner = `${iconWithRing(it)}${refHtml}${mapBadge}${metaHtml}`;
+      // Badge de palier de nœud (Lot 1) : HTML pré-rendu (déjà échappé), posé
+      // entre la réf et le sous-libellé muté — jamais concaténé DANS le texte
+      // muté (qui reste court/nowrap). '' pour toute autre ligne.
+      rowInner = `${iconWithRing(it)}${refHtml}${it.tierBadge || ''}${mapBadge}${metaHtml}`;
     } else {
       // Nœud d'arbre (catnode) : rendu legacy inchangé (puce 🗂 + libellé).
       rowInner = `<span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>

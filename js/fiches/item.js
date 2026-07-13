@@ -8,7 +8,7 @@ import {
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
-  statLabel, statTierLabel, formulaTermLabel,
+  statLabel, statTierLabel, formulaTermLabel, nodeTierBadge,
   chestHex, chestKindLabel, prettyRegion, familyKey,
   speciesLayerHex, familyLayerHex, entityColor,
 } from '../config.js';
@@ -72,7 +72,12 @@ function openNodeFiche(key) {
   if (!n) return;
   S.openFiche = { kind: 'node', id: key };
   const hex = nodeHex(n);
-  const tierLine = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
+  // Palier (nodes.bin `tier`, T1-T3 sur les 30 nœuds) : promu du simple texte de
+  // sous-titre à un BADGE coloré à côté du nom (nodeTierBadge, rampe métallique
+  // NODE_TIER_HEX enfin consommée — Lot 1). Le métier reste en sous-titre : le
+  // métier dit QUOI (herbo/bûcheron/mine), le palier dit COMBIEN (axe orthogonal).
+  const tierBadge = nodeTierBadge(n.tier);
+  const profLine = n.prof ? professionLabel(n.prof) : null;
   const genericChip = n.generic ? ` ${badge({ axis: 'provenance', value: 'absent', extra: tr('nodeGenericNote') })}` : '';
   // Icône HONNÊTEMENT absente (nodes.bin ne porte aucun champ icon) : avatar de
   // repli = glyphe de métier via iconTag(null, …) (rend le span icon-broken
@@ -91,7 +96,7 @@ function openNodeFiche(key) {
   // Nœud de récolte : AUCUNE pastille (mode N — le lien nœud→point n'existe pas
   // côté client, byte-prouvé ; la couche de récolte est le relais dessinable).
   openFiche(`
-    ${ficheHeader({ avatar, name: n.name, hex, nameSuffix: genericChip, sub: `${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}` })}
+    ${ficheHeader({ avatar, name: n.name, hex, nameSuffix: `${tierBadge}${genericChip}`, sub: `${esc(tr('nodeFicheKind'))}${profLine ? ' · ' + esc(profLine) : ''}` })}
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>
     ${aliasesHtml}`);
   setFicheHash(null);
@@ -656,7 +661,10 @@ function nodeChip(nk) {
   // différé), sinon nom en clair replié sur la clé (jamais un lien deviné).
   // Pas de pastille : un nœud n'a PAS de point carte (aucun nœud→point,
   // byte-prouvé §3.1) ; la couche de récolte est le substitut dessinable.
-  return ref({ kind: 'node', key: nk, label, hex: nodeHex(n), hasFiche: !!n });
+  // Palier accolé au chip (Lot 1) : le même badge coloré que la fiche/recherche,
+  // pour qu'un nœud drainé depuis une recette/un drop d'objet porte SON tier
+  // (nodeTierBadge rend '' tant que la clé n'est pas résolue — pas de faux tier).
+  return `${ref({ kind: 'node', key: nk, label, hex: nodeHex(n), hasFiche: !!n })}${nodeTierBadge(n && n.tier)}`;
 }
 
 /* Fiche item : taux de drop (garanti / % séparés), vendeurs (+ position),
