@@ -20,9 +20,7 @@ export default {
       activeDotsLabel: 'Active layers',
       activeTagRemove: name => `${name} — remove`,
       activeTagsMoreAria: n => `${n} more active layer${n === 1 ? '' : 's'} — show`,
-      legend: 'Legend',
-      campsTitle: 'Camps & resources',
-      // Layer tree — FINAL sidebar IA (2026-07-11, COORDINATION.md §IA
+      // Layer tree — FINAL sidebar IA (2026-07-11,  §IA
       // FINALE, user verbatim): 4 fixed groups (World/Monsters/Harvesting/
       // Interactables) replace the 6 groups of chunk (a). groupPoi/
       // groupQuests removed with their groups (rows moved into World/
@@ -33,9 +31,8 @@ export default {
       // Root Creeps/Wildlife groups (user structure correction 2026-07-11:
       // Monsters/Creeps/Wildlife promoted to root level). groupCreeps
       // follows the shipped campKind ("Creeps" — V20 pending owner call);
-      // groupWildlife follows ONTOLOGY.md #11 ("Wildlife", the canonical ◇).
+      // groupWildlife follows  #11 ("Wildlife", the canonical ◇).
       groupCreeps: 'Creeps',
-      groupWildlife: 'Wildlife',
       groupHarvest: 'Harvesting',
       groupContainers: 'Interactables',
       groupWorld: 'World',
@@ -55,7 +52,7 @@ export default {
       subOther: 'Other',
       // Row-label overrides (display only — hash tokens stay camp.<kind>):
       // the honest guards label (2 camps/12 pts, no species/NPC/loot binding
-      // at all — see interactives_taxonomy_INVESTIGATION.md §5); the honest
+      // at all — see  §5); the honest
       // "unidentified spawns" row for kind camps with NO species binding
       // (its count is exactly what the layer draws, see pointsets.js
       // kindRestPoints (règle rest-only universelle, data-dérivée); now serves ALL THREE Monsters/Creeps/Wildlife root
@@ -97,7 +94,7 @@ export default {
       // (giver/slot level) and is NOT exposed in any site .bin at all (incl.
       // npcs.bin/quests.bin) — asserting "server-side spawn" for the whole
       // bucket would overclaim for the rest, which is simply unclassified
-      // (see  unknown_states_DESIGN.md §2 re-check #1).
+      // (see   §2 re-check #1).
       filterHiddenTooltip: n => `${n} without a known position`,
       // (decorFamiliesTitle removed 2026-07-11 with the dissolved "Decor"
       // group — its family rows now live inside the Interactables buckets,
@@ -198,11 +195,10 @@ export default {
       // 2026-07-11 — replaces the verbose "Highlight all spawns in these
       // camps (N camps · M points)"; the word "camps" is banned from
       // quest/step/fiche wording; see js/fiches.js monsterSpawnHighlightBtn).
-      showEntityBtn: 'Show',
       entityPtsN: p => `${p} pts`,
       // (chestTypesAllBtn/chestTypesNoneBtn REMOVED 2026-07-11 with the
       // family list's [All][None] bar — no caller left.)
-      // Container re-categorization (DATA_CONTRACT.md): the 2 real chest
+      // Container re-categorization (): the 2 real chest
       // layers + the "Decor" group (legacy_chest/decor by family).
       decorGroupLabel: 'Decor',
       campChestLabel: 'Camp chest',
@@ -218,53 +214,37 @@ export default {
       doneBtn: 'Done',
       doneBtnActive: 'Done ✓',
       removeBtn: 'Remove',
-      ficheBtn: 'Details',
-      ficheShopBtn: 'Details · Shop',
       loreEntryTitle: 'Bestiary',
       lootTableKind: 'Loot table',
       priceTitle: 'Price',
-      hideHighlightBtn: 'Hide points',
       stockFilterPlaceholder: 'Filter list…',
       rewardTablesN: n => `Reward tables (${n})`,
       questCountSuffix: n => ` · ${n} quest${n > 1 ? 's' : ''}`,
-      highlightPointsBtn: n => `Highlight all ${n} points`,
       dataGeneratedAt: date => `Data from ${date}`,
       questMapsLine: names => `Maps: ${names}`,
       // bestiaryTitle/bestiaryLoading retired (2026-07-11) with the sidebar
       // "Bestiary" section itself (see js/sidebar.js) -- bestiaryZonesN
       // stays: still used by fiches.js openMonsterFiche (monster fiche's lore
       // section), unrelated to this retired section.
-      bestiaryZonesN: n => `${n} zones`,
       monsterFoundInTitle: 'Found in',
       lootTableItemsN: n => `Contents (${n})`,
       probableLootTitle: 'Likely loot',
       probableLootNote: name => `"${name}" table matched by container type — confirm in game.`,
-      questCat: 'Quest',
-      givenBySuffix: name => ` · given by ${name}`,
-      givenByPlain: name => `given by ${name}`,
-      ficheCompleteBtn: 'Full details',
       campLabel: 'Camp',
       pointsHereSuffix: n => ` · ${n} points here`,
       spawnsTotal: n => `${n} total spawns`,
-      campFicheBtn: 'Camp details',
       levelAbbrev: lvl => `lvl ${lvl}`,
       // Level RANGE (task #80 — bestiary species rows/camp fauna rows, e.g.
       // a species spanning lvl 5-20, or a camp's own level span for one
       // species): same abbreviation family as levelAbbrev above.
       levelRangeAbbrev: (min, max) => `lvl ${min}–${max}`,
       spawnPointsCount: n => `${n} spawn points`,
-      viewOnMapBtn: 'View on map',
       likelyMonsters: n => `Likely monsters (${n})`,
       guaranteedLabel: 'Guaranteed',
-      chanceLabel: 'Chance',
       // Approximate SHARE (d.ch = weight / the table's total weight, see
-      // data/SCHEMA.md "chance") of a non-guaranteed drop + honest caveat set
+      //  "chance") of a non-guaranteed drop + honest caveat set
       // as a tooltip (title) on the pill -- see js/fiches.js dropRateHtml.
-      dropChanceApprox: pct => `≈ ${pct} %`,
-      dropChanceBelowOne: '< 1 %',
-      dropChanceCaveat: "This item's share of the table's loot pool — not a per-kill probability (the real roll count is handled server-side).",
       lootBestRates: 'Loot (best rates)',
-      mapLabel: 'Map',
       mapSelectorLabel: 'Displayed map',
       mapBadgeTitle: name => `On ${name} — click to switch`,
       mapTilesOnlySuffix: '(approx.)',
@@ -274,23 +254,19 @@ export default {
       mapGroupPve: 'PvE arenas',
       mapGroupPvp: 'PvP arenas',
       mapGroupOther: 'Other',
-      // "position unknown" banned site-wide (see data/SCHEMA.md "search_zone"):
+      // "position unknown" banned site-wide (see  "search_zone"):
       // this generic label stays only for non-goal rows (NPC/object/merchant
       // with no extracted position) — quest goals themselves use
       // posDynamic/posDynamicZone/posUncatalogued below, never this one.
       posUnknown: 'position not specified',
-      posDynamic: 'Dynamic position',
       // Kept short (was "Dynamic position — spawn zone"): this label sits on
       // the same row as a "View zone" button inside a quest-item fiche, and
       // the long form pushed the button off the right edge (overflow fix E).
-      posDynamicZone: 'Spawn zone',
       // Confidence "medium" (batch-wiring pass, proximity-only guess, see
       //  zone_confidence): distinct wording from posDynamicZone
       // above — a nearby camp cluster is not proof this item actually spawns
       // there, never presented with the same authority as an evidence-backed
       // zone.
-      posEstimatedZone: 'Estimated area',
-      posUncatalogued: 'Uncatalogued position — check in-game',
       // Sub-label for a search result row for an entire QUEST with no
       // extracted position (giver/actors all lack x/z — e.g. the Prison
       // Island quests, on a separate map/coordinate frame). Honest and
@@ -309,16 +285,13 @@ export default {
       questsGivenN: n => `Quests given (${n})`,
       noQuestsForNpc: 'No known quests for this NPC.',
       questItemBadge: 'Quest item',
-      gameItemBadge: 'Game item',
       soldTag: 'sold',
       craftableTag: 'craftable',
       lootTag: 'loot',
-      activableBadge: 'Activatable',
       // "Container" badge (mechanism decode job A): collect_from_object's
       // own object identity (t.label, e.g. "Old crate") — distinct from
       // activableBadge above, which is for USE_object's self-contained
       // "Activatable" prop, not a container something else is found in.
-      containerBadge: 'Container',
       // Goal-target card relation wording (design review, July 2026): the
       // card used to just juxtapose an item and its monster/object with no
       // word connecting them ("looks like a tag but doesn't say where to
@@ -340,7 +313,7 @@ export default {
       goalGivenByLabel: 'given by',
       goalCraftLabel: 'craft it',
       // receive_reward mechanism (mechanism decode job A): the item is
-      // granted by completing a DIFFERENT quest (geo.py's reward_of), not
+      // granted by completing a DIFFERENT quest ('s reward_of), not
       // handed over by this quest's own giver — verb only, one clickable
       // quest-name span per reward_of entry follows (see rewardOfRelRow).
       goalRewardOfLabel: 'obtained by completing',
@@ -359,19 +332,16 @@ export default {
       goalDropChanceLabel: pct => `(${pct} %)`,
       // kill_player mechanism: target.player_specs joined via heroSpecLabel
       // (fiches.js) — no single world location for a PvP objective.
-      goalKillPlayerLabel: specs => `Defeat players (${specs})`,
       objectivesN: n => `Objectives (${n})`,
       objectivesTitle: 'Objectives',
       howToTitle: 'How to',
       rewardsTitle: 'Rewards',
       questItemsN: n => `Quest items (${n})`,
-      viewGiverBtn: 'View giver',
       viewZoneBtn: 'View zone',
       // "medium" confidence counterpart (batch-wiring pass, see posEstimatedZone
       // above): draws the cited camp's real points when the active map has
       // them loaded, else falls back to the same guessed circle as viewZoneBtn
       // — never the same label, so it's never mistaken for a confirmed zone.
-      viewEstimatedZoneBtn: 'View estimate',
       // Layout rework (July 2026): now a collapsed-by-default drawer (see
       // openQuestFiche) — count in the label like the other drawers
       // (dialogsN/questItemsN) since it's no longer an always-open <h3>.
@@ -382,8 +352,6 @@ export default {
       // decoder — 333/335 decoded quests are fully explained today, 2 keep
       // at least one unresolved goal. Never shown when there's no goal graph
       // at all (dialogue barks etc.) — nothing to confirm either way there.
-      questExplainedFull: 'Fully explained',
-      questExplainedPartial: n => `${n} objective${n > 1 ? 's' : ''} uncertain`,
       // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph, isDialogue —
       // no goals/rewards): its fiche is headed with this instead of the empty
       // quest layout, so opening one (dev-content ON, or a direct q= link) is
@@ -401,7 +369,7 @@ export default {
       questFicheKind: region => 'Quest' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Drop rates',
       farmSpotsTitle: 'How to farm',
-      // Farm-spot redesign (farm_spot_UX_DESIGN.md, July 2026): rows grouped
+      // Farm-spot redesign (, July 2026): rows grouped
       // by camp kind (Mining/Monsters/…) instead of a flat 24-row dump —
       // header summary, "+N more" expander, and the honest fallbacks below
       // (unjoined camp, no camp data at all, generic reward-pool collapse).
@@ -416,7 +384,7 @@ export default {
       // "Also found in containers" (#65): an item/recipe's containers[]
       // aggregated per class (camp_chest by monster family, searchable_chest
       // by rarity band) -- `ch` is already the BEST chance across every
-      // grade/band variant folded into that class (see build_site_data.py).
+      // grade/band variant folded into that class (see ).
       containersTitle: 'Also found in containers',
       containerCampChestHint: 'Spawned per monster family by the server — no single placement to point at on the map.',
       containerChanceUpTo: pct => `up to ${pct} %`,
@@ -434,18 +402,17 @@ export default {
       obtainViaInteract: 'By interacting with',
       // Mechanism decode job B: quest_source_of extension (harvest/reward_of/
       // world -- given_by reuses ui.givenByPlain, container reuses
-      // obtainViaInteract above, see build_site_data.py + fiches.js openItemFiche).
+      // obtainViaInteract above, see  + fiches.js openItemFiche).
       obtainViaHarvest: profession => `By harvesting (${profession})`,
       // Fragment, not a full sentence -- composed with ui.givenByPlain as
       // "Given by X — quest Y" (receive_reward's cross-quest case, see
       // openItemFiche's qs.via === 'reward_of' branch).
-      obtainViaRewardOfQuest: name => `quest ${name}`,
       obtainViaWorld: 'Found while completing this quest',
       // Honest obtain-status line (items-obtain audit §B2): shown when an
       // item ships NO obtain channel at all — one explicit line instead of
       // silent blank space. Wording states what the DATA does or doesn't
       // say, never "unobtainable" (a claim about the game we can't prove).
-      // Enum baked by build_site_data.py::_obtain_status_of, mapped in
+      // Enum baked by , mapped in
       // fiches.js openItemFiche (OBTAIN_STATUS_KEY).
       obtainStatusUnknown: 'Not referenced as obtainable in the current game data.',
       obtainStatusQuestOrphan: 'Quest item — no quest in the current game data references it (likely unused or removed content).',
@@ -472,7 +439,6 @@ export default {
       // Prominent recipe chip on a craftable item's own fiche (task #78b) +
       // recipe search result / fiche kind label (task #78a) -- see
       // openItemFiche's recipeChipHtml / search.js buildSearch / openRecipeFiche.
-      recipeChipLabel: name => `Recipe: ${name}`,
       usedInTitle: 'Used in',
       rewardBadge: 'Reward',
       requiredBadge: 'Required',
@@ -504,10 +470,10 @@ export default {
       noLootCatalogued: 'No catalogued loot for this monster.',
       noAbilitiesKnown: 'No known abilities for this monster.',
       noCampsKnown: 'No known spawn location for this monster.',
-      // Camp fiche fauna section (unknown_states_DESIGN.md #4/#10, task #67):
+      // Camp fiche fauna section ( #4/#10, task #67):
       // a "monster-ish" camp (monsters/creeps/wildlife kind) whose manager
       // name yields zero resolved species — byte-proven the camp's own spawn
-      // points carry no entity reference at all (data/SCHEMA.md "camp fauna"),
+      // points carry no entity reference at all ( "camp fauna"),
       // 43/128 such camps today. Used to render nothing at all (silent gap,
       // see openCampFiche); now an honest dynamic-state note instead.
       campFaunaUnknownNote: "This camp's specific creatures aren't recorded in the client data — spawned dynamically by the server.",
@@ -579,8 +545,7 @@ export default {
       // node type with no in-game localization.
       nodeAliasesLabel: names => `Also known as: ${names}`,
       statsTitle: 'Stats',
-      realStatsBadge: 'real',
-      // "real" badge tooltip (monsters.md finding #1): explicitly distinguish
+      // "real" badge tooltip ( finding #1): explicitly distinguish
       // a REAL client reading (m_abs_*/mbt_*_boss record, e.g. Furious
       // Woodraptor = 154,440 HP) from the generic per-tier estimate below.
       realStatsTooltip: 'Real values (client) — read directly from the game data for this specific monster, not a per-tier estimate.',
@@ -597,7 +562,7 @@ export default {
       bossDifficultyNote: "This boss has its own base HP (from the game data). Live HP = base × a server-side difficulty multiplier — about 9–10× at level 20 (e.g. a dungeon boss ≈ 226,000). The exact multiplier is assigned server-side, so this is an estimate, never an exact live total.",
       computedStatsBadge: 'computed (game formula)',
       statsPerTierNote: 'Difficulty tier assigned server-side — range shown per tier (easy → boss).',
-      // Honest caveat on the Elite/Boss columns (monsters.md finding #2):
+      // Honest caveat on the Elite/Boss columns ( finding #2):
       // unlike easy/medium/hard, these 2 tiers were NEVER checked against an
       // external source — the community's "~350,000 HP" level-20 boss figure
       // doesn't reproduce from any client data, and a real named boss can run
@@ -632,7 +597,7 @@ export default {
       // content is displayed (fiche, variant pill, bestiary, search).
       devContentTag: n => `Dev content (${n})`,
       devBadge: 'Test',
-      // "We don't know" 3-state taxonomy (unknown_states_DESIGN.md, task #67):
+      // "We don't know" 3-state taxonomy (, task #67):
       // one shared `.state-chip` component + short vocabulary for every "why
       // don't we know this" spot on the site (position, loot, vendor stock,
       // rarity/tier scaling, unresolved quest-goal residuals…) instead of the
@@ -641,9 +606,6 @@ export default {
       // — dynamic/unknown are the two genuinely new labels. See stateChip()
       // in js/fiches.js.
       devBadgeTitle: 'Unfinished or test content the game ships but never uses.',
-      stateDynamic: 'Dynamic',
-      stateDynamicTitle: 'Decided by the server at runtime — not stored in client data.',
-      stateUnknown: 'Unknown',
       stateUnknownTitle: "Can't be determined from the extracted client data.",
       // 4th state (task #80, monsterStatsSection): a REAL client stat block
       // (m_abs_* fixed-stat sibling record) shared across every level of a
@@ -660,11 +622,11 @@ export default {
       // Roll ranges / weapon DPS / formulas / rune-chip scaling
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- net-new, see 
-      // + , tmp/convergence/port_map.md #8/#9/#10.
+      // + , tmp/convergence/ #8/#9/#10.
       rollRangeTitle: 'Roll range',
       weaponDpsTitle: 'Weapon DPS',
       weaponDpsDerived: 'DPS (computed)',
-      // Main/secondary grouping (data-accuracy audit, items.md #1): an
+      // Main/secondary grouping (data-accuracy audit,  #1): an
       // artifact rolls 1 guaranteed MAIN stat + a limited number of
       // SECONDARY stats drawn from a shared pool -- never all at once, unlike
       // the old flat rendering.
@@ -677,9 +639,9 @@ export default {
       formulaPartialNote: 'Part of this line depends on an undecoded engine reference.',
       rarityScalingTitle: 'Rarity scaling',
       tierScalingTitle: 'Tier scaling',
-      // Reworded (unknown_states_DESIGN.md §2 re-check #2, task #67): the old
+      // Reworded ( §2 re-check #2, task #67): the old
       // "(likely handled server-side)" phrasing asserted a specific, UNPROVEN
-      // cause — data/SCHEMA.md itself can't tell whether this is server-side
+      // cause —  itself can't tell whether this is server-side
       // scaling or a different in-game rule (e.g. a talent-slot-count rule).
       // Neutral now, and wrapped in an `unknown` state-chip by its caller
       // (formulaHtml) instead of the old bare `.hint` paragraph.
@@ -696,7 +658,7 @@ export default {
       rollQualityIntro: 'A higher roll earns a name prefix: a stat rolling in the 33–66% band of its range makes the artifact “Improved” (Tech) / “Strong” (Magic); above 66%, “Reinforced” / “Powerful”.',
       rollQualityBand3366: 'Improved / Strong (33–66%)',
       rollQualityBandMore66: 'Reinforced / Powerful (>66%)',
-      // "Use effect" section (item_desc_PLAN.md Phase B): a linked ability's
+      // "Use effect" section ( Phase B): a linked ability's
       // own tooltip prose, joined from item.abilities[] at build time (see
       //  build_catalog()). Never a fabricated
       // number: every token this build can't honestly resolve renders as a
@@ -734,7 +696,6 @@ export default {
       // "searchable", quest-prop≠quest-item, decor-type≠family, lore≠place,
       // reactive-object, "area" never "zone"). ◇ = ours-by-necessity (no game
       // term) — do NOT "correct" toward a nonexistent game word.
-      regionLabel: 'Region',
       regionFicheKind: 'Region',
       // ── Region fiche ContentsBlock (vague E'c-R) — section titles + honest
       // counts. regionObj* = the object families of objects.byFamily. ─────────
@@ -758,13 +719,6 @@ export default {
       regionObjShrine: 'Shrines',
       regionObjDestroyable: 'Destroyables',
       regionObjUnresolved: 'Other objects',
-      lootCampLabel: 'Loot camp',
-      questPropLabel: 'Quest prop',
-      reactiveObjectLabel: 'Reactive object',
-      decorTypeLabel: 'Decor type',
-      loreEntryLabel: 'Lore entry',
-      spawnAreaLabel: 'Spawn area',
-      estimatedAreaLabel: 'Estimated area',
       // Build fiches (opt L3, blueprint §1.2/§7 E'c-8 — talent/specialization/
       // profession, search+fiche only, no map surface, see fiches/build.js).
       talentFicheKind: 'Talent',
@@ -778,7 +732,7 @@ export default {
       qao: 'Quest objects', workshop: 'Workshops',
       // Container re-categorization: the old single "Chests" layer (chest)
       // is removed, replaced by these 2 real layers — see
-      // DATA_CONTRACT.md §1/§3.1 and js/config.js CATS.
+      //  §1/§3.1 and js/config.js CATS.
       searchable_chest: 'Searchable chests', camp_chest: 'Camp chests',
     },
     rarity: { Common: 'Common', Uncommon: 'Uncommon', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary' },
@@ -810,7 +764,7 @@ export default {
       searchable_chest: 'Searchable chest', node: 'Gathering node',
       // FAMILY row (mission "search activation" 2026-07-11): NOT a precise
       // monster — a tree filter (rung 2 of the precision ladder,
-      // COORDINATION.md). Visually distinguishes the "Family Wolf" row
+      // ). Visually distinguishes the "Family Wolf" row
       // (chip "Family" + label "Wolf") from a species "Monster" row (chip
       // "Monster" + label "Wolf Alpha").
       family: 'Family',
@@ -892,7 +846,7 @@ export default {
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
-    // (js/sidebar.js buildDecorGroup), see DATA_CONTRACT.md §3.1.
+    // (js/sidebar.js buildDecorGroup), see  §3.1.
     decorFamily: {
       barrel: 'Barrels', boxes: 'Boxes', furniture: 'Furniture',
       corpse: 'Corpses', books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
@@ -961,7 +915,7 @@ export default {
       SoloPvP_HC: 'Solo PvP (HC)',
     },
     // Physical chest type (world_objects.json chest_type) -- exact set from
-    // data/world_objects.json, see data/SCHEMA.md "Chest loot + type".
+    // data/world_objects.json, see  "Chest loot + type".
     chestType: {
       Backpack: 'Backpack', Barrel: 'Barrel', Bathroom: 'Bathroom', Bedroom: 'Bedroom',
       Boiler: 'Boiler', Books: 'Books', Boxes: 'Boxes', Cabinet: 'Cabinet', Chest: 'Chest',
@@ -972,7 +926,7 @@ export default {
     // Activatable quest-object nature (world_objects.json activable_type) --
     // exact set from data/world_objects.json; several tokens are proper
     // nouns (characters/unique objects) left identical in every language,
-    // see data/SCHEMA.md "Activable type".
+    // see  "Activable type".
     activableType: {
       Ancient: 'Ancient', Artifact: 'Artifact', Barrel: 'Barrel', Bart: 'Bart', Beehive: 'Beehive',
       Black: 'Black', Blade: 'Blade', Bloody: 'Bloody', Blue: 'Blue', Broken: 'Broken',
@@ -1020,7 +974,7 @@ export default {
       xp_reward: 'XP given', gold_reward: 'Gold given',
       phys_crit_chance: 'Physical crit chance', magic_crit_chance: 'Magic crit chance',
       // Added Phase 4 (stat_ranges/weapon_dps/formulas -- see
-      // tmp/convergence/port_map.md #8/#9): rollable stats/formula operands
+      // tmp/convergence/ #8/#9): rollable stats/formula operands
       // missing from the "monster" set above.
       spell_power: 'Spell power', phys_penetration: 'Physical penetration',
       magic_penetration: 'Magic penetration', flat_phys_penetration: 'Flat physical penetration',

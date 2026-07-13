@@ -143,7 +143,7 @@ function buildHash() {
   // byte-identiques (rétro-compat — absence de map= ⇒ Kwalat, cf. readHash).
   if (S.map && S.map !== 'Kwalat') h += `&map=${S.map}`;
   // Drapeaux utilisateur (#84, clic droit) : PAS de champ hash -- localStorage
-  // par carte uniquement (pins.js), jamais partagés via lien (voir COORDINATION.md).
+  // par carte uniquement (pins.js), jamais partagés via lien (voir ).
   if (S.locator) h += `&at=${Math.round(S.locator.x)},${Math.round(S.locator.z)}`;
   if (S.locator?.label) h += `&atl=${encodeURIComponent(S.locator.label)}`;
   // Report carry-over : ré-encodé via URLSearchParams (pas de concaténation

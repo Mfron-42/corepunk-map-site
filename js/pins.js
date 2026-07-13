@@ -8,7 +8,7 @@
    single-slot, cf. locatorTitle -- "Marker"/"Repère" déjà pris) ET du futur
    "filtre épinglé" du panneau gauche (#82, glyphe épingle ⚲, mot "pin"/
    "épingle") -- ici un petit DRAPEAU teinte --core planté au point exact,
-   jamais le mot pin/épingle dans l'UI (voir COORDINATION.md §Vocabulaire). */
+   jamais le mot pin/épingle dans l'UI (voir  §Vocabulaire). */
 import { S } from './state.js';
 import { esc, fmtCoord, reduceMotion } from './utils.js';
 import { tr } from './i18n/index.js';
@@ -20,7 +20,7 @@ import { syncHash } from './urlstate.js';
    coffre placé, camp, coffre fouillable…) — voir resolveGotoMarker ci-dessous,
    qui décide alors de mettre en avant CE marqueur plutôt que de poser un
    réticule synthétique par-dessus (le bug rapporté, voir
-   npc_dual_identity_INVESTIGATION.md). Omis (undefined/null) : comportement
+   ). Omis (undefined/null) : comportement
    historique inchangé, réticule systématique — c'est le cas légitime pour
    toute cible sans marqueur propre (zone dynamique, centroïde de camp non
    résolu, position brute…). */

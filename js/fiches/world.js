@@ -63,7 +63,7 @@ function chestTimersHtml(r) {
 }
 
 /* Fiche coffre (S.data.chest, placements tc_* : camp_chest/legacy_chest/
-   décor — voir DATA_CONTRACT.md §3) : nom d'affichage = type physique réel
+   décor — voir  §3) : nom d'affichage = type physique réel
    localisé (chestDisplayName, js/config.js — r.type est le vrai classifieur
    chest_type du pipeline, jamais le nom brut d'asset d'art, non localisé et
    bruité) ; ligne de catégorie = la VRAIE catégorie du point (chestKindLabel
@@ -74,7 +74,7 @@ function chestTimersHtml(r) {
    Pas de lien profond dédié (setFicheHash(null)) — même traitement que
    openLocationFiche/openAbilityFiche : ~3830 marqueurs individuels par skin
    de prop, pas un id stable qu'un lien partagé devrait rouvrir (voir
-   data/SCHEMA.md "Chest loot + type" sur pourquoi ces marqueurs ne sont pas
+    "Chest loot + type" sur pourquoi ces marqueurs ne sont pas
    individuellement indexés en recherche non plus). */
 function openChestFiche(i) {
   const r = S.data.chest[i];
@@ -89,7 +89,7 @@ function openChestFiche(i) {
   // Note honnête (r.lootGeneric) : ce placement n'a AUCUNE table de butin
   // dédiée — le seul lien de butin connu est un pool générique fouillable
   // (lt_searchable*), pas une vraie table de coffre curée. Jamais présenté
-  // comme un coffre farmable ciblé (voir DATA_CONTRACT.md §1/§3).
+  // comme un coffre farmable ciblé (voir  §1/§3).
   const genericNote = r.lootGeneric ? `<p class="hint">${esc(tr('lootGenericNote'))}</p>` : '';
   // EN-TÊTE PARTAGÉ : titre coloré (teinte réelle du coffre) + pastille LOCATE
   // (mode L, Q7) sur sa position quand connue — pin persistant retirable. E'c-3 :
@@ -112,7 +112,7 @@ function openChestFiche(i) {
 
 /* Fiche « coffre fouillable » (searchable_chests.bin, poi_searchable_chest_*
    — LE vrai coffre farmable de recette, distinct des placements chest
-   ci-dessus, voir DATA_CONTRACT.md §4) : région (jeton neutre prettifié,
+   ci-dessus, voir  §4) : région (jeton neutre prettifié,
    aucun libellé fourni par les données) + note honnête sur la rareté
    (`rarity` vaut TOUJOURS "random" côté données — le vrai palier est choisi
    côté serveur au spawn, non décodable depuis le client) + la vraie table de

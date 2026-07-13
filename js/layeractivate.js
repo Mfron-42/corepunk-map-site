@@ -12,7 +12,7 @@
    main.js n'exporte jamais rien (« aucune logique métier propre », voir son
    en-tête) et search.js aurait sinon dû re-dériver une copie du même geste
    — interdit par la même discipline que le résolveur de points UNIQUE
-   (COORDINATION.md, pointsets.js).
+   (, pointsets.js).
 
    Module d'ORCHESTRATION pur : ne réimplémente RIEN de la machinerie de
    l'arbre elle-même (specieslayer.js/sidebar.js, INCHANGÉS) — compose
@@ -38,7 +38,7 @@ function activateSpeciesLayer(spId) {
   revealMonsterNode('species', spId);
 }
 /* Famille(s) cochable(s) — grain 2 de l'échelle de précision (espèce >
-   famille > zone/camp > inconnu, COORDINATION.md). CASCADE (IA finale) :
+   famille > zone/camp > inconnu, ). CASCADE (IA finale) :
    cocher une famille coche AUSSI toutes ses espèces (setFamilyOn,
    specieslayer.js) — exactement le même geste que la case famille de
    l'arbre ou le chip family-layer d'une étape de quête, jamais une

@@ -263,7 +263,7 @@ function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '', 
    côté serveur" ni autre) : seuls 18 PNJ de Prison Island ont un vrai
    classifieur `pos_source: server_spawn` prouvé (data/quests.json, côté
    pipeline), et ce champ n'atteint aucun .bin du site -- voir
-   i18n/*.js::filterHiddenTooltip et  unknown_states_DESIGN.md §2
+   i18n/*.js::filterHiddenTooltip et   §2
    re-check #1 pour la même discipline appliquée au tooltip affiché.
    `camp_chest` n'a pas son propre tableau S.data (les points viennent du
    même S.data.chest que la décor/legacy, filtrés par `group`, voir
@@ -282,12 +282,12 @@ function catStats(key) {
    chest ») : ses 7 familles (S.decor, données INCHANGÉES — data.js
    buildDecorGroups, couches decor:<fam>, hash decor.*) se rangent dans les
    sous-groupes du groupe Interactables selon leur `category` CUITE
-   (ontology chunk 2 — data/SCHEMA.md « Chest/decor placements » :
+   (ontology chunk 2 —  « Chest/decor placements » :
    legacy→interactable.chests, barrel/boxes→interactable.destroyable,
    furniture/corpse/books→interactable.reactive, misc→interactable.other).
    L'ancienne table d'affichage DECOR_BUCKET (le même rangement, jugé côté
    front) est SUPPRIMÉE : le front LIT la classification, il ne re-juge
-   plus. Toujours toutes décochées par défaut (DATA_CONTRACT.md §1/§3.1) et
+   plus. Toujours toutes décochées par défaut ( §1/§3.1) et
    pleinement recherchables (search.js buildChestSearchIndex ne filtre
    jamais sur l'état on/off). Ordre d'affichage intra-bucket =
    DECOR_FAMILIES (présentation, config.js). */
@@ -592,7 +592,7 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
    lit l'ÉTAT, jamais une position DOM).
 
    Rangement kind→groupe DÉRIVÉ DE LA DONNÉE (ontology chunk 2) : chaque
-   groupe de camp expédie sa `category` canonique (data/SCHEMA.md « Camp
+   groupe de camp expédie sa `category` canonique ( « Camp
    category » — world.* / harvest.* / interactable.* / monsters / creeps /
    wildlife / quest.pool / event.pool / unclassified, kind→category vérifié
    1:1 par carte) ; l'ancienne table d'affichage KIND_PLACEMENT est
@@ -1236,7 +1236,7 @@ function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0, kind
    (shrines/soulkeeper/guards/wildlife/other) attendent camps.bin (différé).
    Gardes : libellé honnête « Gardes (unité non identifiée) » — 2 camps/12
    points sans AUCUN lien espèce/PNJ/butin/niveau dans les données (voir
-    interactives_taxonomy_INVESTIGATION.md §5) — jamais un pair
+     §5) — jamais un pair
    de camp de monstre qu'il n'est pas. « Others » : sous-groupe DISTINCT du
    sous-groupe POI ci-dessus — il porte la ligne camp:other (littéralement
    les camps moteur « autres »), une notion de kind de camp, pas une famille
@@ -1256,7 +1256,7 @@ function buildGroupWorld() {
   ul.appendChild(catRow('workshop'));
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
   // Lignes camp du groupe World : les kinds de catégorie cuite `world.*`
-  // (shrines/soulkeeper/guards aujourd'hui — data/SCHEMA.md), points
+  // (shrines/soulkeeper/guards aujourd'hui — ), points
   // décroissants (présentation, voir l'en-tête « Arbre de couches »).
   for (const kind of kindsOfCategory(c => c.startsWith('world.'), true)) {
     const li = campRow(kind, campRowLabel(kind));
@@ -1363,7 +1363,7 @@ function buildGroupHarvest() {
 }
 /* Somme HONNÊTE d'un bucket Interactables (sources DISJOINTES prouvées :
    couches CATS ≠ familles décor ≠ camps dynamiques, voir 
-   interactives_taxonomy_INVESTIGATION.md §3 « point-level overlap: zero ») :
+    §3 « point-level overlap: zero ») :
    compte principal = ce que la carte dessinerait, badge +N = enregistrements
    réels sans position (même discipline que catStats/hiddenBadge). */
 function bucketStats(cats, decorFams, kinds) {

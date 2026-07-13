@@ -69,12 +69,12 @@ function ficheHeader({ avatar = '', name, hex = null, dot = null, sub = '', name
    quasi-totalité de la masse pondérée de sa table ; la règle a été durcie,
    un simple poids `w`>=1 NE PROUVE PLUS rien seul -- ~93,6 % des lignes du
    dataset étaient marquées « garanti » à tort avant ce correctif, voir
-   data/SCHEMA.md "guaranteed") soit la Badge FERMÉE `weight-share` (blueprint
+    "guaranteed") soit la Badge FERMÉE `weight-share` (blueprint
    §5.2, même composant que l'obtain block de la fiche objet, item.js
    obtainDropRowHtml) quand `d.ch` (la weight_share de l'objet dans la table,
    0..1) est calculable -- jamais un « % de chance » : la vraie probabilité par
    KILL est décidée côté serveur, absente des données client (honesty fix,
-   voir data/DATA_CONTRACT.md §3 -- l'ancien rendu ≈N% sous un intitulé
+   voir  §3 -- l'ancien rendu ≈N% sous un intitulé
    "Chance" faisait passer une PART de table pour une chance de drop, le même
    bug que l'obtain block d'item.js corrigeait déjà). La Badge porte ce
    caveat dans son info-bulle (i18n `badge` section, valWeightShare/Tip,
@@ -97,7 +97,7 @@ function monsterLootRow(d) {
     S.items[d.key] ? 'fiche-item' : null, d.key, dropRateHtml(d), itemGlyph(S.items[d.key]));
 }
 function lootRowsHtml(list, emptyKey) {
-  // Pastille "unknown" (unknown_states_DESIGN.md #9, task #67) : ce repli
+  // Pastille "unknown" ( #9, task #67) : ce repli
   // partagé (monstre/camp/coffre/table) dit "rien de catalogué" -- un vrai
   // trou de couverture connu, jamais un aveu que le jeu n'a pas de butin ici
   // (voir noLootCatalogued/noHarvestCatalogued -- suivi ouvert, pas final).
@@ -175,7 +175,7 @@ function closeFiche() {
   // Le réticule ambré (pins.js setLocator) posé par un goto sans pin connu
   // (goal dynamique, centroïde de camp…) ne devait jamais survivre à la
   // fermeture de la fiche qui l'a fait apparaître -- avant ce correctif, rien
-  // ne l'effaçait jamais (voir npc_dual_identity_INVESTIGATION.md, "lingers
+  // ne l'effaçait jamais (voir , "lingers
   // forever"). No-op si aucun réticule n'est posé. Q7 (ratifié §9) : les
   // pins LOCATE (S.locates, pins.js addLocatePin — les toggles des pastilles
   // mode L) ne sont VOLONTAIREMENT pas effacés ici : ils survivent à la
@@ -207,26 +207,14 @@ const FICHE_TOKEN = {
   chest: 'ch', searchable_chest: 'sc', loot: 'lt', node: 'node',
   location: 'loc', ability: 'ab', recipe: 'rec',
   // Vague E'c-8 (blueprint §1.2/§7, opt L3) — talent/spécialisation/métier,
-  // fiches/build.js. Jetons RÉSERVÉS par le blueprint (tal=/spec=/prof=) ;
-  // câblés ICI (l'exclusion mutuelle + la sérialisation du jeton, ce qui est
-  // dans le périmètre de ce fichier) mais PAS la restauration entrante
-  // (main.js restoreState()/urlstate.js FICHE_HASH_KEYS sont hors périmètre
-  // de cette vague — voir le rapport de mission : ouvrir une de ces 3 fiches
-  // pose bien le jeton dans le hash, mais coller un lien tal=/spec=/prof= à
-  // froid ne la rouvre pas encore tant qu'un agent futur n'ajoute pas ces 2
-  // lectures dans main.js + les 3 jetons à FICHE_HASH_KEYS).
+  // fiches/build.js. Jetons tal=/spec=/prof= désormais PLEINEMENT deep-linkables
+  // (E'c-8 clos) : ils figurent dans FICHE_HASH_KEYS (importé plus haut) — donc
+  // couverts par la boucle d'exclusion mutuelle de setFicheHash + le report à
+  // travers un pan/zoom (buildHash) — ET relus au chargement (restoreState).
+  // Rien de spécifique à ajouter ici : leur sérialisation passe par FICHE_TOKEN
+  // comme les 15 autres kinds.
   talent: 'tal', spec: 'spec', profession: 'prof',
 };
-/* Jetons de fiche Build (E'c-8) -- PAS encore dans urlstate.js FICHE_HASH_KEYS
-   (fichier hors périmètre de cette vague, voir ci-dessus) : ajoutés à la
-   boucle d'exclusion mutuelle ICI SEULEMENT, pour qu'ouvrir N'IMPORTE QUELLE
-   AUTRE fiche efface bien un tal=/spec=/prof= déjà présent dans le hash (et
-   inversement) -- sans ça, ouvrir par ex. une fiche objet APRÈS une fiche
-   talent laisserait un tal=<node> périmé traîner à côté du nouveau i=<clé>,
-   cassant la règle "un seul jeton de fiche" que FICHE_HASH_KEYS existe pour
-   garantir. Pur ajout local à setFicheHash, aucune modification de
-   urlstate.js. */
-const BUILD_FICHE_HASH_KEYS = ['tal', 'spec', 'prof'];
 /* npc/chest/location portent un INDEX POSITIONNEL dans S.openFiche.id ; on
    SÉRIALISE une clé STABLE (un index glisse à la reconstruction → lien cassé,
    blueprint §8-R3). Résolu à l'index à la restauration (urlstate.js / main.js). */
@@ -238,8 +226,7 @@ function ficheTokenValue(kind, id) {
 }
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul jeton de fiche
-  for (const t of BUILD_FICHE_HASH_KEYS) p.delete(t); // idem pour tal/spec/prof (E'c-8, voir plus haut)
+  for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul des 18 jetons de fiche (tal/spec/prof compris — E'c-8)
   // Openers historiques du monde/objet (coffre, coffre fouillable, chronique,
   // table de butin, nœud, capacité, recette) : ils posent S.openFiche puis
   // appellent setFicheHash(null) (leur module précède le deep-link) — on dérive
@@ -317,46 +304,13 @@ function varPlaceholder(runtime, token) {
   return `<span class="badge badge--inline badge--var-${runtime ? 'runtime' : 'unextracted'}" title="${esc(title)}">?</span>`;
 }
 
-/* Bouton « Carte » standard (icône + libellé) pour tout slot localisable —
-   fiches, popups, objectifs. Un objet/PNJ/vendeur sans position CONNUE reste
-   toujours listé (jamais masqué) : ce repli affiche juste un libellé grisé
-   au lieu du bouton, pour que le joueur sache que la chose existe même sans
-   coordonnée exploitable. */
-const GOTO_ICON = `<svg class="goto-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d="M12 21s6.5-6.2 6.5-11.3a6.5 6.5 0 1 0-13 0C5.5 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.2"/></svg>`;
-/* `cat` (facultatif) : clé de couche carte (voir mapview.js `layers`/
-   config.js CATS, ex. 'npc', 'camp_chest', 'decor:legacy') quand `x,z` sont
-   CONNUS pour coïncider avec un marqueur RÉELLEMENT rendu de cette couche
-   (le pin lui-même, pas juste "quelque part près de lui" -- voir
-   npc_dual_identity_INVESTIGATION.md). Posé en `data-cat`, lu par main.js's
-   goto handler -- pins.js goTo() met alors en avant ce marqueur déjà rendu
-   au lieu d'un réticule ambré redondant à côté (repli automatique sur le
-   réticule si la couche est masquée/éteinte ou le marqueur introuvable).
-   Omis : comportement historique inchangé. */
-function gotoBtn(x, z, label, cat) {
-  if (x == null) return `<span class="pos-unknown">${esc(tr('posUnknown'))}</span>`;
-  const catAttr = cat ? ` data-cat="${esc(cat)}"` : '';
-  return `<button class="goto" data-act="goto" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}"${catAttr}>${GOTO_ICON}<span>${esc(tr('mapLabel'))}</span></button>`;
-}
-/* Cible sur une AUTRE carte : bouton de bascule cross-carte (libellé = nom de
-   la carte cible) au lieu d'un goTo local. Le clic bascule puis focus. */
-function crossMapBtn(mid, x, z, label) {
-  return `<button class="goto goto-cross" data-act="map-goto" data-map="${esc(mid)}" data-x="${x}" data-z="${z}" data-label="${esc(label || '')}">${GOTO_ICON}<span>${esc(mapName(mid))}</span></button>`;
-}
-/* Variante SANS position connue (batch-wiring pass, mechanism decode job A) :
-   geo.py attache parfois `target.map` seul, jamais avec x/z, pour une cible
-   npc/item/zone dont la seule position connue vit sur une AUTRE carte que
-   celle interrogée (ex. _npc_pos_target/_resolve_target_mech's receive_reward
-   branch — "cross-map: named, no local pin"). Avant cette passe, ce cas ne
-   déclenchait NI gotoBtn NI crossMapBtn (les deux exigent x/z) : la vignette
-   retombait sur le texte générique dynamicPosBadge "Position dynamique",
-   perdant complètement l'info de carte. Un simple bouton de bascule (pas de
-   goTo ensuite — aucune coordonnée à viser) répare ça honnêtement, sans
-   fabriquer une position qu'on n'a pas. */
-function crossMapOnlyBtn(mid, label) {
-  return `<button class="goto goto-cross" data-act="map-switch" data-map="${esc(mid)}" data-label="${esc(label || '')}" title="${esc(tr('mapBadgeTitle', mapName(mid)))}">${GOTO_ICON}<span>${esc(mapName(mid))}</span></button>`;
-}
+/* gotoBtn / crossMapBtn / crossMapOnlyBtn RETIRÉS — vague E'c-9 (relicat S1) :
+   0 appelant depuis la migration EntityRef. L'affordance carte n'est plus un
+   bouton « Carte » séparé mais TOUJOURS une référence dessinable [Kind(●)]
+   (posRow/dynamicPosBadge → ref-draw, mode L), y compris pour les cibles
+   cross-carte. GOTO_ICON supprimé avec eux (aucun autre appelant). Les
+   handlers goto/map-goto/map-switch de main.js restent (routés par ref-draw
+   locate). */
 
 /* ── Position d'objectif de quête à 3 niveaux ──────────────────────────
    Un objectif de quête n'affiche PLUS JAMAIS « position inconnue » : un objet
@@ -546,7 +500,7 @@ function drawNamedZone(name) {
    rendu historique (nom prettifié, non cliquable). */
 function itemColor(it) { return (it && RARITY[it.rarity]?.hex) || 'var(--muted)'; }
 /* Entité "recette" (task #78a/#78b) : un item catalogue avec it.kind==='recipe'
-   est un pseudo-item de RÉFÉRENCE (voir data/SCHEMA.md recipes.json "Site
+   est un pseudo-item de RÉFÉRENCE (voir  recipes.json "Site
    propagation" -- une entrée par craft distinct, name/icon/rarities copiés du
    crafté, jamais un objet du jeu à part entière) -- sa propre couleur/fiche,
    jamais celle (souvent grise, sans rareté propre) ni la fiche générique de
@@ -790,10 +744,10 @@ function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
   return `<div class="frow" data-n="${esc(fold(label))}">${iconTag(icon, 'fr-icon', glyph || '📦')}${refHtml}${rateHtml || ''}</div>`;
 }
 
-/* ── « Comment farmer » (farm_spot_UX_DESIGN.md, refonte juillet 2026) ──────
+/* ── « Comment farmer » (, refonte juillet 2026) ──────
    it.farm[] est une liste de camps DÉDUPLIQUÉE par le pipeline (une entrée
    par camp distinct sur TOUTES les tables de butin de l'item, plafonnée à
-   24 -- build_site_data.py), chaque entrée ne portant que {camp, name, x, z}
+   24 -- ), chaque entrée ne portant que {camp, name, x, z}
    (name/x/z = repli PRÉ-groupement, x/z = seulement le point de spawn #0 du
    camp -- jamais un centroïde). La jointure vers le vrai nuage de points
    (S.camps, même clé stripée que campDisplayName/openCampFiche/
@@ -828,7 +782,7 @@ function farmCampRow(key, g) {
 /* Ligne de repli : camp NON trouvé dans S.camps (carte différente --
    préfixe ffm-island-*, réel sur 84,3 % des items à liste de farm dans les
    bins actuellement expédiés (377/447, recompté par
-   island_camp_labels_INVESTIGATION.md §5 — l'ancien « ~24 % » de ce
+    §5 — l'ancien « ~24 % » de ce
    commentaire était périmé) --, ou S.camps pas encore chargé). Pas de
    compte inventé, pas de bouton Surligner qu'on ne peut pas honorer --
    honnête plutôt que de fabriquer un kind/point count qu'on n'a pas.
@@ -905,7 +859,7 @@ function viewGoalZone(zi) {
 
 export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
-  gotoBtn, crossMapBtn, fmtNum, dropRow, dropRateHtml, lootRowsHtml,
+  fmtNum, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
   qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef, questRef,
   disambiguateQuestItems, disambiguatedItemName,

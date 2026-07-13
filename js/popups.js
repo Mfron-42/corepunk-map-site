@@ -107,7 +107,7 @@ function popupHtml(cat, r, id) {
 }
 
 /* Popup « coffre fouillable » (searchable_chests.bin — LE vrai coffre farmable
-   de recette, voir DATA_CONTRACT.md §4) : distinct des placements chest.
+   de recette, voir  §4) : distinct des placements chest.
    En-tête `[Coffre fouillable] <région>` : le tag nomme le kind, la région
    (seule info distinctive — aucun nom propre côté données) est le libellé,
    souligné → fiche recette quand une table est attachée (même garde qu'avant). */

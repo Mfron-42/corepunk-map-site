@@ -17,15 +17,12 @@ export default {
       activeDotsLabel: 'Capas activas',
       activeTagRemove: name => `${name} — quitar`,
       activeTagsMoreAria: n => `${n} capa${n === 1 ? '' : 's'} activa${n === 1 ? '' : 's'} más — mostrar`,
-      legend: 'Leyenda',
-      campsTitle: 'Campamentos y recursos',
       // IA FINAL de la barra lateral (2026-07-11): 4 grupos fijos —
       // groupPoi/groupQuests retirados con sus grupos (filas trasladadas a
       // World/Interactables, ver js/sidebar.js). GLOSSARY-PENDING.
       groupMonsters: 'Monstruos',
       // Grupos raíz Creeps/Wildlife (corrección de estructura 2026-07-11).
       groupCreeps: 'Creeps',
-      groupWildlife: 'Fauna',
       groupHarvest: 'Recolección',
       groupContainers: 'Interactuables',
       groupWorld: 'Mundo',
@@ -82,7 +79,7 @@ export default {
       // expone en ningún .bin del sitio (ni npcs.bin ni quests.bin) —
       // afirmar "lado del servidor" para todo el lote exageraría para el
       // resto, simplemente sin clasificar (ver 
-      // unknown_states_DESIGN.md §2 re-check #1).
+      //  §2 re-check #1).
       filterHiddenTooltip: n => `${n} sin posición conocida`,
       // (decorFamiliesTitle retirada 2026-07-11 con el grupo «Decoración»
       // disuelto — sus filas viven en los buckets de Interactuables, ver
@@ -162,11 +159,10 @@ export default {
       // redacción 2026-07-11 — sustituye al antiguo botón verboso; la
       // palabra «campamentos» queda fuera de la redacción de misiones/
       // fichas; ver js/fiches.js monsterSpawnHighlightBtn).
-      showEntityBtn: 'Mostrar',
       entityPtsN: p => `${p} pts`,
       // (chestTypesAllBtn/chestTypesNoneBtn eliminadas 2026-07-11 — sin
       // llamadores.)
-      // Recategorización de contenedores (DATA_CONTRACT.md): las 2 capas
+      // Recategorización de contenedores (): las 2 capas
       // reales de cofres + el grupo "Decoración" (legacy_chest/decor por
       // familia).
       decorGroupLabel: 'Decoración',
@@ -183,54 +179,38 @@ export default {
       doneBtn: 'Hecho',
       doneBtnActive: 'Hecho ✓',
       removeBtn: 'Quitar',
-      ficheBtn: 'Ficha',
-      ficheShopBtn: 'Ficha · Tienda',
       loreEntryTitle: 'Bestiario',
       lootTableKind: 'Tabla de botín',
       priceTitle: 'Precio',
-      hideHighlightBtn: 'Ocultar puntos',
       stockFilterPlaceholder: 'Filtrar lista…',
       rewardTablesN: n => `Tablas de recompensa (${n})`,
       questCountSuffix: n => ` · ${n} misión${n > 1 ? 'es' : ''}`,
-      highlightPointsBtn: n => `Resaltar los ${n} puntos`,
       dataGeneratedAt: date => `Datos del ${date}`,
       questMapsLine: names => `Mapas: ${names}`,
       // bestiaryTitle/bestiaryLoading retiradas (2026-07-11) con la propia
       // sección lateral "Bestiario" (ver js/sidebar.js) -- bestiaryZonesN se
       // mantiene: sigue en uso por fiches.js openMonsterFiche (sección de
       // lore de la ficha de monstruo), sin relación con esta sección retirada.
-      bestiaryZonesN: n => `${n} zonas`,
       monsterFoundInTitle: 'Se encuentra en',
       lootTableItemsN: n => `Contenido (${n})`,
       probableLootTitle: 'Botín probable',
       probableLootNote: name => `Tabla «${name}» asociada por tipo de contenedor — confirmar en el juego.`,
-      questCat: 'Misión',
-      givenBySuffix: name => ` · dado por ${name}`,
-      givenByPlain: name => `dado por ${name}`,
-      ficheCompleteBtn: 'Ficha completa',
       campLabel: 'Campamento',
       pointsHereSuffix: n => ` · ${n} puntos aquí`,
       spawnsTotal: n => `${n} apariciones en total`,
-      campFicheBtn: 'Ficha del campamento',
       levelAbbrev: lvl => `niv. ${lvl}`,
       // Rango de NIVEL (task #80 — filas de especie del bestiario/fauna de
       // campamento, ej. una especie que cubre niv. 5-20): misma familia de
       // abreviatura que levelAbbrev arriba.
       levelRangeAbbrev: (min, max) => `niv. ${min}–${max}`,
       spawnPointsCount: n => `${n} puntos de aparición`,
-      viewOnMapBtn: 'Ver en el mapa',
       likelyMonsters: n => `Monstruos probables (${n})`,
       guaranteedLabel: 'Garantizado',
-      chanceLabel: 'Probabilidad',
       // Proporción APROXIMADA (d.ch = weight / peso total de la tabla, ver
-      // data/SCHEMA.md "chance") de un botín no garantizado + advertencia
+      //  "chance") de un botín no garantizado + advertencia
       // honesta en un tooltip (title) sobre la píldora — ver js/fiches.js
       // dropRateHtml.
-      dropChanceApprox: pct => `≈ ${pct} %`,
-      dropChanceBelowOne: '< 1 %',
-      dropChanceCaveat: 'Proporción de este objeto en el grupo de botín de la tabla — no una probabilidad por muerte (el número real de tiradas depende del servidor).',
       lootBestRates: 'Botín (mejores probabilidades)',
-      mapLabel: 'Mapa',
       mapSelectorLabel: 'Mapa mostrado',
       mapBadgeTitle: name => `En ${name} — haz clic para cambiar`,
       mapTilesOnlySuffix: '(aprox.)',
@@ -240,20 +220,16 @@ export default {
       mapGroupPve: 'Arenas JcE',
       mapGroupPvp: 'Arenas JcJ',
       mapGroupOther: 'Otros',
-      // «posición desconocida» prohibido en el sitio (ver data/SCHEMA.md "search_zone"):
+      // «posición desconocida» prohibido en el sitio (ver  "search_zone"):
       // esta etiqueta genérica solo se usa para filas sin objetivo de misión
       // (PNJ/objeto/comerciante sin posición extraída) — los propios objetivos
       // de misión usan posDynamic/posDynamicZone/posUncatalogued más abajo.
       posUnknown: 'posición no especificada',
-      posDynamic: 'Posición dinámica',
-      posDynamicZone: 'Zona de aparición',
       // Confianza "media" (pase de cableado por lotes, solo proximidad — ver
       //  zone_confidence): texto distinto de posDynamicZone
       // arriba — un campamento cercano no prueba que el objeto realmente
       // aparezca ahí, nunca presentado con la misma autoridad que una zona
       // respaldada por evidencia.
-      posEstimatedZone: 'Zona estimada',
-      posUncatalogued: 'Posición no catalogada — verificar en el juego',
       // Subtítulo de la fila de resultado de búsqueda para una MISIÓN
       // entera sin posición extraída (el dador/actores no tienen x/z — p.
       // ej. las misiones de Prison Island, en un mapa/sistema de
@@ -272,17 +248,14 @@ export default {
       questsGivenN: n => `Misiones otorgadas (${n})`,
       noQuestsForNpc: 'No se conocen misiones para este PNJ.',
       questItemBadge: 'Objeto de misión',
-      gameItemBadge: 'Objeto del juego',
       soldTag: 'en venta',
       craftableTag: 'crafteable',
       lootTag: 'botín',
-      activableBadge: 'Activable',
       // Insignia «Contenedor» (decodificación de mecanismo, tarea A):
       // identidad propia del objeto de collect_from_object (t.label, p. ej.
       // "Caja vieja") — distinta de activableBadge de arriba (objeto
       // autosuficiente de use_object, no un contenedor donde se encuentra
       // OTRA COSA).
-      containerBadge: 'Contenedor',
       // Relación explícita de la tarjeta de objetivo (design review, julio
       // 2026): ver en.js para el contexto -- nunca interpolado con el
       // nombre (que queda como span cliqueable aparte, ver goalTargetChip).
@@ -302,7 +275,7 @@ export default {
       // ni zona.
       goalGivenByLabel: 'entregado por',
       // Mecanismo receive_reward (decodificación de mecanismo, tarea A): el
-      // objeto se obtiene al completar OTRA misión (geo.py reward_of), no
+      // objeto se obtiene al completar OTRA misión ( reward_of), no
       // entregado por quien da esta misión — solo el verbo, sigue un span de
       // misión cliqueable por cada entrada de reward_of (ver rewardOfRelRow).
       goalRewardOfLabel: 'obtenido al completar',
@@ -322,21 +295,18 @@ export default {
       // Mecanismo kill_player: target.player_specs combinados vía
       // heroSpecLabel (fiches.js) — no hay una única ubicación para un
       // objetivo JcJ.
-      goalKillPlayerLabel: specs => `Derrotar jugadores (${specs})`,
       goalCraftLabel: 'a craftear',
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
       howToTitle: 'Cómo hacerlo',
       rewardsTitle: 'Recompensas',
       questItemsN: n => `Objetos de misión (${n})`,
-      viewGiverBtn: 'Ver a quien la da',
       viewZoneBtn: 'Ver la zona',
       // Contraparte de confianza "media" (pase de cableado por lotes, ver
       // posEstimatedZone arriba): dibuja los puntos reales del campamento
       // citado cuando el mapa activo los tiene cargados, si no recurre al
       // mismo círculo estimado que viewZoneBtn — nunca el mismo texto, para
       // no confundirlo con una zona confirmada.
-      viewEstimatedZoneBtn: 'Ver estimación',
       onMapTitleN: n => `En el mapa (${n})`,
       dialogsN: n => `Diálogos (${n})`,
       // Insignia de confianza en la cabecera (rediseño de layout, julio 2026):
@@ -345,8 +315,6 @@ export default {
       // están hoy totalmente explicadas, 2 conservan al menos un objetivo sin
       // resolver. Nunca se muestra sin grafo de objetivos en absoluto
       // (diálogos de ambiente, etc.).
-      questExplainedFull: 'Totalmente explicada',
-      questExplainedPartial: n => `${n} objetivo${n > 1 ? 's' : ''} incierto${n > 1 ? 's' : ''}`,
       dialogueFicheKind: 'Diálogo de PNJ',
       dialogueHeading: 'Diálogo de PNJ (no es una misión)',
       dialogueNote: 'Frases de ambiente que dice este personaje; no es una misión con objetivos ni recompensas.',
@@ -356,7 +324,7 @@ export default {
       questFicheKind: region => 'Misión' + (region ? ` · ${region}` : ''),
       dropRatesTitle: 'Probabilidades de botín',
       farmSpotsTitle: 'Cómo farmear',
-      // Rediseño de zonas de farmeo (farm_spot_UX_DESIGN.md, julio 2026):
+      // Rediseño de zonas de farmeo (, julio 2026):
       // filas agrupadas por tipo de campamento (Minería/Monstruos/…) en vez
       // de un volcado plano de 24 filas — resumen de cabecera, desplegable
       // «+N», y los repliegues honestos de abajo (campamento sin unir, sin
@@ -372,7 +340,7 @@ export default {
       // receta, agregado POR CLASE (camp_chest por familia de monstruo,
       // searchable_chest por banda de rareza) -- `ch` ya es la MEJOR
       // probabilidad entre las variantes de grado/nivel plegadas en esa
-      // clase (ver build_site_data.py).
+      // clase (ver ).
       containersTitle: 'También se encuentra en cofres',
       containerCampChestHint: 'Generado por el servidor según la familia de monstruo — no hay una ubicación concreta que mostrar en el mapa.',
       containerChanceUpTo: pct => `hasta ${pct} %`,
@@ -386,12 +354,11 @@ export default {
       // Extensión de quest_source_of, decodificación de mecanismo, tarea B
       // (harvest/reward_of/world -- given_by reutiliza ui.givenByPlain,
       // container reutiliza obtainViaInteract de arriba, ver
-      // build_site_data.py + fiches.js openItemFiche).
+      //  + fiches.js openItemFiche).
       obtainViaHarvest: profession => `Recolectando (${profession})`,
       // Fragmento, no una frase completa -- se combina con ui.givenByPlain
       // como "Dado por X — quest Y" (caso cruzado de receive_reward, ver la
       // rama qs.via === 'reward_of' de openItemFiche).
-      obtainViaRewardOfQuest: name => `misión ${name}`,
       obtainViaWorld: 'Se encuentra al completar esta misión',
       // Línea honesta de obtención (items-obtain audit §B2): se muestra
       // cuando un objeto NO tiene ningún canal de obtención — una línea
@@ -416,7 +383,6 @@ export default {
       merchantPosUnknown: 'Posición del vendedor no especificada.',
       recipeTitle: 'Receta',
       producesArrow: 'produce → ',
-      recipeChipLabel: name => `Receta: ${name}`,
       usedInTitle: 'Se usa en',
       rewardBadge: 'Recompensa',
       requiredBadge: 'Requerido',
@@ -458,11 +424,11 @@ export default {
       noLootCatalogued: 'Botín no catalogado para este monstruo.',
       noAbilitiesKnown: 'No se conocen habilidades para este monstruo.',
       noCampsKnown: 'Ningún lugar de aparición conocido para este monstruo.',
-      // Sección de fauna de la ficha de campamento (unknown_states_DESIGN.md
+      // Sección de fauna de la ficha de campamento (
       // #4/#10, tarea #67): un campamento "de tipo monstruo" (kind monsters/
       // creeps/wildlife) cuyo nombre de manager no da ninguna especie
       // resuelta — probado a nivel de bytes que los puntos de aparición del
-      // campamento no llevan NINGUNA referencia de entidad (data/SCHEMA.md
+      // campamento no llevan NINGUNA referencia de entidad (
       // "camp fauna"), 43/128 campamentos así hoy. Antes no mostraba nada en
       // absoluto (vacío silencioso, ver openCampFiche); ahora una nota
       // honesta de estado dinámico.
@@ -527,8 +493,7 @@ export default {
       unitMeters: n => `${n} m`,
       nodeAliasesLabel: names => `También conocido como: ${names}`,
       statsTitle: 'Estadísticas',
-      realStatsBadge: 'real',
-      // Info-bulle del badge « real » (monsters.md finding #1): distingue un
+      // Info-bulle del badge « real » ( finding #1): distingue un
       // registro REAL del cliente (record m_abs_*/mbt_*_boss, p. ej. Furious
       // Woodraptor = 154.440 HP) del rango genérico estimado por nivel de abajo.
       realStatsTooltip: 'Valores reales (cliente) — leídos directamente de los datos del juego para este monstruo concreto, no una estimación por nivel.',
@@ -545,7 +510,7 @@ export default {
       bossDifficultyNote: 'Este jefe tiene su propio PV base (de los datos del juego). PV reales = base × un multiplicador de dificultad del servidor — unos 9-10× a nivel 20 (p. ej. un jefe de mazmorra ≈ 226 000). El multiplicador exacto lo asigna el servidor: es una estimación, nunca un total real fijo.',
       computedStatsBadge: 'calculado (fórmula del juego)',
       statsPerTierNote: 'Nivel de dificultad asignado en el servidor — rango según el nivel (fácil → jefe).',
-      // Advertencia honesta sobre las columnas Élite/Jefe (monsters.md finding
+      // Advertencia honesta sobre las columnas Élite/Jefe ( finding
       // #2): a diferencia de fácil/medio/difícil, estos 2 niveles nunca se
       // verificaron contra una fuente externa — la cifra comunitaria de
       // "~350.000 HP" para un jefe de nivel 20 no se reproduce con ningún dato
@@ -581,7 +546,7 @@ export default {
       // bestiario, búsqueda).
       devContentTag: n => `Contenido de prueba (${n})`,
       devBadge: 'Prueba',
-      // Taxonomía de 3 estados "no lo sabemos" (unknown_states_DESIGN.md,
+      // Taxonomía de 3 estados "no lo sabemos" (,
       // tarea #67): un único componente `.state-chip` + vocabulario corto
       // para cada rincón del sitio que explica honestamente una incertidumbre
       // (posición, botín, stock del vendedor, escalado de rareza/nivel,
@@ -591,9 +556,6 @@ export default {
       // — dynamic/unknown son las dos únicas etiquetas realmente nuevas. Ver
       // stateChip() en js/fiches.js.
       devBadgeTitle: 'Contenido inacabado o de prueba que el juego incluye pero nunca usa.',
-      stateDynamic: 'Dinámico',
-      stateDynamicTitle: 'Decidido por el servidor en tiempo real — no almacenado en los datos del cliente.',
-      stateUnknown: 'Desconocido',
       stateUnknownTitle: 'No se puede determinar a partir de los datos del cliente extraídos.',
       // 4º estado (task #80, monsterStatsSection): un bloque de estadísticas
       // REAL (registro hermano m_abs_*, compartido por todos los niveles de
@@ -611,11 +573,11 @@ export default {
       // Rangos de tirada / DPS de arma / fórmulas / escalado de runas y chips
       // (stat_ranges, weapon_dps, artifact_formula/formula, rarity_scaling,
       // tier_scaling) -- nuevo, ver  +
-      // , tmp/convergence/port_map.md #8/#9/#10.
+      // , tmp/convergence/ #8/#9/#10.
       rollRangeTitle: 'Rango de tirada',
       weaponDpsTitle: 'DPS del arma',
       weaponDpsDerived: 'DPS (calculado)',
-      // Agrupación principal/secundaria (auditoría data-accuracy, items.md #1):
+      // Agrupación principal/secundaria (auditoría data-accuracy,  #1):
       // un artefacto tira 1 stat PRINCIPAL garantizada + un número limitado de
       // stats SECUNDARIAS de un pool compartido -- nunca todas a la vez.
       rollMainStatTitle: 'Stat principal (garantizada)',
@@ -627,9 +589,9 @@ export default {
       formulaPartialNote: 'Parte de esta línea depende de una referencia del motor no decodificada.',
       rarityScalingTitle: 'Escalado por rareza',
       tierScalingTitle: 'Escalado por nivel',
-      // Reformulado (unknown_states_DESIGN.md §2 re-check #2, tarea #67): la
+      // Reformulado ( §2 re-check #2, tarea #67): la
       // antigua frase "(probablemente gestionado en el servidor)" afirmaba
-      // una causa concreta NO PROBADA — data/SCHEMA.md por sí mismo no puede
+      // una causa concreta NO PROBADA —  por sí mismo no puede
       // determinar si es escalado del lado del servidor u otra regla del
       // juego (p. ej. una regla ligada al número de ranuras de talento).
       // Neutro ahora, y envuelto en una pastilla de estado "unknown" por su
@@ -669,7 +631,6 @@ export default {
       // posición, campamento de botín en vez de «searchable», accesorio de misión
       // ≠ objeto de misión, tipo de decoración ≠ familia, crónica ≠ lugar, objeto
       // reactivo, «área» nunca «zona»).
-      regionLabel: 'Región',
       regionFicheKind: 'Región',
       // ── ContentsBlock de la ficha de región (oleada E'c-R) — títulos de
       // sección + recuentos honestos. regionObj* = familias de objects.byFamily.
@@ -693,13 +654,6 @@ export default {
       regionObjShrine: 'Santuarios',
       regionObjDestroyable: 'Destructibles',
       regionObjUnresolved: 'Otros objetos',
-      lootCampLabel: 'Campamento de botín',
-      questPropLabel: 'Accesorio de misión',
-      reactiveObjectLabel: 'Objeto reactivo',
-      decorTypeLabel: 'Tipo de decoración',
-      loreEntryLabel: 'Crónica',
-      spawnAreaLabel: 'Área de aparición',
-      estimatedAreaLabel: 'Área estimada',
       // Fichas Build (opt L3, blueprint §1.2/§7 E'c-8 — talento/
       // especialización/profesión, solo búsqueda + ficha, sin mapa, ver
       // fiches/build.js).
@@ -714,7 +668,7 @@ export default {
       qao: 'Objetos de misión', workshop: 'Talleres',
       // Recategorización de contenedores: la antigua capa única "Cofres"
       // (chest) se elimina, reemplazada por estas 2 capas reales — ver
-      // DATA_CONTRACT.md §1/§3.1 y js/config.js CATS.
+      //  §1/§3.1 y js/config.js CATS.
       searchable_chest: 'Cofres registrables', camp_chest: 'Cofres de campamento',
     },
     rarity: { Common: 'Común', Uncommon: 'Poco común', Rare: 'Raro', Epic: 'Épico', Legendary: 'Legendario' },
@@ -746,7 +700,7 @@ export default {
       searchable_chest: 'Cofre registrable', recipe: 'Receta', node: 'Nodo de recolección',
       // Fila de FAMILIA (mission "search activation" 2026-07-11): NO es un
       // monstruo preciso — un filtro de árbol (2.º peldaño de la escala de
-      // precisión, COORDINATION.md). Distingue visualmente la fila "Familia
+      // precisión, ). Distingue visualmente la fila "Familia
       // Wolf" (chip "Familia" + etiqueta "Wolf") de una fila de especie
       // "Monstruo" (chip "Monstruo" + etiqueta "Wolf Alpha").
       family: 'Familia',
@@ -824,7 +778,7 @@ export default {
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable
-    // "Decoración" (js/sidebar.js buildDecorGroup), ver DATA_CONTRACT.md §3.1.
+    // "Decoración" (js/sidebar.js buildDecorGroup), ver  §3.1.
     decorFamily: {
       barrel: 'Barriles', boxes: 'Cajas', furniture: 'Muebles',
       corpse: 'Cadáveres', books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
@@ -864,7 +818,7 @@ export default {
     },
     // Subcategorías POI (interest_points.bin poiType — agrupación curada
     // NUESTRA de iconos, NO una taxonomía del juego, ver 
-    // ONTOLOGY.md §1 "poiType").
+    //  §1 "poiType").
     poiType: {
       habitat: 'Viviendas', nature: 'Naturaleza', fort: 'Fortificaciones',
       curiosity: 'Curiosidades', transport: 'Transporte', profession: 'Oficios',
@@ -946,7 +900,7 @@ export default {
       xp_reward: 'XP otorgada', gold_reward: 'Oro otorgado',
       phys_crit_chance: 'Prob. de crítico físico', magic_crit_chance: 'Prob. de crítico mágico',
       // Añadido en la Fase 4 (stat_ranges/weapon_dps/fórmulas -- ver
-      // tmp/convergence/port_map.md #8/#9): estadísticas de equipo y
+      // tmp/convergence/ #8/#9): estadísticas de equipo y
       // operandos de fórmula ausentes del conjunto "monstruo" de arriba.
       spell_power: 'Poder de hechizo', phys_penetration: 'Penetración física',
       magic_penetration: 'Penetración mágica', flat_phys_penetration: 'Penetración física fija',

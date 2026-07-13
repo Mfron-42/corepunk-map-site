@@ -97,7 +97,7 @@ function toggleCampHighlight(info) {
    le clic sur un chip d'entité DANS une fiche fait LES DEUX — il ouvre la
    fiche (comportement existant, inchangé) ET coche le BON nœud de l'arbre
    (espèce quand la précision espèce est prouvée, famille quand seul le
-   groupe l'est — échelle de précision COORDINATION.md) quand un point-set
+   groupe l'est — échelle de précision ) quand un point-set
    existe. Pas de point-set → fiche seule (le state-chip de la fiche dit
    déjà « inconnu ») ; le clic n'est JAMAIS mort. Dédoublonnage = c'est une
    case (re-cliquer re-révèle la ligne déjà cochée) ; retrait = décocher
@@ -108,7 +108,7 @@ function toggleCampHighlight(info) {
    plutôt que d'en re-dériver une seconde copie divergente (main.js n'exporte
    jamais rien, voir son en-tête). */
 /* Espèce cochable d'un chip monstre (id = clé S.monsters) : la couche vit
-   au grain ESPÈCE (référence canonique, COORDINATION.md) — résolue via le
+   au grain ESPÈCE (référence canonique, ) — résolue via le
    catalogue puis le résolveur unique ; null quand aucun camp ne joint sur la
    carte active (93/209 espèces — la fiche seule s'ouvre alors, l'arbre
    reste la voie manuelle vers sa ligne « 0 camp »). */
@@ -188,7 +188,7 @@ document.addEventListener('click', e => {
   }
   else if (b.dataset.act === 'map-switch') {
     // Cible sur une AUTRE carte mais SANS position connue dessus (ex.
-    // target.map d'une cible receive_reward/talk cross-map — geo.py n'attache
+    // target.map d'une cible receive_reward/talk cross-map —  n'attache
     // jamais x/z avec map dans ce cas précis, voir fiches.js::crossMapOnlyBtn) :
     // simple bascule, rien à viser après (contrairement à map-goto ci-dessus).
     switchMap(b.dataset.map, { keepView: true });
@@ -386,7 +386,7 @@ map.on('zoomend', () => { $('#ro-zoom').textContent = 'z' + map.getZoom().toFixe
 /* ── i18n : chrome statique + sélecteur de langue ─────────────
    Cohérence UI ⨯ données : changer de langue recharge TOUT le jeu de
    données (site/data/<lang>/) ET retraduit le chrome — jamais l'un sans
-   l'autre (voir data/SCHEMA.md "i18n"). Seules les langues à la fois
+   l'autre (voir  "i18n"). Seules les langues à la fois
    présentes dans LANGS (site/js/i18n.js) et dans le dataset construit
    côté données sont proposées. */
 function applyStaticI18n() {
@@ -436,7 +436,7 @@ function registerAllDenseRenderers() {
   registerDomDense('workshop', 'npc_map', (r, id) => popupHtml('workshop', r, id)); // ateliers : pictogramme couleur, pas d'icône dédiée
   // Contenu dev (feature #13) : tout enregistrement isTest masqué de la
   // carte par défaut (S.devOn faux) -- qao ET (parité, data-accuracy audit
-  // world_objects.md "isTest gating parity") searchable_chest/camp_chest/
+  //  "isTest gating parity") searchable_chest/camp_chest/
   // decor/npc ci-dessous : monstres/items n'ont pas de couche carte propre
   // (voir js/devcontent.js), mais tout enregistrement AVEC position qui
   // porte isTest:true doit rester filtré, jamais juste quelques-unes des 5
@@ -465,18 +465,18 @@ function registerAllDenseRenderers() {
   registerDense('qao', () => S.data.qao.filter(p => !isHiddenTest(p)), CATS.qao.hex,
     p => popupHtml('qao', p, markerId('qao', S.data.qao.indexOf(p))));
   // Coffres fouillables RÉELS (searchable_chests.bin, sa propre couche/son
-  // propre fichier — voir DATA_CONTRACT.md §2/§4) : couleur/popup dédiés,
+  // propre fichier — voir  §2/§4) : couleur/popup dédiés,
   // jamais confondus avec les placements chest ci-dessous.
   registerDense('searchable_chest', () => (S.data.searchable_chest || []).filter(p => !isHiddenTest(p)), CATS.searchable_chest.hex,
     r => searchableChestPopup(r));
   // Coffres de camp RÉELS (S.data.chest `group==="camp_chest"`, skin
   // sci_fi) : sa propre couche de haut niveau, ON par défaut (voir
-  // DATA_CONTRACT.md §3.1) — id de marqueur "chest:<i>" conservé (voir
+  //  §3.1) — id de marqueur "chest:<i>" conservé (voir
   // config.js chestHex/chestKindLabel) pour que Suivre/Fait/fiche-chest
   // continuent de fonctionner sur ce même S.data.chest partagé.
   registerDense('camp_chest', () => S.data.chest.filter(p => p.group === 'camp_chest' && !isHiddenTest(p)), CATS.camp_chest.hex,
     p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
-  // Décor (S.decor, groupe repliable/décoché par défaut — DATA_CONTRACT.md
+  // Décor (S.decor, groupe repliable/décoché par défaut — 
   // §1/§3.1) : une couche dense par famille, même convention que camp:<kind>
   // ci-dessous (préfixe "decor:", voir mapview.js renderDense). 'legacy'
   // regroupe group==="legacy_chest" (family réelle "greenville" ignorée ici,

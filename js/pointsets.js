@@ -1,5 +1,5 @@
 /* Kwalat — résolveur de points UNIQUE (#82 chunk (b), design §3 — voir
-    unified_layers_DESIGN.md et COORDINATION.md « Résolveur de
+     et  « Résolveur de
    points UNIQUE ») : LA seule implémentation des jointures espèce→points,
    famille→points et type-qao→points, consommée par (1) le highlight
    éphémère des fiches (fiches.js monsterSpawnHighlightBtn/farmSectionHtml/
@@ -199,7 +199,7 @@ function wildSpeciesOfKind(kind) { return kindJoinTable().get(kind)?.wild || [];
    wildSpeciesOfKind ci-dessus (jointure PAR kind via camp_details), ces
    espèces n'ont RIEN à joindre nulle part -- listées quand même sous
    Wildlife (sidebar.js buildKindGroup) : catalogue browsable/
-   recherchable, honnêteté "l'arbre est le bestiaire" (COORDINATION.md)
+   recherchable, honnêteté "l'arbre est le bestiaire" ()
    appliquée ici à la faune. GLOBAL (pas de résolution par carte, contrairement
    à speciesCampSet -- il n'y a simplement aucun camp à résoudre). */
 function zeroCampWildlifeSpecies() {

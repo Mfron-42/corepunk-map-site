@@ -18,7 +18,7 @@
     (Node, sans DOM ni `location`) : ne
    lit RIEN de global, uniquement la chaîne passée en argument. Priorité
    (une seule pseudo-page à la fois, mêmes clés que urlstate.js carryKeys) :
-   q > i > mon > fam > npc > camp > zone > ch > sc > lt > node > loc > ab > rec > map (absent ⇒ Kwalat, cf. readHash). Jamais de
+   q > i > mon > fam > npc > camp > zone > ch > sc > lt > node > loc > ab > rec > tal > spec > prof > map (absent ⇒ Kwalat, cf. readHash). Jamais de
    querystring, jamais `lang`, jamais x/z/zm — le pan/zoom ne doit JAMAIS
    compter une visite (voir dédoublonnage de l'effet de bord plus bas). */
 export function hashToPseudoPath(hash) {
@@ -44,6 +44,12 @@ export function hashToPseudoPath(hash) {
   if (p.has('loc')) return '/lore/' + encodeURIComponent(p.get('loc'));
   if (p.has('ab')) return '/ability/' + encodeURIComponent(p.get('ab'));
   if (p.has('rec')) return '/recipe/' + encodeURIComponent(p.get('rec'));
+  // Vague E'c-8 — fiches Build (talent/spécialisation/métier) deep-linkables :
+  // jetons tal=/spec=/prof= dans FICHE_HASH_KEYS (urlstate.js) donc reportés au
+  // pan/zoom comme les autres — une pseudo-page dédiée par node de build ouvert.
+  if (p.has('tal')) return '/talent/' + encodeURIComponent(p.get('tal'));
+  if (p.has('spec')) return '/spec/' + encodeURIComponent(p.get('spec'));
+  if (p.has('prof')) return '/profession/' + encodeURIComponent(p.get('prof'));
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');
 }
 

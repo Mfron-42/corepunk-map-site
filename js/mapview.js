@@ -473,7 +473,7 @@ function refreshIconLayer(cat) {
    (l'appelant relit x/z depuis un attribut data-x/data-z), PAS une tolérance
    de proximité floue -- un point à quelques unités de là (ex. la position
    brute d'un donneur de quête vs. le pin PNJ réel, voir
-   npc_dual_identity_INVESTIGATION.md §2/§3) ne doit JAMAIS matcher ici ; ce
+    §2/§3) ne doit JAMAIS matcher ici ; ce
    cas se corrige en amont, à l'appelant, en visant directement les
    coordonnées du pin plutôt qu'en élargissant cette tolérance. Renvoie null
    pour toute autre raison (couche masquée/éteinte -- son groupe est alors

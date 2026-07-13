@@ -42,7 +42,7 @@ function heroAvatar(iconPath) {
   return 'icons/hero_avatars/' + encodeURIComponent(leaf) + '.png';
 }
 /* Avatar partagé openQuestFiche/openDialogueFiche (les deux dérivent leur
-   identité du même donneur) -- ordre de préférence (fiche_header_DESIGN.md
+   identité du même donneur) -- ordre de préférence (
    §1) : 1) le portrait de PIN réel du donneur (icons/npc_map/<leaf>.png,
    EXACTEMENT la même source qu'openNpcFiche/les lignes vendeur -- l'identité
    est "empruntée" à ce PNJ, jamais son propre HeroAvatars) quand ce donneur
@@ -56,7 +56,7 @@ function questGiverAvatar(q, giverPin) {
 
 /* Encart « Comment faire » : texte généré déterministe (donneur, étapes,
    source d'obtention, position de l'activable), déjà dans la langue active
-   (un jeu de gabarits par langue — voir data/SCHEMA.md "i18n"). Aucune
+   (un jeu de gabarits par langue — voir  "i18n"). Aucune
    génération côté client. */
 function hintBox(q) {
   if (!q.hint) return '';
@@ -209,7 +209,7 @@ function questJournalSection(q) {
 function openDialogueFiche(q, slug) {
   // Le PNJ qui « donne » ce bark : même résolution que le donneur d'une
   // vraie quête (npcIndexByName) -- réutilisée pour l'avatar (portrait de PIN
-  // réel en priorité, fiche_header_DESIGN.md §1) ET pour le chip cliquable
+  // réel en priorité,  §1) ET pour le chip cliquable
   // vers sa vraie fiche, au lieu de l'ancien <span class="pop-coords link">
   // (zéro chip, juste une phrase "given by X" linkifiée).
   const ni = q.giver ? npcIndexByName(q.giver) : -1;
@@ -244,7 +244,7 @@ function openQuestFiche(slug) {
   resetGoalZones();   // ré-indexé à chaque ouverture (voir goalTargetChip/dynamicPosBadge)
   clearGoalZone();
   // Dialogue-bark "quest" (hello_*/info_* NPC greeting graph — isDialogue,
-  // 0 goals/0 rewards/no real items, see build_site_data.py::quest_hints()).
+  // 0 goals/0 rewards/no real items, see ()).
   // Masqué de la recherche/carte par défaut (isHiddenTest), mais ENCORE
   // ouvrable (contenu dev activé, OU lien profond q=<slug> direct) — dans ce
   // cas on ne rend PAS une fiche de quête vide (l'ancien comportement : titre
@@ -295,7 +295,7 @@ function openQuestFiche(slug) {
     // Acteur PNJ résolu par nom (npcIndexByName) : quand le personnage est connu
     // de la carte active, on vise directement SON pin (map_marker.pos, jamais la
     // position brute a.x/a.z qui peut différer de quelques unités -- cas Ophelia
-    // Voss, npc_dual_identity_INVESTIGATION.md §2/§3) : npcRef locate résout SON
+    // Voss,  §2/§3) : npcRef locate résout SON
     // pin lui-même.
     const ni = (a.kind === 'npc' && !onOtherMap) ? npcIndexByName(a.label) : -1;
     const npcPin = ni >= 0 ? S.data.npc[ni] : null;
@@ -411,7 +411,7 @@ function openQuestFiche(slug) {
   // « Voir le donneur » : même correctif que les actorRows ci-dessus -- vise
   // le pin NPC réel (S.data.npc[...].x/z) plutôt que la position brute du
   // donneur (q.x/q.z, souvent à quelques unités du pin -- cas Ophelia Voss,
-  // voir npc_dual_identity_INVESTIGATION.md §2/§3) quand ce donneur est connu
+  // voir  §2/§3) quand ce donneur est connu
   // de la carte active, et porte le `cat` que gotoBtn/pins.js utilisent pour
   // mettre en avant CE marqueur au lieu d'un réticule redondant. giverNi/
   // giverPin sont déjà résolus plus haut (avatar de l'en-tête) -- pas de

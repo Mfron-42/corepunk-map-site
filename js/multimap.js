@@ -54,7 +54,7 @@ async function loadMapData(mid) {
   // 404 pour une catégorie absente de cette carte (ex. Extraction sans ateliers).
   const has = new Set((S.maps[mid] && S.maps[mid].files) || []);
   const get = name => has.has(name) ? fetchJson(base + name + '.bin').catch(() => []) : Promise.resolve([]);
-  // searchable_chests : Kwalat-only aujourd'hui (voir DATA_CONTRACT.md §2),
+  // searchable_chests : Kwalat-only aujourd'hui (voir  §2),
   // mais lu ici comme n'importe quel autre fichier optionnel par carte —
   // rien de spécial à faire le jour où une autre carte en publie un.
   const [npcs, quests, qao, workshops, chests, searchableChests, camps] = await Promise.all([

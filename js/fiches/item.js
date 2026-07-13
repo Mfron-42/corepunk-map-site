@@ -26,7 +26,7 @@ import { ref, refDot } from '../mapref.js';
 import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
-   (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
+   ( finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
    directement à partir de loot_tables.json côté pipeline, voir data.js
    lootTableItems ; l'ancienne méthode, qui reconstruisait une table en
    inversant le cache `dropped_in` tronqué de chaque item, rendait les plus
@@ -59,7 +59,7 @@ const nodeGlyph = n => NODE_GLYPH[(n?.prof || '').toLowerCase()] || '🌾';
    (professionLabel) + ses propres lignes de butin agrégées (drops[], même
    lootRowsHtml que monstre/camp/coffre/table -- garanti/chance, jamais un
    rendu réinventé) + alias internes (aliases[]). `generic:true` (9/30, aucune
-   localisation en jeu pour ce type -- voir build_site_data.py
+   localisation en jeu pour ce type -- voir 
    resource_nodes_site()) : Badge provenance absent honnête à côté du nom plutôt
    qu'un faux nom localisé -- même vocabulaire Badge que partout ailleurs
    (blueprint §5.2), jamais un texte libre inventé. ICÔNE honnêtement ABSENTE
@@ -100,7 +100,7 @@ function openNodeFiche(key) {
 /* ── Plages de jet (stat_ranges/weapon_dps), formules de dégâts
    (artifact_formula/formula) et mise à l'échelle rune/puce (rarity_scaling/
    tier_scaling) — voir  +
-   , tmp/convergence/port_map.md #8/#9/#10. Net-new :
+   , tmp/convergence/ #8/#9/#10. Net-new :
    zéro fiche de référence à porter, juste les 3 handoffs + le contrat de
    champs déjà validé en Phase 0. Toutes les valeurs numériques ci-dessous
    viennent TELLES QUELLES du client (tables Tears/FloatTable/formule
@@ -195,7 +195,7 @@ function rollGroupBlock(titleKey, hintHtml, sids, sr, tier, rarity) {
   if (!rows) return '';
   return `${titleKey ? `<h4 class="fiche-sub">${esc(tr(titleKey))}</h4>` : ''}${hintHtml || ''}<div class="stat-grid">${rows}</div>`;
 }
-/* Plages de jet + DPS d'arme (item.stat_ranges/weapon_dps, port_map.md #8) :
+/* Plages de jet + DPS d'arme (item.stat_ranges/weapon_dps,  #8) :
    UN sélecteur de rareté partagé (jamais deux, même si l'item a les deux
    champs -- voir rollRarityPickHtml ci-dessus), un h3 dont le libellé
    s'adapte à ce qui existe réellement (stat_ranges seul -> "Plage de jet" ;
@@ -203,7 +203,7 @@ function rollGroupBlock(titleKey, hintHtml, sids, sr, tier, rarity) {
    "DPS d'arme" en sous-titre) -- jamais un h3 générique qui ne correspond à
    rien pour ~62 items qui n'ont QUE weapon_dps.
 
-   Structure RÉELLE des artefacts (audit data-accuracy, items.md #1) : un
+   Structure RÉELLE des artefacts (audit data-accuracy,  #1) : un
    artefact ne roule JAMAIS ses ~20-23 stats de stat_ranges toutes à la fois
    -- 1 stat PRINCIPALE garantie + jusqu'à N stats SECONDAIRES tirées d'un
    pool partagé (roll_types: main|secondary|weapon, déjà décodé/livré côté
@@ -256,7 +256,7 @@ function rollRangeSection(it, key) {
   return `<div class="fiche-section"><h3>${esc(title)}</h3>${rollRarityPickHtml(key, rarity)}${genericBlock}${dpsBlock}</div>`;
 }
 
-/* Formules de dégâts (item.artifact_formula / ability.formula, port_map.md
+/* Formules de dégâts (item.artifact_formula / ability.formula, 
    #9) : base + Σ coeff × libellé-stat RECONSTRUITS et LOCALISÉS côté client
    -- jamais le "human"/stat_name anglais figé du pipeline affiché tel quel
    (voir formulaTermLabel, js/config.js). Un "rôle" nommé (ADF/DMG/Scale…)
@@ -316,8 +316,8 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
   const lines = entries.map(e => `<p class="formula-line">${e.tag ? `<span class="formula-role">${esc(e.tag)}</span>` : ''}${esc(e.text)}${
     e.hasExternal ? ` <span class="formula-partial" title="${esc(tr('formulaPartialNote'))}">†</span>` : ''
   }</p>`).join('');
-  // Pastille "unknown" (unknown_states_DESIGN.md #12/re-check #2, task #67) :
-  // ce n'est PAS un fait serveur confirmé -- data/SCHEMA.md lui-même ne peut
+  // Pastille "unknown" ( #12/re-check #2, task #67) :
+  // ce n'est PAS un fait serveur confirmé --  lui-même ne peut
   // pas trancher entre mise à l'échelle côté serveur et une autre règle du
   // jeu (voir le mot i18n reformulé qui a retiré l'implication "probablement
   // côté serveur").
@@ -325,7 +325,7 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
   return `<div class="fiche-section"><h3>${esc(tr('formulaTitle'))}</h3>${lines}${note}</div>`;
 }
 
-/* "Use effect" section (item_desc_PLAN.md Phase B) : it.useEffect[] est une
+/* "Use effect" section ( Phase B) : it.useEffect[] est une
    jointure FAITE AU BUILD (item.abilities[] -> abilities.json, voir
     -- rien
    n'est résolu ici côté client, seulement mis en forme. Chaque entrée porte
@@ -432,7 +432,7 @@ function rarityColsGridHtml(scaling) {
 }
 
 /* Qualité de jet (artefacts uniquement -- ItemPrefix.xml, items_stats_
-   MATRIX.md §4) : le préfixe de nom en jeu ("Amélioré"/"Renforcé" côté Tech,
+    §4) : le préfixe de nom en jeu ("Amélioré"/"Renforcé" côté Tech,
    "Fort"/"Puissant" côté Magie) est attribué par la BANDE de jet -- 33-66 %
    de la plage, ou >66 %. Les SEUILS affichés sont une transformation
    mécanique exacte des plages déjà livrées (min + 0.33/0.66 × (max-min)) au
@@ -468,7 +468,7 @@ function rollQualitySection(it, key) {
 }
 
 /* Mise à l'échelle rune (rarity_scaling, 13/24 runes actives décodées) et
-   puce (tier_scaling, 1/71 seulement -- combo_crusher) : port_map.md #10.
+   puce (tier_scaling, 1/71 seulement -- combo_crusher) :  #10.
    EXIGENCE FERME (pas une nuance de style) : un statut "no_template" montre
    une note honnête, jamais une case vide ni un zéro ; une puce ne montre
    JAMAIS "aucune mise à l'échelle" par défaut -- soit ses vraies valeurs de
@@ -489,7 +489,7 @@ function scalingSection(it) {
     })).join('');
     if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
   } else if (it.rarity_scaling_status === 'no_template') {
-    // Pastille "unknown" (unknown_states_DESIGN.md #13, task #67) : contenu
+    // Pastille "unknown" ( #13, task #67) : contenu
     // déjà correct, juste enveloppé dans le composant d'état partagé.
     parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('scalingNotLocated') })}</p></div>`);
   }
@@ -504,7 +504,7 @@ function scalingSection(it) {
     if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityRarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
   }
   // Palier OVERCLOCKÉ (variante améliorée d'une rune active, items_stats_
-  // MATRIX.md §3.1) : valeurs par rareté quand le client les stocke (2/24
+  //  §3.1) : valeurs par rareté quand le client les stocke (2/24
   // aujourd'hui), note honnête quand la variante EXISTE mais que sa magnitude
   // n'est pas côté client (no_rarity_table -- enregistrement stub/constantes
   // littérales, 13/24), et RIEN quand la rune n'a pas de variante overclockée
@@ -758,7 +758,7 @@ function farmSectionHtml(it) {
     // derrière -- jamais une section farm absente en silence (ex. res_fang,
     // 17 tables de butin dont aucune n'est référencée par un camp du jeu de
     // données expédié -- un vrai trou de couverture, pas un bug de
-    // jointure, voir farm_spot_UX_DESIGN.md §4).
+    // jointure, voir  §4).
     return it.drops?.length
       ? `<div class="fiche-section"><h3>${esc(tr('farmSpotsTitle'))}</h3><p class="hint">${esc(tr('farmSourcesNotMapped'))}</p></div>` : '';
   }
@@ -829,7 +829,7 @@ function harvestedOnHtml(it) {
    .containers[]) : le pipeline agrège déjà PAR CLASSE de contenant --
    camp_chest par famille de monstre, searchable_chest par bande de rareté --
    `ch` étant la MEILLEURE chance parmi les variantes de palier/grade
-   repliées dans cette classe (voir build_site_data.py, commentaire de la
+   repliées dans cette classe (voir , commentaire de la
    passe #65). Les deux classes n'ont PAS le même degré de vérité carte :
      - camp_chest : AUCUN placement réel ne porte la famille de monstre (les
        901 placements chests.bin `group==="camp_chest"` partagent tous le
@@ -935,7 +935,7 @@ function recipeIngredientBlocks(recipeRefs, ownKey) {
 
 /* Fiche « recette » (task #78a searchable-recipes / #78b item IA) : LE
    pseudo-item catalogue it.kind==='recipe' EST la recette (voir
-   data/SCHEMA.md recipes.json "Site propagation" -- une entrée standalone
+    recipes.json "Site propagation" -- une entrée standalone
    par craft distinct, name/icon/rarities copiés de l'objet produit, jamais
    un objet du jeu à part entière) -- cherchable même sans présence propre
    (vendu/looté/quête), voir search.js. Avant cette passe, cette clé restait
@@ -1099,7 +1099,7 @@ function openItemFiche(key) {
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
 
-  // Effet(s) de la/des capacité(s) liée(s) (item_desc_PLAN.md Phase B) --
+  // Effet(s) de la/des capacité(s) liée(s) ( Phase B) --
   // jointure déjà faite au build (it.useEffect), rendue ici seulement.
   const useEffectHtml = useEffectSection(it);
   // Effet d'amélioration (têtes de boss & co.) + lignes d'effet des runes/
@@ -1109,7 +1109,7 @@ function openItemFiche(key) {
 
   // Plages de jet/DPS d'arme (stat_ranges/weapon_dps), formule d'artefact
   // T3 (artifact_formula) et mise à l'échelle rune/puce (rarity_scaling/
-  // tier_scaling) -- port_map.md #8/#9/#10, voir les fonctions partagées
+  // tier_scaling) --  #8/#9/#10, voir les fonctions partagées
   // définies plus haut (rollRangeSection/formulaHtml/scalingSection).
   const rollRangeHtml = rollRangeSection(it, key);
   // Qualité de jet (préfixes "Amélioré/Renforcé..." -- seuils 33 %/66 % dérivés
@@ -1174,7 +1174,7 @@ function openItemFiche(key) {
   }
 
   // Une entrée par rareté ATTEIGNABLE (déjà dédupliqué côté pipeline — voir
-  // data/SCHEMA.md recipes.json "rarity"/"variant_group" : un seul craft/jeu
+  //  recipes.json "rarity"/"variant_group" : un seul craft/jeu
   // d'ingrédients peut produire plusieurs raretés en tirage pondéré). Rendu
   // PARTAGÉ avec openRecipeFiche (recipeIngredientBlocks ci-dessus) — jamais
   // deux implémentations du même bloc ingrédients/produit.
@@ -1229,7 +1229,7 @@ function openItemFiche(key) {
   // case for a genuine quest item (dropped_in/sold_by/produced_by_recipes
   // are all empty by design, e.g. every quest_item_imp_brain_*) — instead of
   // silently showing an empty "how to obtain" section, render the one true
-  // source: the quest goal that actually resolved this item (geo.py's
+  // source: the quest goal that actually resolved this item ('s
   // resolver, NEVER inferred here — it.questSource only exists when that
   // resolver produced a real monster/object target for it).
   let questSourceHtml = '';
@@ -1247,13 +1247,13 @@ function openItemFiche(key) {
       // the race) for any monster whose resolved key got folded into a
       // DIFFERENT (name,level)-grouped representative by monsters_site() --
       // S.monsters[qs.monster_key] then stays undefined forever. qs.
-      // monster_name is now baked at build time straight from geo.py's own
-      // resolved monster name (see build_site_data.py::build_catalog()),
+      // monster_name is now baked at build time straight from 's own
+      // resolved monster name (see ()),
       // independent of the client's catalog grouping -- first render is
       // already correct, no client-side lookup needed at all.
       //
       // Mechanism decode job B: quest_source_of now covers every mechanism
-      // that ever resolves an item (build_site_data.py's build_catalog()),
+      // that ever resolves an item ('s build_catalog()),
       // not just kill/interact -- one viaLine phrase per `qs.via`, each
       // mirroring the exact fact that mechanism's target shape carries
       // (never inferred beyond what's on `qs`).
@@ -1280,7 +1280,7 @@ function openItemFiche(key) {
           : '';
       } else if (qs.via === 'container') {
         // collect_from_object (renamed from the old generic "interact" --
-        // same wording, see build_site_data.py's own comment on the rename).
+        // same wording, see 's own comment on the rename).
         // EntityRef (vague 2, exemple ratifié : « By interacting with Beeswax →
         // By interacting with [Object(●)] Beeswax ») : verbe seul
         // (obtainViaInteract, devenu PRÉFIXE i18n) + référence [Objet] Nom. PAS
@@ -1294,7 +1294,7 @@ function openItemFiche(key) {
         viaLine = `<p class="hint">${esc(tr('obtainViaHarvest', professionLabel(capitalize(qs.profession))))}</p>`;
       } else if (qs.via === 'given_by') {
         // receive_npc, or the "collect" mechanism's own given-by-giver
-        // safety-net branch (see build_site_data.py) -- NPC name is now the
+        // safety-net branch (see ) -- NPC name is now the
         // SHARED npcChip component (task #70 / fiche-header identity pass),
         // the same one the quest header's own "given by" row uses, instead
         // of the whole sentence wrapped in a bare `.link` span (audit
@@ -1356,7 +1356,7 @@ function openItemFiche(key) {
       }).join('')}</div>` : '';
 
   // Ligne d'obtention honnête (items-obtain audit §B2) : le pipeline stampe
-  // `obtainStatus` (enum fermé, build_site_data.py::_obtain_status_of) sur
+  // `obtainStatus` (enum fermé, ) sur
   // toute entrée SANS AUCUN canal d'obtention — plutôt qu'un vide silencieux,
   // la fiche énonce ce que les données disent (« aucune source référencée »,
   // jamais « inobtenable » : une affirmation sur le JEU qu'on ne peut pas
@@ -1385,7 +1385,7 @@ function openItemFiche(key) {
   const weaponLine = weaponTypeLine(it.weapon);
   // Titre désambiguïsé (fix UX) : un item de quête lié à une quête par le
   // résolveur (it.questSource — jamais inventé côté front, voir
-  // build_site_data.py) et qui y a des HOMONYMES (les 3 « Imp Brain »
+  // ) et qui y a des HOMONYMES (les 3 « Imp Brain »
   // d'imp_brain_hunt) affichait 3 fois le même <h2> — la distinction
   // n'existait que dans le corps (« By killing Imp executioner »). Le
   // suffixe vient de LA même source que partout ailleurs
@@ -1403,7 +1403,7 @@ function openItemFiche(key) {
   }
   // Bien craftable sans rareté fixe (recette pure, pas d'item.rarity propre) :
   // liste des raretés ATTEIGNABLES par le craft (it.rarities, tirage pondéré
-  // -- voir data/SCHEMA.md recipes.json) à la place d'une rareté unique.
+  // -- voir  recipes.json) à la place d'une rareté unique.
   const raritiesLine = !rarity && it.rarities?.length ? it.rarities.map(rarityLabel).join(' / ') : '';
   // Sélecteur de rareté : quand la clé ouverte appartient à un groupe de
   // variantes « même nom » (voir rarity.js::buildRarityGroups), une pastille

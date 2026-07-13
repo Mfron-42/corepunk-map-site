@@ -96,7 +96,7 @@ export function setQuestItemFlags(v) { currentQuestItemFlags = v; }
    pass) : une entrée de q.items est déjà entièrement rendue ailleurs sur
    CETTE MÊME fiche dès qu'elle est la cible d'un but (goalTargetChip --
    ligne d'identité + relation + position, voir le flag `shownInSteps`,
-   import_quests.py) ou une récompense fixe/au choix (questRewardsSection --
+   ) ou une récompense fixe/au choix (questRewardsSection --
    icône + nom + quantité, voir `shownInRewards`) : répéter la ligne ici
    n'ajoute alors aucune information (vérifié sur l'ensemble du jeu de
    données -- une position de cible de but est TOUJOURS identique à celle
@@ -140,12 +140,12 @@ function questItemRow(qi, regionHint) {
     hex: cat && kind !== 'quest_item' ? itemEcHex(cat) : null,
     hasFiche: !!cat,
   });
-  // craft:true (geo.py's craft-only pre-check, propagated onto this exact
-  // item row by import_quests.py -- e.g. no_witnesses_to_glory's "Savory
+  // craft:true ('s craft-only pre-check, propagated onto this exact
+  // item row by  -- e.g. no_witnesses_to_glory's "Savory
   // mushroom soup"): this goal is fulfilled by CRAFTING, never a spawn --
   // said explicitly here too (same goalCraftLabel wording as
   // goalTargetChip), and NEVER a position line, even on the off chance
-  // x/searchZone ended up attached (they never do in practice, see geo.py's
+  // x/searchZone ended up attached (they never do in practice, see 's
   // craft pre-check) -- the flag wins regardless, a fabricated position is
   // exactly what this whole pass exists to prevent.
   const craftBit = qi.craft ? `<span class="muted">${esc(tr('goalCraftLabel'))}</span>` : '';
@@ -252,7 +252,7 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
   return `<div class="goal-target-row goal-target-item">${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}${itemRef}${extraBadge || ''}</div>`;
 }
 /* Relation row for a receive_reward mechanism target whose `reward_of`
-   (geo.py's _resolve_target_mech) names at least one quest OTHER than the
+   ('s _resolve_target_mech) names at least one quest OTHER than the
    one currently open (S.openFiche.id, already set by openQuestFiche before
    this section renders): "obtained by completing <that quest>", linked when
    the quest is resolvable on S.quests, one span per entry joined by "or"
@@ -264,12 +264,23 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
    Display name: S.quests' own (live, current-locale, guaranteed aligned)
    name first; `reward_of_names` (baked pipeline-side) only as a fallback
    when a slug isn't in S.quests AND the two arrays are the same length --
-   geo.py's own `names = [n for n in names if n]` can silently drop entries,
+   's own `names = [n for n in names if n]` can silently drop entries,
    so a length mismatch means the arrays are NOT positionally aligned and
    the raw slug is shown instead of risking a wrong quest name. */
+// Renvoie { html, pinnable } — `pinnable` ⇔ au moins une quête source résout
+// avec une position de donneur (questRef l'épingle alors en mode L). Dans ce
+// cas la réf `[Quête(●)]` EST le geste carte de l'objectif : l'appelant SUPPRIME
+// sa propre `posRow` (le bare [Position(●)]) pour ne pas doubler la même
+// pastille — l'intention owner 2026-07-13 « la réf de quête porte la position,
+// jamais un [Position(●)] séparé à côté » (voir questRef/core.js). Quand aucune
+// source ne résout de position, la réf de quête n'a pas de pastille : `posRow`
+// reste alors le SEUL « où » et l'appelant la garde (jamais retirer la seule
+// affordance). Le verbe `.goal-target-rel-verb` (« obtenu en complétant … »)
+// est de toute façon une affordance WHERE honnête à part entière, donc la
+// suppression de posRow ne casse jamais la suivabilité.
 function rewardOfRelRow(t) {
   const others = (t.reward_of || []).filter(s => s !== S.openFiche?.id);
-  if (!others.length) return '';
+  if (!others.length) return { html: '', pinnable: false };
   const namesAligned = t.reward_of_names && t.reward_of_names.length === t.reward_of.length;
   // EntityRef (vague 1 + complaint 2) : chaque quête source est une référence
   // `[Quête(●)] Nom` (questRef — pastille locate épingle son donneur) ; souligné
@@ -280,7 +291,14 @@ function rewardOfRelRow(t) {
     const qname = rq?.name || (namesAligned ? t.reward_of_names[idx] : slug);
     return questRef(slug, { label: qname, resolved: !!rq });
   }).join(esc(tr('orWord')));
-  return `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`;
+  // Même condition d'épinglage que questRef (q && q.x != null → mode L) — jamais
+  // re-dérivée d'une autre façon : une source qui résout avec position = la
+  // pastille de quête porte le « où ».
+  const pinnable = others.some(slug => { const rq = S.quests.get(slug); return !!(rq && rq.x != null); });
+  return {
+    html: `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`,
+    pinnable,
+  };
 }
 /* kill_player mech_target.player_specs codes (e.g. "CHA_S1") are a hero-class
    prefix + spec number. The prefix matches trial_of_worthiness's OWN
@@ -303,10 +321,10 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // bas, même npcIndexByName) : quand une position fixe existe déjà (t.x !=
   // null), viser le pin NPC réel plutôt que la position brute de la cible --
   // même correctif qu'actorRows/« Voir le donneur » ci-dessus (voir
-  // npc_dual_identity_INVESTIGATION.md §2/§3). N'invente JAMAIS un bouton là
+  //  §2/§3). N'invente JAMAIS un bouton là
   // où il n'y en avait pas (t.x == null garde `dynamicPosBadge` inchangé).
   // SOURCE DU NOM (audit quêtes 2026-07-11, classe A) : le pipeline expédie
-  // le PNJ RÉSOLU dans `t.label` (geo.py _npc_pos_target, help/talk) — la
+  // le PNJ RÉSOLU dans `t.label` ( _npc_pos_target, help/talk) — la
   // phrase d'objectif (`label`) n'est qu'un repli, plus jamais la source
   // primaire (elle ne matche le catalogue que par accident).
   const npcName = t.kind === 'npc' ? (t.label || label) : null;
@@ -315,7 +333,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   const posX = npcPin && npcPin.x != null ? npcPin.x : t.x;
   const posZ = npcPin && npcPin.x != null ? npcPin.z : t.z;
   const posCat = npcPin && npcPin.x != null ? 'npc' : null;
-  // `t.map` seul (sans x/z) -- cible cross-carte dont geo.py ne connaît QUE la
+  // `t.map` seul (sans x/z) -- cible cross-carte dont  ne connaît QUE la
   // carte, jamais une coordonnée locale (mechanism decode job A, ex. le PNJ de
   // remise d'un receive_reward sur une autre carte) : bascule simple plutôt
   // que le texte générique dynamicPosBadge, qui masquait l'info de carte.
@@ -350,16 +368,21 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // quand aucun `key` catalogue ne résout) + sa position à 3 niveaux.
     const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem) || '';
     // receive_reward (mechanism) whose single-quest-caller shape resolved a
-    // bare item identity (no quest_refs available -- see geo.py's
+    // bare item identity (no quest_refs available -- see 's
     // _resolve_target_mech, the theoretical fallback of that branch): still
     // carries `reward_of`/`reward_of_names` regardless of the target's own
     // kind, so the same cross-quest relation wording as the npc branch below
     // applies here too -- see rewardOfRelRow's own doc.
-    const itemRewardRow = rewardOfRelRow(t);
-    if (itemRewardRow) {
-      return `<div class="goal-target">${itemRow}${itemRewardRow}${posRow}</div>`;
+    const itemReward = rewardOfRelRow(t);
+    if (itemReward.html) {
+      // La réf `[Quête(●)]` épingle le donneur de la quête source (mode L) quand
+      // il est connu : elle EST la position de l'objectif. Un `[Position(●)]` nu
+      // à côté doublerait la même pastille (intention owner) — on le supprime
+      // dès que la réf porte ce pin ; on ne garde `posRow` que comme SEUL « où »
+      // quand aucune source ne résout de position.
+      return `<div class="goal-target">${itemRow}${itemReward.html}${itemReward.pinnable ? '' : posRow}</div>`;
     }
-    // craft:true (geo.py's craft-only pre-check, e.g. construction_lesson's
+    // craft:true ('s craft-only pre-check, e.g. construction_lesson's
     // "Recipe: Immuno-Stimulating Implant"): items.json proves this item is
     // produced_by_recipes/craftable with ZERO world drop/farm evidence -- the
     // goal is fulfilled by CRAFTING, never a spawn. Relation row says so
@@ -386,7 +409,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // voir data.js S.nodes/js/state.js) : une liste de référence, pas un
     // "va ici". Calculé une fois, ajouté aux DEUX branches ci-dessous (avec
     // ou sans `t.profession`) puisque les 11 buts observés se répartissent
-    // sur les deux (voir wave_pipeline_FRONT_TODO.md #3).
+    // sur les deux (voir  #3).
     // EntityRef (vague 1) : chaque type de nœud accepté est une référence
     // [Nœud] Nom — souligné ⇔ résolu sur S.nodes (chargement différé : se
     // répare seul au re-rendu, même garde que l'ancien nodeChip) ; jamais de
@@ -399,12 +422,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   }).join('')}</div></div>`
       : '';
     // harvest (mechanism): a resource-gathering node (logging/herbalism/
-    // mining -- geo.py's dedicated harvest branch, `target.profession`),
+    // mining -- 's dedicated harvest branch, `target.profession`),
     // never an "Activatable" quest prop -- checked FIRST, before the
     // generic item_key/key join below (a harvest target always carries
     // item_key too, which would otherwise misroute it into the differing/
     // "Activatable" wording meant for actual interactive objects). No
-    // position ever ships for these (geo.py never resolves one) -- `posRow`
+    // position ever ships for these ( never resolves one) -- `posRow`
     // still renders its honest generic "dynamic position" fallback, exactly
     // like any other position-less target.
     if (t.profession) {
@@ -550,9 +573,9 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // monster fiche the link opens. Genuinely different labels (rare) are
     // left untouched -- never inventing or destroying real information.
     const nameLbl = (t.label && label && fold(t.label) === fold(label)) ? label : (t.label || label || '');
-    // Précision de cible (#87, échelle de précision COORDINATION.md "jamais
-    // plus précis que prouvable") : `t.bound_units` (byte-proven, geo.py's
-    // trigger-slot decode -- see wave_pipeline_FRONT_TODO.md #1) est
+    // Précision de cible (#87, échelle de précision  "jamais
+    // plus précis que prouvable") : `t.bound_units` (byte-proven, 's
+    // trigger-slot decode -- see  #1) est
     // désormais la SEULE source de niveau/portée affichée ici. L'ancien
     // `levelHint` (campMobRow?.lvl, la plage COMPLÈTE de l'espèce dans CE
     // camp -- ex. 2-20 pour les Imps de Windreach Woods) fabriquait un "niv 2"
@@ -579,7 +602,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         : bu.levels?.length > 1 ? tr('levelRangeAbbrev', bu.levels[0], bu.levels[bu.levels.length - 1])
           : null;
     // BUG FIX (deferred-render-race blast-radius audit, follow-up task 3):
-    // was `t.key || null` -- t.key is the RAW canonical monster key geo.py's
+    // was `t.key || null` -- t.key is the RAW canonical monster key 's
     // resolver matched, not necessarily the (name,level)-grouped
     // REPRESENTATIVE key monsters_site() keeps as S.monsters' own dict key
     // (the exact class of bug actorRows had before its sec-5.3 fix -- see
@@ -629,11 +652,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const spId = mk ? S.monsters[mk]?.species : null;
     const spPts = spId ? speciesPoints(spId) : null;
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
-    // byte-attached -- see geo.py's drops_quest_loot join on BOTH mechs):
+    // byte-attached -- see 's drops_quest_loot join on BOTH mechs):
     // `target.drop_chance` (0-100, byte-exact from SetQuestLootDirect, NOT
     // the generic loot-table weight share dropRateHtml renders elsewhere) --
     // shown as a plain percentage, or "Guaranteed" at the 100% direct-grant
-    // value QUEST_FORMAT.md sec 9b documents. Only meaningful next to a real
+    // value  sec 9b documents. Only meaningful next to a real
     // attached item (t.item_key/item_label) -- never on a bare kill.
     const chanceText = t.drop_chance == null ? null
       : t.drop_chance >= 100 ? tr('guaranteedLabel') : tr('goalDropChanceLabel', t.drop_chance);
@@ -743,25 +766,25 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   }
 
   if (t.kind === 'npc') {
-    // Quest-granted item (geo.py's given_by_giver, e.g. eight_legged_freaks'
+    // Quest-granted item ('s given_by_giver, e.g. eight_legged_freaks'
     // "Time of Death" handed over in Ophelia Voss's own dialog, already
     // listed in this quest's own reward table): item chip first (identity,
     // clickable to its fiche) + an explicit "given by <giver>" relation row
-    // -- never a spawn zone, this was never a world spawn (see geo.py
+    // -- never a spawn zone, this was never a world spawn (see 
     // resolve_goal_item's craft/given_by_giver pre-check). `t.label` here IS
     // the giver's real name (unlike the plain npc branch below, whose only
     // reliable name source is the objective sentence `label` -- see its own
     // comment) -- resolved through the same npcIndexByName lookup so the
     // giver's name is clickable to their fiche when known on the active map.
     // `posRow` (shared, computed above) still renders correctly here: t.x/z
-    // are the giver's own position when known (see geo.py's `given["x"]`),
+    // are the giver's own position when known (see 's `given["x"]`),
     // never a fabricated one.
     if (t.given_by_giver) {
       const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
       // receive_reward (mechanism) whose reward_of names a quest OTHER than
       // the one currently open: "obtained by completing <that quest>" wins
       // over the plain given-by wording below -- t.label here is merely
-      // THAT quest's own turn-in NPC (geo.py's _resolve_target_mech
+      // THAT quest's own turn-in NPC ('s _resolve_target_mech
       // receive_reward branch, e.g. eight_legged_freaks' Ophelia Voss
       // handing over thistlebrooks_terrifying_task's "Time of Death"),
       // saying "given by" would misattribute the grant to the OPEN quest.
@@ -769,9 +792,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       // slug, e.g. puzzles_of_the_afterlife's saddle) return '' here and
       // fall through to the unchanged given-by wording -- this quest really
       // is the source. See rewardOfRelRow's own doc.
-      const rewardRow = rewardOfRelRow(t);
-      if (rewardRow) {
-        return `<div class="goal-target">${itemRow}${rewardRow}${posRow}</div>`;
+      const reward = rewardOfRelRow(t);
+      if (reward.html) {
+        // Même dédup que la branche item : la réf `[Quête(●)]` épingle le donneur
+        // de la quête source ; quand elle porte ce pin, le `[Position(●)]` séparé
+        // ferait doublon → supprimé. Sinon `posRow` reste le seul « où ».
+        return `<div class="goal-target">${itemRow}${reward.html}${reward.pinnable ? '' : posRow}</div>`;
       }
       // EntityRef (vague 1) : le donneur est une référence [PNJ ●] — nom
       // souligné ⇔ le PNJ résout sur la carte active (jamais un lien
@@ -864,7 +890,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
 
   if (t.kind === 'zone') {
     // enter_zone/exit_zone (mechanism): a named area (mech_target.label),
-    // sometimes with a real slot position (geo.py's enter_zone branch) --
+    // sometimes with a real slot position ('s enter_zone branch) --
     // `posRow` (shared, computed above) already renders it (gotoBtn) or the
     // honest generic dynamic-position fallback when it isn't known.
     const zLabel = t.label ? cleanLabel(t.label) : null;
@@ -873,14 +899,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // monstre, une zone nommée est une entité de carte à part entière.
     // Ping cliquable (retour utilisateur « activable n'est plus cliquable ») :
     // quand le pipeline a joint le centroïde du polygone de zone décodé (t.x,
-    // geo.py zone_geo — trigger enter_zone sans slot placé), le NOM devient un
+    //  zone_geo — trigger enter_zone sans slot placé), le NOM devient un
     // goto vers ce centre au lieu d'un libellé mort. La zone reste le bon
     // barreau d'échelle (une AIRE, pas un objet placé) : le clic centre la
     // carte dessus, et la fiche offre en plus « Voir la zone » (contour
     // complet, S.zonesQuest). Sans centroïde (zone sans géométrie décodée :
     // « Around wreck », honnête trou), reste un libellé simple.
     // EntityRef (vague 1) : `[Région ●] Nom` — pastille locate ⇔ le centroïde
-    // du polygone décodé est joint (t.x, geo.py zone_geo) ; elle absorbe la
+    // du polygone décodé est joint (t.x,  zone_geo) ; elle absorbe la
     // ligne « Carte » séparée (une seule affordance carte). Nom JAMAIS
     // souligné tant que la fiche région n'existe pas (vague R — honnêteté
     // §3.5 : pas de lien vers une page qui n'existe pas). Sans centroïde
@@ -920,17 +946,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
 
   // Honest last-resort fallback (batch-wiring pass, mechanism decode job A):
   // an unrecognized/future target kind (or one of the 4 byte-parse-gap
-  // residuals, mechanism: null -- QUEST_FORMAT.md sec 12) never renders
+  // residuals, mechanism: null --  sec 12) never renders
   // silently blank under a normal-looking objective sentence -- shows
   // whatever name the resolver actually produced, never a fabricated
   // relation/position beyond what's genuinely on `t`.
   const customName = t.label ? cleanLabel(t.label) : null;
   if (!customName) return '';
-  // Pastille "unknown" (unknown_states_DESIGN.md #15, task #67) : ce résidu
+  // Pastille "unknown" ( #15, task #67) : ce résidu
   // couvre 4 buts au total -- 3 sur test_craft_trigger (quête de test) + 1
   // sur zero_to_hero_ish (contenu joueur RÉEL, opcode moteur non décodé --
   // ni "dev", ni "dynamique", juste non déterminable depuis les données
-  // extraites, voir QUEST_FORMAT.md §12). Jamais pour le contenu de test (déjà
+  // extraites, voir  §12). Jamais pour le contenu de test (déjà
   // couvert par isTest ailleurs) -- pas de double pastille sur le même but.
   const unknownChip = isTestQuest ? '' : ` ${badge({ axis: 'provenance', value: 'absent' })}`;
   return `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span>${unknownChip}</div></div>`;

@@ -32,7 +32,7 @@ const TILE_BASE = 'https://mfron-42.github.io/corepunk-map-tiles';
    identifiers, shipped as-is regardless of language. Which categories render
    DOM portraits vs canvas dots is decided by main.js's registerDomDense/
    registerDense call sites, not by a flag here. */
-/* Coffres (container re-categorization, DATA_CONTRACT.md) : l'ancienne
+/* Coffres (container re-categorization, ) : l'ancienne
    couche unique "chest" (`type` brut, 3 vraies catégories conflées sous un
    seul "Coffres") est remplacée par DEUX couches de haut niveau réelles —
    `searchable_chest` (searchable_chests.bin, poi_searchable_chest_* — LE
@@ -72,12 +72,12 @@ const CATS = {
 };
 const catLabel = key => tbl('cat', key) || key;
 /* Sous-catégories POI (interest_points.bin `poiType`, pipeline pass
-   2026-07-11b — extract_markers.py, ◇ curaté "exactly like campKind... NOT a
+   2026-07-11b — , ◇ curaté "exactly like campKind... NOT a
    game-classified taxonomy field", voir  §1 "poiType").
    8 familles réelles + "other" défensif (0 enregistrement aujourd'hui, jamais
    affiché -- voir sidebar.js buildPoiSubGroup). Axe = FORME d'icône, très
    déséquilibré (habitat 71/156 sur Kwalat) : filtre grossier, jamais vendu
-   comme une taxonomie fine (pass4_FRONT_TODO.md §1). UNE seule teinte
+   comme une taxonomie fine ( §1). UNE seule teinte
    partagée (CATS.poi.hex) pour les 8 lignes -- une fausse distinction
    chromatique impliquerait une taxonomie de jeu qui n'existe pas. */
 const POI_TYPES = ['habitat', 'nature', 'fort', 'curiosity', 'transport', 'profession', 'amenity', 'portal'];
@@ -181,7 +181,7 @@ const nodeTierHex = t => NODE_TIER_HEX[Math.max(0, Math.min(NODE_TIER_HEX.length
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 /* Statistiques de monstre (stats_decoded / stat_curve) — voir
-   data/SCHEMA.md "Monster stats" + js/fiches.js::openMonsterFiche(). */
+    "Monster stats" + js/fiches.js::openMonsterFiche(). */
 const statLabel = key => tbl('statLabel', key) || pretty(key);
 const statTierLabel = key => tbl('statTier', key) || key;
 /* Formules (item.artifact_formula / ability.formula, voir js/fiches.js) : le
@@ -287,7 +287,7 @@ const mapName = id => tbl('mapName', id) || prettyMapId(id);
 /* ── Types de contenants — CLASSIFICATION CUITE (ontology chunk 2) ──────
    Le sous-type de prop (tonneau explosif, caisse de maïs, cercueil,
    champignons…) est désormais un CHAMP EXPÉDIÉ (`subtype`, ◇ byte-dérivé —
-    CAMP_SUBTYPE_RULES, data/SCHEMA.md « Canonical
+    CAMP_SUBTYPE_RULES,  « Canonical
    classification ») : les tables de re-détection front (CAMP_TYPE_RULES /
    TYPED_CAMP_RE, regex sur la clé) sont SUPPRIMÉES — le front ne
    re-classifie plus jamais, il lit `subtype`/`category` sur le record.
@@ -301,7 +301,7 @@ const campTypeLabel = key => tbl('campType', key) || pretty(key);
 const CAMP_KEY_VOCAB_PREFIX_RE = /^(fulfillment-manager-|ffm-island-|ffm-bg-arena-)/;
 /* RÉSIDU DE FORMATAGE (INTERIM, marqué — chunk 2) : le `name` expédié d'un
    camp typé contient encore les mots du prop (« Mushrooms Windreach Woods »,
-   data/SCHEMA.md « raw split ») et AUCUN champ « reste » (la partie région
+    « raw split ») et AUCUN champ « reste » (la partie région
    de la clé) n'est expédié. Pour afficher « Champignons — Windreach woods »
    (byte-identique à l'existant), les mots de vocabulaire prop/kind sont
    retirés de la CLÉ ici. Ce n'est PAS une re-classification (le type vient
@@ -329,7 +329,7 @@ function campDisplayName(rawKey) {
    - `subtype` présent (prop typé — caisse de maïs, champignons…) : libellé
      campType localisé + reste de clé (résidu de formatage, voir ci-dessus) ;
    - kind interactable typé SANS subtype (15-85 % des camps typés, absence
-     honnête — ONTOLOGY.md #25) : libellé du kind + reste de clé ;
+     honnête —  #25) : libellé du kind + reste de clé ;
    - sinon : le `name` PROPRE expédié (splitter pipeline), repli
      campDisplayName pour une clé retardataire sans name. */
 function campLabel(key, kind, shippedName, subtype) {
@@ -352,9 +352,9 @@ function campLabel(key, kind, shippedName, subtype) {
   return shippedName || campDisplayName(key);
 }
 /* Qualificatif de camp (patrol|buffed -- jeton NEUTRE côté moteur, poids par
-   mode PvP/PvE byte-prouvé, voir island_camp_labels_INVESTIGATION.md §3) :
+   mode PvP/PvE byte-prouvé, voir  §3) :
    « — Patrouille » / « — Renforcé (PvP) », formulation SOFT (c'est un poids
-   serveur, jamais une garantie de tracé/timer -- voir COORDINATION.md §3.3).
+   serveur, jamais une garantie de tracé/timer -- voir  §3.3).
    campQualifierChip est PARTAGÉ par fiches.js (farmCampRow/farmUnjoinedRow/
    openCampFiche) ET popups.js (campPopup) : posé ici (module pur, aucune
    dépendance DOM/état) pour éviter tout import croisé entre ces deux fichiers
@@ -378,7 +378,7 @@ const campModeLabel = key => tbl('campMode', key) || pretty(key);
    capitalisés, ex. "Barrel"/"Boxes"/"Radio"/"Evidence") — le site compose
    juste son propre libellé localisé, même principe que campKindLabel/
    monsterAttackLabel ci-dessus. Pas de déduction depuis le nom de prop ici :
-   ce champ existe déjà sur r.type (voir data/SCHEMA.md "Chest loot + type" /
+   ce champ existe déjà sur r.type (voir  "Chest loot + type" /
    "Activable type").
    Overlay ⚑ (ontology chunk 2) : quand class_labels.bin porte le mot
    OFFICIEL du client pour le jeton (src:"game", Interactive.xml byte-matché
@@ -394,7 +394,7 @@ const activableTypeLabel = key => gameLabel('activableType', key) || tbl('activa
 
 /* Nom d'affichage d'un coffre placé (popup, fiche, recherche) : le NOM brut
    (r.name, ex. "Chest barrel elenian 02 blood") est un identifiant d'ASSET
-   D'ART — jamais localisé (pas une entrée Localization/, voir data/SCHEMA.md
+   D'ART — jamais localisé (pas une entrée Localization/, voir 
    "Chest loot + type") et truffé de bruit interne (set d'art "elenian"/
    "greenville", couleur, variante…) qui ne dit RIEN au joueur. Le vrai
    classifieur joueur, c'est r.type (Barrel/Boxes/Corpse/Cabinet/…, même champ
@@ -402,7 +402,7 @@ const activableTypeLabel = key => gameLabel('activableType', key) || tbl('activa
    position sur la carte dit déjà où, la fiche dit quoi + butin, inutile de
    répéter le jeton d'art. Repli sur le nom nettoyé (préfixe "Chest "/"Small
    chest " retiré, reste prettifié) seulement pour les ~44 placements sans
-   type lié (voir data/SCHEMA.md coverage). */
+   type lié (voir  coverage). */
 function chestDisplayName(r) {
   if (r.type) return chestTypeLabel(r.type);
   return pretty((r.name || '').replace(/^(small\s+)?chest\s+/i, ''));
@@ -410,7 +410,7 @@ function chestDisplayName(r) {
 
 /* ── Décor (chests.bin `group==="decor"`|`"legacy_chest"`) ──────────────
    6 familles de décor + le coffre-trésor hérité (legacy) — voir
-   DATA_CONTRACT.md §3.1. Ordre d'affichage = ordre de la liste ci-dessous
+    §3.1. Ordre d'affichage = ordre de la liste ci-dessous
    (grosso modo décroissant par volume, legacy en dernier — c'est un `group`
    à part, pas une vraie "famille" décor, mais rangé au même endroit dans le
    panneau à la demande du propriétaire). Couleurs volontairement sourdes/
@@ -425,7 +425,7 @@ const decorFamilyLabel = key => tbl('decorFamily', key) || pretty(key);
 
 /* Couleur RÉELLE d'un coffre placé (S.data.chest) — camp_chest/legacy_chest/
    décor par famille, jamais un unique hex "coffre" générique (l'ancien
-   CATS.chest, retiré — voir DATA_CONTRACT.md §3.1). Utilisée partout où un
+   CATS.chest, retiré — voir  §3.1). Utilisée partout où un
    point/tracké/popup/fiche de S.data.chest a besoin d'une couleur honnête. */
 function chestHex(r) {
   if (!r) return DECOR_HEX.misc;
@@ -435,7 +435,7 @@ function chestHex(r) {
 }
 /* Libellé de catégorie RÉELLE d'un coffre placé (pop-cat/fiche-kind) —
    remplace l'ancien catLabel('chest') générique qui conflait les 3 vraies
-   catégories sous un seul "Coffres" (voir DATA_CONTRACT.md §3.1 et §6). */
+   catégories sous un seul "Coffres" (voir  §3.1 et §6). */
 function chestKindLabel(r) {
   if (!r) return '';
   if (r.group === 'camp_chest') return tr('campChestLabel');
@@ -444,7 +444,7 @@ function chestKindLabel(r) {
 }
 
 /* Prettification du `region` d'un coffre fouillable (searchable_chests.bin —
-   aucun libellé fourni par les données, voir DATA_CONTRACT.md §4) :
+   aucun libellé fourni par les données, voir  §4) :
    "ripplecrop-fields" -> "Ripplecrop Fields". Même esprit neutre que
    prettyMapId ci-dessus (noms propres, valable dans toutes les langues). */
 function prettyRegion(region) {

@@ -1271,7 +1271,7 @@ body {
 /* ── Sélection d'un pin déjà rendu (goto conscient du pin) ──
    Posée brièvement (~3.2s, voir pins.js highlightMarker) sur le marqueur DOM
    réel (PNJ/POI/atelier) qu'un « aller à » vient de retrouver au lieu de
-   poser un réticule ambré par-dessus (npc_dual_identity_INVESTIGATION.md) —
+   poser un réticule ambré par-dessus () —
    même teinte que le réticule (--accent) pour se lire comme la même famille
    de repère de navigation, jamais un second marqueur. */
 .mk.pin-highlight .mk-pin { animation: pin-select-glow 1.6s ease-out 2; }
@@ -1722,7 +1722,7 @@ body {
 .journal-expand-cb:checked ~ .journal-expand-toggle .journal-expand-more { display: none; }
 .journal-expand-cb:checked ~ .journal-expand-toggle .journal-expand-less { display: inline; }
 
-/* ── "Use effect" (item_desc_PLAN.md Phase B, js/fiches.js useEffectSection)
+/* ── "Use effect" ( Phase B, js/fiches.js useEffectSection)
    -- texte résolu d'une capacité liée à l'objet. `white-space: pre-line`
    n'est PAS mis sur .fiche-journal (partagée avec la description brute de
    l'objet/capacité/table de butin ailleurs) pour ne rien changer à ces
@@ -2233,7 +2233,7 @@ body {
   color: var(--muted);
 }
 .fiche-sub:first-child { margin-top: 0; }
-/* ── Fiche item « Comment farmer » (farm_spot_UX_DESIGN.md) : groupes par
+/* ── Fiche item « Comment farmer » () : groupes par
    kind de camp (Mining/Monsters/…), en-tête compact (libellé teinté + compte
    camps/points + bouton « Surligner tout » optionnel) au-dessus des lignes
    .frow habituelles — mêmes jetons que le reste des fiches, aucun nouveau
@@ -2466,7 +2466,7 @@ button.rar-pill:hover {
   opacity: .85;
 }
 
-/* Marqueur "*" sur les en-têtes Élite/Boss du tableau par-palier (monsters.md
+/* Marqueur "*" sur les en-têtes Élite/Boss du tableau par-palier (
    finding #2) : ces deux colonnes n'ont jamais été vérifiées contre une
    source externe, contrairement à easy/medium/hard -- info-bulle honnête au
    survol, cf. statsBossEliteCaveat (i18n). */

@@ -12,7 +12,7 @@
    isDeprecatedItem — si ce code vivait dans fiches.js, data.js devrait
    l'importer alors que fiches.js importe déjà data.js (monsterKeyFor,
    npcIndexByName…), un cycle interdit par l'architecture du site (voir
-   tmp/convergence/architecture_map.md, "Strictly downward, no cycles"). */
+   tmp/convergence/, "Strictly downward, no cycles"). */
 import { S } from './state.js';
 import { fold, capitalize } from './utils.js';
 import { RARITY } from './config.js';

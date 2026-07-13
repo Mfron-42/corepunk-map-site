@@ -34,7 +34,7 @@ import { regionRef, regionFicheExists } from './zone.js';
    pas publié par le jeu). */
 /* Kinds "monster-ish" ( -- même classement, tokens
    raw "monsters"/"monster"/"creeps"/"wild"/"peaceful" normalisés en kinds
-   site "monsters"/"creeps"/"wildlife", voir build_site_data.py
+   site "monsters"/"creeps"/"wildlife", voir 
    _CAMP_KIND_NORM) : la seule famille de camps pour laquelle une SECTION
    FAUNE a un sens -- un camp de minerai/herboristerie n'a simplement aucune
    créature à lister, ce n'est pas un trou de donnée. */
@@ -49,7 +49,7 @@ const MONSTER_ISH_CAMP_KINDS = new Set(['monsters', 'creeps', 'wildlife']);
    "official" (creeps.bin) — un fait client byte-prouvé → badge « officiel » ;
    une disposition heuristique (jointure de nom/famille) → badge « inféré ».
    `monsters.disposition` est une CHAÎNE, `creeps.disposition` un OBJET {value}
-   (data/SCHEMA.md §5.2) : normalisés à la lecture par data.js
+   ( §5.2) : normalisés à la lecture par data.js
    (normDisposition/dispositionFor), on reçoit ici la chaîne normalisée. Repli
    honnête : disposition inconnue -> rien (jamais un « peaceful » inventé). */
 const DISPOSITION_KNOWN = new Set(['peaceful', 'neutral', 'hostile']);
@@ -97,7 +97,7 @@ function wildlifeDisposition(id, w) {
    sont la fourchette de niveau RÉELLE de cette espèce dans CE camp précis
    (identiques quand l'espèce n'y a qu'un seul niveau — pas de "–" inventé),
    `count` = le nombre de clés brutes/cosmétiques repliées dans cette ligne
-   (voir data/SCHEMA.md camps.json "One mobs[] row per species", omis quand
+   (voir  camps.json "One mobs[] row per species", omis quand
    ≤ 1 -- jamais un "×1" qui laisserait croire à une variante réelle). `atk`
    passe désormais par monsterAttackLabel (même traduction que la fiche
    monstre elle-même, openMonsterFiche) au lieu du jeton brut "Melee"/"Range". */
@@ -307,7 +307,7 @@ function openCampFiche(key) {
   // « roster serveur » (JAMAIS silencieux quand un roster existe) + DensityBar
   // (nuage COMPLET, jamais positions[0]). Un camp "monster-ish" dont AUCUNE
   // espèce n'a été résolue (les points de spawn ne portent aucune référence
-  // d'entité côté client, data/SCHEMA.md "camp fauna") garde une note honnête
+  // d'entité côté client,  "camp fauna") garde une note honnête
   // (roster décidé serveur) plutôt qu'un silence qui se lit « pas de monstres
   // ici ». Un camp de ressource (logging/mining/…) sans faune n'a simplement
   // pas de section (pas un trou de donnée).
@@ -453,7 +453,7 @@ function wildlifeWhereHtml(id, spRes) {
 }
 
 /* Fiche « espèce de faune » (wildlife_species.bin, S.wildlifeSpecies — 25
-   espèces catalogue SANS record species.bin, ONTOLOGY.md #11) : une VRAIE page
+   espèces catalogue SANS record species.bin,  #11) : une VRAIE page
    pour un animal (nom + famille + méthode de dépeçage + son BUTIN), qui
    n'existait pas — un clic sur « Green Turtle » (recherche/arbre Creeps)
    n'ouvrait RIEN (activateSpeciesLayer seul, sans points pour les 0-camp).
@@ -503,12 +503,12 @@ function openWildlifeFiche(id) {
   setFicheHash('wildlife', id);
 }
 
-/* Statistiques de monstre — voir data/SCHEMA.md "Monster stats". Seule une
+/* Statistiques de monstre — voir  "Monster stats". Seule une
    poignée de groupes (m.stats/m.statsSource === "record", ex. le troll boss
    mbt_10_troll_rusty_boss) a un relevé client réel ; la quasi-totalité des
    autres n'ont AUCUNE stat par-monstre fiable côté client (statsSource null
    OU "partial" — un ou deux codes épars, jamais un bloc complet, voir
-   data/SCHEMA.md) : le client ne nomme jamais quel tier de difficulté un mob
+   ) : le client ne nomme jamais quel tier de difficulté un mob
    donné utilise en jeu.
    Un ancien rendu affichait ici une grille de nombres "estimés" en
    appliquant la courbe d'UN template de tier représentatif
@@ -536,7 +536,7 @@ function statsGridHtml(stats) {
   return `<div class="stat-grid">${rows}</div>`;
 }
 
-/* Fourchette de stats PAR PALIER (fiches.js) — voir data/SCHEMA.md "Monster
+/* Fourchette de stats PAR PALIER (fiches.js) — voir  "Monster
    stats" +  Le client ne nomme
    jamais quel palier de difficulté (easy/medium/hard/elit/boss) un mob donné
    utilise en jeu (choix serveur au spawn, sans référence persistée côté
@@ -584,7 +584,7 @@ function computedStatsGridHtml(sc) {
    courts). Enveloppée dans un conteneur défilable horizontalement pour ne
    jamais faire déborder le tiroir de fiche sur mobile. */
 /* Colonnes dont la fourchette générique est marquée d'un caveat honnête
-   (monsters.md finding #2) : "elit"/"boss" n'ont JAMAIS été vérifiées contre
+   ( finding #2) : "elit"/"boss" n'ont JAMAIS été vérifiées contre
    une source externe (contrairement à easy/medium/hard, croisées avec une
    fourchette 1500-20000 documentée) -- le pipeline concède lui-même que le
    chiffre communautaire "~350 000 PV" pour un boss niv.20 ne se reproduit
@@ -597,7 +597,7 @@ const _UNVERIFIED_TIERS = new Set(['elit', 'boss']);
    groupe m_abs_* sœur porte, EN PLUS de la fourchette calculée ci-dessus, un
    relevé CHIFFRÉ réel indépendant du niveau (démoté depuis
    record_fixed_sibling quand ce même m_abs_* couvre plusieurs niveaux — voir
-   data/SCHEMA.md "m_abs_* fixed-stat sibling records") : jamais montré comme
+    "m_abs_* fixed-stat sibling records") : jamais montré comme
    les stats DE ce mob (exactement l'erreur que l'ancienne courbe rétractée
    commettait), juste un repère honnête, replié par défaut pour ne pas
    concurrencer visuellement la fourchette qui EST la donnée principale ici.
@@ -651,7 +651,7 @@ function perTierStatsSection(level, sf, fixedReading) {
 }
 /* Bloc statistiques de fiche monstre — bascule EXPLICITE sur
    `m.statsProvenance` (task #80, mandatory honest display enum, voir
-   data/SCHEMA.md "Monster stats") plutôt que de déduire l'état à partir de
+    "Monster stats") plutôt que de déduire l'état à partir de
    `statsSource`/`level`/présence de champs comme avant cette passe :
      - record_own    -> Badge provenance official (un relevé client PROPRE à
                         CE mob : mbt_10_troll_rusty_boss + les bosses
@@ -745,7 +745,7 @@ function monsterStatsSection(m) {
    L'espèce est un cran plus large que l'ancien axe MODÈLE (retiré : plus
    chargé côté client depuis que l'axe est passé à species.bin, task #80) :
    "Troll"/"Mighty Troll"/"Overweight Troll" étaient 3 modèles DIFFÉRENTS
-   (CamelCase-glué, voir data/SCHEMA.md "Known limitation") qu'un sélecteur par
+   (CamelCase-glué, voir  "Known limitation") qu'un sélecteur par
    modèle ne réunissait jamais, alors qu'ils désignent la MÊME créature aux yeux
    du joueur -- la bonne raison de ce changement d'axe (raw cosmetic counts
    polish, task #80).
@@ -822,7 +822,7 @@ function openMonsterFiche(key) {
   const variantSelectHtml = monsterVariantPickHtml(key, speciesVariantSpawns(spId, key), species);
   const icon = m.icon ? `icons/${m.icon}` : null;
   // Zone(s) où ce monstre apparaît : champ `m.zones` cuit dans les données
-  // (build_site_data.py::_monster_zone_names — croisement camps ⨯ régions,
+  // ( — croisement camps ⨯ régions,
   // hors zone attrape-tout « Restricted Area » qui couvrait 82% de la carte).
   // PRÉSENTATION (priorité owner) : la répartition famille→région est CE que le
   // joueur vient chercher (« où sont les imps ? »). Sortie du sous-titre muet
@@ -877,7 +877,7 @@ function openMonsterFiche(key) {
   // (monsterCampsHtml ci-dessous, réutilise farmCampRow/farmUnjoinedRow/
   // allCampGroupsFlat de farmSectionHtml -- "où sont les imps bleus ?" doit
   // dessiner l'union réelle de tous les camps du monstre, jamais une poignée
-  // de points). Pastille "unknown" (unknown_states_DESIGN.md #10, task #67)
+  // de points). Pastille "unknown" ( #10, task #67)
   // toujours au même endroit quand m.camps est vide -- comportement inchangé.
   // PLACEMENT (manager feedback, task #80/#79) : c'est l'info que le joueur
   // vient chercher en premier depuis une quête ("où farmer ça ?") -- montée
@@ -922,7 +922,7 @@ function openMonsterFiche(key) {
     : '';
 
   // Quest items this monster drops (monster<->quest-item link follow-up,
-  // task 1/4): baked at build time (build_site_data.py::monsters_site(),
+  // task 1/4): baked at build time ((),
   // inverting build_catalog()'s own item->quest quest_source_of index) --
   // ONLY resolver-produced "kill" links, never name-inferred, so this
   // section simply doesn't exist for a monster with no such link (never an
@@ -979,12 +979,13 @@ function openMonsterFiche(key) {
   // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
   // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
   // DispositionBadge : la posture du monstre (hostile/neutral/…), résolue par
-  // data.js dispositionFor(key) — `monsters.disposition` est une CHAÎNE
-  // (data/SCHEMA.md §5.2). Le champ n'est PAS encore cuit dans monsters.bin
-  // (DATA_CONTRACT.md §2 « monsters.bin +fields disposition ») : lecteur écrit
-  // CONTRE le contrat (404/null-tolérant, blueprint §7), aujourd'hui DORMANT
-  // (dispositionFor -> null pour tous les monstres) donc AUCUN badge rendu —
-  // s'allumera dès que le pipeline publiera le champ, sans toucher le front.
+  // data.js dispositionFor(key) — `monsters.disposition` est une CHAÎNE.
+  // Le champ est désormais CUIT et LIVE dans les données (913/916 monstres en
+  // portent une) : dispositionFor le lit et dispositionChip rend le badge
+  // « official » ci-dessous. Le lecteur reste 404/null-tolérant (blueprint §7)
+  // — un monstre sans disposition connue ne rend simplement aucun badge, jamais
+  // une valeur inventée. (La disposition monstre reste un badge de fiche unique
+  // et honnête : ~910/913 hostile, donc pas un axe discriminant d'arbre/recherche.)
   const dispHtml = dispositionChip(dispositionFor(key), 'official');
   openFiche(`
     ${ficheHeader({
@@ -1157,11 +1158,11 @@ function vendorStockSection(vendorKey) {
   if (!v) return '';
   if (!v.sells?.length) {
     // Pastille d'état RÉELLE (#68) : les 20/69 vendors.bin `sells:[]` vides
-    // (unknown_states_DESIGN.md #19/re-check #4, task #67) portent désormais
+    // ( #19/re-check #4, task #67) portent désormais
     // `stockState` (dynamic/dev/unknown, la sous-distinction que le suivi
     // ci-dessus disait manquer) + `stockStateReason` -- une phrase COURTE en
     // anglais, jamais localisée (c'est une note de provenance technique pour
-    // qui creuse, pas un texte joueur, voir wave_pipeline_FRONT_TODO.md #4) --
+    // qui creuse, pas un texte joueur, voir  #4) --
     // portée en info-bulle de la Badge via le paramètre `extra` de stateBadge
     // (même mécanique que campFaunaUnknownNote ailleurs dans ce fichier).
     // stateBadge mappe dev -> contenu dev, dynamic/unknown -> provenance absent
@@ -1240,7 +1241,7 @@ function openNpcFiche(idx) {
   // (visibleQuestSlugs ci-dessus) car ce ne sont pas des quêtes — mais leurs
   // répliques d'ambiance SONT ce personnage. Comme les pins dupliqués (le
   // donneur-de-dialogue + le donneur-de-quête + le vrai PNJ) sont désormais
-  // fusionnés en UN seul pin (build_site_data.py::link_npc_quests), on rattache
+  // fusionnés en UN seul pin (), on rattache
   // ici ses dialogues À CÔTÉ de ses vraies quêtes, dans une section repliée et
   // clairement étiquetée — jamais une fausse entrée de quête vide. Toujours
   // visible (c'est du lore, pas du contenu dev), dédupliqué ligne à ligne.
@@ -1307,7 +1308,7 @@ function openNpcFiche(idx) {
    farmCampRow (camp joint -- le nom vient du `name` EXPÉDIÉ via campLabel,
    LE formateur partagé : l'ancien name « cuit » cassé pour les clés
    non-Kwalat, cause du retrait temporaire d'alors, est CORRIGÉ côté
-   pipeline — voir island_camp_labels_INVESTIGATION.md §4) et
+   pipeline — voir  §4) et
    farmUnjoinedRow (camp d'une autre carte, champ `map` expédié -- 448
    lignes réelles sur le catalogue monstre expédié (129/916 monstres,
    recompté par l'investigation §1 -- l'ancien « 449 refs » était périmé),
@@ -1320,7 +1321,7 @@ function openNpcFiche(idx) {
    triées nom puis base < patrol < buffed pour que chaque triade se lise
    d'un bloc (leurs nuages restent distincts, seul l'ORDRE change). 0 camp
    DU TOUT retombe sur la pastille "unknown" déjà en place
-   (unknown_states_DESIGN.md #10, task #67 -- comportement inchangé). */
+   ( #10, task #67 -- comportement inchangé). */
 const QUALIFIER_RANK = { patrol: 1, buffed: 2 };
 function monsterCampsHtml(m) {
   const camps = m.camps || [];

@@ -2,7 +2,7 @@
    Une langue n'entre dans LANGS qu'une fois les DEUX couches complètes :
    le dictionnaire UI (js/i18n/<code>.js) ET le build de données de jeu
    sous data/<code>/ — jamais une interface dans une langue avec du contenu
-   dans une autre (voir data/SCHEMA.md "i18n"). FR est la langue par défaut. */
+   dans une autre (voir  "i18n"). FR est la langue par défaut. */
 const LANGS = {
   fr: { name: 'Français', flag: '🇫🇷', numberLocale: 'fr-FR' },
   en: { name: 'English', flag: '🇬🇧', numberLocale: 'en-US' },

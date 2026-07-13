@@ -39,7 +39,7 @@ function itemBias(key, it) {
   if (it?.isTest || NOISE_KEY_RE.test(key || '')) return 2;   // bruit technique -> en dernier
   if (it?.isLobby) return 1.5;   // arme de lobby non craftable (SkipForExport) -> après les vrais objets
   // Objet joueur reconnu -> en tête. Icône/rareté couvrent la majorité des
-  // items, mais ~9500/16307 n'ont aucune icône extraite (voir data/SCHEMA.md) —
+  // items, mais ~9500/16307 n'ont aucune icône extraite (voir ) —
   // craftable (recipes[]), vendu (soldBy[]) ou lootable (drops[]) sont des
   // signaux tout aussi fiables qu'un item existe réellement pour le joueur,
   // sans quoi une arme craftable sans icône se classait derrière une arme de
@@ -60,7 +60,7 @@ const CAT_GLYPH = {
   searchable_chest: '🗝', recipe: '📜', node: '🌿',
   // Famille (mission "search activation" 2026-07-11) : PAS un monstre précis
   // — un nœud FAMILLE de l'arbre (2e barreau de l'échelle de précision,
-  // COORDINATION.md). Glyphe distinct du 🐾 espèce, la puce catégorie
+  // ). Glyphe distinct du 🐾 espèce, la puce catégorie
   // (searchCatLabel, "Famille"/"Family"…) porte l'essentiel de la
   // distinction visuelle (voir buildFamilySearchIndex/renderSearch).
   family: '🧬',
@@ -96,7 +96,7 @@ const searchCatLabel = key => tbl('searchCat', key) || CAT_GLYPH[key] || key;
                     quête (q.giver), libellé de but court (q.goalTexts, ex.
                     "Return to Furr"), archétype d'objet (it.archetype, ex.
                     "Brain Imp Executioner" -- clé de désambiguïsation entre
-                    objets de quête homonymes, data/SCHEMA.md), mot de type de
+                    objets de quête homonymes, ), mot de type de
                     coffre, alias de monstre (species.namesAll), digest de
                     quête cross-carte (déjà surtout des libellés, voir
                     pipeline's _quest_search_terms).
@@ -264,7 +264,7 @@ function questSearchBody(q) {
 /* Corpus secondaire d'un OBJET (mission "search quality" 2026-07-11d) :
    archétype (it.archetype -- clé de désambiguïsation entre objets de quête
    homonymes, ex. "Brain Imp Executioner" pour un "Imp Brain" parmi 3, voir
-   data/SCHEMA.md/pipeline build_site_data.py) et texte de saveur
+   /pipeline ) et texte de saveur
    (it.desc). AUCUN des deux n'était indexé du tout avant cette passe (le
    push d'objet plus bas passait toujours `body=null`) -- 459/6542 objets ont
    un archétype, 357/6542 une description (mesuré sur items.bin EN). Même
@@ -288,7 +288,7 @@ function buildSearch() {
   // correspondent chacune à UNE couche carte adressable par coordonnées
   // exactes (mapview.js findRenderedMarker) — un clic de résultat met alors
   // en avant le marqueur RÉEL déjà rendu au lieu de poser un réticule ambré
-  // par-dessus (npc_dual_identity_INVESTIGATION.md, cas Ophelia Voss via
+  // par-dessus (, cas Ophelia Voss via
   // recherche). camp/coffre-skin gardent le réticule : leur clic déclenche
   // déjà son propre mécanisme de surlignage (showHighlight, voir
   // buildCampSearchIndex/buildChestSearchIndex), pas un pin unique.
@@ -339,7 +339,7 @@ function buildSearch() {
     // (a-ter) Recette (task #78a, recipes-searchable pass) : it.kind==='recipe'
     // est un pseudo-item catalogue de RÉFÉRENCE (une entrée standalone par
     // craft distinct, name/icon/rarities copiés de l'objet produit — voir
-    // data/SCHEMA.md recipes.json "Site propagation") plutôt qu'un objet du
+    //  recipes.json "Site propagation") plutôt qu'un objet du
     // jeu. AVANT cette passe il retombait dans la branche générique ci-dessous
     // (cat "item", couleur de rareté -- souvent grise faute de it.rarity
     // propre --, et un clic ouvrait openItemFiche() sur un titre IDENTIQUE à
@@ -444,7 +444,7 @@ function buildCrossMapSearch() {
     // (buildSearch above) and the map's own quest dense layer — had no
     // isHiddenTest() gate, so searching an NPC name surfaced its empty
     // "Hello X" dialogue fiche by default. The pipeline now stamps isTest/
-    // isDialogue onto every search_index.bin quest entry (build_site_data.py
+    // isDialogue onto every search_index.bin quest entry (
     // build_map_bundles) so the SAME single gate applies here too; revealed
     // with the dev-content toggle exactly like everywhere else.
     if (isHiddenTest(e)) continue;
@@ -457,12 +457,12 @@ function buildCrossMapSearch() {
           // Coffre placé cross-carte : pas de r complet ici (juste l'entrée
           // légère search_index.bin, sans group/family) — repli neutre
           // décor plutôt qu'un CATS.chest qui n'existe plus (voir
-          // DATA_CONTRACT.md §5 : group/family ne sont PAS dans l'index).
+          //  §5 : group/family ne sont PAS dans l'index).
           : e.cat === 'chest' ? '#6c757d'
             : e.cat === 'searchable_chest' ? CATS.searchable_chest.hex
               : e.cat === 'workshop' ? CATS.workshop.hex
                 : e.cat === 'camp' ? (CAMP_COLORS[e.kind] || '#888') : '#8d99ae';
-    // `terms` (quests only, build_site_data.py::_quest_search_terms): a
+    // `terms` (quests only, ): a
     // compact localized digest (name + goal actions/labels + item labels +
     // objective keywords). A quest on another map ships NO objectives/
     // goalTexts/journal in the light cross-map index — this single string is
@@ -507,7 +507,7 @@ function crossMapOpen(e) {
    préfixait auparavant chaque entrée avec `catLabel('chest')` — une clé
    i18n (`cat.chest`) RETIRÉE de toutes les locales quand l'ancienne couche
    unifiée CATS.chest a été scindée en `searchable_chest`/`camp_chest` (voir
-   config.js, DATA_CONTRACT.md §1/§3.1). `catLabel()` n'a alors plus de
+   config.js,  §1/§3.1). `catLabel()` n'a alors plus de
    traduction à trouver et retombe sur la clé BRUTE, si bien que les 132
    entrées dédupliquées de cette couche affichaient un "chest —" anglais en
    dur au-devant du libellé — dans TOUTES les locales, y compris FR/RU/UK/ES
@@ -551,7 +551,7 @@ function buildChestSearchIndex() {
 }
 
 /* Coffres fouillables RÉELS (searchable_chests.bin, poi_searchable_chest_* —
-   voir DATA_CONTRACT.md §4) : chaque point de spawn a son propre id stable
+   voir  §4) : chaque point de spawn a son propre id stable
    (r.k) et sa propre région — contrairement aux placements chest ci-dessus
    (aucun skin répété à dédoublonner), une entrée par point (487) reste
    parfaitement lisible. Clic -> fiche complète (region + note de rareté +
@@ -620,11 +620,11 @@ function buildZoneSearchIndex() {
    une seule créature déclinée niveau 3 à 20) OU par modèle (335 -- l'ancien
    axe utilisé ici, plus étroit qu'une espèce : "Troll"/"Mighty Troll"/
    "Overweight Troll" sont 3 modèles DIFFÉRENTS -- CamelCase-glué, voir
-   data/SCHEMA.md "Known limitation" -- qui ne partagent pourtant AUCUN nom en
+    "Known limitation" -- qui ne partagent pourtant AUCUN nom en
    commun avec le nom canonique, donc ne pouvaient jamais se retrouver l'un
    l'autre par le texte de leur PROPRE titre). Regroupement fait ici sur
    `m.species` (garanti présent sur les 916/916 groupes du build actuel,
-   voir data/SCHEMA.md "monster_species.json"). Une seule entrée par espèce,
+   voir  "monster_species.json"). Une seule entrée par espèce,
    avec un indice "N variantes" quand elle couvre plus d'un groupe (name,level)
    (même idiome que "N raretés" pour les objets ci-dessus) ; clic -> fiche
    (openMonsterFiche) ouverte sur le représentant de l'espèce
@@ -634,7 +634,7 @@ function buildZoneSearchIndex() {
    liste CHAQUE nom distinct replié dans l'espèce, y compris ceux qu'aucun
    MODÈLE ne partage avec le représentant (ex. "Young Woodraptor"/"Overweight
    Troll"/"Gravecrusher" — rejoints par simple égalité de nom, pas de modèle,
-   voir data/SCHEMA.md "monster_species.json" "connected components") :
+   voir  "monster_species.json" "connected components") :
    auparavant totalement absents de tout titre de recherche (seul le nom du
    REPRÉSENTANT du modèle était indexé), ils sont maintenant chacun leur
    propre segment de corpus (`body`, même mécanisme que questSearchBody plus
@@ -647,7 +647,7 @@ function buildMonsterSearchIndex() {
   const bySpecies = new Map();   // species id -> [[key, m], …] (membres VISIBLES seulement)
   for (const [key, m] of Object.entries(S.monsters)) {
     if (isHiddenTest(m)) continue;
-    const spId = m.species || key;   // repli défensif -- `species` est garanti sur chaque groupe (voir data/SCHEMA.md)
+    const spId = m.species || key;   // repli défensif -- `species` est garanti sur chaque groupe (voir )
     let arr = bySpecies.get(spId);
     if (!arr) bySpecies.set(spId, arr = []);
     arr.push([key, m]);
@@ -684,7 +684,7 @@ function buildMonsterSearchIndex() {
     const campsCtx = res ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale())) : tr('speciesZeroCamps');
     const ctx = repM.family ? `${tr('speciesFamilyOf', pretty(repM.family))} · ${campsCtx}` : campsCtx;
     // Clic-double-effet (même modèle EXACT que les chips d'entité de
-    // fiche/quête, décision utilisateur COORDINATION.md — étendu ici à la
+    // fiche/quête, décision utilisateur  — étendu ici à la
     // recherche, mission "search activation") : ouvre la fiche ET coche le
     // nœud ESPÈCE de l'arbre (auto-dépliage de sa famille) quand un
     // point-set existe (js/layeractivate.js activateSpeciesLayer, résolveur
@@ -701,7 +701,7 @@ function buildMonsterSearchIndex() {
     // convention `icons/<chemin>` que tout le reste (it.icon/repM.icon
     // ci-dessus/ci-dessous), le champ porte déjà son propre sous-dossier
     // (monsters/…, quelques items/… pour les portraits résolus via un nom
-    // d'objet partagé — voir data/SCHEMA.md §monster_species). 146/224
+    // d'objet partagé — voir  §monster_species). 146/224
     // espèces n'en ont encore aucune : repli honnête sur repM.icon puis le
     // glyphe 🐾, exactement comme avant cette passe.
     const icon = sp?.portrait ? `icons/${sp.portrait}` : (repM.icon ? `icons/${repM.icon}` : null);
@@ -712,7 +712,7 @@ function buildMonsterSearchIndex() {
 }
 
 /* Familles de monstres (mission "search activation" 2026-07-11 — grain 2 de
-   l'échelle de précision, COORDINATION.md) : une entrée par famille du
+   l'échelle de précision, ) : une entrée par famille du
    CATALOGUE GLOBAL (S.species, post-alias familyKey — même univers que
    buildMonsterSearchIndex ci-dessus), qu'elle ait ou non des camps joints
    sur la carte active — même honnêteté « 0 camp » que la ligne famille de
@@ -736,7 +736,7 @@ function buildMonsterSearchIndex() {
    catégorie dédiée (searchCat.family, « Famille »/« Family »…) + un glyphe
    dédié (CAT_GLYPH.family) + une classe de ligne dédiée (voir renderSearch,
    style.css .sr-family-row) — jamais une seconde couleur qui romprait l'axe
-   couleur = nature d'entité (ONTOLOGY.md #39, config.js ecAttr). */
+   couleur = nature d'entité ( #39, config.js ecAttr). */
 function familySearchRows() {
   const camped = new Map(monsterFamilies().map(f => [f.family, f]));
   const rows = [...camped.values()];
@@ -759,7 +759,7 @@ function buildFamilySearchIndex() {
 }
 
 /* Faune (wildlife_species.bin, catalogue GLOBAL 25 espèces SANS record
-   species.bin — ONTOLOGY.md #11) : mission "search activation" —
+   species.bin —  #11) : mission "search activation" —
    « searching dinde/turkey surfaces the creeps species similarly ».
    Le clic OUVRE désormais une VRAIE FICHE (fiches.js openWildlifeFiche) — ces
    espèces ont une page (nom + famille + méthode de dépeçage + BUTIN) : avant
@@ -887,7 +887,7 @@ function buildLocationSearchIndex() {
 
 /* Capacités NOMMÉES seulement (202/1765 — sorts de héros Q/W/E/R/MA ; les
    capacités de monstre n'ont aucune localisation dans le client, voir
-   data/SCHEMA.md abilities.json) : indexer les ~1560 restantes n'aurait
+    abilities.json) : indexer les ~1560 restantes n'aurait
    affiché que des libellés de repli vides de sens, sans bénéfice pour la
    recherche. */
 function buildAbilitySearchIndex() {
@@ -1333,7 +1333,7 @@ document.addEventListener('keydown', e => {
 });
 /* ── Lignes de résultat en EntityRef « [Kind(●)] Nom » (owner 2026-07-13,
    « la quête doit être [Quest(●)] épinglable, plus de Position séparée — cette
-   quête ET TOUTES les quêtes » ; vague 4 du contrat mapref_component_SPEC.md) ──
+   quête ET TOUTES les quêtes » ; vague 4 du contrat ) ──
    Chaque ligne d'ENTITÉ rend le composant unique (mapref.js ref()) au lieu de
    l'ancien cat-chip + libellé + coordonnée : le NOM souligné ouvre la fiche
    (closure `open` existante), la PASTILLE épingle la position (kinds locate,

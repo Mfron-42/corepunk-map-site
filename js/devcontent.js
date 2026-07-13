@@ -3,7 +3,7 @@
    `isTest: true` côté données — placeholders/doublons de dev jamais
    retirés du client, jamais destinés au joueur. Monstres en particulier
    (162/917 groupes) : ils étaient auparavant DROPÉS ENTIÈREMENT par le
-   pipeline ; maintenant qu'ils sont dans les données (voir data/SCHEMA.md),
+   pipeline ; maintenant qu'ils sont dans les données (voir ),
    les laisser visibles par défaut ferait apparaître 162 groupes de test
    d'un coup dans la recherche/le bestiaire — d'où ce filtre, off par
    défaut : un joueur qui n'a jamais entendu parler de cette fonctionnalité
@@ -42,12 +42,12 @@ function isHiddenTest(rec) {
 /* Slugs from an NPC's `quests` list (site npcs.json — quest-giver links)
    narrowed to the ones actually visible right now, same isHiddenTest gate as
    everywhere else. An NPC whose ONLY given "quests" are the hello_ / info_
-   dialogue barks (isTest+isDialogue, see build_site_data.py::quest_hints())
+   dialogue barks (isTest+isDialogue, see ())
    must not list/count them as real quests by default — fiches.js
    openNpcFiche's "N quests given" section and popups.js's map-popup
    "N quêtes" badge both read this instead of the raw `r.quests`/`n.quests`
    array (data-accuracy audit, NPC-duplication finding #4: a merged NPC pin
-   (see build_site_data.py::link_npc_quests()) can carry BOTH a real quest
+   (see ()) can carry BOTH a real quest
    slug and a hidden dialogue slug in the same list). `S.quests` (slug ->
    site quest record) must already be populated, see data.js::loadCritical. */
 function visibleQuestSlugs(slugs) {
@@ -94,7 +94,7 @@ function devContentCounts() {
    directly). The rest of `hidden`, for every category, is simply
    UNCLASSIFIED, not confirmed-dynamic. See i18n/*.js::filterHiddenTooltip
    (deliberately neutral "without a known position", no parenthetical claim)
-   and  unknown_states_DESIGN.md §2 re-check #1. */
+   and   §2 re-check #1. */
 function positionCounts(list) {
   let shown = 0, hidden = 0;
   for (const r of (list || [])) {

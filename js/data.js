@@ -84,7 +84,7 @@ const dataPath = name => `data/${S.lang}/${name}`;
    on/off précédent (même principe que le prevOn de loadDeferred ci-dessous
    pour S.camps) — une famille déjà connue garde son cochage, une famille
    nouvellement vue démarre DÉCOCHÉE (Décor est masqué par défaut, voir
-   DATA_CONTRACT.md §3.1 — contrairement à l'ancien buildChestTypes qui
+    §3.1 — contrairement à l'ancien buildChestTypes qui
    démarrait tout coché). camp_chest/searchable_chest n'entrent jamais ici :
    ce sont désormais leurs propres couches de haut niveau (config.js CATS),
    pas des sous-filtres. */
@@ -106,7 +106,7 @@ function buildDecorGroups(chests, prevOn = {}) {
     // devcontent.js::positionCounts, jamais un isTest -- déjà exclu des deux).
     const { shown, hidden } = positionCounts(byFam[fam]);
     // `category` : la classification CUITE des records (ontology chunk 2,
-    // data/SCHEMA.md « Chest/decor placements » — interactable.chests/
+    //  « Chest/decor placements » — interactable.chests/
     // destroyable/reactive/other), homogène par famille (vérifié 1:1 sur
     // toutes cartes). C'est elle qui range la famille dans son bucket
     // Interactables du panneau (sidebar.js decorFamsOfCategory) — l'ancienne
@@ -130,7 +130,7 @@ async function loadCritical() {
     fetchJson(dataPath('quests.bin')), fetchJson(dataPath('quest_objects.bin')),
     fetchJson(dataPath('workshops.bin')), fetchJson(dataPath('chests.bin')),
     // Coffres fouillables réels (searchable_chests.bin, Kwalat racine
-    // seulement aujourd'hui — voir DATA_CONTRACT.md §2) : 404-tolérant, comme
+    // seulement aujourd'hui — voir  §2) : 404-tolérant, comme
     // tout fichier optionnel par carte (autre carte sans ce fichier -> []).
     fetchJson(dataPath('searchable_chests.bin')).catch(() => []),
     fetchJson(dataPath('site_meta.json')).catch(() => ({})),
@@ -179,7 +179,7 @@ async function loadDeferred() {
     fetchJson(dataPath('vendors.bin')).catch(() => ({})),
     fetchJson(dataPath('monsters.bin')).catch(() => ({})),
     // Espèces (task #80 — monster-model overhaul part 2, site/data/<lang>/
-    // species.bin, voir data/SCHEMA.md "monster_species.json") : l'unité
+    // species.bin, voir  "monster_species.json") : l'unité
     // "créature" au sens joueur (~224), un cran plus large que `model`
     // ci-dessus (un modèle peut sur-scinder — ex. Imp servant sur 9 modèles
     // d'arme tenue ; une espèce peut au contraire UNIR plusieurs modèles qui
@@ -194,9 +194,9 @@ async function loadDeferred() {
     fetchJson(dataPath('locations.bin')).catch(() => []),
     fetchJson(dataPath('abilities.bin')).catch(() => ({})),
     fetchJson(dataPath('events.bin')).catch(() => []),
-    // Table de butin COMPLÈTE par libellé (loot.md finding #2) : bundle dédié
+    // Table de butin COMPLÈTE par libellé ( finding #2) : bundle dédié
     // construit directement depuis loot_tables.json côté pipeline (voir
-    // build_site_data.py::loot_table_contents_site()) -- remplace l'ancienne
+    // ()) -- remplace l'ancienne
     // inversion de items.*.drops (tronquée, voir lootTableItems ci-dessous).
     // 404-tolérant comme tout fichier optionnel : une carte/build sans ce
     // bundle retombe juste sur "aucune table" plutôt que de planter.
@@ -207,7 +207,7 @@ async function loadDeferred() {
     // le reste de ce lot différé.
     fetchJson(dataPath('nodes.bin')).catch(() => ({})),
     // Faune sauvage curatée (job pass 2026-07-11b, site/data/<lang>/
-    // wildlife_species.bin — voir data/SCHEMA.md, js/state.js S.wildlifeSpecies) :
+    // wildlife_species.bin — voir , js/state.js S.wildlifeSpecies) :
     // catalogue GLOBAL (indépendant de la carte, comme species.bin), jamais
     // une couche carte propre. Depuis le retrait du groupe « Faune sauvage »
     // (2026-07-12), ces espèces 0-camp ne sont plus listées dans l'arbre —
@@ -216,7 +216,7 @@ async function loadDeferred() {
     // 404-tolérant comme le reste de ce lot différé.
     fetchJson(dataPath('wildlife_species.bin')).catch(() => ({})),
     // Libellés ⚑ officiels des jetons de classification (class_labels.bin,
-    // pipeline chunk 1 — voir data/SCHEMA.md « ⚑ label source » et
+    // pipeline chunk 1 — voir  « ⚑ label source » et
     // js/classlabels.js pour le contrat de provenance game/game_tooltip_mt).
     // Différé comme le reste : consommé par les résolveurs de libellés
     // (config.js chestTypeLabel/activableTypeLabel) — avant l'arrivée du
@@ -224,7 +224,7 @@ async function loadDeferred() {
     // LANGUE (jamais par carte) : rechargé par setLang via ce même load.
     // 404-tolérant -> null (les libellés ◇ restent, jamais un plantage).
     fetchJson(dataPath('class_labels.bin')).catch(() => null),
-    // ── Nouveaux jeux différés (SCAFFOLDING E′c-0, DATA_CONTRACT.md §2) ──
+    // ── Nouveaux jeux différés (SCAFFOLDING E′c-0,  §2) ──
     // Enregistrés ici EXACTEMENT comme species.bin/nodes.bin ci-dessus, tous
     // 404-tolérants (doctrine additive : un déploiement partiel dégrade en
     // silence, jamais un plantage). Ils EXISTENT déjà sur disque (construits en
@@ -302,7 +302,7 @@ async function loadDeferred() {
      2) ESPÈCE (species.bin, task #80) : résout par nom, alias `namesAll`
         compris (namesAll couvre aussi des noms qu'AUCUN modèle ne partage —
         "Overweight Troll"/"Mighty Troll" rejoignent l'espèce "Troll" par
-        égalité de nom, pas de modèle, voir data/SCHEMA.md
+        égalité de nom, pas de modèle, voir 
         "monster_species.json") — choix déterministe parmi les spawns
         VISIBLES de l'espèce : le spawn dont le niveau est le plus proche de
         `levelHint` quand l'appelant en connaît un (ex. le niveau du mob dans
@@ -409,16 +409,16 @@ function locationIndexForId(id) {
   return i == null ? null : i;
 }
 
-/* Table de butin COMPLÈTE par libellé (loot.md finding #2) : lue directement
+/* Table de butin COMPLÈTE par libellé ( finding #2) : lue directement
    depuis S.lootTableContents (bundle dédié construit côté pipeline depuis
-   loot_tables.json -- voir build_site_data.py::loot_table_contents_site(),
+   loot_tables.json -- voir (),
    chargé en différé dans loadDeferred() ci-dessus), donc toujours 100%
    complète (max observé : 582 lignes, les 13 tables lt_poi_chest_hidden_* de
    coffre de recette) -- plus jamais reconstruite en inversant le cache
    `dropped_in` tronqué de chaque item (l'ancienne méthode, gardée juste en
    dessous en repli), qui rendait justement CES tables-là vides ou
    incomplètes (0/582 avant ce correctif). `ch` (part approximative dans le
-   pool, voir data/SCHEMA.md "chance") toujours propagée au même titre que
+   pool, voir  "chance") toujours propagée au même titre que
    w/c/g -- fiches.js::dropRateHtml en a besoin pour ne jamais retomber sur le
    poids brut `w` comme faux pourcentage. */
 let lootTableIdxFallback = null;
@@ -448,7 +448,7 @@ function lootTableItems(label) {
    RIEN ne les appelle aujourd'hui — ils ne se construisent donc jamais et le
    rendu reste identique ; ils attendent leurs vagues (région/faune/build). */
 
-/* Contenu inversé d'une région (zones_contents.bin, DATA_CONTRACT.md §2) :
+/* Contenu inversé d'une région (zones_contents.bin,  §2) :
    zone_id -> {display, camps, monsters, creeps, objects, quests}. Le bundle est
    déjà un objet indexé par zone_id (accès direct comme lootTableContents) ; le
    Map paresseux tolère aussi une forme tableau {zone_id|id, …} par robustesse.
@@ -469,7 +469,7 @@ function zoneContentsFor(zoneId) {
   return v == null ? null : v;
 }
 
-/* Creep par clé (creeps.bin, DATA_CONTRACT.md §2) : clé -> {name, family,
+/* Creep par clé (creeps.bin,  §2) : clé -> {name, family,
    disposition, …}. Objet indexé par clé (le cas courant) ou tableau {key|id, …}
    par robustesse. Consommé par la future fiche faune/creep (openWildlifeFiche)
    et dispositionFor ci-dessous. */
@@ -491,7 +491,7 @@ function creepFor(key) {
 
 /* Disposition NORMALISÉE d'une entité -> "peaceful"|"neutral"|"hostile"|… :
    `creeps.disposition` est une CHAÎNE (creeps.bin) ; une future disposition de
-   monstre pourra arriver en chaîne OU en objet {value} (DATA_CONTRACT.md §2 /
+   monstre pourra arriver en chaîne OU en objet {value} ( §2 /
    blueprint §3.3 « normalize on read ») — aplatie ici à la lecture. Index
    paresseux fusionnant S.creeps puis S.monsters (le creep gagne si les deux
    portent la clé). Consommé par la future DispositionBadge (vague E′c-4). */
@@ -521,7 +521,7 @@ function dispositionFor(key) {
 }
 
 /* Zones nommées où un monstre apparaît : désormais SERVIES par le pipeline
-   (champ `m.zones`, build_site_data.py::_monster_zone_names — croisement camps
+   (champ `m.zones`,  — croisement camps
    ⨯ régions, hors zone attrape-tout « Restricted Area »). L'ancien calcul
    client (monsterZones/pointInRing, buggé par la dominance de Restricted Area)
    est retiré : les vues lisent directement `m.zones`, cohérent avec la

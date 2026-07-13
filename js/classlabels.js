@@ -1,5 +1,5 @@
 /* Kwalat — libellés ⚑ OFFICIELS des jetons de classification
-   (site/data/<lang>/class_labels.bin, pipeline chunk 1 — voir data/SCHEMA.md
+   (site/data/<lang>/class_labels.bin, pipeline chunk 1 — voir 
    « ⚑ label source »). Module minuscule et SANS dépendance (consommé par
    config.js, rempli par data.js loadDeferred) pour éviter tout import
    croisé config ⇄ data.
