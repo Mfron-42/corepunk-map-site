@@ -13,14 +13,14 @@ import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
   map, toWorld, registerDense, registerDomDense, scheduleRedraw,
-  denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
+  denseRenderers, buildZoneLayer, markerId, clearHighlight,
 } from './mapview.js';
 import { loadCritical, loadDeferred, resetDeferred, initVersion, whenDeferred } from './data.js';
 import { startUpdateWatcher, refreshUpdateBannerI18n } from './updatecheck.js';
 import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
-  openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
+  openMonsterFiche, openFamilyFiche, openWildlifeFiche, openLocationFiche, openLootTableFiche, openChestFiche,
   openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche, openRegionFiche,
   openTalentFiche, openSpecFiche, openProfessionFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
@@ -34,62 +34,43 @@ import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from
 import { initMapRefDelegation, locateRefKey, refKindLabel } from './mapref.js';
 import { buildSearch, hideSearchResults } from './search.js';
 import {
-  buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
+  buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, syncEntityRefDots,
 } from './sidebar.js';
 import { syncHash, pushFocusState, unfocus, chestIndexForToken, locationIndexForToken } from './urlstate.js';
 import {
   goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
   addLocatePin, removeLocatePin, renderLocatePins,
+  addCampTrace, removeCampTrace, renderCampTraces,
 } from './pins.js';
 import { applyLocationState } from './router.js';
 import { isHiddenTest, devContentCounts } from './devcontent.js';
 import './analytics.js';
 
-/* ── Surlignage transitoire d'UN camp (EntityRef vague 2) ────────────────────
-   Un camp individuel (fiche camp / lignes de farm) n'a AUCUN nœud d'arbre : son
-   tracé n'existe que comme surlignage transitoire single-slot — l'équivalent
-   honnête le plus proche de l'ex-bouton de surlignage de camp (retiré,
-   kill-list §7.2 ; idem l'ex-surlignage de couche coffres). La référence `[Camp(●)]`
-   (fiches.js campRef) bascule le surlignage de SES points ; showHighlight centre
-   aussi la caméra. Single-slot (showHighlight efface le précédent), effacé à la
-   fermeture de fiche (fiches.js closeFiche → clearHighlight). `highlightedCampKey`
-   mémorise le camp en avant pour (a) basculer OFF au re-clic, (b) éteindre la
-   pastille de l'autre camp quand on change. L'état n'est PAS persisté (rendu
-   initial toujours OFF — parité stricte avec l'ancien bouton dont le libellé se
-   réinitialisait à chaque rendu) : on reflète l'état sur la pastille CLIQUÉE
-   (aria-pressed + remplissage), même geste que l'ex-handler species-layer
-   flippait son bouton. */
-let highlightedCampKey = null;
-function setCampRefBubble(el, on) {
-  const tag = el?.querySelector('.ref-tag');
-  const bub = el?.querySelector('.ref-bubble');
-  if (tag) tag.setAttribute('aria-pressed', String(on));
-  // ne jamais écraser un état ⊘ (0 point ici) — un camp surlignable a toujours
-  // des points, mais garde défensive symétrique du refFill de mapref.js.
-  if (bub && bub.dataset.fill !== 'empty' && bub.dataset.fill !== 'empty-on') {
-    bub.setAttribute('data-fill', on ? 'on' : 'off');
-  }
-}
-function toggleCampHighlight(info) {
-  const g = info.key ? campGroupByKey(info.key) : null;
-  if (!g) return;
-  if (highlightedCampKey === info.key && hasHighlight()) {
-    clearHighlight();
-    highlightedCampKey = null;
-    setCampRefBubble(info.el, false);
-    return;
-  }
+/* ── Tracé PERSISTANT d'UN camp (EntityRef `[Camp(●)]` campRef, mode E) ───────
+   Un camp individuel (ligne de farm d'une fiche monstre/objet, ligne camp
+   d'une fiche région) n'a AUCUN nœud d'arbre. Sa pastille bascule désormais un
+   TRACÉ de 1re classe — même modèle que les pins locate (Q7) : le nuage complet
+   de ses points est enregistré dans pins.js S.campTraces, listé comme TAG dans
+   le bandeau-légende sous la barre de recherche, et retirable par sa pastille
+   OU le ✕ de sa tag (removeCampTrace) — ratifié 2026-07-13 (« un camp affiché
+   doit se mettre sous la barre pour que je puisse le cacher »). Supersède
+   l'ex-surlignage transitoire single-slot (kill-list §7.2) : plusieurs camps
+   simultanés autorisés, le tracé survit à la fermeture de fiche (il ne vit plus
+   dans la couche de surlignage éphémère que closeFiche efface). La pastille du
+   ref d'origine se resynchronise via sidebar.syncEntityRefDots (branche camp
+   mode E → S.campTraces), câblée sur onCampTracesChange ET après chaque
+   ouverture de fiche (campRef rend drawn:false, une réouverture doit relire
+   l'état). Teinte du nuage = couleur de kind du camp (CAMP_COLORS). */
+function toggleCampTrace(info) {
+  const key = info.key;
+  if (!key) return;
+  if (S.campTraces?.has(key)) { removeCampTrace(key); return; }   // re-clic = retrait
+  const g = campGroupByKey(key);
+  if (!g || !g.pts.length) return;
   const pts = g.pts.map(([x, z]) => ({ x, z }));
-  if (!pts.length) return;
-  // un AUTRE camp était en avant : éteindre sa pastille (si encore dans le
-  // drawer) avant d'allumer le nouveau (single-slot, comme l'ancien bouton).
-  if (highlightedCampKey && highlightedCampKey !== info.key) {
-    const prev = document.querySelector(`#detail .ref[data-kind="camp"][data-key="${CSS.escape(highlightedCampKey)}"]`);
-    if (prev) setCampRefBubble(prev, false);
-  }
-  showHighlight(pts, CAMP_COLORS[g.kind] || '#888');
-  highlightedCampKey = info.key;
-  setCampRefBubble(info.el, true);
+  const hex = CAMP_COLORS[g.kind] || '#888';
+  const label = (info.label || '').trim() || refKindLabel('camp');
+  addCampTrace(key, { pts, hex, label, kind: g.kind, map: S.map });
 }
 
 /* ── Couches espèce/famille (#82 chunk (d)) : orchestration d'un geste ────
@@ -204,6 +185,11 @@ document.addEventListener('click', e => {
   // focus/historique que les drapeaux (pas de pushFocusState/unfocus),
   // l'autre voie de retrait étant la pastille/le ✕ du bandeau-légende.
   else if (b.dataset.act === 'remove-locate-pin') removeLocatePin(b.dataset.id);
+  // Une ouverture de fiche par data-act (fiche-camp/-monster/-item/… ci-dessus)
+  // vient de (re)rendre #detail : resynchronise ses pastilles `[Camp(●)]` avec
+  // les tracés actifs (campRef rend drawn:false, l'état doit être relu à la
+  // réouverture). Idempotent/à coût nul pour les clics sans fiche (track/goto…).
+  syncEntityRefDots();
 });
 
 /* ── EntityRef (◇) : l'UNIQUE délégué du composant js/mapref.js ──────────────
@@ -219,7 +205,14 @@ initMapRefDelegation(document, {
   open(info) {
     pushFocusState();                       // une entrée d'historique par geste (modèle existant)
     switch (info.kind) {
-      case 'species': openMonsterFiche(info.key); break;
+      // Espèce : clé du bestiaire (S.monsters) en priorité ; une clé qui n'y
+      // résout pas mais existe au registre FAUNE (S.wildlifeSpecies — réfs
+      // d'objectif « une seule espèce de faune », stepguide) ouvre la fiche
+      // faune — même page que la recherche/l'arbre Creeps, jamais une fiche
+      // monstre qui n'ouvre rien.
+      case 'species':
+        if (!S.monsters?.[info.key] && S.wildlifeSpecies?.[info.key]) { openWildlifeFiche(info.key); break; }
+        openMonsterFiche(info.key); break;
       case 'family': openFamilyFiche(info.key); break;
       case 'item': case 'quest_item': openItemFiche(info.key); break;
       case 'recipe': openRecipeFiche(info.key); break;
@@ -251,6 +244,10 @@ initMapRefDelegation(document, {
       // nom→zone_id lui-même (jamais re-dérivé par surface).
       case 'zone': openRegionFiche(info.key != null ? info.key : info.label); break;
     }
+    // La fiche vient d'être (re)rendue : resynchronise ses pastilles `[Camp(●)]`
+    // (campRef rend drawn:false → sinon un tracé déjà actif s'afficherait ○ à la
+    // réouverture) et les autres pastilles E/L/C — même entonnoir que l'arbre.
+    syncEntityRefDots();
   },
   draw(info) {
     switch (info.kind) {
@@ -309,11 +306,11 @@ initMapRefDelegation(document, {
         // PAS la réf d'objectif enter_zone (subrole absent, mode L) : elle reste
         // un pin locate au centroïde, traitée par la branche mode L plus bas.
         if (info.kind === 'zone' && info.subrole === 'region') { drawNamedZone(info.key != null ? info.key : info.label); break; }
-        // Camp individuel (mode E) — surlignage transitoire self-toggle (vague
-        // 2, remplace l'ex-surlignage de camp, kill-list §7.2) : un camp n'a
+        // Camp individuel (mode E) — TRACÉ persistant self-toggle de 1re classe
+        // (remplace l'ex-surlignage transitoire, kill-list §7.2) : un camp n'a
         // aucun nœud d'arbre. Un camp CROSS-carte (farmUnjoinedRow) est mode L →
         // il tombe dans le traitement locate ci-dessous, jamais ici.
-        if (info.kind === 'camp' && info.mode !== 'L') { toggleCampHighlight(info); break; }
+        if (info.kind === 'camp' && info.mode !== 'L') { toggleCampTrace(info); break; }
         // Catégorie « Coffres fouillables » (mode C, vague 2, remplace
         // l'ex-surlignage de couche coffres) : VRAI toggle de la case (checkbox,
         // .click() bascule dans les DEUX sens — contrairement à
@@ -751,6 +748,8 @@ async function restoreState() {
     renderUserFlags();  // drapeaux utilisateur (#84) : scopés par carte, S.map vient de changer
     renderLocatePins(); // pins locate (Q7) : ceux de la carte active se re-dessinent,
                         // les autres RESTENT dans S.locates (jamais perdus à la bascule)
+    renderCampTraces(); // tracés de camp (mode E) : même modèle — ceux de la carte
+                        // active se re-dessinent, les autres restent dans S.campTraces
   });
 
   buildFilters();

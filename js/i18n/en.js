@@ -312,6 +312,11 @@ export default {
       // neither is ever a world spawn, so neither ever gets a position/zone.
       goalGivenByLabel: 'given by',
       goalCraftLabel: 'craft it',
+      // Label of a goal's estimated search-area reference (dynamicPosBadge):
+      // the drawable zone is a best-effort cluster, never a confirmed spawn —
+      // the reference always carries this explicit wording (or the real
+      // region name when the zone IS a named region), never an empty tag.
+      goalSearchZoneLabel: 'Estimated area',
       // receive_reward mechanism (mechanism decode job A): the item is
       // granted by completing a DIFFERENT quest ('s reward_of), not
       // handed over by this quest's own giver — verb only, one clickable

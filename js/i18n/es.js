@@ -296,6 +296,10 @@ export default {
       // heroSpecLabel (fiches.js) — no hay una única ubicación para un
       // objetivo JcJ.
       goalCraftLabel: 'a craftear',
+      // Etiqueta de la referencia «zona estimada» de un objetivo
+      // (dynamicPosBadge): la zona dibujable es una estimación, nunca un
+      // spawn confirmado — la referencia nunca queda sin etiqueta.
+      goalSearchZoneLabel: 'Zona estimada',
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
       howToTitle: 'Cómo hacerlo',

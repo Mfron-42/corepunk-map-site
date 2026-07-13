@@ -10,9 +10,9 @@ import {
 } from './config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty } from './utils.js';
 import { tr, tbl, numberLocale } from './i18n/index.js';
-import { map, toLL, toggleZones, showHighlight } from './mapview.js';
+import { map, toLL, toggleZones } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
-import { addLocatePin, removeLocatePin } from './pins.js';
+import { addLocatePin, removeLocatePin, addCampTrace, removeCampTrace } from './pins.js';
 import { ref, locateRefKey } from './mapref.js';
 import { whenDeferred } from './data.js';
 import {
@@ -289,8 +289,8 @@ function buildSearch() {
   // exactes (mapview.js findRenderedMarker) — un clic de résultat met alors
   // en avant le marqueur RÉEL déjà rendu au lieu de poser un réticule ambré
   // par-dessus (, cas Ophelia Voss via
-  // recherche). camp/coffre-skin gardent le réticule : leur clic déclenche
-  // déjà son propre mécanisme de surlignage (showHighlight, voir
+  // recherche). camp/coffre-skin n'ont pas de pinCat : leur clic bascule
+  // leur TRACÉ de lot de 1re classe (pins.js, voir toggleLotTrace/
   // buildCampSearchIndex/buildChestSearchIndex), pas un pin unique.
   // Icône = le PORTRAIT PROPRE du PNJ (npcIconUrl, exactement la même source
   // que sa fiche/popup/puce — voir utils.js), plus le glyphe d'initiales en
@@ -544,8 +544,18 @@ function buildChestSearchIndex() {
     // Couleur RÉELLE (chestHex — camp_chest/décor par famille/legacy, voir
     // config.js) : un skin d'asset donné (r.name) est TOUJOURS de la même
     // group/family, donc homogène pour tout le lot dédupliqué ci-dessus.
-    pushSearchEntry(chestSearchLabel(r), 'chest', chestHex(r), r.x, r.z,
-      () => showHighlight(S.data.chest.filter(c => c.name === r.name), chestHex(r)),
+    // Clic → TRACÉ de LOT de 1re classe (toggleLotTrace, même registre pins.js
+    // que les camps — ratifié 2026-07-13) : tous les placements de CE skin,
+    // tag « [Chest] <nom> » dans le bandeau-légende, re-clic/✕ = retrait,
+    // persistance/multi — plus jamais le surlignage transitoire single-slot.
+    // Clé = le ref déjà expédié ('chest:'+skin) ; points relus au clic
+    // (S.data.chest courant), teinte du lot inchangée (chestHex).
+    const lbl = chestSearchLabel(r);
+    pushSearchEntry(lbl, 'chest', chestHex(r), r.x, r.z,
+      () => toggleLotTrace('chest:' + r.name, () => ({
+        pts: S.data.chest.filter(c => c.name === r.name).map(c => ({ x: c.x, z: c.z })),
+        hex: chestHex(r), label: lbl, kind: 'chest', refKind: 'chest', map: S.map,
+      })),
       null, typeLabel, null, 0, body, { ref: 'chest:' + r.name });
   });
 }
@@ -581,6 +591,21 @@ function campSearchLabel(g) {
   return g.qualifier ? `${base} — ${campQualifierLabel(g.qualifier)}` : base;
 }
 
+/* Bascule du TRACÉ de LOT d'un résultat (camp / skin de coffre) — LE même
+   registre de 1re classe que la pastille `[Camp(●)]` des fiches (pins.js
+   S.campTraces, ratifié 2026-07-13 : « un camp affiché doit se mettre sous la
+   barre pour que je puisse le cacher », étendu à la recherche) : déjà tracé ⇒
+   retrait (parité re-clic) ; sinon pose (nuage dessiné + tag de légende + ✕ +
+   caméra cadrée + survie à la fermeture/bascule, tout par addCampTrace).
+   `makeTrace` est une fabrique (points relus au moment du clic, jamais figés
+   à la construction de l'index). */
+function toggleLotTrace(key, makeTrace) {
+  if (!key) return;
+  if (S.campTraces?.has(key)) { removeCampTrace(key); return; }
+  const t = makeTrace();
+  if (!t.pts.length) return;
+  addCampTrace(key, t);
+}
 /* Entrées « Camp » ajoutées à l'index une fois camps.json arrivé (chargement
    différé) — le tableau searchIndex est déjà branché sur la barre de
    recherche, un simple push suffit. */
@@ -589,10 +614,18 @@ function buildCampSearchIndex() {
     if (!g.pts.length) return;
     const label = campSearchLabel(g);
     if (label == null) return;
-    // Clic → surligne TOUS les points du groupe (pas seulement le premier) :
-    // « montre-moi toutes les caisses de maïs », voir showHighlight.
+    // Clic → TRACÉ de 1re classe de TOUS les points du groupe (toggleLotTrace
+    // ci-dessus) — même clé g.k que la pastille `[Camp(●)]` des fiches
+    // (main.js toggleCampTrace) : un camp tracé depuis une fiche se lit/se
+    // retire depuis la recherche et réciproquement, un seul état. `ref: g.k`
+    // porte la clé jusqu'à la pastille de la ligne (état lu au rendu,
+    // searchRefHtml, + resync live mode E par sidebar.syncEntityRefDots).
     pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1],
-      () => showHighlight(g.pts.map(([x, z]) => ({ x, z })), CAMP_COLORS[g.kind] || '#888'));
+      () => toggleLotTrace(g.k, () => ({
+        pts: g.pts.map(([x, z]) => ({ x, z })),
+        hex: CAMP_COLORS[g.kind] || '#888', label, kind: g.kind, map: S.map,
+      })),
+      null, null, null, 0, null, { ref: g.k });
   }));
 }
 
@@ -1348,13 +1381,20 @@ const SEARCH_REF_KIND = {
   zone: 'zone', location: 'location', ability: 'ability', event: 'event',
   chest: 'chest', searchable_chest: 'searchable_chest', node: 'node',
   talent: 'talent', specialization: 'specialization', profession: 'profession',
+  // Camp (fermeture de classe 2026-07-13) : la ligne rend enfin la grammaire
+  // `[Camp(●)] Nom` comme toutes les autres — la pastille bascule le TRACÉ de
+  // lot de 1re classe (même clé/registre que la pastille des fiches, voir
+  // toggleLotTrace) ; sans ce mapping la ligne restait au rendu legacy
+  // puce+libellé, sans pastille du tout.
+  camp: 'camp',
 };
 /* Kinds mono-entité à POSITION unique → la pastille pose/retire un pin LOCATE
    (Q7 verbatim owner : « épinglable, apparaît sous la barre, retirable ») quand
    x est connu — c'est LE geste que l'owner réclamait pour la quête. */
 const SEARCH_LOCATE_CATS = new Set(['npc', 'poi', 'quest', 'qao', 'workshop', 'searchable_chest', 'location', 'event']);
 /* Kinds « groupe de points » (camp / skin de coffre) : aucun nœud d'arbre, aucun
-   pin unique — la pastille rejoue leur surlignage de LOT (closure showHighlight). */
+   pin unique — la pastille bascule leur TRACÉ de LOT de 1re classe (closure
+   toggleLotTrace → pins.js S.campTraces : tag de légende, ✕, persistance). */
 const SEARCH_HIGHLIGHT_CATS = new Set(['camp', 'chest']);
 
 /* Clé STABLE du pin locate d'une ligne — la MÊME source pour l'état affiché de
@@ -1387,7 +1427,14 @@ function searchRefHtml(it) {
     desc.drawable = true;
     desc.drawn = !!(S.locates && S.locates.has(entryLocateKey(it)));
   } else if (highlight) {
-    desc.drawable = true; desc.drawn = false;   // surlignage de lot transitoire, jamais persisté
+    // Tracé de LOT de 1re classe (camp / skin de coffre — pins.js S.campTraces) :
+    // la pastille reflète l'appartenance au registre par la MÊME clé que la
+    // bascule (it.ref : clé de camp / 'chest:'+skin), jamais re-dérivée. Le
+    // dropdown est transitoire (re-rendu à chaque frappe) : état lu au rendu ;
+    // les lignes camp (mode E, data-key) sont en plus resynchronisées en place
+    // par sidebar.syncEntityRefDots tant que la liste reste ouverte.
+    desc.drawable = true;
+    desc.drawn = !!(S.campTraces && it.ref && S.campTraces.has(it.ref));
   } else if (kind === 'zone') {
     desc.drawable = true; desc.drawn = !!S.zonesOn;   // la pastille suit la couche « Zones »
   } else if (kind === 'species' || kind === 'family') {

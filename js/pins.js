@@ -12,7 +12,7 @@
 import { S } from './state.js';
 import { esc, fmtCoord, reduceMotion } from './utils.js';
 import { tr } from './i18n/index.js';
-import { map, toLL, toWorld, activeMap, findRenderedMarker, refreshIconLayer } from './mapview.js';
+import { map, toLL, toWorld, activeMap, findRenderedMarker, refreshIconLayer, canvasR } from './mapview.js';
 import { syncHash } from './urlstate.js';
 
 /* `pinRef` (facultatif, {cat}) : le caller a déjà résolu la cible à une
@@ -231,6 +231,78 @@ function removeLocatePin(key) {
   if (mk) { locateLayer?.removeLayer(mk); locateMarkers.delete(key); }
   notifyLocatesChange();
 }
+/* ── Tracés de CAMP (EntityRef `[Camp(●)]` campRef, mode E) — 1re classe ─────
+   Un camp individuel (ligne de farm d'une fiche monstre/objet, ligne camp
+   d'une fiche région) n'a AUCUN nœud d'arbre : sa pastille bascule un TRACÉ
+   PERSISTANT — le nuage COMPLET de ses points de spawn, teinte de kind
+   (CAMP_COLORS) — qui remplace l'ex-surlignage transitoire single-slot.
+   Registre JUMEAU des pins locate ci-dessus (même patron : Map clé→tracé +
+   Set d'abonnés + re-rendu par carte + tag de légende + loi du même-état),
+   MAIS la valeur est MULTI-points et le dessin est un nuage de cercles
+   canvas NON interactif — pas un marqueur mono-point (les deux affordances
+   d'un camp restent distinctes et honnêtes : l'en-tête de fiche pose un pin
+   locate sur le point représentatif, cette pastille-ci trace tous les
+   points). SESSION seule, GLOBAL : plusieurs camps simultanés autorisés, le
+   tracé survit à la fermeture de fiche (il ne vit pas dans la couche de
+   surlignage éphémère de mapview) et à la bascule de carte (re-rendu au
+   retour, comme les pins locate). Retrait : la pastille d'origine OU le ✕ de
+   sa tag de légende (removeCampTrace, alias dot-off). La teinte/le libellé de
+   chaque point sont ceux de la référence qui l'a tracé — mêmes données que
+   la tag de légende. Un tracé stocke un INSTANTANÉ de ses points (jamais
+   re-résolu par clé : sur une autre carte le camp n'est plus joignable).
+   Né pour les camps, le registre porte tout LOT multi-points du même geste :
+   les skins de coffre de la recherche y vivent aussi (search.js
+   toggleLotTrace, clé 'chest:'+skin — espace de noms disjoint des clés de
+   camp) ; `refKind` (défaut 'camp') porte le kind mapref de la tag de
+   légende, jamais re-déduit de la clé. */
+if (!S.campTraces) S.campTraces = new Map();   // clé de lot -> {pts:[{x,z}], hex, label, kind, refKind, map}
+let campTraceLayer = null;                     // L.layerGroup parent, monté pour S.map courante
+const campTraceGroups = new Map();             // clé -> L.layerGroup (les cercles d'UN camp), carte courante
+const campTracesListeners = new Set();
+function onCampTracesChange(cb) { campTracesListeners.add(cb); }
+function notifyCampTracesChange() { campTracesListeners.forEach(cb => cb()); }
+function mountCampTrace(key, t) {
+  if (!campTraceLayer) campTraceLayer = L.layerGroup().addTo(map);
+  const g = L.layerGroup();
+  for (const p of t.pts) {
+    L.circleMarker(toLL(p.x, p.z), {
+      renderer: canvasR, radius: 5.5, color: '#0a0e14', weight: 1.2,
+      fillColor: t.hex || '#888', fillOpacity: .95, interactive: false,
+    }).addTo(g);
+  }
+  g.addTo(campTraceLayer);
+  campTraceGroups.set(key, g);
+  return g;
+}
+/* (Re)pose tous les tracés de camp de la carte ACTIVE — appelée par main.js à
+   chaque bascule de carte (hook onMapSwitch), comme renderLocatePins : les
+   tracés d'une autre carte restent dans S.campTraces mais ne se dessinent pas. */
+function renderCampTraces() {
+  if (campTraceLayer) { map.removeLayer(campTraceLayer); campTraceLayer = null; }
+  campTraceGroups.clear();
+  for (const [key, t] of S.campTraces) if ((t.map || S.map) === S.map) mountCampTrace(key, t);
+  notifyCampTracesChange();
+}
+/* Ajout = nuage tracé + caméra cadrée sur ses bornes (même geste que
+   l'ex-showHighlight du camp). Sur re-rendu de carte (renderCampTraces) on ne
+   recadre PAS — parité stricte avec addLocatePin/renderLocatePins. */
+function addCampTrace(key, t) {
+  if (!key || !t.pts?.length) return;
+  const trace = { pts: t.pts, hex: t.hex || null, label: t.label || null, kind: t.kind || null, refKind: t.refKind || 'camp', map: t.map || S.map };
+  S.campTraces.set(key, trace);
+  if (trace.map === S.map) {
+    mountCampTrace(key, trace);
+    const b = L.latLngBounds(trace.pts.map(p => toLL(p.x, p.z))).pad(0.15);
+    reduceMotion ? map.fitBounds(b) : map.flyToBounds(b);
+  }
+  notifyCampTracesChange();
+}
+function removeCampTrace(key) {
+  S.campTraces.delete(key);
+  const g = campTraceGroups.get(key);
+  if (g) { campTraceLayer?.removeLayer(g); campTraceGroups.delete(key); }
+  notifyCampTracesChange();
+}
 /* ── Drapeaux utilisateur (clic droit) ── #84 ──────────────────
    Remplace l'ancien "ping" (setPing/clearPing ci-dessus dans les versions
    précédentes de ce fichier) : un marqueur SINGLE-SLOT partagé avec le même
@@ -345,4 +417,5 @@ export {
   goTo, setLocator, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
   onUserFlagsChange, listUserFlags,
   addLocatePin, removeLocatePin, renderLocatePins, onLocatesChange,
+  addCampTrace, removeCampTrace, renderCampTraces, onCampTracesChange,
 };

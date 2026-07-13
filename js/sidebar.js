@@ -10,7 +10,7 @@ import { $, $$, esc, fmtCoord, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
 import { map, layers, scheduleRedraw, refreshIconLayer, toggleZones } from './mapview.js';
 import { syncHash, pushFocusState } from './urlstate.js';
-import { goTo, onUserFlagsChange, listUserFlags, removeLocatePin, onLocatesChange } from './pins.js';
+import { goTo, onUserFlagsChange, listUserFlags, removeLocatePin, onLocatesChange, removeCampTrace, onCampTracesChange } from './pins.js';
 import { locateRefKey, refKindLabel } from './mapref.js';
 import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
@@ -165,6 +165,13 @@ onUserFlagsChange(renderUserPins);
    resynchronise les pastilles L affichées (loi du même-état §5.3 étendue
    au mode L — aria-pressed/remplissage relus de S.locates, jamais figés). */
 onLocatesChange(() => { renderActiveTags(); syncEntityRefDots(); });
+/* Tracés de CAMP (pins.js S.campTraces, mode E) : même idiome d'abonnement
+   unique que les pins locate — chaque mutation (activation/retrait/re-rendu de
+   carte) republie le bandeau-légende (les tags de tracés y vivent, voir
+   collectActiveTags) ET resynchronise la pastille `[Camp(●)]` du ref d'origine
+   si sa fiche est ouverte (loi du même-état §5.3 étendue au tracé de camp —
+   aria-pressed/remplissage relus de S.campTraces, jamais figés). */
+onCampTracesChange(() => { renderActiveTags(); syncEntityRefDots(); });
 
 /* ── Filtres (sidebar) ──────────────────────────────────────── */
 /* Badge discret "+N" quand une catégorie a des enregistrements réels sans
@@ -844,7 +851,14 @@ function syncEntityRefDots() {
     else if (d.kind === 'family') {
       const fams = (d.family || d.key || '').split(',').filter(Boolean);
       on = fams.length > 0 && fams.every(f => S.monfam[f]?.on);
-    } else {
+    }
+    // Ref de CAMP INDIVIDUEL (campRef, mode E, data-key = clé du camp — pas de
+    // subrole) : l'état dessiné est l'appartenance au registre des tracés
+    // (S.campTraces, pins.js), la MÊME source que le bandeau. Distinct de la
+    // ref de CATÉGORIE de camp (mode C, subrole = kind → S.camps[kind]) qui
+    // n'entre jamais dans cette boucle mode E.
+    else if (d.kind === 'camp' && d.key) { on = !!S.campTraces?.has(d.key); }
+    else {
       const k = d.subrole || d.key;
       if (k && S.camps && S.camps[k] !== undefined) on = !!S.camps[k]?.on;
     }
@@ -953,7 +967,7 @@ function activeTagInput(d) {
 function collectActiveTags() {
   const tags = [];
   const seen = new Set();
-  const push = d => { const id = (d.locate ? 'loc:' : d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); tags.push(d); } };
+  const push = d => { const id = (d.campTrace ? 'ct:' : d.locate ? 'loc:' : d.sub ? 'sub:' : d.sp ? 'sp:' : 'row:') + d.key; if (!seen.has(id)) { seen.add(id); tags.push(d); } };
   for (const el of document.querySelectorAll('#filters details.decor-group, #filters li[data-fkey], #filters li[data-species]')) {
     if (el.matches('details.decor-group')) {
       const input = el.querySelector(':scope > summary .subgrp-check');
@@ -1022,6 +1036,20 @@ function collectActiveTags() {
   for (const [key, p] of S.locates || []) {
     push({ locate: true, key, label: p.label || refKindLabel(p.kind || 'position'), hex: p.hex || 'var(--accent)', kind: p.kind || 'position' });
   }
+  // Tracés de LOT (pins.js S.campTraces — camps mode E + skins de coffre de la
+  // recherche) : chaque tracé actif est une
+  // tag de légende comme les couches/les pins — libellé = celui de la référence
+  // qui l'a tracé (repli : mot de kind localisé), teinte = celle du lot (portée
+  // dans t.hex), kind de tag = le refKind STOCKÉ par le poseur (camp / chest
+  // pour les skins de coffre de la recherche — jamais re-déduit de la clé).
+  // TOUS listés, y compris ceux d'une AUTRE carte (état global, survit à la
+  // bascule — sans tag ici un tracé cross-carte deviendrait irretirable ; même
+  // parité que les pins locate). Retrait : buildTagEl route la tag/le ✕ vers
+  // removeCampTrace (alias dot-off §2.5).
+  for (const [key, t] of S.campTraces || []) {
+    const rk = t.refKind || 'camp';
+    push({ campTrace: true, key, label: t.label || refKindLabel(rk), hex: t.hex || 'var(--accent)', kind: rk });
+  }
   return tags;
 }
 /* Une tag = un <button> plein : pastille (couleur de couche, demi-teinte si
@@ -1064,6 +1092,10 @@ function buildTagEl(d) {
     // retire le pin (removeLocatePin notifie → cette légende et les
     // pastilles L des fiches se republient seules via onLocatesChange).
     if (d.locate) { removeLocatePin(d.key); return; }
+    // Tag de TRACÉ de camp (mode E) : même geste sans case d'arbre — le clic
+    // retire le tracé (removeCampTrace notifie → légende + pastille `[Camp(●)]`
+    // du ref d'origine se republient via onCampTracesChange).
+    if (d.campTrace) { removeCampTrace(d.key); return; }
     const input = activeTagInput(d);
     if (input) {
       input.checked = false;
@@ -1522,4 +1554,4 @@ $('#panel-toggle').addEventListener('click', () => {
   setTimeout(() => map.invalidateSize(), 280);
 });
 
-export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode };
+export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, syncEntityRefDots };

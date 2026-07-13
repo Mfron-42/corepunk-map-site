@@ -296,6 +296,11 @@ export default {
       // l'autre n'est un spawn dans le monde, donc jamais de position/zone.
       goalGivenByLabel: 'donné par',
       goalCraftLabel: 'à fabriquer',
+      // Libellé de la réf « zone de recherche estimée » d'un objectif
+      // (dynamicPosBadge) : la zone dessinable est un meilleur-effort, jamais
+      // un spawn confirmé — la réf porte toujours ce libellé explicite (ou le
+      // vrai nom de région quand la zone EN est une), jamais un tag vide.
+      goalSearchZoneLabel: 'Zone estimée',
       // Mécanisme receive_reward (passe décodage mécanisme, job A) : l'item
       // est obtenu en terminant une AUTRE quête ( reward_of), pas remis
       // par le donneur de cette quête-ci — verbe seul, un span de quête

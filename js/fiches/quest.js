@@ -285,8 +285,12 @@ function openQuestFiche(slug) {
   // d'honnêteté dynamicPosBadge (zone de recherche / non localisé). REMPLACE
   // l'ex-gotoBtn/crossMapBtn — l'affordance carte est désormais TOUJOURS une
   // pastille ratifiée, jamais un bouton « Carte » séparé.
+  // Acteur ITEM (classe A) : sa clé catalogue voyage jusqu'à dynamicPosBadge
+  // — un item commun à canaux d'obtention réels (vendu/craftable/loot) y
+  // troque la zone de proximité devinée contre ses puces d'obtention ; les
+  // autres kinds gardent la zone (désormais toujours libellée) / unlocated.
   const actorPosRef = a => a.x == null
-    ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
+    ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint, a.kind === 'item' ? a.key || null : null)
     : (a.map && a.map !== S.map)
       ? ref({ kind: 'position', pos: { x: null, z: null, map: a.map }, label: mapName(a.map) })
       : ref({ kind: 'position', pos: { x: a.x, z: a.z }, label: '', subrole: a.kind === 'npc' ? 'npc' : null });

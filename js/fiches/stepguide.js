@@ -35,7 +35,12 @@ import { regionFicheExists } from './zone.js';
      data-subrole "goal-zone", key = index dans currentGoalZones). Une zone
      confiance MOYENNE n'est qu'une proximité, jamais une preuve de spawn : sa
      confiance plus faible passe en info-bulle (extra), jamais en libellé plus
-     affirmatif que la confiance haute.
+     affirmatif que la confiance haute. La réf porte TOUJOURS un libellé
+     (sz.region réelle, sinon « Zone estimée ») — jamais un [Région] vide.
+     EXCEPTION item-catalogue (`itemKey`, audit 2026-07-13 classe A) : quand
+     l'item visé a de VRAIS canaux d'obtention au catalogue (vendu/craftable/
+     loot), la zone de proximité ne prouve rien de plus → aucune zone dessinée,
+     les puces d'obtention (mêmes bits que questItemRow) prennent sa place.
      (EXCEPTION Q7 : ces refs goal-zone ne sont PAS des pins locate togglables —
      leur machinerie est single-slot, effacée à la fermeture de fiche, et leur
      clé n'est qu'un index ré-attribué à chaque openQuestFiche ; sidebar.js/
@@ -46,13 +51,39 @@ import { regionFicheExists } from './zone.js';
      (spawn dynamique/serveur, aucun point fixe) ; la région du journal, quand
      elle existe, l'accompagne en rappel muet d'orientation (.pos-region),
      jamais une affirmation dessinable. */
-function dynamicPosBadge(t, regionHint) {
+function dynamicPosBadge(t, regionHint, itemKey) {
   const sz = t && t.search_zone;
   if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
+    // Item COMMUN du catalogue avec de vrais canaux d'obtention (vendu /
+    // craftable / loot — les MÊMES puces que questItemRow) : la search_zone
+    // n'est qu'une PROXIMITÉ (le cluster de points de spawn de quête le plus
+    // proche du donneur — le pipeline la marque `basis:"proximity"`), jamais
+    // une preuve que CET item y apparaisse. On ne dessine plus de zone : les
+    // canaux catalogue disent honnêtement COMMENT l'obtenir, et le nom d'item
+    // souligné juste au-dessus mène à sa fiche où tous les canaux vivent
+    // déjà. `.goal-target-rel-verb` : le même registre visuel muet que les
+    // autres verbes de relation (« craft it », « given by ») — l'obtention
+    // EST la relation de ce but.
+    const cat = itemKey ? S.items[itemKey] : null;
+    const obtainBits = [];
+    if (cat) {
+      if (cat.soldBy?.length) obtainBits.push(tr('soldTag'));
+      if (cat.recipes?.length) obtainBits.push(tr('craftableTag'));
+      if (cat.drops?.length) obtainBits.push(tr('lootTag'));
+    }
+    if (obtainBits.length) {
+      return `<span class="goal-target-rel-verb">${esc(obtainBits.join(' · '))}</span>`;
+    }
     const zi = currentGoalZones.push(sz) - 1;
     const isEstimate = sz.confidence === 'medium';
     const areaBadge = badge({ axis: 'precision', value: 'area', extra: isEstimate ? tr('stateUnknownTitle') : null });
-    return `${areaBadge}${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false })}`;
+    // Libellé de la réf zone : JAMAIS vide (un `[Région]` sans nom se lit
+    // comme une référence cassée). Le nom de RÉGION réel quand la zone en est
+    // une (sz.region — repli région du pipeline), sinon le libellé honnête
+    // « Zone estimée » (goalSearchZoneLabel, ×5 locales) — le nom interne du
+    // camp source n'est jamais montré tel quel.
+    const zLabel = sz.region || tr('goalSearchZoneLabel');
+    return `${areaBadge}${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false, label: zLabel })}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
     return badge({ axis: 'precision', value: 'unlocated' });
@@ -160,8 +191,15 @@ function questItemRow(qi, regionHint) {
   // est ABANDONNÉ. L'item lui-même reste sans pastille (mode N, rien à dessiner) ;
   // sa position de placement vit dans cette pastille locate, jamais un bouton
   // « [Item] … at [bouton position] » verbeux. Zone de recherche → dynamicPosBadge.
+  // Zone de recherche du tiroir (classe A) : quand la ligne affiche DÉJÀ ses
+  // puces d'obtention (`bits` ci-dessus), une zone de proximité n'ajoute rien
+  // — aucune répétition. Sinon la clé voyage jusqu'à dynamicPosBadge : un item
+  // à canaux catalogue (même traité comme objet de quête PAR cette quête) y
+  // troque la zone devinée contre ses puces d'obtention réelles.
   const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
-    ? (qi.x != null ? ref({ kind: 'position', pos: { x: qi.x, z: qi.z }, label: '' }) : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint))
+    ? (qi.x != null ? ref({ kind: 'position', pos: { x: qi.x, z: qi.z }, label: '' })
+      : bits.length ? ''
+        : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint, qi.key || null))
     : '';
   return `<div class="frow">
     ${iconTag(icon, 'fr-icon', itemGlyph(cat))}
@@ -356,7 +394,10 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   const posRow = `<div class="goal-target-row goal-target-row-pos">${
     t.x != null ? ref({ kind: 'position', pos: { x: posX, z: posZ }, label: '', subrole: posCat || null })
       : t.map ? ref({ kind: 'position', pos: { x: null, z: null, map: t.map }, label: mapName(t.map) })
-        : dynamicPosBadge(t, regionHint)
+        // Cible ITEM : la clé catalogue voyage jusqu'à dynamicPosBadge pour
+        // sa règle item-commun-avec-canaux (classe A) — les autres kinds
+        // gardent le rendu zone/unlocated inchangé.
+        : dynamicPosBadge(t, regionHint, t.kind === 'item' ? t.key : null)
   }</div>`;
 
   if (t.kind === 'item') {
@@ -538,12 +579,20 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // aircraft) est une référence [Objet] — pastille locate quand son
     // placement qao est byte-joint (le retour « activable n'est plus
     // cliquable »), tag+libellé nus sinon (honnête : rien à viser).
+    // OBJET DE MONDE à clé HORS catalogue (audit 2026-07-13 classe C) : les
+    // clés QuestActiveObject sont sorties du catalogue d'items (« [Item] Qao
+    // Mixing Pot » était un pseudo-item de fuite de classifieur) — quand la
+    // cible porte une telle clé ET son propre nom (t.label, « Mixing Pot »),
+    // l'étape use_object rend l'OBJET lui-même sous son nom, jamais la phrase
+    // d'objectif répétée. Les cibles SANS clé gardent la phrase (t.label y est
+    // souvent un jeton d'éditeur brut — « soplo », « Pod Active »).
     if (!itemRow) {
       const canPing = t.x != null;
       posInRef = canPing;
+      const worldObjName = (t.key && !S.items[t.key] && t.label) ? cleanLabel(t.label) : null;
       itemRow = `<div class="goal-target-row goal-target-item">
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
-        ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: label || '' })}
+        ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: worldObjName || label || '' })}
       </div>`;
     }
     // Position restante : l'item ramassé porte son « trouvé à » en ligne
@@ -651,6 +700,21 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // re-dérivée par surface (même discipline que le résolveur de points).
     const spId = mk ? S.monsters[mk]?.species : null;
     const spPts = spId ? speciesPoints(spId) : null;
+    // Identité FAUNE byte-prouvée (audit 2026-07-13 classe B) : quand le pool
+    // d'unités lié résout EXACTEMENT UNE espèce de faune du registre
+    // (t.wildlife_species, jointure exacte par clé d'unité — jamais un match
+    // de nom deviné) et qu'aucune espèce du bestiaire combat (mk) ne résout,
+    // la référence porte cette ESPÈCE : nom du registre (« Leaf Dragon » —
+    // le pipeline l'expédie aussi dans t.label), souligné → fiche faune
+    // (routeur species de main.js), pastille ⇔ points réels (speciesPoints
+    // résout aussi les ids faune). Plusieurs espèces → le pli famille honnête
+    // reste (jamais une espèce nommée à la place du groupe). Chargement
+    // différé : S.wildlifeSpecies absent → repli texte simple inchangé, se
+    // répare seul au re-rendu (même garde jamais-de-lien-deviné que mk).
+    const wspId = (!isFamilyScope && !mk && (t.wildlife_species || []).length === 1)
+      ? t.wildlife_species[0] : null;
+    const wsp = wspId ? S.wildlifeSpecies?.[wspId] : null;
+    const wspPts = wsp ? speciesPoints(wspId) : null;
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
     // byte-attached -- see 's drops_quest_loot join on BOTH mechs):
     // `target.drop_chance` (0-100, byte-exact from SetQuestLootDirect, NOT
@@ -696,7 +760,20 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
           drawn: !!(spId && S.monsp[spId]?.on),
           meta: metaParts(spPts ? spPts.nPts : null),
         })
-        : (nameLbl ? ref({ kind: 'species', label: nameLbl, hex: MONSTER_HEX, hasFiche: false, drawable: false, meta: metaParts(null) }) : '');
+        : wsp
+          // Espèce de FAUNE résolue (classe B) : même vocabulaire [Espèce ●]
+          // que mk — teinte de SA couche (speciesLayerHex sur l'id d'espèce),
+          // nom souligné → fiche faune, pastille ⇔ points réels (0 camp joint
+          // → tag+nom seuls, honnête, ex. Leaf Dragon).
+          ? ref({
+            kind: 'species', key: wspId, label: wsp.name || nameLbl,
+            hex: speciesLayerHex(wspId),
+            hasFiche: true,
+            drawable: !!wspPts, count: wspPts ? wspPts.nPts : 0,
+            drawn: !!S.monsp[wspId]?.on,
+            meta: metaParts(wspPts ? wspPts.nPts : null),
+          })
+          : (nameLbl ? ref({ kind: 'species', label: nameLbl, hex: MONSTER_HEX, hasFiche: false, drawable: false, meta: metaParts(null) }) : '');
     const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
     // Relation EXPLICITE seulement quand un item de quête est réellement
     // rattaché (le point central de cette passe) : "dropped by <monstre>".
@@ -744,7 +821,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // couche a réellement des points » lu au résolveur unique — spPts pour
     // l'espèce, familyPoints par jeton pour la famille — strictement la même
     // condition que rendaient spawnBtn/familyBtn.)
-    const hasLayerResolution = !!spPts
+    const hasLayerResolution = !!spPts || !!wspPts
       || (isFamilyScope && famTokens.some(f => !!familyPoints(f)));
     // « Où » TYPÉ explicitement (blueprint §2.2.4/§2.3 : « chaque localisation
     // non-exacte est typée, jamais un faux pin »). Un monstre n'a jamais de pin
