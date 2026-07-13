@@ -18,7 +18,7 @@ import {
 import { esc, fmtCoord, iconTag, initials, npcIconUrl, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor, locationIndexForId } from './data.js';
-import { visibleQuestSlugs } from './devcontent.js';
+import { visibleQuestSlugsSplit } from './devcontent.js';
 import { ref } from './mapref.js';
 
 /* ── Popups ─────────────────────────────────────────────────── */
@@ -62,9 +62,11 @@ function popupHtml(cat, r, id) {
     }
   }
 
-  // « N quêtes » : seulement les quêtes RÉELLEMENT visibles (jamais un
-  // dialogue-bark hello_*/info_* masqué par défaut, voir devcontent.js).
-  const npcQuests = cat === 'npc' ? visibleQuestSlugs(r.quests) : null;
+  // « N quêtes » : seulement les VRAIES quêtes visibles — jamais un
+  // dialogue-bark hello_*/info_*, même révélé par le contenu dev (le compte
+  // resterait mensonger) : partition partagée devcontent.js::
+  // visibleQuestSlugsSplit, même règle que la fiche PNJ.
+  const npcQuests = cat === 'npc' ? visibleQuestSlugsSplit(r.quests).real : null;
 
   // Titre : nom d'affichage localisé pour un coffre (vrai nom officiel
   // r.displayName sinon chestDisplayName — le nom brut est un jeton d'asset

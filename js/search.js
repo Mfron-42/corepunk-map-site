@@ -321,8 +321,13 @@ function buildSearch() {
   // « Contenu dev » (main.js buildDevToggle) n'a pas été cliqué.
   S.data.quest.forEach(q => {
     if (isHiddenTest(q)) return;
+    // Quête test/interne révélée (S.devOn) : marquée dans le sous-libellé —
+    // même parité « Test » que les items/recettes/espèces ci-dessous, jamais
+    // un bark/déclencheur révélé rendu indistinguable d'une vraie quête.
+    const qDevSub = (q.isTest || q.isInternal) ? tr('devBadge') : null;
+    const qSub = [qDevSub, q.x == null ? tr('questNoPos') : null].filter(Boolean).join(' · ') || null;
     push(q.name, 'quest', entityColor('quest', null), q.x, q.z, () => openQuestFiche(q.slug),
-      null, q.x == null ? tr('questNoPos') : null, null, 0, questSearchBody(q), { map: q.map, ref: q.slug, pinCat: 'quest' });
+      null, qSub, null, 0, questSearchBody(q), { map: q.map, ref: q.slug, pinCat: 'quest' });
   });
   S.data.qao.forEach(r => { if (!isHiddenTest(r)) push(r.name, 'qao', entityColor('qao', null), r.x, r.z, null, null, null, null, 0, null, { pinCat: 'qao' }); });
   S.data.workshop.forEach(r => push(r.name, 'workshop', entityColor('workshop', null), r.x, r.z, null, null, null, null, 0, null, { pinCat: 'workshop' }));
@@ -476,8 +481,11 @@ function buildCrossMapSearch() {
     // — même suffixe texte localisé que campSearchLabel ci-dessous.
     const label = (e.cat === 'camp' && e.qualifier)
       ? `${e.label} — ${campQualifierLabel(e.qualifier)}` : e.label;
+    // Même parité de marquage dev que l'index riche ci-dessus (une entrée
+    // test/bark révélée reste typée « Test », jamais anonyme).
+    const crossDevSub = e.isTest ? tr('devBadge') : null;
     pushSearchEntry(label, e.cat, hex, e.x ?? null, e.z ?? null,
-      () => crossMapOpen(e), null, null, null, 0, body, { map: e.map, ref: e.ref });
+      () => crossMapOpen(e), null, crossDevSub, null, 0, body, { map: e.map, ref: e.ref });
   }
 }
 
@@ -487,7 +495,15 @@ function buildCrossMapSearch() {
 function crossMapOpen(e) {
   if (e.cat === 'quest' && e.ref && S.quests.has(e.ref)) openQuestFiche(e.ref);
   else if (e.cat === 'npc') {
-    const i = S.data.npc.findIndex(n => n.name === e.label);
+    // Jointure par nom durcie (fix nom canonique des PNJ fusionnés) : l'égalité
+    // stricte d'abord, puis le MÊME repli plié que npcIndexByName — une entrée
+    // d'index dont le libellé diverge typographiquement du pin (apostrophe,
+    // espace final…) ouvre quand même la bonne fiche au lieu d'un clic mort.
+    let i = S.data.npc.findIndex(n => n.name === e.label);
+    if (i < 0) {
+      const f = fold(e.label);
+      i = f ? S.data.npc.findIndex(n => fold(n.name) === f) : -1;
+    }
     if (i >= 0) openNpcFiche(i);
   }
 }

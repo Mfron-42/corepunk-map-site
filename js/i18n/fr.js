@@ -345,6 +345,10 @@ export default {
       dialogueFicheKind: 'Dialogue PNJ',
       dialogueHeading: 'Dialogue PNJ (pas une quête)',
       dialogueNote: 'Répliques d’ambiance dites par ce personnage — ce n’est pas une quête avec objectifs ni récompenses.',
+      interactionFicheKind: 'Interaction PNJ',
+      interactionHeading: 'Interaction — pas une quête à objectifs',
+      interactionNote: 'Ce personnage propose un service par dialogue (les données du jeu ne définissent aucun objectif pour cette entrée).',
+      devBarksGivenN: n => `Dialogues révélés — contenu dev (${n})`,
       // Le journal s'affiche désormais en simple paragraphe de présentation
       // juste sous le titre (refonte layout, juillet 2026) — plus de titre de
       // section (même choix que la description d'objet, voir descHtml).

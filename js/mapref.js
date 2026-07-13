@@ -93,7 +93,13 @@ const ct = k => tbl('cat', k);              // NPCs/Workshops/… (catégorie, p
    peut toujours forcer la teinte précise via desc.hex (espèce/famille/rareté). */
 const KINDS = {
   // ── Dessinable + fiche (triple capacité) ──
-  species:      { word: (d, pl) => pl ? ck('monsters') : sc('monster'), fiche: true, mode: 'E' },
+  // Espèce de FAUNE (subrole 'wildlife', registre S.wildlifeSpecies) : même
+  // machinerie que le bestiaire (couche S.monsp, fiche faune routée par la
+  // même case species de main.js) mais le MOT dit le kind réel — « Wildlife »
+  // (campKind.wildlife, ×5 locales, le même mot que la couche/le pool) —
+  // jamais « Monster » pour un animal paisible (retour owner 2026-07-13,
+  // Leaf Dragon). Aucun mot neuf : la table campKind existante.
+  species:      { word: (d, pl) => d.subrole === 'wildlife' ? ck('wildlife') : (pl ? ck('monsters') : sc('monster')), fiche: true, mode: 'E' },
   family:       { word: () => sc('family'),                             fiche: true, mode: 'E' },
   camp:         { word: () => sc('camp'),                               fiche: true, mode: 'E' },
   npc:          { word: (d, pl) => pl ? ct('npc') : sc('npc'),          fiche: true, mode: 'E' },
@@ -123,6 +129,9 @@ const KINDS = {
   wildlife:     { word: () => ck('wildlife'),                           fiche: false, mode: 'C' },
   node:         { word: () => sc('node'),                               fiche: true, mode: 'N' },
   // ── Fiche seule (tag + libellé souligné, PAS de pastille) ──
+  // item/quest_item/recipe : mode N par défaut (catalogue sans position) MAIS
+  // promus mode L par refMode quand un placement monde (desc.pos) est fourni —
+  // ratification 2026-07-13, voir refMode/POS_PROMOTED_KINDS.
   item:         { word: () => sc('item'),                               fiche: true, mode: 'N' },
   quest_item:   { word: () => tr('questItemBadge'),                     fiche: true, mode: 'N' },
   recipe:       { word: () => sc('recipe'),                             fiche: true, mode: 'N' },
@@ -151,9 +160,22 @@ const KINDS = {
 };
 
 /* Mode de tracé effectif (surcharge desc.mode possible, sinon défaut du kind,
-   sinon 'N' = jamais dessinable). */
+   sinon 'N' = jamais dessinable).
+   RATIFIÉ 2026-07-13 (spec §9, « [Kind(●)] Nom » universel) : un ITEM (item /
+   quest_item / recipe) dont l'appelant fournit un PLACEMENT MONDE réel
+   (pos.x/z finis — contrat de quête au sol, objet de quête placé) porte sa
+   pastille locate LUI-MÊME (mode L, même machinerie Q7 que npc/quête) — le
+   composant promeut le mode ici pour que PLUS AUCUN site d'appel ne puisse
+   régresser vers « [Item] Nom + [Position(●)] séparé » (la forme verbeuse
+   tuée par cette ratification). Un item catalogue SANS pos reste mode N
+   (rien à dessiner) ; desc.mode explicite garde la priorité. */
+const POS_PROMOTED_KINDS = new Set(['item', 'quest_item', 'recipe']);
 function refMode(desc) {
-  return desc.mode || (KINDS[desc.kind] && KINDS[desc.kind].mode) || 'N';
+  if (desc.mode) return desc.mode;
+  const dflt = (KINDS[desc.kind] && KINDS[desc.kind].mode) || 'N';
+  if (dflt === 'N' && POS_PROMOTED_KINDS.has(desc.kind)
+      && desc.pos && Number.isFinite(+desc.pos.x) && Number.isFinite(+desc.pos.z)) return 'L';
+  return dflt;
 }
 
 /* Mot de kind localisé — helper EXPORTÉ (les vagues 1-6 le réutilisent pour

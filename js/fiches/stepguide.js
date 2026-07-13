@@ -163,13 +163,17 @@ function questItemRow(qi, regionHint) {
   // lien fr-label deviennent UNE référence `[Quest Item]`/`[Item]`/`[Recipe]`
   // (le tag EST le badge — même vocabulaire que goalTargetItemRow). Teinte
   // itemEcHex (rareté/recette) sauf objet de quête (teinte qao par défaut du
-  // kind) ; souligné ⇔ résout au catalogue ; pas de pastille (un item n'a rien
-  // à dessiner, le placement éventuel vit dans posBit à côté).
+  // kind) ; souligné ⇔ résout au catalogue.
+  // RATIFIÉ 2026-07-13 : le placement monde connu (qi.x) vit SUR ce chip —
+  // `[Quest Item(●)] Nom` (pos → mode L promu par mapref.js, pastille = pin
+  // locate Q7, le MÊME point que l'ex-`[Position(●)]` séparé, désormais mort).
+  // craft:true garde sa garde jamais-de-position (voir craftBit ci-dessous).
   const kind = qi.isQuestItem ? 'quest_item' : (cat && isRecipeKind(cat) ? 'recipe' : 'item');
   const itemRef = ref({
     kind, key: qi.key || null, label: name,
     hex: cat && kind !== 'quest_item' ? itemEcHex(cat) : null,
     hasFiche: !!cat,
+    pos: (!qi.craft && qi.x != null) ? { x: qi.x, z: qi.z } : undefined,
   });
   // craft:true ('s craft-only pre-check, propagated onto this exact
   // item row by  -- e.g. no_witnesses_to_glory's "Savory
@@ -186,20 +190,16 @@ function questItemRow(qi, regionHint) {
   const givenByBit = qi.givenBy
     ? `<span class="muted">${esc(tr('goalGivenByLabel'))}</span> ${npcRef(qi.givenBy)}`
     : '';
-  // EntityRef (E'c-3) : position fixe = pastille LOCATE ratifiée `[Position(●)]`
-  // (même forme que goalTargetChip's posRow) — l'ex-bouton carte (gotoBtn) séparé
-  // est ABANDONNÉ. L'item lui-même reste sans pastille (mode N, rien à dessiner) ;
-  // sa position de placement vit dans cette pastille locate, jamais un bouton
-  // « [Item] … at [bouton position] » verbeux. Zone de recherche → dynamicPosBadge.
+  // Position fixe : FONDUE dans le chip d'item ci-dessus (ratification
+  // 2026-07-13 — l'ex-`[Position(●)]` nu adjacent est mort, l'entité porte sa
+  // propre pastille). Ne reste ici que la zone de recherche → dynamicPosBadge.
   // Zone de recherche du tiroir (classe A) : quand la ligne affiche DÉJÀ ses
   // puces d'obtention (`bits` ci-dessus), une zone de proximité n'ajoute rien
   // — aucune répétition. Sinon la clé voyage jusqu'à dynamicPosBadge : un item
   // à canaux catalogue (même traité comme objet de quête PAR cette quête) y
   // troque la zone devinée contre ses puces d'obtention réelles.
-  const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
-    ? (qi.x != null ? ref({ kind: 'position', pos: { x: qi.x, z: qi.z }, label: '' })
-      : bits.length ? ''
-        : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint, qi.key || null))
+  const posBit = (!qi.craft && qi.x == null && qi.searchZone && !bits.length)
+    ? dynamicPosBadge({ search_zone: qi.searchZone }, regionHint, qi.key || null)
     : '';
   return `<div class="frow">
     ${iconTag(icon, 'fr-icon', itemGlyph(cat))}
@@ -256,7 +256,14 @@ const ACTIVABLE_GLYPH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
    quand elle n'apparaît pas dans q.items pour une raison quelconque. Repli
    sur le kind catalogue seulement en dernier recours (item attaché à un
    monstre/objet, jamais listé nulle part ailleurs). */
-function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
+/* `pos` ({x,z}, optionnel — ratification 2026-07-13) : le PLACEMENT MONDE de
+   l'item porté par SON chip — `[Quest Item(●)] Nom`, pastille = pin locate Q7
+   (mode L promu par mapref.js). Remplace les deux formes verbeuses mortes :
+   l'extraBadge `[Position(●)]` inline (ex-itemFoundAt) et la ligne de position
+   séparée sous la ligne d'identité. L'appelant ne fournit `pos` que quand la
+   position est RÉELLE (byte-jointe) et qu'aucune autre réf ne porte déjà ce
+   pin (une seule affordance carte par cible). */
+function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint, pos) {
   const it = key ? S.items[key] : null;
   const base = it?.name || fallbackLabel;
   if (!base) return '';
@@ -286,6 +293,7 @@ function goalTargetItemRow(key, fallbackLabel, approx, extraBadge, hint) {
     hex: it && kind !== 'quest_item' ? itemEcHex(it) : null,
     hasFiche: !!it,
     meta: approx ? '≈' : null,
+    pos: pos || undefined,
   });
   return `<div class="goal-target-row goal-target-item">${iconTag(icon, 'goal-target-item-icon', itemGlyph(it))}${itemRef}${extraBadge || ''}</div>`;
 }
@@ -391,6 +399,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // d'objectif affichée juste au-dessus (retour QA ×2 : duplication visible).
   // La bascule cross-carte garde son libellé (le nom de la carte cible est
   // une information, pas une répétition).
+  // RATIFIÉ 2026-07-13 : `posRow` n'est plus JAMAIS rendu à côté d'un chip
+  // d'entité qui pourrait porter la pastille (item/PNJ/qao… → la position vit
+  // SUR le chip) — chaque branche ne le garde que comme SEUL « où » (cible
+  // dynamic, ligne sans chip d'identité) ou pour ses replis d'honnêteté
+  // (dynamicPosBadge). Le harnais 
+  // verrouille cet invariant sur toutes les fiches rendues.
   const posRow = `<div class="goal-target-row goal-target-row-pos">${
     t.x != null ? ref({ kind: 'position', pos: { x: posX, z: posZ }, label: '', subrole: posCat || null })
       : t.map ? ref({ kind: 'position', pos: { x: null, z: null, map: t.map }, label: mapName(t.map) })
@@ -406,8 +420,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // DÉJÀ nettoyée et affichée juste au-dessus -- JAMAIS t.label brut, dont
     // l'audit montre qu'il porte souvent le verbe ou un libellé de slot
     // interne non nettoyé, ex. "Quest item removed start quest troll head",
-    // quand aucun `key` catalogue ne résout) + sa position à 3 niveaux.
-    const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem) || '';
+    // quand aucun `key` catalogue ne résout) + sa position.
     // receive_reward (mechanism) whose single-quest-caller shape resolved a
     // bare item identity (no quest_refs available -- see 's
     // _resolve_target_mech, the theoretical fallback of that branch): still
@@ -415,13 +428,22 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // kind, so the same cross-quest relation wording as the npc branch below
     // applies here too -- see rewardOfRelRow's own doc.
     const itemReward = rewardOfRelRow(t);
+    // RATIFIÉ 2026-07-13 : la position fixe de la cible vit SUR le chip d'item
+    // (`[Quest Item(●)] Nom`, pin locate Q7 — le MÊME point que l'ex-ligne
+    // `[Position(●)]` séparée, morte). Une seule affordance carte par cible :
+    // quand la réf `[Quête(●)]` de reward_of porte déjà le pin (pinnable),
+    // l'item n'en reçoit pas un second.
+    const itemPos = (t.x != null && !itemReward.pinnable) ? { x: posX, z: posZ } : null;
+    const itemRow = goalTargetItemRow(t.key, label, t.approx, '', t.isQuestItem, itemPos) || '';
+    // `posRow` ne survit que comme SEUL « où » : aucune ligne d'identité à qui
+    // donner la pastille (itemRow vide) ou aucune position fixe fondue (repli
+    // cross-carte / zone / non-localisé, jamais un [Position(●)] nu adjacent).
+    const soleWhere = (itemRow && itemPos) ? '' : posRow;
     if (itemReward.html) {
       // La réf `[Quête(●)]` épingle le donneur de la quête source (mode L) quand
-      // il est connu : elle EST la position de l'objectif. Un `[Position(●)]` nu
-      // à côté doublerait la même pastille (intention owner) — on le supprime
-      // dès que la réf porte ce pin ; on ne garde `posRow` que comme SEUL « où »
-      // quand aucune source ne résout de position.
-      return `<div class="goal-target">${itemRow}${itemReward.html}${itemReward.pinnable ? '' : posRow}</div>`;
+      // il est connu : elle EST la position de l'objectif — rien d'autre à
+      // garder. Sinon le « où » restant (chip d'item pinné, ou seul-où honnête).
+      return `<div class="goal-target">${itemRow}${itemReward.html}${itemReward.pinnable ? '' : soleWhere}</div>`;
     }
     // craft:true ('s craft-only pre-check, e.g. construction_lesson's
     // "Recipe: Immuno-Stimulating Implant"): items.json proves this item is
@@ -438,7 +460,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       const craftRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalCraftLabel'))}</span></div>`;
       return `<div class="goal-target">${itemRow}${craftRow}</div>`;
     }
-    return `<div class="goal-target">${itemRow}${posRow}</div>`;
+    return `<div class="goal-target">${itemRow}${soleWhere}</div>`;
   }
 
   if (t.kind === 'object') {
@@ -496,12 +518,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // secondaire léger, JAMAIS une seconde entrée « Objet … à <position> »
     // co-égale (le double-listage exact que l'owner a signalé, ex. Souvenir
     // Sword). La position éventuelle de l'objet devient le « trouvé à » de
-    // l'ITEM : une pastille [Position ●] locate posée EN LIGNE avec son identité
-    // (extraBadge de goalTargetItemRow — même idiome que questItemRow, où le
-    // placement d'un item vit dans une pastille adjacente, jamais une entité
-    // distincte). Sans item ramassé (use_object pur, ex. l'aéronef « soplo » :
-    // t.item_key absent) l'objet RESTE la cible `[Qao(●)]` (repli activable plus
-    // bas) — inchangé.
+    // l'ITEM : portée par SON chip — `[Quest Item(●)] Nom` (pos de
+    // goalTargetItemRow, mode L promu par mapref.js — même idiome que
+    // questItemRow, ratification 2026-07-13 : la pastille vit SUR l'entité,
+    // jamais un `[Position(●)]` adjacent). Sans item ramassé (use_object pur,
+    // ex. l'aéronef « soplo » : t.item_key absent) l'objet RESTE la cible
+    // `[Qao(●)]` (repli activable plus bas) — inchangé.
     //
     // DISCRIMINATEUR HONNÊTE : l'item ne mène QUE lorsqu'il est lié au but par
     // le MÉCANISME du jeu (`item_join === "mechanism"`) — le seul join prouvé,
@@ -522,15 +544,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // « distincts » mesurés sont la MÊME entité) : aucun conteneur réel à
     // nommer, l'item seul suffit.
     const namedContainer = differing && !!t.label;
-    // « Trouvé à » de l'item : la position de l'objet réutilisée comme pastille
-    // LOCATE de l'ITEM (mode L togglable, Q7 — apparaît sous la barre de
-    // recherche, retirable, comme tout pin). Seulement quand un item est
-    // réellement ramassé ET qu'aucun conteneur nommé ne porte déjà ce pin
-    // (sinon deux pins pour le même point). Jamais fabriqué : uniquement quand
-    // t.x existe vraiment (sinon l'item se tient seul, sa fiche EST le guide).
-    const itemFoundAt = (collectsItem && !namedContainer && t.x != null)
-      ? ref({ kind: 'position', mode: 'L', pos: { x: posX, z: posZ }, label: '' })
-      : '';
+    // « Trouvé à » de l'item : la position de l'objet portée par le CHIP DE
+    // L'ITEM lui-même — `[Quest Item(●)] Nom` (ratification 2026-07-13 : la
+    // pastille locate vit SUR l'entité, l'ex-`[Position(●)]` inline est mort ;
+    // même pin Q7, togglable, listé sous la barre de recherche, retirable).
+    // Seulement quand un item est réellement ramassé ET qu'aucun conteneur
+    // nommé ne porte déjà ce pin (sinon deux pins pour le même point). Jamais
+    // fabriqué : uniquement quand t.x existe vraiment (sinon l'item se tient
+    // seul, sa fiche EST le guide).
+    const itemFoundAtPos = (collectsItem && !namedContainer && t.x != null)
+      ? { x: posX, z: posZ }
+      : null;
     // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
     // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
     // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
@@ -538,15 +562,15 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // clic d'un chip objet devra cocher la ligne de SON type (placements
     // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
     // t.label — 45), même clic-double-effet que les chips monstre.
-    // L'item MÈNE — son « trouvé à » (itemFoundAt) posé EN LIGNE (extraBadge),
+    // L'item MÈNE — son « trouvé à » (itemFoundAtPos) porté par SON chip,
     // jamais une ligne de position séparée co-égale.
-    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, itemFoundAt);
+    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, '', undefined, itemFoundAtPos);
     let relRow = '';
-    // Quand l'item porte déjà son pin (itemFoundAt) OU qu'un conteneur nommé le
-    // porte, la ligne position séparée disparaît — une seule affordance carte
+    // Quand l'item porte déjà son pin (itemFoundAtPos) OU qu'un conteneur nommé
+    // le porte, la ligne position séparée disparaît — une seule affordance carte
     // par cible, jamais deux pins pour le même point (loi d'uniformisation,
     // même logique que hasLayerResolution côté monstre).
-    let posInRef = !!itemFoundAt;
+    let posInRef = !!(itemRow && itemFoundAtPos);
     if (itemRow && namedContainer) {
       // collect_from_object avec un conteneur DISTINCT nommé : « found in
       // [Objet ●] <conteneur> » — contexte secondaire léger (verbe + nom),
@@ -565,10 +589,10 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
             <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
             ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
           </div>`;
-    } else if (itemRow && differing && !itemFoundAt) {
+    } else if (itemRow && differing && !itemFoundAtPos) {
       // Conteneur DISTINCT mais anonyme ET sans position : le verbe honnête seul
-      // (« obtenu ici ») — quand une position existe, itemFoundAt la porte déjà
-      // (le « trouvé à » de l'item) et rend ce verbe redondant, donc omis.
+      // (« obtenu ici ») — quand une position existe, le chip d'item la porte
+      // déjà (son « trouvé à ») et rend ce verbe redondant, donc omis.
       relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
@@ -715,6 +739,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       ? t.wildlife_species[0] : null;
     const wsp = wspId ? S.wildlifeSpecies?.[wspId] : null;
     const wspPts = wsp ? speciesPoints(wspId) : null;
+    // Cible FAUNE (mono OU multi-espèces, jointure byte-prouvée
+    // t.wildlife_species, jamais un match de nom) : le kind affiché est le
+    // vocabulaire faune ratifié — subrole 'wildlife' → mot « Wildlife »
+    // (mapref.js, campKind.wildlife ×5) — plus jamais `[Monster]` pour un
+    // animal paisible (retour owner 2026-07-13, Leaf Dragon).
+    const isFauna = !isFamilyScope && !mk && (t.wildlife_species || []).length >= 1;
     // kill_collect (mechanism, also plain `kill` when a quest-loot drop is
     // byte-attached -- see 's drops_quest_loot join on BOTH mechs):
     // `target.drop_chance` (0-100, byte-exact from SetQuestLootDirect, NOT
@@ -766,14 +796,19 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
           // nom souligné → fiche faune, pastille ⇔ points réels (0 camp joint
           // → tag+nom seuls, honnête, ex. Leaf Dragon).
           ? ref({
-            kind: 'species', key: wspId, label: wsp.name || nameLbl,
+            kind: 'species', subrole: 'wildlife', key: wspId, label: wsp.name || nameLbl,
             hex: speciesLayerHex(wspId),
             hasFiche: true,
             drawable: !!wspPts, count: wspPts ? wspPts.nPts : 0,
             drawn: !!S.monsp[wspId]?.on,
             meta: metaParts(wspPts ? wspPts.nPts : null),
           })
-          : (nameLbl ? ref({ kind: 'species', label: nameLbl, hex: MONSTER_HEX, hasFiche: false, drawable: false, meta: metaParts(null) }) : '');
+          // Non résolu : libellé plié honnête inchangé (« Turtles ») — mais une
+          // cible FAUNE (multi-espèces, ou registre pas encore chargé) dit son
+          // kind réel (subrole 'wildlife' → « Wildlife ») et prend la teinte de
+          // la couche « Animaux paisibles » (CAMP_COLORS.wildlife — celle du
+          // pool que son renvoi bascule), jamais l'orange bestiaire.
+          : (nameLbl ? ref({ kind: 'species', subrole: isFauna ? 'wildlife' : null, label: nameLbl, hex: isFauna ? CAMP_COLORS.wildlife : MONSTER_HEX, hasFiche: false, drawable: false, meta: metaParts(null) }) : '');
     const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx);
     // Relation EXPLICITE seulement quand un item de quête est réellement
     // rattaché (le point central de cette passe) : "dropped by <monstre>".
@@ -836,9 +871,32 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // honnête (spawn serveur, rien à dessiner ici). Le badge via-chain vit dans
     // sa PROPRE ligne `-where` (jamais `-pos` : la position reste « aucun pin
     // fixe » — l'affordance carte EST la pastille du tag, pas une seconde ligne).
+    // Cible FAUNE sans points propres (0 camp joint — assignation serveur) :
+    // le badge « Non localisé » était MALHONNÊTE PAR OMISSION — le motif
+    // ratifié (2026-07-12, fiche faune entity.js wildlifeWhereHtml) existe :
+    // l'espèce n'a pas de points isolables MAIS le pool « Animaux paisibles »
+    // (couche camp:wildlife, ~5 900 points) est dessinable. MÊME renvoi ici :
+    // la phrase de la fiche faune (wildlifePeacefulNote) + la référence-toggle
+    // de LA COUCHE des pools (mode C, fkey camp:wildlife → activateCategoryNode,
+    // main.js ; état resynchronisé par syncEntityRefDots) — jamais « ce point
+    // précis EST un Leaf Dragon ». Gardé sur l'existence réelle de points
+    // (jamais un toggle mort) et seulement quand le repli serait le badge
+    // « non localisé » (une vraie search_zone/position/carte garde son rendu,
+    // plus spécifique).
+    let faunaPoolRow = '';
+    if (isFauna && !hasLayerResolution && t.x == null && !t.map
+        && !(t.search_zone && (t.search_zone.confidence === 'high' || t.search_zone.confidence === 'medium'))
+        && S.camps?.wildlife) {
+      const rest = kindRestPoints('wildlife');
+      if (rest && rest.nPts) {
+        faunaPoolRow = `<div class="goal-target-row goal-target-row-where"><span class="goal-target-rel-verb">${esc(tr('wildlifePeacefulNote'))}</span>${
+          ref({ kind: 'wildlife', mode: 'C', fkey: 'camp:wildlife', label: tr('wildlifeRestRow'), hex: CAMP_COLORS.wildlife, drawn: !!S.camps.wildlife?.on, count: rest.nPts })
+        }</div>`;
+      }
+    }
     const monsterPosRow = hasLayerResolution
       ? `<div class="goal-target-row goal-target-row-where">${badge({ axis: 'precision', value: 'via-chain' })}</div>`
-      : posRow;
+      : (faunaPoolRow || posRow);
     return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}</div>`;
   }
 
@@ -857,7 +915,6 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // are the giver's own position when known (see 's `given["x"]`),
     // never a fabricated one.
     if (t.given_by_giver) {
-      const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
       // receive_reward (mechanism) whose reward_of names a quest OTHER than
       // the one currently open: "obtained by completing <that quest>" wins
       // over the plain given-by wording below -- t.label here is merely
@@ -872,10 +929,17 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       const reward = rewardOfRelRow(t);
       if (reward.html) {
         // Même dédup que la branche item : la réf `[Quête(●)]` épingle le donneur
-        // de la quête source ; quand elle porte ce pin, le `[Position(●)]` séparé
-        // ferait doublon → supprimé. Sinon `posRow` reste le seul « où ».
-        return `<div class="goal-target">${itemRow}${reward.html}${reward.pinnable ? '' : posRow}</div>`;
+        // de la quête source ; quand elle porte ce pin, aucune autre pastille.
+        // Sinon (ratification 2026-07-13) la position du PNJ remetteur (t.x —
+        // là où l'item s'obtient) vit SUR le chip d'item (`[Quest Item(●)]`),
+        // plus jamais un `[Position(●)]` nu adjacent ; `posRow` ne reste que
+        // comme SEUL « où » (pas de chip, ou pas de position fixe).
+        const handPos = (t.x != null && !reward.pinnable) ? { x: posX, z: posZ } : null;
+        const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx, '', undefined, handPos) || '';
+        const soleWhere = (itemRow && handPos) ? '' : posRow;
+        return `<div class="goal-target">${itemRow}${reward.html}${reward.pinnable ? '' : soleWhere}</div>`;
       }
+      const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
       // EntityRef (vague 1) : le donneur est une référence [PNJ ●] — nom
       // souligné ⇔ le PNJ résout sur la carte active (jamais un lien
       // deviné), pastille locate ⇔ une position est connue (elle remplace la
@@ -907,17 +971,26 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // la carte active (mêmes gardes/sources qu'avant, voir le commentaire
     // ci-dessus), pastille locate ⇔ une position existe (pin réel corrigé en
     // tête de fonction — posX/posZ/posCat) ; elle absorbe la ligne « Carte »
-    // séparée. Sans position : tag+nom sans pastille, et posRow garde ses
-    // replis honnêtes (bascule cross-carte / position dynamique).
+    // séparée. PNJ sur une AUTRE carte sans coordonnée locale (t.map seul,
+    // ex. le Fantôme de l'Île-prison) : ratification 2026-07-13 — la bascule
+    // de carte vit SUR le chip PNJ lui-même (pastille mode L à pos.x nul →
+    // switchMap, main.js ; nom de la carte en méta — même idiome que les
+    // acteurs cross-carte), plus jamais un `[Position(●)] <carte>` adjacent.
+    // Sans rien : tag+nom sans pastille, et posRow garde son repli honnête
+    // (position dynamique).
     const ni = npcName ? npcIndexByName(npcName) : -1;
     const canPing = t.x != null;
+    const crossMap = !canPing && !!t.map;
     const npcRef = npcName ? ref({
       kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: cleanLabel(npcName),
-      hasFiche: ni >= 0, mode: 'L', drawable: canPing,
-      pos: canPing ? { x: posX, z: posZ } : undefined, subrole: posCat || null,
+      hasFiche: ni >= 0, mode: 'L', drawable: canPing || crossMap,
+      pos: canPing ? { x: posX, z: posZ }
+        : crossMap ? { x: null, z: null, map: t.map } : undefined,
+      subrole: posCat || null,
+      meta: crossMap ? `· ${mapName(t.map)}` : null,
     }) : '';
     const nameRow = npcRef ? `<div class="goal-target-row goal-target-row-rel">${npcRef}</div>` : '';
-    return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
+    return `<div class="goal-target">${nameRow}${(canPing || (crossMap && npcRef)) ? '' : posRow}</div>`;
   }
 
   if (t.kind === 'dynamic') {
@@ -1092,6 +1165,10 @@ function seriesTargetChips(members, kind, regionHint) {
   // bouton « Carte » (membre positionné) ; membre sans position : tag+nom
   // nus + repli dynamicPosBadge inchangé. Membres = acteurs de slot, jamais
   // des entités catalogue → pas de fiche (jamais un lien deviné).
+  // Repli 'position' (kind de membre non mappé) : SEUL-OÙ légitime — la réf
+  // membre est l'UNIQUE chip de sa carte compacte (aucune entité adjacente
+  // pour porter la pastille), conforme à la ratification 2026-07-13 (« un
+  // [Position(●)] nu ne reste légitime que comme seul “où” d'une carte »).
   const refKind = kind === 'object' ? 'qao'
     : kind === 'monster' ? 'species'
       : kind === 'npc' ? 'npc' : 'position';

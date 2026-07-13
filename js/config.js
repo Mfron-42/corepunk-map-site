@@ -562,7 +562,12 @@ function djb2(s) {
    teinte (mono-ton). Réplique 1:1 les défauts de l'ancien registre KINDS. */
 function kindBaseHex(kind, subrole) {
   switch (kind) {
-    case 'species': case 'family': return MONSTER_HEX;
+    // Espèce de FAUNE (subrole 'wildlife', réfs d'objectif) : l'ancre du tag
+    // est la teinte de la couche « Animaux paisibles » (CAMP_COLORS.wildlife —
+    // la même que sa ligne d'arbre et le pool que son renvoi bascule), jamais
+    // l'orange bestiaire : le tag dit « Wildlife », sa couleur dit pareil.
+    case 'species': case 'family':
+      return subrole === 'wildlife' ? CAMP_COLORS.wildlife : MONSTER_HEX;
     case 'npc':          return CATS.npc.hex;
     case 'poi':          return CATS.poi.hex;
     case 'workshop':     return CATS.workshop.hex;

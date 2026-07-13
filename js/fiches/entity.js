@@ -19,7 +19,7 @@ import { unfocus } from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems, dispositionFor, creepFor } from '../data.js';
 import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
+import { isHiddenTest, visibleQuestSlugs, visibleQuestSlugsSplit } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
 import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, questRef } from './core.js';
@@ -1209,9 +1209,13 @@ function openNpcFiche(idx) {
   // (isTest+isDialogue) que ce PNJ « donne » ne compte pas comme une quête et
   // n'apparaît pas ici par défaut (voir devcontent.js visibleQuestSlugs) —
   // sinon un PNJ sans aucune vraie quête affichait « Quêtes données (2) » +
-  // 2 lignes qui, cliquées, ouvraient une fiche vide. Révélé avec le contenu
-  // dev (S.devOn), exactement comme partout ailleurs.
-  const visibleSlugs = visibleQuestSlugs(r.quests);
+  // 2 lignes qui, cliquées, ouvraient une fiche vide.
+  // PARTITION (vague quêtes-dialogues) : même RÉVÉLÉS (contenu dev actif),
+  // les barks n'entrent JAMAIS dans « Quêtes données (N) » — ni dans le
+  // compte ni comme chips indistinguables. Ils sont listés À PART plus bas
+  // (barksSection), typés par le badge dev, via LA règle partagée
+  // devcontent.js::visibleQuestSlugsSplit.
+  const { real: visibleSlugs, barks: barkSlugs } = visibleQuestSlugsSplit(r.quests);
   // EntityRef (vague E'c-3) : chaque quête donnée = `[Quête(●)] Nom`. La forme
   // verbeuse « [Quête] Nom + bouton carte (gotoBtn) » est ABANDONNÉE (intention
   // owner ré-emphasée : « [Kind(●)] name », jamais « [Kind] name at [Position()] ») :
@@ -1223,6 +1227,17 @@ function openNpcFiche(idx) {
     if (!q) return '';
     return `<div class="frow">${questRef(slug)}</div>`;
   }).join('');
+  // Barks révélés (contenu dev actif — un bark est isTest, donc barkSlugs est
+  // vide par défaut) : liste séparée, chaque chip porte le badge dev (axe
+  // `content` du Badge 3 axes) — jamais un faux « [Quête] » anonyme au milieu
+  // des vraies quêtes données.
+  const barkRows = barkSlugs.map(slug => {
+    const q = S.quests.get(slug);
+    if (!q) return '';
+    return `<div class="frow">${questRef(slug)}${badge({ axis: 'content', value: 'dev', inline: true })}</div>`;
+  }).join('');
+  const barksSection = barkRows
+    ? `<div class="fiche-section"><h3>${esc(tr('devBarksGivenN', barkSlugs.length))}</h3>${barkRows}</div>` : '';
   // Some NPCs are known only from dialog/quest-slot text, with no world
   // placement or map pin at all (site/js/i18n.js's generic posUnknown, same
   // label already used for a merchant/object with no extracted position --
@@ -1286,7 +1301,7 @@ function openNpcFiche(idx) {
         <button class="act" data-act="track" data-id="npc:${idx}">${esc(tr('trackBtn'))}</button>
       </div></div>
     <div class="fiche-section"><h3>${esc(tr('questsGivenN', visibleSlugs.length))}</h3>
-      ${quests || `<p class="hint">${esc(tr('noQuestsForNpc'))}</p>`}</div>
+      ${quests || `<p class="hint">${esc(tr('noQuestsForNpc'))}</p>`}</div>${barksSection}
     ${dialogueSection}
     ${r.vendor ? vendorStockSection(r.vendor) : ''}`);
   setFicheHash('npc', idx);

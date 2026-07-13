@@ -21,7 +21,7 @@ import { esc, fold, pretty } from '../utils.js';
 import { tr } from '../i18n/index.js';
 import { zoneContentsFor } from '../data.js';
 import { campGroupByKey } from '../pointsets.js';
-import { visibleQuestSlugs } from '../devcontent.js';
+import { visibleQuestSlugsSplit } from '../devcontent.js';
 import { ref } from '../mapref.js';
 import { ficheHeader, openFiche, setFicheHash, badge, campRef, drawNamedZone, questRef } from './core.js';
 
@@ -189,9 +189,12 @@ function questsBlock(q) {
   if (!q) return '';
   // Donneurs ICI (quests.givers, présent sur les régions habitées) : chaque
   // `{slug, npcKey}` → une réf `[Quête] Nom` (soulignée ⇔ la quête est au
-  // catalogue ET visible — contenu dev filtré comme partout, visibleQuestSlugs).
+  // catalogue ET visible). VRAIES quêtes seulement : un dialogue-bark révélé
+  // par le contenu dev n'est pas une quête de la région — même partition
+  // partagée que la fiche PNJ et le badge « N quêtes » des popups
+  // (devcontent.js::visibleQuestSlugsSplit).
   const givers = (q.givers || []).map(gv => gv && gv.slug).filter(Boolean);
-  const visible = new Set(visibleQuestSlugs(givers));
+  const visible = new Set(visibleQuestSlugsSplit(givers).real);
   const giverRefs = givers
     .filter(slug => visible.has(slug) && S.quests.has(slug))
     .map(slug => `<div class="frow region-quest-row">${questRef(slug)}</div>`)

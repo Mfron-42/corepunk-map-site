@@ -54,6 +54,31 @@ function visibleQuestSlugs(slugs) {
   return (slugs || []).filter(slug => !isHiddenTest(S.quests.get(slug)));
 }
 
+/* Bark de dialogue PNJ (hello_* / info_* : répliques d'ambiance, jamais une
+   quête à objectifs). LA règle unique, partagée par toutes les surfaces qui
+   listent/comptent des quêtes : quest.js (aiguillage de fiche), entity.js
+   (« Quêtes données (N) »), popups.js (badge « N quêtes »), zone.js (quêtes
+   d'une région). questClass (greeting|dialogue) est la source primaire,
+   isDialogue le repli hérité — même doublé de garde que l'aiguillage de
+   openQuestFiche, jamais deux règles qui divergent. */
+function isDialogueBark(rec) {
+  return !!(rec && (rec.isDialogue || rec.questClass === 'greeting'
+    || rec.questClass === 'dialogue'));
+}
+
+/* Partition des slugs VISIBLES d'un porteur (PNJ/région) : `real` = vraies
+   quêtes — les seules à compter dans un « Quêtes données (N) » / badge
+   « N quêtes » ; `barks` = barks de dialogue actuellement visibles (donc
+   contenu dev actif, puisqu'un bark est isTest) — à lister À PART avec leur
+   marquage dev, jamais mélangés ni comptés comme quêtes. */
+function visibleQuestSlugsSplit(slugs) {
+  const real = [], barks = [];
+  for (const slug of visibleQuestSlugs(slugs)) {
+    (isDialogueBark(S.quests.get(slug)) ? barks : real).push(slug);
+  }
+  return { real, barks };
+}
+
 /* Comptes bruts (pas dédupliqués par modèle) pour l'étiquette « Contenu dev
    (N) » — reflète exactement les 4 jeux de données concernés par la mission
    (monstres/items/objets de quête/quêtes). Recalculé à chaque appel (pas de
@@ -66,7 +91,10 @@ function devContentCounts() {
   // périmètre que isHiddenTest ci-dessus, jamais deux règles qui divergent).
   const items = Object.values(S.items || {}).filter(it => it.isTest || it.isInternal).length;
   const qao = (S.data.qao || []).filter(o => o.isTest).length;
-  const quests = (S.data.quest || []).filter(q => q.isTest).length;
+  // quêtes : isTest OU isInternal — isInternal couvre les déclencheurs moteur
+  // (portes/zones d'extraction, coquilles dev vides) masqués par défaut, même
+  // périmètre que isHiddenTest ci-dessus (jamais deux règles qui divergent).
+  const quests = (S.data.quest || []).filter(q => q.isTest || q.isInternal).length;
   return { monsters, items, qao, quests, total: monsters + items + qao + quests };
 }
 
@@ -104,4 +132,4 @@ function positionCounts(list) {
   return { shown, hidden };
 }
 
-export { isHiddenTest, devContentCounts, visibleQuestSlugs, positionCounts };
+export { isHiddenTest, devContentCounts, visibleQuestSlugs, visibleQuestSlugsSplit, isDialogueBark, positionCounts };

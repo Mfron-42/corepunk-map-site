@@ -5,7 +5,7 @@
 import { KWALAT_DEFAULTS, TILE_BASE, CATS } from './config.js';
 import { S } from './state.js';
 import { esc, iconTag, initials } from './utils.js';
-import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
+import { isHiddenTest, visibleQuestSlugsSplit } from './devcontent.js';
 
 export let activeMap = KWALAT_DEFAULTS;
 export function setActiveMap(m) { activeMap = m; }
@@ -415,10 +415,11 @@ function renderDomCulled(cat, iconPathFor, popupFor, onSelect) {
     const id = markerId(cat, i);
     const url = r.icon ? `icons/${iconPathFor}/${encodeURIComponent(r.icon)}.png` : null;
     // Accent "donne une quête" (voir domIcon ci-dessus) : seulement pour les
-    // PNJ, et seulement des quêtes RÉELLEMENT visibles (même garde que la
-    // popup PNJ/la fiche -- visibleQuestSlugs, jamais un simple hello_/
-    // info_ bark compté comme une quête).
-    const hasQuest = cat === 'npc' && visibleQuestSlugs(r.quests).length > 0;
+    // PNJ, et seulement des VRAIES quêtes visibles (même partition partagée
+    // que la popup PNJ/la fiche -- devcontent.js visibleQuestSlugsSplit :
+    // jamais un hello_/info_ bark compté comme une quête, même révélé par le
+    // contenu dev).
+    const hasQuest = cat === 'npc' && visibleQuestSlugsSplit(r.quests).real.length > 0;
     const mk = L.marker(toLL(r.x, r.z), { icon: domIcon(cat, url, S.done.has(id), r.name, hasQuest) });
     mk._meta = { cat, i, id, r };
     mk.bindPopup(() => popupFor(r, id), { maxWidth: 300 });

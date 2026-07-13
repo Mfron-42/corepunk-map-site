@@ -205,8 +205,14 @@ function questJournalSection(q) {
    (pas une quête) » — jamais la mise en page d'une quête vide. Toujours
    ouvrable (contenu dev activé / lien profond direct) ; garde le hash de
    quête (setFicheHash('quest', slug)) pour que le partage d'URL rouvre
-   exactement cette fiche. */
-function openDialogueFiche(q, slug) {
+   exactement cette fiche.
+   Variante `interaction` : même mécanique légère pour une entrée VISIBLE qui
+   n'est pas un bark mais un service par dialogue sans objectifs (questStatus
+   'noObjectives' avec de vraies répliques, ex. le ferry payant de Captain
+   Rob) — en-tête honnête dédié « Interaction — pas une quête à objectifs »
+   au lieu du libellé bark, décidé par les données (questStatus), jamais par
+   une liste de slugs codée en dur. */
+function openDialogueFiche(q, slug, { interaction = false } = {}) {
   // Le PNJ qui « donne » ce bark : même résolution que le donneur d'une
   // vraie quête (npcIndexByName) -- réutilisée pour l'avatar (portrait de PIN
   // réel en priorité,  §1) ET pour le chip cliquable
@@ -227,11 +233,12 @@ function openDialogueFiche(q, slug) {
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver || q.name)),
-      name: q.name, hex: entityColor('quest', q.name), sub: esc(tr('dialogueFicheKind')), below: giverRow,
+      name: q.name, hex: entityColor('quest', q.name),
+      sub: esc(tr(interaction ? 'interactionFicheKind' : 'dialogueFicheKind')), below: giverRow,
     })}
     <div class="fiche-section">
-      <h3>${esc(tr('dialogueHeading'))}</h3>
-      <p class="hint">${esc(tr('dialogueNote'))}</p>
+      <h3>${esc(tr(interaction ? 'interactionHeading' : 'dialogueHeading'))}</h3>
+      <p class="hint">${esc(tr(interaction ? 'interactionNote' : 'dialogueNote'))}</p>
       <div class="fiche-dialogs-flat">${linesHtml}</div>
     </div>`);
   setFicheHash('quest', slug);
@@ -259,6 +266,17 @@ function openQuestFiche(slug) {
   // greeting|dialogue|28 no_objective-dialogue — quest_class est désormais la
   // source primaire, jamais un re-calcul front.
   if (q.questClass === 'greeting' || q.questClass === 'dialogue' || q.isDialogue) { openDialogueFiche(q, slug); return; }
+  // Interaction de service (vague quêtes-dialogues) : entrée VISIBLE sans
+  // objectifs décodés (questStatus 'noObjectives') mais avec de VRAIES
+  // répliques joueur/PNJ (ex. le ferry payant) — la mise en page quête
+  // n'aurait rien à montrer d'autre que ce dialogue ; on ouvre la même fiche
+  // légère que les barks, typée honnêtement « Interaction — pas une quête à
+  // objectifs ». Purement piloté par les données (statut + présence de
+  // répliques), aucun slug codé en dur.
+  if (q.questStatus === 'noObjectives' && (q.dialogs?.npc?.length || q.dialogs?.player?.length)) {
+    openDialogueFiche(q, slug, { interaction: true });
+    return;
+  }
   // Recalculée AVANT la construction des sections (items + étapes) : la même
   // Map sert questItemRow ET goalTargetItemRow — voir currentQuestItemDisambig.
   setQuestItemDisambig(q.items?.length ? disambiguateQuestItems(q.items) : null);
@@ -272,28 +290,18 @@ function openQuestFiche(slug) {
   const giverNi = q.giver ? npcIndexByName(q.giver) : -1;
   const giverPin = giverNi >= 0 ? S.data.npc[giverNi] : null;
   const avatar = questGiverAvatar(q, giverPin);
-  // 3 niveaux ici aussi (pas seulement sur les objectifs goalTargetChip) :
-  // (a) position fixe -> gotoBtn normal ; (b)/(c) pas de position fixe mais
-  // une search_zone propagée depuis le goal dont ce slot est la cible ->
-  // dynamicPosBadge (zone dessinée seulement si confiance haute). Ne JAMAIS
-  // retomber sur le "position inconnue" de gotoBtn pour un slot de quête.
-  // Un acteur sur une AUTRE carte (a.map ≠ carte active) : bouton de bascule
-  // cross-carte au lieu d'un goTo qui tomberait dans le mauvais repère.
-  // Position ratifiée d'un acteur NON épinglable-par-identité (mob/objet/inconnu),
-  // même échelle que goalTargetChip's posRow : `[Position(●)]` locate quand une
-  // coord existe (bascule cross-carte incluse via pos.map), sinon le badge
-  // d'honnêteté dynamicPosBadge (zone de recherche / non localisé). REMPLACE
-  // l'ex-gotoBtn/crossMapBtn — l'affordance carte est désormais TOUJOURS une
-  // pastille ratifiée, jamais un bouton « Carte » séparé.
-  // Acteur ITEM (classe A) : sa clé catalogue voyage jusqu'à dynamicPosBadge
-  // — un item commun à canaux d'obtention réels (vendu/craftable/loot) y
-  // troque la zone de proximité devinée contre ses puces d'obtention ; les
-  // autres kinds gardent la zone (désormais toujours libellée) / unlocated.
-  const actorPosRef = a => a.x == null
-    ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint, a.kind === 'item' ? a.key || null : null)
-    : (a.map && a.map !== S.map)
-      ? ref({ kind: 'position', pos: { x: null, z: null, map: a.map }, label: mapName(a.map) })
-      : ref({ kind: 'position', pos: { x: a.x, z: a.z }, label: '', subrole: a.kind === 'npc' ? 'npc' : null });
+  // RATIFIÉ 2026-07-13 (spec §9 Q9) : le placement d'un acteur vit SUR SON
+  // CHIP — `[Kind(●)] Nom`, pastille locate mode L (pin Q7 togglable ; acteur
+  // cross-carte : pos.map + nom de carte en méta, la pastille bascule de
+  // carte — mêmes idiomes que goalTargetChip). L'ex-`[Position(●)]` adjacent
+  // est MORT (la forme que l'invariant _verify_no_bare_position.mjs interdit).
+  // Sans coordonnée : le badge d'honnêteté dynamicPosBadge reste la seule
+  // cellule de position (zone de recherche / non localisé — jamais perdre le
+  // « où »). Acteur ITEM (classe A) : sa clé catalogue voyage jusqu'à
+  // dynamicPosBadge — un item commun à canaux d'obtention réels (vendu/
+  // craftable/loot) y troque la zone de proximité devinée contre ses puces.
+  const actorZoneBadge = a =>
+    dynamicPosBadge({ search_zone: a.searchZone }, regionHint, a.kind === 'item' ? a.key || null : null);
   const actorRows = (q.actors || []).map(a => {
     const onOtherMap = a.map && a.map !== S.map;
     // Acteur PNJ résolu par nom (npcIndexByName) : quand le personnage est connu
@@ -304,40 +312,57 @@ function openQuestFiche(slug) {
     const ni = (a.kind === 'npc' && !onOtherMap) ? npcIndexByName(a.label) : -1;
     const npcPin = ni >= 0 ? S.data.npc[ni] : null;
     const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
-    // EntityRef (E'c-3) : l'identité ET la position se FONDENT en une seule
-    // `[Kind(●)]` dès que le kind est épinglable — un PNJ résolu sur la carte
-    // active devient `[PNJ(●)]` (npcRef locate, le pin EST la position), plus de
-    // « identité + bouton position séparé » (forme verbeuse abandonnée, intention
-    // owner). Les kinds sans couche/pin propre (mob/objet/inconnu) gardent
-    // l'identité + une pastille `[Position(●)]` ratifiée (actorPosRef).
+    // EntityRef (E'c-3, complété 2026-07-13 §9 Q9) : l'identité ET la position
+    // se FONDENT en une seule `[Kind(●)]` pour TOUS les kinds — le placement du
+    // slot (a.x/a.z, cross-carte inclus via a.map) vit sur le chip de l'acteur,
+    // plus jamais un `[Position(●)]` adjacent. `slotPos` : le pin locate du
+    // slot ; `slotMeta` : le nom de la carte cible en méta (info conservée de
+    // l'ex-libellé `[Position] <carte>`).
+    const slotPos = a.x != null ? (onOtherMap ? { x: a.x, z: a.z, map: a.map } : { x: a.x, z: a.z }) : null;
+    const slotMeta = slotPos && onOtherMap ? `· ${mapName(a.map)}` : null;
     let actorRef, posCell = '';
     if (a.kind === 'npc' && ni >= 0 && npcPin && npcPin.x != null) {
       actorRef = npcRef(aLabel, { ni });                       // [PNJ(●)] pin fondu dedans
     } else if (a.kind === 'npc' && onOtherMap && a.x != null) {
       // PNJ cross-carte : la pastille bascule de carte PUIS épingle (main.js
       // ref-draw mode L) ; pas de fiche PNJ atteignable ici (autre carte).
-      actorRef = ref({ kind: 'npc', label: aLabel, mode: 'L', pos: { x: a.x, z: a.z, map: a.map }, hasFiche: false, meta: `· ${mapName(a.map)}` });
+      actorRef = ref({ kind: 'npc', label: aLabel, mode: 'L', pos: slotPos, hasFiche: false, meta: slotMeta });
     } else if (a.kind === 'npc') {
-      // PNJ non épinglable par son identité (nom non joint à un pin, ou cross-carte
-      // sans coord) : identité + position ratifiée (actorPosRef → `[Position(●)]`
-      // quand a.x existe, sinon dynamicPosBadge). Ne JAMAIS perdre la position
-      // fixe d'un acteur non résolu (l'ex-gotoBtn la portait déjà).
-      actorRef = npcRef(aLabel, { ni: onOtherMap ? -1 : ni, locate: false });
-      posCell = actorPosRef(a);
+      // PNJ non joint à un pin par son identité : quand le SLOT a une
+      // coordonnée, le chip la porte (`[PNJ(●)]`, pin locate au slot — jamais
+      // perdre la position fixe d'un acteur non résolu) ; nom souligné ⇔ le
+      // PNJ résout quand même au catalogue. Sans coordonnée : identité nue +
+      // badge d'honnêteté.
+      actorRef = slotPos
+        ? ref({ kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: aLabel, hasFiche: ni >= 0, mode: 'L', pos: slotPos })
+        : npcRef(aLabel, { ni: onOtherMap ? -1 : ni, locate: false });
+      posCell = slotPos ? '' : actorZoneBadge(a);
     } else if (a.kind === 'mob') {
+      // Un slot MOB ne porte JAMAIS de coordonnée (mesuré 129/129 acteurs mob
+      // sans x — spawn dynamique) : identité seule + badge d'honnêteté, aucun
+      // pin à fondre. (Si la donnée driftait un jour vers mob+x, le router
+      // ref-draw `species` route la COUCHE, pas un pin — décision à prendre à
+      // ce moment-là, jamais un pin silencieusement cassé.)
       const mk = monsterKeyFor(null, a.label);
       const spId = mk ? S.monsters[mk]?.species : null;
       actorRef = ref({ kind: 'species', key: mk || null, label: aLabel, hex: spId ? speciesLayerHex(spId) : MONSTER_HEX, hasFiche: !!mk, drawable: false });
-      posCell = actorPosRef(a);
+      posCell = actorZoneBadge(a);
     } else if (a.kind === 'object') {
-      actorRef = ref({ kind: 'qao', mode: 'N', label: aLabel });
-      posCell = actorPosRef(a);
+      // Objet placé : `[Qao(●)]` — le pin du slot sur le chip (clé absente →
+      // locateRefKey par coordonnées : deux slots distincts = deux pins).
+      actorRef = ref({ kind: 'qao', mode: slotPos ? 'L' : 'N', pos: slotPos || undefined, label: aLabel, meta: slotMeta });
+      posCell = slotPos ? '' : actorZoneBadge(a);
     } else {
-      // Kind d'acteur non mappé (rare) : réf générique inerte (le tag nomme le
-      // kind, nom en clair, aucun lien/tracé) — l'ex-`.k-chip` détaché est
-      // SUPPRIMÉ (kill-list §3.5). Teinte neutre explicite (jamais un tag cassé).
-      actorRef = ref({ kind: a.kind, label: aLabel, hex: '#8d99ae', hasFiche: false, drawable: false });
-      posCell = actorPosRef(a);
+      // Kind d'acteur générique (item/zone/ability/poi/inconnu) : le tag nomme
+      // le kind, nom en clair (aucun lien deviné) — et le placement du slot,
+      // quand il existe, vit sur le chip comme partout (mode L ; un item à
+      // pos est promu par mapref.js de toute façon). Teinte neutre explicite.
+      actorRef = ref({
+        kind: a.kind, label: aLabel, hex: '#8d99ae', hasFiche: false,
+        drawable: slotPos ? true : false, mode: slotPos ? 'L' : undefined,
+        pos: slotPos || undefined, meta: slotMeta,
+      });
+      posCell = slotPos ? '' : actorZoneBadge(a);
     }
     return `
     <div class="frow">

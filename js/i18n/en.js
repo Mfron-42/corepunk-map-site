@@ -364,6 +364,10 @@ export default {
       dialogueFicheKind: 'NPC dialogue',
       dialogueHeading: 'NPC dialogue (not a quest)',
       dialogueNote: 'Idle greeting lines this character says — not a quest with objectives or rewards.',
+      interactionFicheKind: 'NPC interaction',
+      interactionHeading: 'Interaction — not an objective quest',
+      interactionNote: 'This character offers a dialogue-driven service (the game data defines no objectives for this entry).',
+      devBarksGivenN: n => `Revealed dialogues — dev content (${n})`,
       // Journal now renders as a plain presentation paragraph right under the
       // title (layout rework, July 2026) — no more section heading (same
       // choice as the item description, see descHtml). Only shown when the
