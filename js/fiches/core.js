@@ -652,6 +652,30 @@ function npcRef(name, { ni, locate = true } = {}) {
   });
 }
 
+/* Référence QUÊTE `[Quête(●)] Nom` — LA forme partagée par toute surface-phrase
+   qui cite une quête (quêtes liées, série, source d'obtention, donneurs d'une
+   région, quêtes à portée famille, objets de quête lâchés…). Owner 2026-07-13,
+   « quests pinnable everywhere » : la pastille LOCATE (mode L, Q7) épingle la
+   POSITION de la quête = celle de son donneur (q.x/q.z, résolu au slot du giver
+   par le pipeline — même point que la fiche PNJ donneur épingle déjà) ; nom
+   souligné → fiche quête. Un seul geste carte, jamais un `[Position(●)]` séparé
+   à côté (forme verbeuse « [Quête] Nom + [Position] » abandonnée, intention
+   owner). Quête sans position connue (q.x null, ex. Île-prison) → `[Quête] Nom`
+   nu, honnête (pas de pastille, rien à épingler). Quête NON résolue (hors
+   S.quests) → `[Quête] Nom` non souligné (pas de fiche), jamais un lien deviné.
+   `label`/`resolved` : surcharges pour les appelants qui portent un nom de repli
+   (reward_of_names/quest_names) ou connaissent déjà l'état résolu. */
+function questRef(slug, { label = null, resolved = null } = {}) {
+  const q = slug ? S.quests.get(slug) : null;
+  const isRes = resolved != null ? resolved : !!q;
+  const name = label != null ? label : (q ? q.name : pretty(slug));
+  const qpos = (q && q.x != null) ? { x: q.x, z: q.z } : null;
+  return ref({
+    kind: 'quest', key: isRes ? slug : null, label: name,
+    hasFiche: isRes, mode: qpos ? 'L' : undefined, pos: qpos || undefined,
+  });
+}
+
 /* Référence CAMP `[Camp(●)] Nom` — lignes de farm (fiche objet/monstre) et
    en-tête de fiche camp. La pastille est le TOGGLE de surlignage de CE camp
    (showHighlight de ses points + centrage caméra, routé par main.js ref-draw
@@ -883,7 +907,7 @@ export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
   gotoBtn, crossMapBtn, fmtNum, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
-  qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef,
+  qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef, questRef,
   disambiguateQuestItems, disambiguatedItemName,
   farmCampRow, farmUnjoinedRow, farmCapRows,
   resetGoalZones, clearGoalZone, viewGoalZone, viewMonsterZone, drawNamedZone,

@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, npcRef, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone, badge } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, npcRef, questRef, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone, badge } from './core.js';
 import { goalStepsSection, questItemRow, questItemAddsInfo, dynamicPosBadge, setQuestItemDisambig, setQuestItemFlags } from './stepguide.js';
 
 /* Avatar HeroAvatars -- traite le leaf générique `Dwarf_dark` comme "pas
@@ -164,7 +164,7 @@ function questSeriesNav(q, slug) {
     const qq = S.quests.get(s);
     const label = qq ? qq.name : pretty(s);
     const inner = qq
-      ? ref({ kind: 'quest', key: s, label, hasFiche: true })
+      ? questRef(s)
       : `<span class="fr-label">${esc(label)}</span>`;
     return `<span class="series-nav-step series-nav-${dirKey}"><span class="series-nav-dir">${esc(tr(dirKey === 'prev' ? 'seriesPrevLabel' : 'seriesNextLabel'))}</span>${inner}</span>`;
   };
@@ -401,10 +401,11 @@ function openQuestFiche(slug) {
         ${(q.dialogs.npc || []).map(l => `<p class="dlg dlg-npc">${esc(l)}</p>`).join('')}
         ${(q.dialogs.player || []).map(l => `<p class="dlg dlg-player">${esc(l)}</p>`).join('')}
       </details></div>` : '';
-  // EntityRef (vague 2) : quêtes liées = références `[Quête] Nom` (le tag
-  // remplace le badge k-chip détaché ; souligné → fiche quête).
+  // EntityRef (vague 2 + complaint 2) : quêtes liées = références `[Quête(●)] Nom`
+  // (questRef — la pastille locate épingle le donneur de CHAQUE quête liée ;
+  // souligné → fiche quête).
   const related = (q.related || []).filter(s => S.quests.has(s)).map(s =>
-    `<div class="frow">${ref({ kind: 'quest', key: s, label: S.quests.get(s).name, hasFiche: true })}</div>`).join('');
+    `<div class="frow">${questRef(s)}</div>`).join('');
   const zoneBtn = S.zonesQuest[slug]
     ? `<button class="act ghost" data-act="zone-view" data-id="${esc(slug)}">${esc(tr('viewZoneBtn'))}</button>` : '';
   // « Voir le donneur » : même correctif que les actorRows ci-dessus -- vise

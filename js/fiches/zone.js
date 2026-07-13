@@ -23,7 +23,7 @@ import { zoneContentsFor } from '../data.js';
 import { campGroupByKey } from '../pointsets.js';
 import { visibleQuestSlugs } from '../devcontent.js';
 import { ref } from '../mapref.js';
-import { ficheHeader, openFiche, setFicheHash, badge, campRef, drawNamedZone } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, campRef, drawNamedZone, questRef } from './core.js';
 
 /* ── Résolution NOM de région → zone_id ──────────────────────────────────────
    zones_contents.bin est indexé par zone_id ; son champ `display` porte le nom
@@ -194,7 +194,7 @@ function questsBlock(q) {
   const visible = new Set(visibleQuestSlugs(givers));
   const giverRefs = givers
     .filter(slug => visible.has(slug) && S.quests.has(slug))
-    .map(slug => `<div class="frow region-quest-row">${ref({ kind: 'quest', key: slug, label: S.quests.get(slug).name, hasFiche: true })}</div>`)
+    .map(slug => `<div class="frow region-quest-row">${questRef(slug)}</div>`)
     .join('');
   // Objectifs ICI (quests.questsWithGoal) : un COMPTE honnête (le bin ne porte
   // pas la liste des quêtes-à-objectif, juste leur nombre — jamais fabriquer

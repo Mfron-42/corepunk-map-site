@@ -24,7 +24,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { disambiguatedItemName, currentGoalZones, npcRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
+import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
 
 /* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
@@ -271,13 +271,14 @@ function rewardOfRelRow(t) {
   const others = (t.reward_of || []).filter(s => s !== S.openFiche?.id);
   if (!others.length) return '';
   const namesAligned = t.reward_of_names && t.reward_of_names.length === t.reward_of.length;
-  // EntityRef (vague 1) : chaque quête source est une référence [Quête] Nom —
-  // souligné ⇔ la quête résout sur S.quests (jamais un lien deviné).
+  // EntityRef (vague 1 + complaint 2) : chaque quête source est une référence
+  // `[Quête(●)] Nom` (questRef — pastille locate épingle son donneur) ; souligné
+  // ⇔ la quête résout sur S.quests (jamais un lien deviné).
   const links = others.map(slug => {
     const rq = S.quests.get(slug);
     const idx = t.reward_of.indexOf(slug);
     const qname = rq?.name || (namesAligned ? t.reward_of_names[idx] : slug);
-    return ref({ kind: 'quest', key: slug, label: qname, hasFiche: !!rq });
+    return questRef(slug, { label: qname, resolved: !!rq });
   }).join(esc(tr('orWord')));
   return `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalRewardOfLabel'))}</span>${links}</div>`;
 }

@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -974,7 +974,7 @@ function openRecipeFiche(key) {
         if (!q) return '';
         return `<div class="frow">
           <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
-          ${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}
+          ${questRef(slug)}
         </div>`;
       }).join('')}</div>` : '';
   // Schéma trouvable en coffre (#65, 240 stubs recette) : MÊME composant que
@@ -1328,7 +1328,7 @@ function openItemFiche(key) {
         const rqName = qs.quest_names?.[0] || (rqSlug ? pretty(rqSlug) : null);
         const rqResolved = !!(rqSlug && S.quests.has(rqSlug));
         const rqRef = rqName
-          ? ref({ kind: 'quest', key: rqResolved ? rqSlug : null, label: rqName, hasFiche: rqResolved })
+          ? questRef(rqSlug, { label: rqName, resolved: rqResolved })
           : '';
         const bits = [givenBit, rqRef].filter(Boolean);
         viaLine = bits.length ? `<p class="hint">${bits.join(' — ')}</p>` : '';
@@ -1339,7 +1339,7 @@ function openItemFiche(key) {
       // + ex-fr-label) devient une seule référence `[Quête] Nom` (le tag
       // remplace le badge détaché).
       questSourceHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDuringQuestTitle'))}</h3>
-        <div class="frow">${ref({ kind: 'quest', key: qs.quest, label: srcQuest.name, hasFiche: true })}</div>
+        <div class="frow">${questRef(qs.quest, { label: srcQuest.name })}</div>
         ${viaLine}
       </div>`;
     }
@@ -1351,7 +1351,7 @@ function openItemFiche(key) {
         if (!q) return '';
         return `<div class="frow">
           <span class="k-chip" style="--chip-c:${role === 'reward' ? CATS.quest.hex : CATS.qao.hex}">${role === 'reward' ? esc(tr('rewardBadge')) : esc(tr('requiredBadge'))}</span>
-          ${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}
+          ${questRef(slug)}
         </div>`;
       }).join('')}</div>` : '';
 

@@ -183,26 +183,33 @@ function hiddenBadge(hidden) {
   return `<span class="fcount-hidden" title="${esc(label)}" aria-label="${esc(label)}">+${hidden.toLocaleString(numberLocale())}</span>`;
 }
 /* ── EntityRef (◇) dans l'arbre + la légende vivante (vague 6, spec §4.7) ──────
-   L'arbre de GAUCHE et le bandeau « couches actives » deviennent des instances
-   EntityRef « [Kind(●)] Nom » : la pastille (swatch / atag-dot — recette
-   byte-identique à .ref-bubble) EST le point d'état ●/○/◐/⊘, le nom EST le
-   libellé (souligné ⇔ fiche, loi §1.1), et une PILULE de kind (mot localisé via
-   refKindLabel — AUCUNE clé i18n neuve) nomme le KIND en tête. C'est un AJOUT de
-   contrat (identité data-kind/data-mode, source du pill de la légende + loi du
-   même-état ; teinte deux-tons --ref-c/--ref-kc depuis la source couleur UNIQUE
-   de config.js) — jamais une réécriture : le mécanisme natif (case à cocher /
-   bouton .atag) et TOUS les sélecteurs/harnais restent intacts, le geste dessin
-   reste la case / l'atag, jamais un 3ᵉ état (modèle « légende vivante » §2.5).
-   La PILULE ne s'affiche que pour les kinds ENTITÉ (nom ≠ kind : species →
-   « Monster », family → « Family », en.js:804) ; les lignes de CATÉGORIE portent
-   déjà le mot de kind DANS leur libellé (« NPCs », « Peaceful animals »…) — pas
-   de pilule redondante, juste identité + teinte. Le contrat .ref n'est PAS posé
-   comme CLASSE sur la ligne (display:inline-flex de .ref se battrait avec le
-   flex des .filter-row/.species-row/.atag existants, et syncEntityRefDots ne
-   doit pas doubler la cascade native) : on réutilise les recettes AUTONOMES
-   .ref-tag/.ref-kindword + les variables --ref-c/--ref-kc, sans l'enveloppe. */
+   L'arbre de GAUCHE et le bandeau « couches actives » portent l'identité
+   EntityRef : la pastille (swatch / atag-dot — recette byte-identique à
+   .ref-bubble) EST le point d'état ●/○/◐/⊘, le nom EST le libellé (souligné ⇔
+   fiche, loi §1.1). C'est un AJOUT de contrat (identité data-kind/data-mode,
+   source du pill de la légende + loi du même-état ; teinte deux-tons
+   --ref-c/--ref-kc depuis la source couleur UNIQUE de config.js) — jamais une
+   réécriture : le mécanisme natif (case à cocher / bouton .atag) et TOUS les
+   sélecteurs/harnais restent intacts, le geste dessin reste la case / l'atag,
+   jamais un 3ᵉ état (modèle « légende vivante » §2.5).
+   PILULE DE KIND — RETIRÉE DE L'ARBRE (owner 2026-07-13, « restore the cleaner
+   dot ») : l'arbre de gauche est DÉJÀ groupé par kind via ses <details>
+   (Monsters/Creeps/World…), donc une pilule « [Monster] »/« [Family] » par
+   LIGNE était du bruit redondant. Les lignes d'arbre redeviennent le rendu
+   propre `[pastille d'état] Nom` — teinte + identité data-kind conservées
+   (stampRef), seul le libellé de kind visible disparaît de la ligne. La pilule
+   (refKindPill/PILL_KINDS ci-dessous) ne sert plus QUE le bandeau-légende
+   (buildTagEl), une liste PLATE (non groupée par kind) où le mot de kind
+   distingue encore une espèce « Rat » d'une famille « Rat ». Le contrat .ref
+   n'est PAS posé comme CLASSE sur la ligne (display:inline-flex de .ref se
+   battrait avec le flex des .filter-row/.species-row/.atag existants, et
+   syncEntityRefDots ne doit pas doubler la cascade native) : on réutilise les
+   recettes AUTONOMES .ref-tag/.ref-kindword + les variables --ref-c/--ref-kc,
+   sans l'enveloppe. */
 const PILL_KINDS = new Set(['species', 'family']);
 const refKcHex = (kind, subrole) => kindBaseHex(kind, subrole) || '';
+/* Pilule de kind inerte — bandeau-légende SEULEMENT (buildTagEl ; retirée des
+   lignes d'arbre 2026-07-13, voir ci-dessus). */
 function refKindPill(kind, opts = {}) {
   return `<span class="ref-tag ref-tag-inert ref-tree-tag"><span class="ref-kindword">${esc(refKindLabel(kind, opts))}</span></span>`;
 }
@@ -226,14 +233,16 @@ function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '', 
   // couches actives (renderActiveTags — dédup des copies miroir Creeps,
   // résolution de l'<input> par clé au moment du clic).
   li.dataset.fkey = key;
-  // Pilule de kind « [Kind] » : lignes ENTITÉ seulement (nom ≠ kind — ici les
-  // familles ; les catégories gardent le kind dans leur libellé). Insérée entre
-  // la pastille et le nom, HORS de .flabel (les harnais lisent .flabel = le nom).
-  const pill = ref && ref.pill && PILL_KINDS.has(ref.kind) ? refKindPill(ref.kind, { plural: ref.plural }) : '';
+  // Ligne d'arbre = `[pastille d'état] Nom` PROPRE — la pilule de kind par
+  // ligne (E′c-7) est RETIRÉE (owner 2026-07-13 : l'arbre est déjà groupé par
+  // kind via ses <details>, donc une pilule par ligne était du bruit redondant ;
+  // « restore the cleaner dot »). On GARDE la teinte, l'identité data-kind
+  // (stampRef ci-dessous), la pastille .swatch et la cascade tri-état — seul le
+  // libellé de kind visible disparaît de la ligne.
   li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
     <input type="checkbox" ${on ? 'checked' : ''}>
     <span class="swatch" style="background:${hex}"></span>
-    ${pill}<span class="flabel">${esc(label)}</span>
+    <span class="flabel">${esc(label)}</span>
     <span class="fcount">${count.toLocaleString(numberLocale())}</span>${hiddenBadge(hidden)}</label>`;
   stampRef(li, hex, ref);
   li.querySelector('input').addEventListener('change', e => {
@@ -376,15 +385,15 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
   const spHex = speciesLayerHex(id);
   const li = document.createElement('li');
   li.dataset.species = id;
-  // EntityRef « [Monster(●)] Nom » (vague 6) : pastille .swatch = point d'état,
-  // pilule « Monster » (refKindLabel — pas de clé neuve), nom souligné ⇔ fiche.
-  // La pilule vit HORS de .flabel (harnais : .flabel/.sp-name = le nom seul) ;
-  // cliquée, elle passe par le handler de ligne ci-dessous (= bascule dessin,
-  // geste tag→draw), n'étant ni .sp-check ni [data-act].
+  // Ligne espèce = `[pastille .swatch] Nom` PROPRE (point d'état + nom souligné
+  // ⇔ fiche) : la pilule « Monster » par ligne (E′c-7) est RETIRÉE (owner
+  // 2026-07-13, « restore the cleaner dot » — l'arbre est déjà groupé par kind,
+  // la pilule par ligne était redondante). Teinte/identité conservées via
+  // stampRef ; le nom reste souligné → fiche, la case reste la bascule de couche.
   li.innerHTML = `<div class="filter-row species-row ${st.on ? '' : 'off'}${res ? '' : ' sp-zero'}">
     <label class="sp-check"><input type="checkbox" ${st.on ? 'checked' : ''} aria-label="${esc(sp.name)}">
       <span class="swatch" style="background:${spHex}"></span></label>
-    ${refKindPill('species')}<span class="flabel"><span class="sp-name${key || wildId ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
+    <span class="flabel"><span class="sp-name${key || wildId ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
     <span class="sp-meta">${esc(meta)}</span>
   </div>`;
   stampRef(li, spHex, { kind: 'species', mode: 'E' });
@@ -513,7 +522,7 @@ function familyRowLi(fam, f, hex, withNode) {
     setFamilyOn(fam, on);
     scheduleRedraw();
     buildGroupMonsters();
-  }, 'filter-row-sub' + (zero ? ' fam-zero' : ''), { kind: 'family', mode: 'E', pill: true });
+  }, 'filter-row-sub' + (zero ? ' fam-zero' : ''), { kind: 'family', mode: 'E' });
   row.querySelector('.flabel').insertAdjacentHTML('afterend', famCampsMeta(f.nCamps));
   if (withNode) return attachFamilyNode(row, fam);
   row.dataset.fam = fam;   // copie miroir : resynchronisée par refreshParentChecks

@@ -22,7 +22,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, questRef } from './core.js';
 import { regionRef, regionFicheExists } from './zone.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
@@ -939,7 +939,9 @@ function openMonsterFiche(key) {
         const dicon = dit?.icon ? `icons/${dit.icon}` : null;
         const itemKind = dit && isRecipeKind(dit) ? 'recipe' : (dit?.kind === 'quest_item' ? 'quest_item' : 'item');
         const itemRefHtml = ref({ kind: itemKind, key: d.item_key, label: d.item_name, hex: dit && itemKind !== 'quest_item' ? itemEcHex(dit) : null, hasFiche: !!dit });
-        const questRefHtml = ref({ kind: 'quest', key: S.quests.has(d.quest_slug) ? d.quest_slug : null, label: d.quest_name, hasFiche: S.quests.has(d.quest_slug) });
+        // complaint 2 : `[Quête(●)]` — la pastille locate épingle le donneur de
+        // la quête (questRef, forme partagée) ; label de repli d.quest_name.
+        const questRefHtml = questRef(d.quest_slug, { label: d.quest_name });
         return `<div class="frow">
           ${iconTag(dicon, 'fr-icon', itemGlyph(dit))}
           ${itemRefHtml}
@@ -1050,7 +1052,7 @@ function familyScopeQuestRows(fam) {
       if (!bu || !bu.scope || bu.scope === 'species') continue;
       if (!(bu.families || []).map(familyKey).includes(fam)) continue;
       seen.add(slug);
-      rows.push(`<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}</div>`);
+      rows.push(`<div class="frow">${questRef(slug)}</div>`);
       break;
     }
   }
@@ -1218,8 +1220,7 @@ function openNpcFiche(idx) {
   const quests = visibleSlugs.map(slug => {
     const q = S.quests.get(slug);
     if (!q) return '';
-    const qpos = q.x != null ? { x: q.x, z: q.z } : null;
-    return `<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true, mode: qpos ? 'L' : undefined, pos: qpos || undefined })}</div>`;
+    return `<div class="frow">${questRef(slug)}</div>`;
   }).join('');
   // Some NPCs are known only from dialog/quest-slot text, with no world
   // placement or map pin at all (site/js/i18n.js's generic posUnknown, same
