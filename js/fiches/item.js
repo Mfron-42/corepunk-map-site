@@ -9,7 +9,7 @@ import {
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
   statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
+  chestHex, chestKindLabel, prettyRegion, familyKey,
   speciesLayerHex, familyLayerHex, entityColor,
 } from '../config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, gotoBtn, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -651,8 +651,12 @@ function openAbilityFiche(key) {
 function nodeChip(nk) {
   const n = S.nodes?.[nk];
   const label = n ? n.name : pretty(nk.replace(/^gn_/, ''));
-  const attrs = n ? ` data-act="fiche-node" data-id="${esc(nk)}"` : '';
-  return `<span class="chip"${ecAttr(nodeHex(n), 'node')}${attrs}>${esc(label)}</span>`;
+  // EntityRef (E'c-3, kill-list §3.5) : l'ex-`.chip` + data-act="fiche-node"
+  // devient `[Nœud] Nom` — souligné → fiche nœud quand la clé résout (S.nodes,
+  // différé), sinon nom en clair replié sur la clé (jamais un lien deviné).
+  // Pas de pastille : un nœud n'a PAS de point carte (aucun nœud→point,
+  // byte-prouvé §3.1) ; la couche de récolte est le substitut dessinable.
+  return ref({ kind: 'node', key: nk, label, hex: nodeHex(n), hasFiche: !!n });
 }
 
 /* Fiche item : taux de drop (garanti / % séparés), vendeurs (+ position),
@@ -1143,13 +1147,14 @@ function openItemFiche(key) {
         const ni = npcIndexByName(n.name);
         const rec = ni >= 0 ? S.data.npc[ni] : null;
         const icon = npcIconUrl(rec?.icon);
-        // EntityRef (vague 2) : `[PNJ] Nom` (npcRef, IDENTITÉ seule — le bouton
-        // carte gotoBtn ci-dessous reste l'affordance de position du marchand,
-        // pas de double localisateur). Portrait conservé en chrome de ligne.
+        // EntityRef (E'c-3) : `[PNJ(●)] Nom` (npcRef, locate:true par défaut) —
+        // la pastille LOCATE du marchand REMPLACE l'ex-bouton carte séparé
+        // (forme verbeuse « réf + bouton position » abandonnée, intention owner) :
+        // un seul geste carte (pin persistant du marchand sur la carte active),
+        // le nom souligné ouvre sa fiche PNJ. Portrait conservé en chrome de ligne.
         return `<div class="frow">
           ${iconTag(icon, 'fr-icon', initials(n.name))}
-          ${npcRef(n.name, { ni, locate: false })}
-          ${gotoBtn(n.x, n.z, n.name, 'npc')}
+          ${npcRef(n.name, { ni })}
         </div>`;
       }).join('');
       const more = npcs.length > 6 ? `<p class="hint">${esc(tr('moreMerchants', npcs.length - 6))}</p>` : '';
@@ -1186,12 +1191,16 @@ function openItemFiche(key) {
   if (it.recipes?.length) {
     const seenRk = new Set();
     const chips = [];
-    for (const ref of it.recipes) {
-      const rk = typeof ref === 'string' ? ref : ref.key;
+    for (const rc of it.recipes) {
+      const rk = typeof rc === 'string' ? rc : rc.key;
       if (seenRk.has(rk) || !S.recipes[rk]) continue;
       seenRk.add(rk);
       const rIcon = S.recipes[rk].icon ? `icons/${S.recipes[rk].icon}` : null;
-      chips.push(`<span class="chip"${ecAttr(RECIPE_HEX, 'recipe')} data-act="fiche-recipe" data-id="${esc(rk)}">${iconTag(rIcon, 'chip-icon', '📜')}${esc(tr('recipeChipLabel', it.name))}</span>`);
+      // EntityRef (E'c-3, kill-list §3.5) : l'ex-`.chip` + data-act="fiche-recipe"
+      // devient `[Recette(●?)] Nom` — le tag [Recette] porte l'info que
+      // l'ex-libellé « Recette : … » disait en clair, souligné → fiche recette.
+      // Icône réelle du schéma conservée en chrome de tête (chip-icon).
+      chips.push(`${iconTag(rIcon, 'chip-icon', '📜')}${ref({ kind: 'recipe', key: rk, label: it.name, hex: RECIPE_HEX, hasFiche: true })}`);
     }
     if (chips.length) recipeChipHtml = `<div class="reward-chips item-recipe-row">${chips.join('')}</div>`;
   }

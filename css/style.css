@@ -1399,6 +1399,18 @@ body {
   display: flex; align-items: center; gap: 8px;
 }
 .pop h3 .pop-icon { width: 26px; height: 26px; object-fit: contain; border-radius: 50%; font-size: .68rem; flex: none; }
+/* En-tête EntityRef de popup (E'c-3) : l'icône du marqueur + la réf `[Kind] Nom`
+   sur une ligne — même gabarit que l'ex-`.pop h3` (icône ronde, gap), le nom de
+   la réf prend la taille de titre (le tag reste à sa taille de pilule). */
+.pop-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 5px; }
+.pop-head .pop-icon { width: 26px; height: 26px; object-fit: contain; border-radius: 50%; font-size: .68rem; flex: none; }
+.pop-head .ref { min-width: 0; flex-wrap: wrap; }
+.pop-head .ref-label, .pop-head .ref-label-plain {
+  font-family: var(--font-display); font-size: 1.0rem; letter-spacing: .02em;
+}
+/* Chip d'espèce d'un popup camp (icône + réf `[Espèce] Nom`) : paire inline. */
+.pop-mob { display: inline-flex; align-items: center; gap: 4px; }
+.pop-mob .chip-icon { width: 18px; height: 18px; flex: none; }
 .pop .pop-cat {
   font-family: var(--font-display);
   font-size: .62rem;

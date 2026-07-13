@@ -102,6 +102,12 @@ const KINDS = {
   zone:         { word: () => sc('zone'),                               fiche: false, mode: 'L' },  // souligné une fois la fiche région livrée (vague R)
   qao:          { word: (d, pl) => pl ? ct('qao') : sc('qao'),          fiche: false, mode: 'C' },
   chest:        { word: () => sc('chest'),                              fiche: true, mode: 'C' },
+  // Coffre fouillable (searchable_chests.bin) : entité mono-point sans couche
+  // d'arbre — mot localisé = son titre existant (searchableChestTitle, ×5) ;
+  // déjà utilisé comme kind par la pastille d'en-tête (world.js scDot) et le
+  // popup, jamais tombé sur pretty() anglais. mode N (l'affordance carte est un
+  // pin LOCATE explicite, jamais une couche de catégorie).
+  searchable_chest: { word: () => tr('searchableChestTitle'),           fiche: true, mode: 'N' },
   shrine:       { word: () => ck('shrines'),                            fiche: false, mode: 'C' },
   soulkeeper:   { word: () => ck('soulkeeper'),                         fiche: false, mode: 'C' },
   guard:        { word: () => ck('guards'),                             fiche: false, mode: 'C' },

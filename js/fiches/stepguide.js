@@ -24,7 +24,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { disambiguatedItemName, currentGoalZones, npcRef, gotoBtn, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
+import { disambiguatedItemName, currentGoalZones, npcRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 
 /* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
    PRÉCISION (blueprint §5.2), plus l'ancienne échelle posDynamic/posEstimatedZone/
@@ -154,8 +154,13 @@ function questItemRow(qi, regionHint) {
   const givenByBit = qi.givenBy
     ? `<span class="muted">${esc(tr('goalGivenByLabel'))}</span> ${npcRef(qi.givenBy)}`
     : '';
+  // EntityRef (E'c-3) : position fixe = pastille LOCATE ratifiée `[Position(●)]`
+  // (même forme que goalTargetChip's posRow) — l'ex-bouton carte (gotoBtn) séparé
+  // est ABANDONNÉ. L'item lui-même reste sans pastille (mode N, rien à dessiner) ;
+  // sa position de placement vit dans cette pastille locate, jamais un bouton
+  // « [Item] … at [bouton position] » verbeux. Zone de recherche → dynamicPosBadge.
   const posBit = (!qi.craft && (qi.x != null || qi.searchZone))
-    ? (qi.x != null ? gotoBtn(qi.x, qi.z, name) : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint))
+    ? (qi.x != null ? ref({ kind: 'position', pos: { x: qi.x, z: qi.z }, label: '' }) : dynamicPosBadge({ search_zone: qi.searchZone }, regionHint))
     : '';
   return `<div class="frow">
     ${iconTag(icon, 'fr-icon', itemGlyph(cat))}

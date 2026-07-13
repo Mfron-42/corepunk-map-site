@@ -2,7 +2,7 @@
    Fiches d'entités vivantes : monstre/espèce, famille, faune, PNJ, camp. */
 import { S } from '../state.js';
 import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
+  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
@@ -22,7 +22,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, gotoBtn, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers } from './core.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -337,12 +337,13 @@ function openCampFiche(key) {
   // #93 — activité + présence par mode (camp_details `activity`/`modes`,
   // voir campPresenceHtml ci-dessous) : formulation SOFT, jamais un timer.
   const presenceHtml = campPresenceHtml(det);
-  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré (teinte du kind de camp) + pastille
-  // LOCATE (mode L, Q7) sur le point REPRÉSENTATIF du camp (g.pts[0]) quand il
-  // a des points — bascule un pin persistant listé dans la légende (remplace
-  // l'ex-surlignage transitoire campRef self:true, kill-list §7.2, folded ici :
-  // jamais deux affordances). Le bouton « Voir sur la carte » (goto, vol
-  // caméra sans pin) reste, distinct du pin persistant.
+  // EN-TÊTE PARTAGÉ : titre coloré (teinte du kind de camp) + pastille LOCATE
+  // (mode L, Q7) sur le point REPRÉSENTATIF du camp (g.pts[0]) quand il a des
+  // points — bascule un pin persistant listé dans la légende (remplace
+  // l'ex-surlignage transitoire campRef self:true, kill-list §7.2, folded ici).
+  // E'c-3 : l'ex-bouton « Voir sur la carte » (goto) séparé est RETIRÉ — la
+  // pastille de l'en-tête EST le locate, jamais l'en-tête + un bouton position
+  // redondant sur le même point (forme verbeuse abandonnée, intention owner).
   const campDot = g.pts.length
     ? { kind: 'camp', mode: 'L', key, label: name, hex: CAMP_COLORS[g.kind] || '#999',
         drawable: true, pos: { x: g.pts[0][0], z: g.pts[0][1] } }
@@ -353,9 +354,6 @@ function openCampFiche(key) {
       sub: `${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}`,
       below: `<span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span>`,
     })}
-    <div class="fiche-section"><div class="pop-actions">
-      ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
-    </div></div>
     ${campContextSection(det)}${presenceHtml}
     ${rosterSection}
     ${cospawnHtml}
@@ -938,12 +936,18 @@ function openMonsterFiche(key) {
         </div>`;
       }).join('')}</div>` : '';
 
+  // EntityRef (E'c-3, kill-list §3.5) : l'ex-`.k-chip` de slot + `.fr-label` nu
+  // deviennent UNE référence `[Capacité] Nom` — le slot (Q/W/E/R/MA) passe en
+  // suffixe méta muet. Souligné → fiche capacité quand la clé résout (GAP §7.1
+  // fermé : ref-open `ability` est branché main.js) ; sinon nom en clair teinté
+  // (honnête, jamais un lien mort). Teinte ABILITY_HEX par défaut du kind.
   const abilitiesHtml = `<div class="fiche-section"><h3>${esc(tr('monsterAbilitiesN', m.abilities?.length || 0))}</h3>${
     m.abilities?.length
-      ? m.abilities.map(a => `<div class="frow">
-          <span class="k-chip" style="--chip-c:${ABILITY_HEX}">${esc(a.slot || '·')}</span>
-          <span class="fr-label">${esc(a.name)}</span>
-        </div>`).join('')
+      ? m.abilities.map(a => `<div class="frow">${ref({
+          kind: 'ability', key: a.key || null, label: a.name,
+          hasFiche: !!(a.key && S.abilities?.[a.key]),
+          meta: a.slot ? `· ${a.slot}` : '',
+        })}</div>`).join('')
       : `<p class="hint">${esc(tr('noAbilitiesKnown'))}</p>`
   }</div>`;
 
@@ -1194,12 +1198,17 @@ function openNpcFiche(idx) {
   // 2 lignes qui, cliquées, ouvraient une fiche vide. Révélé avec le contenu
   // dev (S.devOn), exactement comme partout ailleurs.
   const visibleSlugs = visibleQuestSlugs(r.quests);
-  // EntityRef (vague 2) : chaque quête donnée = `[Quête] Nom` (le tag remplace
-  // le badge k-chip détaché ; souligné → fiche quête). Le bouton carte
-  // (gotoBtn) reste — il vise la position de la quête (= ce donneur).
+  // EntityRef (vague E'c-3) : chaque quête donnée = `[Quête(●)] Nom`. La forme
+  // verbeuse « [Quête] Nom + bouton carte (gotoBtn) » est ABANDONNÉE (intention
+  // owner ré-emphasée : « [Kind(●)] name », jamais « [Kind] name at [Position()] ») :
+  // la pastille LOCATE (mode L, Q7) épingle/retire la position de la quête (= son
+  // donneur = CE PNJ) — un seul geste carte, le nom souligné ouvre la fiche quête.
+  // Pastille présente ⇔ position connue (q.x != null), sinon `[Quête] Nom` nu.
   const quests = visibleSlugs.map(slug => {
     const q = S.quests.get(slug);
-    return q ? `<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true })}${gotoBtn(q.x, q.z, q.name)}</div>` : '';
+    if (!q) return '';
+    const qpos = q.x != null ? { x: q.x, z: q.z } : null;
+    return `<div class="frow">${ref({ kind: 'quest', key: slug, label: q.name, hasFiche: true, mode: qpos ? 'L' : undefined, pos: qpos || undefined })}</div>`;
   }).join('');
   // Some NPCs are known only from dialog/quest-slot text, with no world
   // placement or map pin at all (site/js/i18n.js's generic posUnknown, same
@@ -1214,9 +1223,6 @@ function openNpcFiche(idx) {
   const variant = r.k ? pretty(r.k.replace(/^npc_/, '')) : '';
   const variantLine = variant && fold(variant) !== fold(r.name)
     ? `<span class="pop-coords">${esc(variant)}</span>` : '';
-  const mapBtn = r.x != null
-    ? `<button class="act primary" data-act="goto" data-x="${r.x}" data-z="${r.z}" data-label="${esc(r.name)}" data-cat="npc">${esc(tr('viewOnMapBtn'))}</button>`
-    : '';
   // Dialogue du personnage (data-accuracy audit, NPC-duplication fix): les
   // barks hello_/info_ que ce PNJ « donne » sont masqués de la liste de quêtes
   // (visibleQuestSlugs ci-dessus) car ce ne sont pas des quêtes — mais leurs
@@ -1245,7 +1251,9 @@ function openNpcFiche(idx) {
   // honnête est un pin LOCATE (mode L, Q7) : `[NPC(●)] Nom` où la pastille
   // épingle/retire ce PNJ sur la carte (pin persistant listé dans la légende).
   // Présente ⇔ une position est connue (r.x != null) ; sinon titre coloré seul
-  // (rien à localiser). Le bouton « Voir sur la carte » (goto) reste, distinct.
+  // (rien à localiser). L'ex-bouton « Voir sur la carte » (goto) séparé est
+  // RETIRÉ (E'c-3) : la pastille de l'en-tête EST le locate — un seul geste,
+  // jamais la forme verbeuse en-tête + bouton position redondant.
   // Nuance PRÉCISE de CE PNJ (entityColor, LA source unique) — le même ambre
   // que sa réf/son chip/son pin partout : « npc + Zarnok = un jaune précis pour
   // Zarnok », jamais l'ambre plat de catégorie.
@@ -1262,7 +1270,6 @@ function openNpcFiche(idx) {
     })}
     <div class="fiche-section">
       <div class="pop-actions">
-        ${mapBtn}
         <button class="act" data-act="track" data-id="npc:${idx}">${esc(tr('trackBtn'))}</button>
       </div></div>
     <div class="fiche-section"><h3>${esc(tr('questsGivenN', visibleSlugs.length))}</h3>

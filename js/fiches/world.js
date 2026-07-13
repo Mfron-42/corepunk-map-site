@@ -22,7 +22,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, gotoBtn, badge, speciesRef } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, speciesRef } from './core.js';
 
 /* Icône de coffre : chests.bin stocke un chemin client brut
    `UI/Icons/HeroAvatars/Chest/<leaf>` (694/3834 placements) ; le fichier réel
@@ -91,14 +91,9 @@ function openChestFiche(i) {
   // (lt_searchable*), pas une vraie table de coffre curée. Jamais présenté
   // comme un coffre farmable ciblé (voir DATA_CONTRACT.md §1/§3).
   const genericNote = r.lootGeneric ? `<p class="hint">${esc(tr('lootGenericNote'))}</p>` : '';
-  // Couche carte réelle de CE placement (voir main.js registerAllDenseRenderers) :
-  // camp_chest / decor:<famille> / decor:legacy -- jamais l'ancien "chest"
-  // générique, qui n'est plus le nom d'aucune couche (voir DATA_CONTRACT.md §3.1).
-  const chestCat = r.group === 'camp_chest' ? 'camp_chest'
-    : r.group === 'legacy_chest' ? 'decor:legacy'
-      : (r.group === 'decor' && r.family) ? 'decor:' + r.family : null;
-  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré (teinte réelle du coffre) + pastille
-  // LOCATE (mode L, Q7) sur sa position quand connue — pin persistant retirable.
+  // EN-TÊTE PARTAGÉ : titre coloré (teinte réelle du coffre) + pastille LOCATE
+  // (mode L, Q7) sur sa position quand connue — pin persistant retirable. E'c-3 :
+  // l'ex-bouton carte (gotoBtn) séparé est RETIRÉ, la pastille EST le locate.
   const chestDot = r.x != null
     ? { kind: 'chest', mode: 'L', key: 'chest:' + i, label: name, hex: chestHex(r), drawable: true, pos: { x: r.x, z: r.z } }
     : null;
@@ -110,9 +105,6 @@ function openChestFiche(i) {
     ? `<div class="fiche-region">${ref({ kind: 'zone', label: r.zone, hasFiche: false, drawable: false })}</div>` : '';
   openFiche(`
     ${ficheHeader({ avatar: iconTag(chestIconUrl(r), 'fiche-avatar', CHEST_GLYPH), name, hex: chestHex(r), dot: chestDot, sub: esc(chestKindLabel(r)), below: zoneRef })}
-    <div class="fiche-section"><div class="pop-actions">
-      ${gotoBtn(r.x, r.z, name, chestCat)}
-    </div></div>
     ${chestTimersHtml(r)}
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${genericNote}${drops}</div>`);
   setFicheHash(null);
@@ -133,8 +125,8 @@ function openSearchableChestFiche(k) {
   S.openFiche = { kind: 'searchable_chest', id: k };
   const region = prettyRegion(r.region);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
-  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré + pastille LOCATE (mode L, Q7) sur
-  // sa position — pin persistant retirable.
+  // EN-TÊTE PARTAGÉ : titre coloré + pastille LOCATE (mode L, Q7) sur sa
+  // position — pin persistant retirable. E'c-3 : l'ex-bouton carte séparé RETIRÉ.
   const scDot = r.x != null
     ? { kind: 'searchable_chest', mode: 'L', key: r.k, label: tr('searchableChestTitle'),
         hex: CATS.searchable_chest.hex, drawable: true, pos: { x: r.x, z: r.z } }
@@ -147,9 +139,6 @@ function openSearchableChestFiche(k) {
     ? `<div class="fiche-region">${ref({ kind: 'zone', label: region, hasFiche: false, drawable: false })}</div>` : '';
   openFiche(`
     ${ficheHeader({ name: tr('searchableChestTitle'), hex: CATS.searchable_chest.hex, dot: scDot, sub: '', below: regionRef })}
-    <div class="fiche-section"><div class="pop-actions">
-      ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
-    </div></div>
     <div class="fiche-section"><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('searchableChestRarityNote') })}</p></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash(null);
@@ -172,19 +161,16 @@ function openLocationFiche(idx) {
     ? `<div class="fiche-section"><h3>${esc(tr('familyMonstersTitle', l.monsters.length))}</h3>${l.monsters.map(fm =>
         `<div class="frow">${speciesRef({ key: fm.key, name: fm.name, meta: fm.level != null ? tr('levelAbbrev', fm.level) : '' })}</div>`
       ).join('')}</div>` : '';
-  // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré + pastille LOCATE (mode L, Q7) sur
-  // la position quand connue (38/208 lieux ont un pin _ip) — pin persistant
-  // retirable ; sinon titre coloré seul. Le bouton « Voir sur la carte » (goto)
-  // reste, distinct du pin.
+  // EN-TÊTE PARTAGÉ : titre coloré + pastille LOCATE (mode L, Q7) sur la position
+  // quand connue (38/208 lieux ont un pin _ip) — pin persistant retirable ; sinon
+  // titre coloré seul. E'c-3 : l'ex-bouton « Voir sur la carte » (goto) séparé est
+  // RETIRÉ — la pastille de l'en-tête EST le locate (jamais deux affordances).
   const locHex = entityColor('location', l.title);
   const locDot = l.x != null
     ? { kind: 'location', mode: 'L', key: idx, label: l.title, hex: locHex, drawable: true, pos: { x: l.x, z: l.z } }
     : null;
   openFiche(`
     ${ficheHeader({ name: l.title, hex: locHex, dot: locDot, sub: esc(locationKindLabel(l.kind)) })}
-    ${l.x != null ? `<div class="fiche-section"><div class="pop-actions">
-      <button class="act primary" data-act="goto" data-x="${l.x}" data-z="${l.z}" data-label="${esc(l.title)}">${esc(tr('viewOnMapBtn'))}</button>
-    </div></div>` : ''}
     ${l.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(l.desc)}</p></div>` : ''}
     ${monstersHtml}`);
   setFicheHash(null);

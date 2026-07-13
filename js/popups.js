@@ -1,17 +1,25 @@
 /* Kwalat — gabarits HTML des popups de marqueur (PNJ/POI/objet/coffre,
    quête, camp) + libellé de mob partagé avec les fiches. Vues pures :
-   uniquement du HTML, les actions passent par data-act (délégué global,
-   voir main.js). */
+   uniquement du HTML.
+   E'c-3 : l'en-tête de chaque popup est une RÉFÉRENCE `EntityRef` compacte
+   `[Kind] Nom` (js/mapref.js) — le TAG de kind remplace l'ex-ligne .pop-cat
+   couleur-seule ET le bouton fiche séparé (le nom souligné ouvre la fiche via
+   ref-open, routé par main.js). Fini la forme verbeuse « Nom / [Kind] /
+   [Position] » empilée. Popups honesty-light (blueprint §1.1) : AUCUNE pastille
+   dans l'en-tête (le marqueur cliqué EST déjà la position) ; le locate persistant
+   vit dans la FICHE, pas ici. Suivre/Fait restent des boutons d'état personnel
+   (data-act track/done), jamais des références. */
 import { S } from './state.js';
 import {
-  CATS, CAMP_COLORS, MONSTER_HEX, catLabel, campKindLabel,
+  CATS, CAMP_COLORS, MONSTER_HEX, campKindLabel,
   campLabel, campQualifierChip, chestDisplayName, activableTypeLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, speciesLayerHex,
+  chestHex, chestKindLabel, prettyRegion, speciesLayerHex,
 } from './config.js';
 import { esc, fmtCoord, iconTag, initials, npcIconUrl, cleanLabel } from './utils.js';
 import { tr } from './i18n/index.js';
 import { monsterKeyFor, locationIndexForId } from './data.js';
 import { visibleQuestSlugs } from './devcontent.js';
+import { ref } from './mapref.js';
 
 /* ── Popups ─────────────────────────────────────────────────── */
 function actionBtns(id, extra = '') {
@@ -23,39 +31,25 @@ function actionBtns(id, extra = '') {
     ${extra}</div>`;
 }
 
+/* En-tête compacte `[Kind] Nom` (EntityRef) : l'icône du marqueur reste en tête
+   de ligne, le tag+nom viennent du composant partagé (ref). */
+function popHead(icon, desc) {
+  return `<div class="pop-head">${icon}${ref(desc)}</div>`;
+}
+
 function popupHtml(cat, r, id) {
   const c = CATS[cat];
   let icon = '';
   if (cat === 'npc') icon = iconTag(npcIconUrl(r.icon), 'pop-icon', initials(r.name));
   if (cat === 'poi') icon = iconTag(r.icon ? `icons/interest_points/${encodeURIComponent(r.icon)}.png` : null, 'pop-icon', initials(r.name));
-  let extraBtn = '', extraHtml = '';
-  if (cat === 'npc') {
-    // Fiche TOUJOURS accessible depuis la carte — pas seulement pour les
-    // donneurs de quêtes. Le libellé reste sobre (« Fiche » / « Fiche ·
-    // Boutique ») : l'ancien « Fiche (3 quêtes) » se lisait comme une
-    // « fiche de quête » ; le compte de quêtes vit désormais dans la ligne
-    // de catégorie (« PNJ · Marchand · 3 quêtes »), voir catLine.
-    const label = r.vendor ? tr('ficheShopBtn') : tr('ficheBtn');
-    extraBtn = `<button class="act primary" data-act="fiche-npc" data-id="${esc(id)}">${esc(label)}</button>`;
-  }
-  // Activable : le vrai classifieur activable_type du pipeline (r.type, ex.
-  // "Radio"/"Evidence") — remplace l'ancienne prettification de la clé
-  // technique brute (qao_*), qui fuitait l'identifiant interne ("qao_radio_
-  // red" -> "Radio red") tel quel dans le popup.
-  if (cat === 'qao' && r.type) extraHtml = `<p class="pop-extra">${esc(activableTypeLabel(r.type))}</p>`;
-  // POI enrichis (pipeline pass 2026-07-11b — vrais noms InterestPoint.xml,
-  // desc/locTitle/loc joints depuis l'encyclopédie MapMarkers, region cuite) :
-  // le nom réel arrive tout seul via r.name (titre h3 ci-dessous, aucun
-  // changement requis) ; s'y ajoutent — quand présents — le titre de lore
-  // divergent (locTitle, ex. pin "Coal Village" / lore "Great Bones
-  // Village" : 15/156), le paragraphe d'encyclopédie (desc, 32/156,
-  // localisé, scrollable — .pop-desc) et un bouton vers la fiche lore
-  // existante (fiche-location) quand `loc` se résout dans S.locations
-  // (chargement DIFFÉRÉ : le popup est construit paresseusement au clic,
-  // donc quasi toujours résolu ; sinon le bouton est simplement omis, la
-  // course se répare au prochain clic — jamais un bouton mort). La ligne
-  // région vit dans catLine plus bas (pop-cat, même idiome que
-  // searchableChestPopup).
+
+  let extraHtml = '', extraRef = '';
+  // POI enrichis (vrais noms InterestPoint.xml, desc/locTitle/loc joints) : le
+  // titre de lore divergent (locTitle) et le paragraphe d'encyclopédie (desc)
+  // restent des blocs distincts. La CHRONIQUE (lore) est une entité DISTINCTE du
+  // POI → sa propre réf `[Chronique] Titre` (souligné → fiche lore via ref-open),
+  // jamais fondue dans le nom du POI. Chargement DIFFÉRÉ : le popup est construit
+  // au clic (quasi toujours résolu) ; sinon la réf est simplement omise.
   if (cat === 'poi') {
     const locTitleHtml = (r.locTitle && r.locTitle !== r.name)
       ? `<p class="pop-extra">${esc(tr('poiLoreNamed', r.locTitle))}</p>` : '';
@@ -63,95 +57,86 @@ function popupHtml(cat, r, id) {
     extraHtml = locTitleHtml + descHtml;
     const locIdx = r.loc ? locationIndexForId(r.loc) : null;
     if (locIdx != null) {
-      extraBtn = `<button class="act primary" data-act="fiche-location" data-id="${locIdx}">${esc(tr('poiLoreBtn'))}</button>`;
+      const loreName = S.locations?.[locIdx]?.title || tr('poiLoreBtn');
+      extraRef = `<div class="pop-actions">${ref({ kind: 'location', key: locIdx, label: loreName, hasFiche: true, drawable: false })}</div>`;
     }
   }
-  // Coffre placé : bouton fiche complète seulement quand une table de butin
-  // exacte est attachée. Pas de badge de type ici : le titre (h3, ci-dessous)
-  // EST déjà le type physique localisé (chestDisplayName) — un badge
-  // répéterait la même info deux fois dans la même popup.
-  if (cat === 'chest' && r.loot?.length) {
-    extraBtn = `<button class="act primary" data-act="fiche-chest" data-id="${esc(id)}">${esc(tr('ficheCompleteBtn'))}</button>`;
-  }
-  // Ligne de catégorie d'un coffre placé : la VRAIE catégorie (camp_chest/
-  // décor par famille/legacy — chestKindLabel, js/config.js) remplace
-  // l'ancien catLabel('chest') générique ("Coffres") qui conflait les 3
-  // vraies catégories (voir DATA_CONTRACT.md §3.1/§6) — CATS.chest n'existe
-  // plus du tout, `c` (CATS[cat]) est donc undefined pour cat === 'chest'.
+
   // « N quêtes » : seulement les quêtes RÉELLEMENT visibles (jamais un
-  // dialogue-bark hello_*/info_* masqué par défaut, voir devcontent.js
-  // visibleQuestSlugs) — sinon un PNJ qui ne donne AUCUNE vraie quête (juste
-  // le bark générateur de son propre "Hello X") affichait quand même
-  // « · 2 quêtes », trompeur.
+  // dialogue-bark hello_*/info_* masqué par défaut, voir devcontent.js).
   const npcQuests = cat === 'npc' ? visibleQuestSlugs(r.quests) : null;
-  // POI : la région nommée cuite (r.region, localisée — pipeline pass
-  // 2026-07-11b) complète la ligne de catégorie, même position que la
-  // région d'un coffre fouillable (searchableChestPopup ci-dessous).
-  const catLine = cat === 'chest' ? chestKindLabel(r)
-    : catLabel(cat)
-      + (cat === 'npc' && r.vendor ? tr('vendorSuffix') : '')
-      + (cat === 'npc' && npcQuests.length ? tr('questCountSuffix', npcQuests.length) : '')
-      + (cat === 'poi' && r.region ? ' · ' + r.region : '');
-  // Titre : nom d'affichage localisé pour un coffre (chestDisplayName — le
-  // nom brut est un jeton d'asset d'art jamais localisé, voir config.js) ;
-  // nettoyage TEXTURING/QItem générique (cleanLabel) pour tout le reste.
-  const title = cat === 'chest' ? chestDisplayName(r) : cleanLabel(r.name);
-  const chipColor = cat === 'chest' ? chestHex(r) : c.hex;
+
+  // Titre : nom d'affichage localisé pour un coffre (vrai nom officiel
+  // r.displayName sinon chestDisplayName — le nom brut est un jeton d'asset
+  // jamais localisé) ; nettoyage TEXTURING/QItem générique (cleanLabel) sinon.
+  const title = cat === 'chest' ? (r.displayName || chestDisplayName(r)) : cleanLabel(r.name);
+
+  // Descripteur EntityRef par catégorie. Fiche pliée dans le nom souligné
+  // (ref-open) là où une fiche existe et route ; sinon nom en clair honnête
+  // (poi/qao/atelier — pas de fiche directe). Aucune pastille (drawable:false —
+  // honesty-light, le marqueur EST la position).
+  let desc;
+  if (cat === 'npc') {
+    // Fiche PNJ TOUJOURS accessible : le nom souligné remplace l'ex-bouton
+    // « Fiche »/« Fiche · Boutique ». Rôle vendeur + compte de quêtes → méta
+    // muette (l'ex-ligne pop-cat « PNJ · Marchand · 3 quêtes »).
+    const meta = `${r.vendor ? tr('vendorSuffix') : ''}${npcQuests.length ? tr('questCountSuffix', npcQuests.length) : ''}`;
+    desc = { kind: 'npc', key: id, label: title, hasFiche: true, drawable: false, meta };
+  } else if (cat === 'poi') {
+    desc = { kind: 'poi', label: title, hex: c.hex, hasFiche: false, drawable: false, meta: r.region ? ` · ${r.region}` : '' };
+  } else if (cat === 'qao') {
+    // Activable : le vrai classifieur activable_type (r.type, ex. « Radio ») en
+    // méta — remplace l'ancienne prettification du jeton technique brut.
+    desc = { kind: 'qao', label: title, hex: c.hex, hasFiche: false, drawable: false, meta: r.type ? ` · ${activableTypeLabel(r.type)}` : '' };
+  } else if (cat === 'chest') {
+    // Fiche complète seulement quand une table de butin exacte est attachée
+    // (nom souligné ⇔ r.loot présent). La VRAIE catégorie (chestKindLabel :
+    // camp_chest / décor par famille / legacy) passe en méta.
+    desc = { kind: 'chest', key: id, label: title, hex: chestHex(r), hasFiche: !!r.loot?.length, drawable: false, meta: ` · ${chestKindLabel(r)}` };
+  } else {
+    // Atelier / autre couche à pictogramme : `[Kind] Nom` non souligné.
+    desc = { kind: cat, label: title, hex: c ? c.hex : null, hasFiche: false, drawable: false };
+  }
+
   return `<div class="pop">
-    <h3>${icon}${esc(title)}</h3>
-    <div class="pop-cat" style="color:${chipColor}">${esc(catLine)}</div>
+    ${popHead(icon, desc)}
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
     ${extraHtml}
-    ${actionBtns(id, extraBtn)}</div>`;
+    ${extraRef}
+    ${actionBtns(id)}</div>`;
 }
 
-/* Popup « coffre fouillable » (searchable_chests.bin, poi_searchable_chest_*
-   — LE vrai coffre farmable de recette, voir DATA_CONTRACT.md §4) : distinct
-   des placements chest (S.data.chest) ci-dessus, sa propre popup (forme de
-   données différente : region/rarity au lieu de name/type). Bouton fiche
-   complète seulement quand une table de recette est attachée (même garde
-   que popupHtml ci-dessus). */
+/* Popup « coffre fouillable » (searchable_chests.bin — LE vrai coffre farmable
+   de recette, voir DATA_CONTRACT.md §4) : distinct des placements chest.
+   En-tête `[Coffre fouillable] <région>` : le tag nomme le kind, la région
+   (seule info distinctive — aucun nom propre côté données) est le libellé,
+   souligné → fiche recette quand une table est attachée (même garde qu'avant). */
 function searchableChestPopup(r) {
   const id = 'searchable_chest:' + r.k;
   const region = prettyRegion(r.region);
-  const extraBtn = r.loot?.length
-    ? `<button class="act primary" data-act="fiche-searchable-chest" data-id="${esc(r.k)}">${esc(tr('ficheCompleteBtn'))}</button>`
-    : '';
+  const desc = {
+    kind: 'searchable_chest', key: r.k, label: region || tr('searchableChestTitle'),
+    hex: CATS.searchable_chest.hex, hasFiche: !!r.loot?.length, drawable: false,
+  };
   return `<div class="pop">
-    <h3>${esc(tr('searchableChestTitle'))}</h3>
-    <div class="pop-cat" style="color:${CATS.searchable_chest.hex}">${esc(region)}</div>
+    ${popHead('', desc)}
     <span class="pop-coords">${fmtCoord(r.x, r.z)}</span>
-    ${actionBtns(id, extraBtn)}</div>`;
+    ${actionBtns(id)}</div>`;
 }
 
-/* questPopup (popup du point violet "quête" au clic sur le point canvas
-   posé à la position de son donneur) a été retirée avec la couche
-   registerDense('quest', ...) elle-même (main.js registerAllDenseRenderers,
-   2026-07-11) : ce point dupliquait exactement le pin PNJ du même donneur
-   (giver-pos-snap). Une quête se lit désormais sur le pin de son donneur
-   (popup PNJ "N quêtes" + fiche "Quêtes données") et via la recherche,
-   jamais plus via son propre marqueur carte -- voir CATS.quest (config.js,
-   sa .hex reste utilisée par les chips/liens quête ailleurs) et
-   urlstate.js (exclusion explicite du jeton `on=quest`). */
-/* Libellé de mob commun (fiche camp / popup camp) : cliquable vers la fiche
-   monstre quand elle existe, texte simple sinon. */
+/* questPopup a été retirée avec la couche registerDense('quest', ...) : une
+   quête se lit désormais sur le pin de son donneur (popup PNJ « N quêtes » +
+   fiche « Quêtes données ») et via la recherche, jamais via son propre marqueur. */
+
+/* Libellé de mob commun (partagé fiche/popup) : `[Espèce] Nom` (EntityRef,
+   identité — souligné → fiche monstre quand elle existe). Honesty-light : pas de
+   pastille (contexte popup). Note : ce helper n'a plus d'appelant vivant (rendu
+   des mobs de popup inliné dans campPopup) ; conservé pour compat d'export. */
 function mobLabelHtml(m, cls) {
-  // `m.lvl` (camp_details mob row) sert d'indice de niveau à monsterKeyFor
-  // (task #80 -- "quest zone/step level hint") : ce camp connaît le niveau
-  // réel du spawn ici, donc la fiche ouverte doit être la variante d'ESPÈCE
-  // la plus proche de CE niveau, pas un repli arbitraire (canonicalSiteKey
-  // pourrait être un niveau tout autre, ex. 20, pour un mob de camp niv 2).
   const mk = monsterKeyFor(m.key, m.name, m.lvl);
-  // Couleur d'entité : la teinte PRÉCISE de l'ESPÈCE (speciesLayerHex, Q6 — la
-  // MÊME que son titre de fiche, sa ligne d'arbre et ses points carte), pas
-  // l'ambre-rouge plat MONSTER_HEX ; repli MONSTER_HEX tant que l'espèce n'est
-  // pas résolue (S.monsters différé). La teinte affirme le KIND+l'identité, pas
-  // la cliquabilité (portée par .link/data-act).
   const spId = mk ? S.monsters?.[mk]?.species : null;
   const hex = spId ? speciesLayerHex(spId) : MONSTER_HEX;
-  return mk
-    ? `<span class="${cls} link"${ecAttr(hex, 'monster')} data-act="fiche-monster" data-id="${esc(mk)}">${esc(m.name)}</span>`
-    : `<span class="${cls}"${ecAttr(hex, 'monster')}>${esc(m.name)}</span>`;
+  return ref({ kind: 'species', key: mk || null, label: m.name, hex, hasFiche: !!mk, drawable: false });
 }
 
 function campPopup(p, n) {
@@ -160,32 +145,33 @@ function campPopup(p, n) {
   let extra = '';
   if (det?.mobs?.length) {
     extra = `<div class="pop-mobs">${det.mobs.slice(0, 4).map(m => {
+      // `m.lvl` (camp_details) sert d'indice de niveau à monsterKeyFor (#80) :
+      // la fiche ouverte doit être la variante d'ESPÈCE la plus proche de CE
+      // niveau, pas un repli arbitraire.
       const mk = monsterKeyFor(m.key, m.name, m.lvl);
       const spId = mk ? S.monsters?.[mk]?.species : null;
       const hex = spId ? speciesLayerHex(spId) : MONSTER_HEX;   // teinte précise d'espèce (Q6)
-      const attrs = mk ? ` data-act="fiche-monster" data-id="${esc(mk)}"` : '';
-      // Fourchette de niveau du camp (m.lvlMax, folded-row polish task #80)
-      // quand elle diffère de m.lvl -- même idiome que openCampFiche/
-      // campMobLevelLine, juste sans le "×N" (chip de popup trop compact).
+      // Fourchette de niveau du camp (m.lvlMax) quand elle diffère de m.lvl.
       const lvlTxt = m.lvl != null
         ? (m.lvlMax != null && m.lvlMax !== m.lvl ? tr('levelRangeAbbrev', m.lvl, m.lvlMax) : tr('levelAbbrev', m.lvl))
         : '';
-      return `<span class="chip"${ecAttr(hex, 'monster')}${attrs}>${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${esc(m.name)}${lvlTxt ? ` <i>${esc(lvlTxt)}</i>` : ''}</span>`;
+      // EntityRef (E'c-3) : `[Espèce] Nom` (identité, honesty-light — pas de
+      // pastille en popup) REMPLACE l'ex-`.chip` + ecAttr + data-act. Icône en
+      // tête, niveau en méta muette.
+      return `<span class="pop-mob">${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'chip-icon', initials(m.name))}${ref({ kind: 'species', key: mk || null, label: m.name, hex, hasFiche: !!mk, drawable: false, meta: lvlTxt })}</span>`;
     }).join('')}</div>`;
   }
-  // Fiche TOUJOURS accessible (même sans fiche camp détaillée : la fiche
-  // affiche au minimum les points de spawn + le butin probable des
-  // contenants typés — voir openCampFiche).
-  const ficheBtn = `<div class="pop-actions"><button class="act primary" data-act="fiche-camp" data-id="${esc(g.k)}">${esc(tr('campFicheBtn'))}</button></div>`;
-  // Titre : nom EXPÉDIÉ (g.name) + SOUS-TYPE CUIT (g.subtype — ontology
-  // chunk 2) via campLabel (config.js — LE formateur unique, qui lit les
-  // champs de classification du record), + chip qualificatif (— Patrouille /
-  // — Renforcé (PvP)) quand le camp en porte un.
+  // En-tête compacte `[Camp] Nom · <kind>[ · N ici]` : le tag remplace l'ex-ligne
+  // .pop-cat, le nom souligné remplace l'ex-bouton « Fiche camp » (ref-open camp,
+  // fiche TOUJOURS accessible). Sous-type cuit (campLabel) + chip qualificatif
+  // (— Patrouille / — Renforcé (PvP)) conservés. Honesty-light : pas de pastille.
+  const name = campLabel(g.k, g.kind, g.name, g.subtype);
+  const meta = `· ${campKindLabel(g.kind)}${n > 1 ? tr('pointsHereSuffix', n) : ''}`;
+  const desc = { kind: 'camp', key: g.k, label: name, hex: CAMP_COLORS[g.kind] || '#999', hasFiche: true, drawable: false, meta };
   return `<div class="pop">
-    <h3>${esc(campLabel(g.k, g.kind, g.name, g.subtype))}${campQualifierChip(g.qualifier)}</h3>
-    <div class="pop-cat" style="color:${CAMP_COLORS[g.kind] || '#999'}">${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}${n > 1 ? esc(tr('pointsHereSuffix', n)) : ''}</div>
+    <div class="pop-head">${ref(desc)}${campQualifierChip(g.qualifier)}</div>
     <span class="pop-coords">${fmtCoord(p.x, p.z)} · ${esc(tr('spawnsTotal', g.pts.length))}</span>
-    ${extra}${ficheBtn}</div>`;
+    ${extra}</div>`;
 }
 
 export { popupHtml, campPopup, mobLabelHtml, searchableChestPopup };

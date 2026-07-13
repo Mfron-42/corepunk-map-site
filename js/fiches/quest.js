@@ -4,7 +4,7 @@
 import { S } from '../state.js';
 import {
   CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
+  campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, npcRef, gotoBtn, crossMapBtn, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone, badge } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, npcRef, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone, badge } from './core.js';
 import { goalStepsSection, questItemRow, questItemAddsInfo, dynamicPosBadge, setQuestItemDisambig, setQuestItemFlags } from './stepguide.js';
 
 /* Avatar HeroAvatars -- traite le leaf générique `Dwarf_dark` comme "pas
@@ -279,48 +279,61 @@ function openQuestFiche(slug) {
   // retomber sur le "position inconnue" de gotoBtn pour un slot de quête.
   // Un acteur sur une AUTRE carte (a.map ≠ carte active) : bouton de bascule
   // cross-carte au lieu d'un goTo qui tomberait dans le mauvais repère.
+  // Position ratifiée d'un acteur NON épinglable-par-identité (mob/objet/inconnu),
+  // même échelle que goalTargetChip's posRow : `[Position(●)]` locate quand une
+  // coord existe (bascule cross-carte incluse via pos.map), sinon le badge
+  // d'honnêteté dynamicPosBadge (zone de recherche / non localisé). REMPLACE
+  // l'ex-gotoBtn/crossMapBtn — l'affordance carte est désormais TOUJOURS une
+  // pastille ratifiée, jamais un bouton « Carte » séparé.
+  const actorPosRef = a => a.x == null
+    ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
+    : (a.map && a.map !== S.map)
+      ? ref({ kind: 'position', pos: { x: null, z: null, map: a.map }, label: mapName(a.map) })
+      : ref({ kind: 'position', pos: { x: a.x, z: a.z }, label: '', subrole: a.kind === 'npc' ? 'npc' : null });
   const actorRows = (q.actors || []).map(a => {
     const onOtherMap = a.map && a.map !== S.map;
-    // Acteur PNJ résolu par nom (npcIndexByName) : la position BRUTE de
-    // l'acteur (a.x/a.z, un placement/point de graphe de quête) peut différer
-    // de quelques unités du pin NPC réellement affiché pour ce même
-    // personnage (map_marker.pos -- voir npc_dual_identity_INVESTIGATION.md
-    // §2/§3, cas Ophelia Voss) ; quand le personnage est connu de la carte
-    // active, on vise directement SON pin -- fixe le "deux marqueurs, deux
-    // icônes" pour ce cas ET permet à findRenderedMarker() de le retrouver
-    // exactement (voir gotoBtn's `cat`/pins.js resolveGotoMarker).
+    // Acteur PNJ résolu par nom (npcIndexByName) : quand le personnage est connu
+    // de la carte active, on vise directement SON pin (map_marker.pos, jamais la
+    // position brute a.x/a.z qui peut différer de quelques unités -- cas Ophelia
+    // Voss, npc_dual_identity_INVESTIGATION.md §2/§3) : npcRef locate résout SON
+    // pin lui-même.
     const ni = (a.kind === 'npc' && !onOtherMap) ? npcIndexByName(a.label) : -1;
     const npcPin = ni >= 0 ? S.data.npc[ni] : null;
-    const posX = npcPin && npcPin.x != null ? npcPin.x : a.x;
-    const posZ = npcPin && npcPin.x != null ? npcPin.z : a.z;
-    const posCat = npcPin && npcPin.x != null ? 'npc' : null;
-    const posCell = a.x == null ? dynamicPosBadge({ search_zone: a.searchZone }, regionHint)
-      : onOtherMap ? crossMapBtn(a.map, a.x, a.z, cleanLabel(a.label))
-        : gotoBtn(posX, posZ, cleanLabel(a.label), posCat);
-    // Acteur PNJ cliquable vers sa fiche (quêtes + boutique) quand il est
-    // connu de la carte active ; monstre idem vers sa fiche bestiaire —
-    // navigation quête → PNJ/monstre sans repasser par la recherche.
     const aLabel = cleanLabel(a.label);   // affichage nettoyé, résolutions sur la donnée brute
-    // EntityRef (vague 2) : l'ex-badge k-chip + lien deviennent une référence
-    // d'IDENTITÉ `[PNJ]`/`[Espèce]`/`[Objet]` — SANS pastille : la cellule de
-    // position (posCell) juste à côté est l'affordance carte propre à CET
-    // acteur PLACÉ (jamais une couche espèce-entière). Nom souligné ⇔ résolu
-    // (mêmes gardes/sources qu'avant : npcIndexByName / monsterKeyFor). Un
-    // acteur "mob" (créature — jamais "monster", qui est le kind de cible
-    // RÉSOLUE de geo.py) porte la teinte espèce précise ; un kind non reconnu
-    // (rare) garde une identité générique, aucun kind EntityRef ne mappant un
-    // type d'acteur arbitraire (justifié, jamais un faux tag).
-    let actorRef;
-    if (a.kind === 'npc') {
-      actorRef = npcRef(aLabel, { ni, locate: false });
+    // EntityRef (E'c-3) : l'identité ET la position se FONDENT en une seule
+    // `[Kind(●)]` dès que le kind est épinglable — un PNJ résolu sur la carte
+    // active devient `[PNJ(●)]` (npcRef locate, le pin EST la position), plus de
+    // « identité + bouton position séparé » (forme verbeuse abandonnée, intention
+    // owner). Les kinds sans couche/pin propre (mob/objet/inconnu) gardent
+    // l'identité + une pastille `[Position(●)]` ratifiée (actorPosRef).
+    let actorRef, posCell = '';
+    if (a.kind === 'npc' && ni >= 0 && npcPin && npcPin.x != null) {
+      actorRef = npcRef(aLabel, { ni });                       // [PNJ(●)] pin fondu dedans
+    } else if (a.kind === 'npc' && onOtherMap && a.x != null) {
+      // PNJ cross-carte : la pastille bascule de carte PUIS épingle (main.js
+      // ref-draw mode L) ; pas de fiche PNJ atteignable ici (autre carte).
+      actorRef = ref({ kind: 'npc', label: aLabel, mode: 'L', pos: { x: a.x, z: a.z, map: a.map }, hasFiche: false, meta: `· ${mapName(a.map)}` });
+    } else if (a.kind === 'npc') {
+      // PNJ non épinglable par son identité (nom non joint à un pin, ou cross-carte
+      // sans coord) : identité + position ratifiée (actorPosRef → `[Position(●)]`
+      // quand a.x existe, sinon dynamicPosBadge). Ne JAMAIS perdre la position
+      // fixe d'un acteur non résolu (l'ex-gotoBtn la portait déjà).
+      actorRef = npcRef(aLabel, { ni: onOtherMap ? -1 : ni, locate: false });
+      posCell = actorPosRef(a);
     } else if (a.kind === 'mob') {
       const mk = monsterKeyFor(null, a.label);
       const spId = mk ? S.monsters[mk]?.species : null;
       actorRef = ref({ kind: 'species', key: mk || null, label: aLabel, hex: spId ? speciesLayerHex(spId) : MONSTER_HEX, hasFiche: !!mk, drawable: false });
+      posCell = actorPosRef(a);
     } else if (a.kind === 'object') {
       actorRef = ref({ kind: 'qao', mode: 'N', label: aLabel });
+      posCell = actorPosRef(a);
     } else {
-      actorRef = `<span class="k-chip" style="--chip-c:#8d99ae">${esc(actorKindLabel(a.kind))}</span> <span class="fr-label">${esc(aLabel)}</span>`;
+      // Kind d'acteur non mappé (rare) : réf générique inerte (le tag nomme le
+      // kind, nom en clair, aucun lien/tracé) — l'ex-`.k-chip` détaché est
+      // SUPPRIMÉ (kill-list §3.5). Teinte neutre explicite (jamais un tag cassé).
+      actorRef = ref({ kind: a.kind, label: aLabel, hex: '#8d99ae', hasFiche: false, drawable: false });
+      posCell = actorPosRef(a);
     }
     return `
     <div class="frow">
@@ -404,8 +417,6 @@ function openQuestFiche(slug) {
   // second lookup ici.
   const giverX = giverPin && giverPin.x != null ? giverPin.x : q.x;
   const giverZ = giverPin && giverPin.x != null ? giverPin.z : q.z;
-  const giverCat = giverPin && giverPin.x != null ? 'npc' : null;
-  const giverCatAttr = giverCat ? ` data-cat="${giverCat}"` : '';
   // Nuance PRÉCISE de CETTE quête (entityColor, source unique) — même violet
   // que sa réf/son chip partout.
   const questHex = entityColor('quest', q.name);
@@ -413,14 +424,14 @@ function openQuestFiche(slug) {
   // quête se lit sur le PIN de son donneur. Quand ce donneur est un PNJ résolu
   // AVEC position (giverRefPinnable), la réf `[PNJ(●)] <donneur>` sous le titre
   // devient LE pin PRIMAIRE (locate:true, épingle/retire, centre la caméra) —
-  // « make the giver ref the primary pin ». On SUPPRIME alors les deux
-  // affordances redondantes qui visaient le même point : la pastille du TITRE
-  // (questDot) ET le bouton « Voir le donneur » (l'épinglage centre déjà). Le
+  // « make the giver ref the primary pin ». On SUPPRIME alors les affordances
+  // redondantes qui visaient le même point : la pastille du TITRE (questDot). Le
   // titre reste coloré, sans pastille (comme une fiche objet). REPLI seulement
   // quand le donneur n'est PAS épinglable par sa réf (nom non résolu à un pin,
-  // mais q.x connu hors-zone) : la pastille du titre + le bouton restent la
-  // SEULE affordance carte (label = nom de quête). Jamais deux pins pour le
-  // même donneur (redondance signalée par l'owner). */
+  // mais q.x connu hors-zone) : la pastille du titre `[Quête(●)]` (questDot)
+  // devient la SEULE affordance carte. E'c-3 : l'ex-bouton « Voir le donneur »
+  // (goto) séparé est RETIRÉ même dans ce repli — la pastille du titre EST le
+  // locate, jamais un pin + un bouton position redondants sur le même point. */
   const giverRefPinnable = giverNi >= 0 && giverPin && giverPin.x != null;
   const questPosFallback = !giverRefPinnable && q.x != null && q.posSource !== 'zone';
   const questDot = questPosFallback
@@ -456,7 +467,6 @@ function openQuestFiche(slug) {
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}`,
     })}
     <div class="fiche-section"><div class="pop-actions">
-      ${questPosFallback ? `<button class="act primary" data-act="goto" data-x="${giverX}" data-z="${giverZ}" data-label="${esc(q.giver || q.name)}"${giverCatAttr}>${esc(tr('viewGiverBtn'))}</button>` : ''}
       ${zoneBtn}
       <button class="act" data-act="track" data-id="quest:${esc(slug)}">${esc(tr('trackBtn'))}</button>
       <button class="act" data-act="done" data-id="quest:${esc(slug)}">${esc(tr('doneBtn'))}</button>
