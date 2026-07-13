@@ -18,7 +18,7 @@
     (Node, sans DOM ni `location`) : ne
    lit RIEN de global, uniquement la chaîne passée en argument. Priorité
    (une seule pseudo-page à la fois, mêmes clés que urlstate.js carryKeys) :
-   q > i > mon > fam > npc > camp > map (absent ⇒ Kwalat, cf. readHash). Jamais de
+   q > i > mon > fam > npc > camp > zone > map (absent ⇒ Kwalat, cf. readHash). Jamais de
    querystring, jamais `lang`, jamais x/z/zm — le pan/zoom ne doit JAMAIS
    compter une visite (voir dédoublonnage de l'effet de bord plus bas). */
 export function hashToPseudoPath(hash) {
@@ -29,6 +29,9 @@ export function hashToPseudoPath(hash) {
   if (p.has('fam')) return '/family/' + encodeURIComponent(p.get('fam'));
   if (p.has('npc')) return '/npc/' + encodeURIComponent(p.get('npc'));
   if (p.has('camp')) return '/camp/' + encodeURIComponent(p.get('camp'));
+  // Fiche RÉGION (vague E'c-R) : jeton `zone=<zone_id>`, même carry-key que les
+  // autres jetons de fiche (urlstate.js) — une pseudo-page par région ouverte.
+  if (p.has('zone')) return '/zone/' + encodeURIComponent(p.get('zone'));
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');
 }
 

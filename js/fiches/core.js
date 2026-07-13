@@ -196,13 +196,16 @@ function openFiche(html) {
    fiche et canGoBackLocally()/unfocus() ne fonctionneraient plus jamais. */
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam'); p.delete('wsp');
+  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam'); p.delete('wsp'); p.delete('zone');
   if (kind === 'quest') p.set('q', id);
   else if (kind === 'item') p.set('i', id);
   else if (kind === 'npc') p.set('npc', id);
   else if (kind === 'monster') p.set('mon', id);
   else if (kind === 'family') p.set('fam', id);
   else if (kind === 'wildlife') p.set('wsp', id);
+  // Fiche RÉGION (vague E'c-R) : jeton `zone=<zone_id>`, mutuellement exclusif
+  // des autres jetons de fiche (tous supprimés ci-dessus, un seul à la fois).
+  else if (kind === 'region') p.set('zone', id);
   else if (kind) p.set('camp', id);
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
@@ -836,7 +839,7 @@ export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
   gotoBtn, crossMapBtn, fmtNum, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
-  qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef,
+  qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef,
   disambiguateQuestItems, disambiguatedItemName,
   farmCampRow, farmUnjoinedRow, farmCapRows,
   resetGoalZones, clearGoalZone, viewGoalZone, viewMonsterZone, drawNamedZone,

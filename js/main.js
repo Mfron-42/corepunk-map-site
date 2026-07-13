@@ -15,13 +15,13 @@ import {
   map, toWorld, registerDense, registerDomDense, scheduleRedraw,
   denseRenderers, buildZoneLayer, markerId, showHighlight, clearHighlight, hasHighlight,
 } from './mapview.js';
-import { loadCritical, loadDeferred, resetDeferred, initVersion } from './data.js';
+import { loadCritical, loadDeferred, resetDeferred, initVersion, whenDeferred } from './data.js';
 import { startUpdateWatcher, refreshUpdateBannerI18n } from './updatecheck.js';
 import { popupHtml, campPopup, searchableChestPopup } from './popups.js';
 import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
-  openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche,
+  openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche, openRegionFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -234,9 +234,12 @@ initMapRefDelegation(document, {
       // atteignable que par la recherche — une référence [Capacité] à clé
       // prouvée (S.abilities) est désormais soulignée et route ici.
       case 'ability': openAbilityFiche(info.key); break;
-      // zone (fiche région, vague R) : opener pas encore branché — le
-      // libellé rend un span non-souligné honnête (mapref.js hasFiche=false),
-      // donc aucun ref-open n'est émis d'ici.
+      // Fiche RÉGION (vague E'c-R) : une réf `[Région]` soulignée (nom résolu à
+      // une région cataloguée, zone.js regionFicheExists) ouvre sa fiche. La
+      // clé porte le NOM (réfs monster-zone/region/camp) ou est absente (réf
+      // d'objectif enter_zone) → openRegionFiche accepte les deux et résout
+      // nom→zone_id lui-même (jamais re-dérivé par surface).
+      case 'zone': openRegionFiche(info.key != null ? info.key : info.label); break;
     }
   },
   draw(info) {
@@ -289,6 +292,13 @@ initMapRefDelegation(document, {
         // même primitive single-slot que la zone d'objectif). La clé porte le
         // NOM de la région (résolu par nom sur S.zonesGeo côté fiches.js).
         if (info.kind === 'zone' && info.subrole === 'monster-zone') { drawNamedZone(info.key); break; }
+        // Contour d'une RÉGION ([Région(●)], subrole « region » — en-tête de
+        // fiche région, ligne région d'une fiche camp) : même primitive
+        // single-slot (drawNamedZone, effacée à la fermeture de fiche). La clé
+        // porte le NOM de la région (résolu par nom sur S.zonesGeo). N'attrape
+        // PAS la réf d'objectif enter_zone (subrole absent, mode L) : elle reste
+        // un pin locate au centroïde, traitée par la branche mode L plus bas.
+        if (info.kind === 'zone' && info.subrole === 'region') { drawNamedZone(info.key != null ? info.key : info.label); break; }
         // Camp individuel (mode E) — surlignage transitoire self-toggle (vague
         // 2, remplace l'ex-surlignage de camp, kill-list §7.2) : un camp n'a
         // aucun nœud d'arbre. Un camp CROSS-carte (farmUnjoinedRow) est mode L →
@@ -651,6 +661,21 @@ async function setLang(code) {
     buildDevToggle();  // le compte de monstres isTest n'est connu qu'ici
   });
 }
+/* ── Restauration d'état + fiche RÉGION par lien profond (vague E'c-R) ────────
+   applyLocationState() (router.js) restaure caméra/filtres/fiche pour tous les
+   jetons de fiche SAUF `zone=<zone_id>` (la fiche région, nouvelle surface,
+   route et restaure ici — main.js porte le routage EntityRef + ce jeton). Le
+   jeton est LU AVANT applyLocationState : sa closeFiche() supprime `zone` du
+   hash (jeton de fiche mutuellement exclusif), donc on le capture d'abord puis
+   on rouvre la fiche région APRÈS. whenDeferred : la fiche a besoin de
+   zones_contents.bin (chargement différé, comme camp/monster) — synchrone si
+   déjà prêt (popstate après boot), différé au tout premier chargement (le hash
+   `zone` est re-posé par openRegionFiche quand la donnée arrive). */
+async function restoreState() {
+  const zone = new URLSearchParams(location.hash.slice(1)).get('zone');
+  await applyLocationState();
+  if (zone) whenDeferred(() => openRegionFiche(zone));
+}
 /* ── Démarrage ──────────────────────────────────────────────── */
 (async function init() {
   applyStaticI18n();
@@ -721,7 +746,7 @@ async function setLang(code) {
 
   // await : un lien profond map=<id> doit avoir basculé la carte avant qu'on
   // masque le voile de chargement (sinon flash de Kwalat puis bascule).
-  await applyLocationState();
+  await restoreState();
   // Drapeaux utilisateur (#84) : appel explicite ICI en plus du hook
   // onMapSwitch ci-dessus -- un boot SANS bascule de carte (pas de `map=`
   // dans le hash, Kwalat déjà actif par défaut) ne déclenche jamais
@@ -742,7 +767,7 @@ async function setLang(code) {
   // pas par une navigation en app" — canGoBackLocally()/unfocus() s'en servent
   // pour savoir si un Précédent natif est sûr (voir pushFocusState() plus haut).
   history.replaceState({ cpm: true, cpmSeq: 0 }, '', location.hash);
-  window.addEventListener('popstate', () => applyLocationState());
+  window.addEventListener('popstate', () => restoreState());
 
   // Camps, fiches camp, recettes, stock des vendeurs : chargés en tâche de
   // fond, sans avoir bloqué le premier rendu ni les fiches ci-dessus. Le

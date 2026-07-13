@@ -12,3 +12,4 @@ export { openQuestFiche, flyToQuestZone } from './fiches/quest.js';
 export { openMonsterFiche, openFamilyFiche, openWildlifeFiche, openNpcFiche, openCampFiche } from './fiches/entity.js';
 export { openItemFiche, openRecipeFiche, openLootTableFiche, openNodeFiche, openAbilityFiche, setRollRarity } from './fiches/item.js';
 export { openChestFiche, openSearchableChestFiche, openLocationFiche } from './fiches/world.js';
+export { openRegionFiche } from './fiches/zone.js';

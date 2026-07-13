@@ -23,6 +23,7 @@ import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
 import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers } from './core.js';
+import { regionRef, regionFicheExists } from './zone.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -262,14 +263,18 @@ function campRegionRow(det) {
   const dom = det && det.dominantZone;
   const zones = (det && det.zones) || [];
   if (!dom && !zones.length) return '';
-  // dominantZone : texte localisé NU (deviendra une réf `[Région]` en vague E′c-R).
-  const domHtml = dom ? `<span class="camp-region-name">${esc(dom)}</span>` : '';
+  // E'c-R : dominantZone/zones — cuites en TEXTE localisé NU par E′c-4b, prêtes à
+  // devenir des réfs — sont désormais des `[Région(●)]` (regionRef) : nom
+  // souligné → openRegionFiche, pastille → contour du polygone. Les 217 camps à
+  // région pointent tous vers une région cataloguée (nom résolu, jamais un lien
+  // mort). La provenance DERIVED (attribution point-en-polygone) reste badgée.
+  const domHtml = dom ? regionRef(dom) : '';
   // Liste COMPLÈTE des AUTRES régions couvertes (la dominante est déjà mise en
-  // avant ci-dessus — jamais répétée ; noms déjà échappés puis passés au
-  // gabarit i18n de confiance, pas de double-échappement).
+  // avant ci-dessus — jamais répétée), chacune une réf `[Région(●)]`. Le gabarit
+  // i18n campRegionAlsoIn reçoit du HTML de réfs (concaténé), pas du texte échappé.
   const others = zones.filter(z => z !== dom);
   const othersHtml = others.length
-    ? `<span class="camp-region-others">${tr('campRegionAlsoIn', others.map(esc).join(' · '))}</span>` : '';
+    ? `<span class="camp-region-others">${tr('campRegionAlsoIn', others.map(z => regionRef(z)).join(''))}</span>` : '';
   return `<div class="camp-region-row">
     <span class="camp-region-label">${esc(tr('campRegionLabel'))}</span>
     ${domHtml}${othersHtml}
@@ -844,10 +849,16 @@ function openMonsterFiche(key) {
   // (honnête : région réelle, simplement pas traçable ici — cross-carte / non
   // décodée). `drawn:false` explicite : tracé one-shot, jamais un toggle
   // persistant (même contrat que la réf goal-zone).
+  // E'c-R : le NOM de région devient une réf `[Région(●)]` SOULIGNÉE quand une
+  // fiche région existe (regionFicheExists — les 15 régions de spawn en ont
+  // toutes une) → ref-open ouvre openRegionFiche (main.js), la pastille
+  // (subrole « monster-zone », inchangée) dessine toujours le contour du
+  // polygone. Un nom sans fiche cataloguée reste en clair (honnête). C'est le
+  // payoff owner : « où sont les imps ? » — chaque région est cliquable.
   const zoneGeoFold = new Set((S.zonesGeo || []).map(z => fold(z.name)));
   const foundInHtml = zones.length
     ? `<div class="fiche-section"><h3>${esc(tr('monsterFoundInTitle'))}</h3><div class="reward-chips">${
-      zones.map(zn => ref({ kind: 'zone', subrole: 'monster-zone', key: zn, label: zn, drawable: zoneGeoFold.has(fold(zn)), drawn: false })).join('')
+      zones.map(zn => ref({ kind: 'zone', subrole: 'monster-zone', key: zn, label: zn, hasFiche: regionFicheExists(zn), drawable: zoneGeoFold.has(fold(zn)), drawn: false })).join('')
     }</div></div>`
     : '';
   // Contenu dev (feature #13) : marqueur explicite quand la variante

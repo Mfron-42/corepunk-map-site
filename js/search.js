@@ -17,8 +17,9 @@ import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
-  openRecipeFiche, openNodeFiche, openWildlifeFiche,
+  openRecipeFiche, openNodeFiche, openWildlifeFiche, openRegionFiche,
 } from './fiches.js';
+import { regionFicheExists } from './fiches/zone.js';
 import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
@@ -576,13 +577,17 @@ function buildCampSearchIndex() {
 }
 
 /* Régions nommées (zones_geo.json, chargé au critique — voir loadCritical) :
-   clic -> zoom sur les anneaux réels de la région (pas juste son point
-   d'étiquette) + active la couche "Zones" si elle était masquée, pour que
-   le polygone soit effectivement visible. */
+   clic -> OUVRE la fiche RÉGION (vague E'c-R : openRegionFiche, contenu inversé
+   du polygone + focus du contour) quand une région cataloguée porte ce nom
+   (regionFicheExists — zones_contents.bin) ; sinon repli honnête sur l'ancien
+   comportement (zoom sur les anneaux réels + activation de la couche « Zones »)
+   pour une région tracée sans contenu inversé catalogué. Une zone est ainsi
+   trouvable par NOM et ouvre sa fiche (blueprint §1.1 « adds zone kind »). */
 function buildZoneSearchIndex() {
   S.zonesGeo.forEach(z => {
     if (!z.rings?.length) return;
     pushSearchEntry(z.name, 'zone', ZONE_HEX, null, null, () => {
+      if (regionFicheExists(z.name)) { openRegionFiche(z.name); return; }
       if (!S.zonesOn) { S.zonesOn = true; toggleZones(true); buildFilters(); }
       map.flyToBounds(L.latLngBounds(z.rings.flat().map(([x, zz]) => toLL(x, zz))).pad(0.15));
     }, null, null, '🗺');

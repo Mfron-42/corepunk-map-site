@@ -25,6 +25,7 @@ import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
 import { disambiguatedItemName, currentGoalZones, npcRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
+import { regionFicheExists } from './zone.js';
 
 /* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
    PRÉCISION (blueprint §5.2), plus l'ancienne échelle posDynamic/posEstimatedZone/
@@ -842,9 +843,16 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // pastille est relu en direct de S.locates (mapref.js liveDrawn, mode L),
     // comme toute autre pastille locate (le centroïde devient un pin
     // persistant, listé dans le bandeau-légende, retirable).
+    // E'c-R : le NOM de la zone devient une réf `[Région(●)]` SOULIGNÉE quand une
+    // vraie région cataloguée porte ce nom (regionFicheExists) → ref-open ouvre
+    // openRegionFiche (main.js). La pastille reste un pin LOCATE au centroïde
+    // décodé (mode L, inchangé) — deux affordances distinctes coexistent. Un
+    // sous-lieu de quête sans région cataloguée (« Around wreck », « House Hilda
+    // Deeproot ») reste en clair (honnêteté §3.5 : jamais un lien vers une page
+    // inexistante) et garde sa seule pastille locate.
     const canPing = t.x != null;
     const zoneRef = zLabel ? ref({
-      kind: 'zone', label: zLabel, drawable: canPing,
+      kind: 'zone', label: zLabel, hasFiche: regionFicheExists(zLabel), drawable: canPing,
       pos: canPing ? { x: t.x, z: t.z } : undefined,
     }) : '';
     const nameRow = zoneRef ? `<div class="goal-target-row goal-target-row-rel">${zoneRef}</div>` : '';
@@ -993,9 +1001,20 @@ function goalStepsSection(q) {
     const count = `<span class="goal-count">×${n}${g.approx ? '<sup>≈</sup>' : ''}</span>`;
     const aggregate = g.target?.kind === 'multiple' ? ' goal-step-aggregate' : '';
     const series = n > 1 ? seriesActorsFor(q, g) : null;
+    // enter_zone/exit_zone (mechanism) dont la cible n'est PAS déjà une zone
+    // (ex. imp_brain_hunt s4 : entrer « House Hilda Deeproot » où se trouve le
+    // PNJ Hilda) : l'AIRE à atteindre EST l'objectif — on la rend en réf
+    // `[Région(●)]` (label = g.label, pin locate au centroïde connu de la cible),
+    // pas en réf de la cible interne. Les buts déjà à cible zone (aircraft
+    // « Around wreck »…) sont inchangés (kind zone → branche zone existante).
+    const ez = (g.mechanism === 'enter_zone' || g.mechanism === 'exit_zone')
+      && g.target && g.target.kind !== 'zone' && g.label;
+    const goalTarget = ez
+      ? { kind: 'zone', label: g.label, x: g.target.x, z: g.target.z, map: g.target.map, search_zone: g.target.search_zone }
+      : g.target;
     const targetHtml = series
       ? seriesTargetHtml(g.target, series, regionHint)
-      : goalTargetChip(g.target, cleanLabel(g.label), regionHint, q.isTest);
+      : goalTargetChip(goalTarget, cleanLabel(g.label), regionHint, q.isTest);
     // `verb_included` : le libellé du but contient DÉJÀ son verbe ("Bring
     // book to King Head") — ne pas re-préfixer, sinon verbe doublé
     // ("Livrer Bring book to…"). Le pictogramme d'action reste.
