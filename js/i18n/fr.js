@@ -151,6 +151,33 @@ export default {
       campModesTitle: 'Présence par mode',
       campModesHint: 'Poids d’activation serveur par mode de jeu — jamais une garantie d’apparition.',
       campModeTier: (m, n) => `${m} · palier ${n}`,
+      // ── E′c-4 · roster / densité / disposition / mitigation / bande de prix ──
+      campRosterServerNote: 'Le roster exact est décidé par le serveur — aucune liste de membres n’est stockée côté client.',
+      campRosterServerCountNote: n => `Le roster exact est décidé par le serveur — environ ${n} créatures dans le vivier.`,
+      campRosterCandidatesNote: 'Les créatures listées sont des candidats probables — le serveur décide du roster réel au spawn.',
+      spawnDensityLabel: 'Densité de spawn',
+      spawnDensityNote: 'Nombre de points de spawn sur la carte active, relatif au camp le plus dense ici — le nombre est exact, la barre est relative.',
+      cospawnTitle: 'Co-spawn probable',
+      mitigationRowLabel: 'Dégâts réduits',
+      mitigationNote: 'Fraction des dégâts entrants absorbée, dérivée de l’armure de chaque palier via la courbe unique du client (identique pour l’armure et la résistance magique) — calculée, pas un relevé client.',
+      priceBandTitle: 'Fourchette de prix d’achat (bande du multiplicateur serveur)',
+      stockInfinity: 'Illimité',
+      stockInfinityTitle: 'Toujours en stock — quantité illimitée.',
+      stockChance: n => `${n} % en stock`,
+      stockChanceTitle: 'Probabilité que cet article soit proposé au réapprovisionnement — pas toujours disponible.',
+      // ── E′c-4b · région / bande de niveau du camp · nav de série de quêtes ──
+      campRegionLabel: 'Région',
+      campRegionNote: 'Régions que le nuage de spawn du camp recouvre — attribuées par point-en-polygone sur le nuage complet (dérivé).',
+      campRegionAlsoIn: list => `aussi dans ${list}`,
+      levelBandLabel: 'Bande de niveau',
+      levelBandNote: 'Fourchettes de niveau que ce camp couvre — issues du nommage des tables de butin (un fait client).',
+      tierBandElite: 'Élite',
+      tierBandEliteTip: 'Ce camp comprend une bande de palier élite.',
+      seriesPositionLabel: (i, n) => `${i} / ${n}`,
+      seriesPrevLabel: 'Précédent',
+      seriesNextLabel: 'Suivant',
+      seriesGraphTip: 'Position dans la chaîne de quêtes (d’après le graphe de quêtes).',
+      seriesListedTip: 'Regroupé par ordre de déclaration — une association plus lâche que le graphe de quêtes.',
       // POI enrichis (pipeline pass 2026-07-11b) : bouton vers la fiche
       // encyclopédie (locations) + titre de lore divergent (locTitle).
       poiLoreBtn: 'Encyclopédie',
@@ -767,6 +794,15 @@ export default {
       valCospawnProbable: 'Co-spawn probable',
       valCospawnProbableTip: 'Associé par type — probable, pas garanti.',
     },
+    // Disposition d'une créature (blueprint §3.3 DispositionBadge) : posture
+    // envers le joueur — une CLASSIFICATION de domaine (comme la rareté), PAS un
+    // Badge d'honnêteté ; sa provenance l'accompagne en badge().
+    disposition: {
+      peaceful: 'Pacifique', peacefulTip: 'N’attaque jamais — ignore le joueur.',
+      neutral: 'Neutre', neutralTip: 'N’attaque que si on le provoque.',
+      hostile: 'Hostile', hostileTip: 'Attaque le joueur à vue.',
+      other: 'Disposition', otherTip: 'Posture envers le joueur.',
+    },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"
     // (js/sidebar.js buildDecorGroup) — voir DATA_CONTRACT.md §3.1.
@@ -827,6 +863,19 @@ export default {
     // présente en PvP (0.6), buffed=PvP seul 10 % — formulation SOFT,
     // c'est un poids serveur, pas une garantie ni un tracé de ronde).
     campQualifier: { patrol: 'Patrouille', buffed: 'Renforcé (PvP)' },
+    // Qualificatifs de membre de roster (camp_details `mobs[].qualifiers[]`) —
+    // marqueurs de VARIANTE descriptifs (chips .roster-qual), distincts du
+    // vocabulaire d'honnêteté Badge. `summon` = membre campSpawnUnlikely
+    // (invoqué par capacité, pas placé dans le camp ; dormant aujourd'hui).
+    rosterQual: {
+      boss: 'Boss', bossTip: 'Une variante de palier boss de cette créature.',
+      undead: 'Mort-vivant', undeadTip: 'Une variante mort-vivante de cette créature.',
+      buffed: 'Renforcé', buffedTip: 'Une variante renforcée (buff).',
+      event: 'Événement', eventTip: 'Apparaît dans le cadre d’un événement spécial ou limité.',
+      arena: 'Arène', arenaTip: 'Une variante d’arène de cette créature.',
+      affix: 'Affixe', affixTip: 'Porte un modificateur d’affixe supplémentaire.',
+      summon: 'Invocation', summonTip: 'Invoqué par capacité, pas placé dans le camp — invoqué en combat.',
+    },
     // Modes de jeu des tables de présence (#93, camp_details `modes`) —
     // jetons moteur PvE/PvP/Solo*, PvE/PvP laissés tels quels (usage
     // universel), Solo composé.

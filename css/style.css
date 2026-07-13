@@ -2487,6 +2487,132 @@ button.rar-pill:hover {
 .ptr-table tbody tr:not(:last-child) th,
 .ptr-table tbody tr:not(:last-child) td { border-bottom: 1px solid var(--line-soft); }
 
+/* ── E′c-4 · roster / density / disposition / mitigation ─────────────────────
+   Composants de fiche d'entité (blueprint §3.3). Réutilisent EXCLUSIVEMENT le
+   vocabulaire visuel existant (tons panel/accent/core/danger, --font-display
+   pour les micro-étiquettes, mêmes rayons/tailles que .badge) — aucun jeton
+   couleur neuf. */
+
+/* Ligne « Dégâts réduits » du tableau par-palier (MitigationCurve) : une valeur
+   DÉRIVÉE (%, pas un relevé brut) → séparée par un liseré accent et teintée
+   accent pour ne jamais se confondre avec les stats brutes au-dessus. */
+.ptr-table tbody tr.ptr-mitig th,
+.ptr-table tbody tr.ptr-mitig td { border-top: 1px solid var(--line-strong); }
+.ptr-table tbody tr.ptr-mitig td { color: var(--accent-hi); }
+
+/* DispositionBadge — chip de CLASSIFICATION de domaine (comme la rareté), bien
+   distinct de la famille .badge d'HONNÊTETÉ qui l'accompagne (provenance). */
+.disposition-row { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.disposition-badge {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-display);
+  font-size: .6rem; letter-spacing: .06em; text-transform: uppercase;
+  border-radius: 4px; padding: 1px 7px; cursor: help; vertical-align: middle;
+}
+.disposition-badge--peaceful { color: var(--core); background: var(--core-soft); border: 1px solid color-mix(in srgb, var(--core) 40%, transparent); }
+.disposition-badge--neutral  { color: var(--accent-hi); background: var(--accent-soft); border: 1px solid var(--line-strong); }
+.disposition-badge--hostile  { color: var(--danger); background: rgba(224, 100, 92, .14); border: 1px solid rgba(224, 100, 92, .4); }
+.disposition-badge--other    { color: var(--muted); background: transparent; border: 1px dashed var(--muted); }
+
+/* DensityBar — le NOMBRE affiché est réel (nuage COMPLET, jamais positions[0]) ;
+   la barre est RELATIVE au camp le plus dense de la carte active (le badge
+   « dérivé » juste à côté le dit). */
+.density-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; }
+.density-label {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-family: var(--font-display); font-size: .64rem;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.density-bar {
+  flex: 1; min-width: 60px; height: 7px; border-radius: 4px;
+  background: var(--panel-3); overflow: hidden; border: 1px solid var(--line-soft);
+}
+.density-fill { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-hi)); }
+.density-count { flex: none; font-family: var(--font-mono); font-size: .72rem; color: var(--muted); white-space: nowrap; }
+
+/* Drapeaux d'article de stock (PriceBandRow) : stock illimité / chance en
+   stock — petits chips discrets AVANT le prix (dormants tant que vendors.bin
+   n'expédie qu'un prix scalaire). */
+.stock-flag {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-display); font-size: .58rem;
+  letter-spacing: .05em; text-transform: uppercase;
+  border-radius: 4px; padding: 1px 5px; margin-right: 5px; cursor: help;
+  color: var(--accent-hi); background: var(--accent-soft); border: 1px solid var(--line-strong);
+}
+.stock-flag-muted { color: var(--muted); background: transparent; border: 1px dashed var(--muted); }
+
+/* ── E′c-4b · qualificatifs de roster + contexte camp + nav de série ──────────
+   Réutilisent EXCLUSIVEMENT le vocabulaire visuel existant (tons panel/accent/
+   muted, --font-display pour les micro-étiquettes, mêmes rayons que .badge) —
+   aucun jeton couleur neuf. */
+
+/* Qualificatifs de membre de roster (camp_details `mobs[].qualifiers[]`) :
+   marqueurs de VARIANTE descriptifs par membre (boss/undead/buffed/event/arena/
+   affix + invocation), rendus DANS la RosterRow à côté de la réf espèce.
+   Volontairement DISTINCTS de la famille .badge (vocabulaire d'honnêteté) ET de
+   .disposition-badge : petit chip neutre sur fond panneau, casse NORMALE (jamais
+   l'aplat majuscule d'un Badge) — il ne doit jamais se lire comme une
+   revendication de provenance/précision. */
+.roster-quals { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 2px; vertical-align: middle; }
+.roster-qual {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-display);
+  font-size: .58rem; letter-spacing: .04em;
+  border-radius: 4px; padding: 1px 6px;
+  color: var(--ink-dim); background: var(--panel-3);
+  border: 1px solid var(--line-soft);
+  cursor: help; white-space: nowrap;
+}
+/* boss : le marqueur le plus notable pour le joueur → léger accent (jamais un
+   Badge d'honnêteté pour autant). */
+.roster-qual--boss { color: var(--accent-hi); background: var(--accent-soft); border-color: var(--line-strong); }
+/* invocation (campSpawnUnlikely, dormant) : membre invoqué par capacité, pas
+   placé dans le camp → ton muet pointillé (une nuance, pas une variante fixe). */
+.roster-qual--summon { color: var(--muted); background: transparent; border: 1px dashed var(--muted); font-style: italic; }
+
+/* Contexte de camp (camp_details `zones`/`dominantZone` + `tierBand`) : deux
+   lignes de CONTEXTE au niveau camp, chacune accompagnée de son Badge de
+   provenance (dérivé pour la région point-en-polygone, officiel pour la bande
+   de niveau issue du nommage des tables de butin). */
+.camp-context { display: flex; flex-direction: column; gap: 8px; }
+.camp-region-row, .tierband-row { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
+.camp-region-label, .tierband-label {
+  flex: none;
+  font-family: var(--font-display); font-size: .62rem;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+}
+.camp-region-name { color: var(--ink); font-size: .84rem; }
+.camp-region-others { color: var(--muted); font-size: .78rem; }
+.tierband-vals { font-family: var(--font-mono); font-size: .8rem; color: var(--ink); }
+.tierband-elite {
+  font-family: var(--font-display); font-size: .58rem;
+  letter-spacing: .05em; text-transform: uppercase;
+  color: var(--accent-hi); background: var(--accent-soft);
+  border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; cursor: help;
+}
+
+/* Navigation de série de quêtes (blueprint §2.4) : prev/position/suivant dans
+   l'en-tête de fiche quête. DORMANTE tant que `sequence` ne porte pas une vraie
+   chaîne de slugs (voir questSeriesNav) — ces règles ne stylent aujourd'hui
+   aucun nœud rendu, prêtes pour l'allumage. */
+.series-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+.series-nav-pos {
+  flex: none;
+  font-family: var(--font-display); font-size: .6rem;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--accent-hi); background: var(--accent-soft);
+  border: 1px solid var(--line-strong); border-radius: 4px; padding: 1px 7px; cursor: help;
+}
+/* "listed" (ordre de déclaration) = maillon plus faible qu'une chaîne de
+   graphe → ton muet pointillé. */
+.series-nav-pos--weak { color: var(--muted); background: transparent; border: 1px dashed var(--muted); font-style: italic; }
+.series-nav-step { display: inline-flex; align-items: center; gap: 5px; }
+.series-nav-dir {
+  font-family: var(--font-display); font-size: .58rem;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--muted);
+}
+
 /* ── Formules (artefacts T3 / capacités nommées) ─────────────────────
    base + Σ coeff × stat, RECONSTRUITE et LOCALISÉE côté client (jamais le
    "human"/stat_name anglais figé du pipeline) -- voir js/fiches.js

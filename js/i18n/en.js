@@ -145,6 +145,51 @@ export default {
       campModesTitle: 'Presence by game mode',
       campModesHint: 'Server activation weight per game mode — never a spawn guarantee.',
       campModeTier: (m, n) => `${m} · tier ${n}`,
+      // ── E′c-4 · roster / density / disposition / mitigation / price band ──
+      // Camp roster (camp_details `roster` {state,count}): the honesty summary
+      // is the valRosterServerSide Badge; these strings ride in its tooltip.
+      campRosterServerNote: 'The exact roster is decided by the server — no member list is stored client-side.',
+      campRosterServerCountNote: n => `The exact roster is decided by the server — about ${n} creatures in the pool.`,
+      campRosterCandidatesNote: 'The creatures listed are likely candidates — the server decides the actual roster at spawn.',
+      // DensityBar (blueprint §3.3): spawn count from the FULL positions cloud
+      // (never positions[0]); the bar is relative to the densest camp here.
+      spawnDensityLabel: 'Spawn density',
+      spawnDensityNote: 'Number of spawn points on the active map, relative to the densest camp here — the count is exact, the bar is relative.',
+      // Probable co-spawn (camp_details `cospawnProbable`): a family associated
+      // by type, never asserted alongside the placed family (valCospawnProbable).
+      cospawnTitle: 'Probable co-spawn',
+      // MitigationCurve (blueprint §3.3): damage reduction derived from each
+      // difficulty tier’s armour via the client’s single mitigation curve.
+      mitigationRowLabel: 'Damage mitigated',
+      mitigationNote: 'Fraction of incoming damage absorbed, derived from each tier’s armour via the client’s single mitigation curve (same for armour and magic resist) — computed, not a client reading.',
+      // PriceBandRow (blueprint §3.3): vendor buy price as a band when the data
+      // carries it; infinity = unlimited stock; chance = restock likelihood.
+      priceBandTitle: 'Buy price range (server multiplier band)',
+      stockInfinity: 'Unlimited',
+      stockInfinityTitle: 'Always in stock — unlimited quantity.',
+      stockChance: n => `${n}% in stock`,
+      stockChanceTitle: 'Chance this item is offered when the shop restocks — not always available.',
+      // ── E′c-4b · camp region / level band · quest series nav ──
+      // Camp region (camp_details `zones`/`dominantZone`): assigned by point-in-
+      // polygon over the full spawn cloud (derived). dominantZone renders as
+      // plain localized text until the region fiche ships (E′c-R).
+      campRegionLabel: 'Region',
+      campRegionNote: "Regions the camp's spawn cloud covers — assigned by point-in-polygon over the full cloud (derived).",
+      campRegionAlsoIn: list => `also in ${list}`,
+      // Camp level band (camp_details `tierBand`): the level ranges this camp
+      // spans, from the loot-table tier naming (a client fact) + elite flag.
+      levelBandLabel: 'Level band',
+      levelBandNote: 'Level ranges this camp spans — from the loot-table tier naming (a client fact).',
+      tierBandElite: 'Elite',
+      tierBandEliteTip: 'This camp includes an elite-tier band.',
+      // Quest series nav (blueprint §2.4): prev/next within a quest chain +
+      // position. Dormant until `sequence` carries a real chain of quest slugs
+      // (today it carries intra-quest goalIds — see fiches/quest.js).
+      seriesPositionLabel: (i, n) => `${i} / ${n}`,
+      seriesPrevLabel: 'Previous',
+      seriesNextLabel: 'Next',
+      seriesGraphTip: 'Position in the quest chain (from the quest graph).',
+      seriesListedTip: 'Grouped by declaration order — a looser association than the quest graph.',
       // Enriched POIs (pipeline pass 2026-07-11b): encyclopedia fiche button
       // + divergent lore title (locTitle).
       poiLoreBtn: 'Encyclopedia',
@@ -768,6 +813,16 @@ export default {
       valCospawnProbable: 'Probable co-spawn',
       valCospawnProbableTip: 'Associated by type — probable, not guaranteed.',
     },
+    // Creature disposition (blueprint §3.3 DispositionBadge): stance toward the
+    // player — a DOMAIN classification (like rarity), NOT an honesty Badge; its
+    // provenance rides alongside as a badge(). monsters.disposition is a STRING,
+    // creeps.disposition an OBJECT{value}; both normalized on read (SCHEMA §5.2).
+    disposition: {
+      peaceful: 'Peaceful', peacefulTip: 'Never attacks — ignores the player.',
+      neutral: 'Neutral', neutralTip: 'Won’t attack unless provoked.',
+      hostile: 'Hostile', hostileTip: 'Attacks the player on sight.',
+      other: 'Disposition', otherTip: 'Stance toward the player.',
+    },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
     // (js/sidebar.js buildDecorGroup), see DATA_CONTRACT.md §3.1.
@@ -820,6 +875,19 @@ export default {
     // PvP (0.6), buffed=PvP-only 10% — SOFT wording, it is a server weight,
     // never a guarantee nor a drawable patrol route).
     campQualifier: { patrol: 'Patrol', buffed: 'Buffed (PvP)' },
+    // Roster member qualifiers (camp_details `mobs[].qualifiers[]`) — DESCRIPTIVE
+    // variant markers rendered as .roster-qual chips in the camp RosterRow, kept
+    // visually distinct from the honesty Badge vocabulary. `summon` covers a
+    // campSpawnUnlikely member (ability-spawned, not camp-placed; dormant today).
+    rosterQual: {
+      boss: 'Boss', bossTip: 'A boss-tier variant of this creature.',
+      undead: 'Undead', undeadTip: 'An undead variant of this creature.',
+      buffed: 'Buffed', buffedTip: 'A strengthened (buffed) variant.',
+      event: 'Event', eventTip: 'Appears as part of a limited-time or special event.',
+      arena: 'Arena', arenaTip: 'An arena variant of this creature.',
+      affix: 'Affix', affixTip: 'Carries an extra affix modifier.',
+      summon: 'Summon', summonTip: 'Ability-spawned, not camp-placed — summoned during combat.',
+    },
     // Game-mode tokens of the presence tables (#93, camp_details `modes`).
     campMode: {
       PvE: 'PvE', PvP: 'PvP', SoloPvE: 'Solo PvE', SoloPvP: 'Solo PvP',

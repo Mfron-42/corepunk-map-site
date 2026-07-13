@@ -127,6 +127,33 @@ export default {
       campModesTitle: 'Presencia por modo',
       campModesHint: 'Peso de activación del servidor por modo de juego — nunca una garantía de aparición.',
       campModeTier: (m, n) => `${m} · nivel ${n}`,
+      // ── E′c-4 · lista / densidad / disposición / mitigación / franja de precio ──
+      campRosterServerNote: 'El servidor decide la lista exacta — no se guarda ninguna lista de miembros en el cliente.',
+      campRosterServerCountNote: n => `El servidor decide la lista exacta — unas ${n} criaturas en el grupo.`,
+      campRosterCandidatesNote: 'Las criaturas listadas son candidatas probables — el servidor decide la lista real al aparecer.',
+      spawnDensityLabel: 'Densidad de aparición',
+      spawnDensityNote: 'Número de puntos de aparición en el mapa activo, relativo al campamento más denso de aquí — el número es exacto, la barra es relativa.',
+      cospawnTitle: 'Aparición conjunta probable',
+      mitigationRowLabel: 'Daño mitigado',
+      mitigationNote: 'Fracción del daño entrante absorbida, derivada de la armadura de cada nivel mediante la única curva del cliente (igual para armadura y resistencia mágica) — calculada, no leída del cliente.',
+      priceBandTitle: 'Franja de precio de compra (banda del multiplicador del servidor)',
+      stockInfinity: 'Ilimitado',
+      stockInfinityTitle: 'Siempre disponible — cantidad ilimitada.',
+      stockChance: n => `${n}% en stock`,
+      stockChanceTitle: 'Probabilidad de que el artículo se ofrezca al reponer — no siempre disponible.',
+      // ── E′c-4b · región / banda de nivel del campamento · nav de serie ──
+      campRegionLabel: 'Región',
+      campRegionNote: 'Regiones que cubre la nube de aparición del campamento — asignadas por punto-en-polígono sobre toda la nube (derivado).',
+      campRegionAlsoIn: list => `también en ${list}`,
+      levelBandLabel: 'Banda de nivel',
+      levelBandNote: 'Rangos de nivel que abarca este campamento — del nombre de las tablas de botín (un dato del cliente).',
+      tierBandElite: 'Élite',
+      tierBandEliteTip: 'Este campamento incluye una banda de nivel élite.',
+      seriesPositionLabel: (i, n) => `${i} / ${n}`,
+      seriesPrevLabel: 'Anterior',
+      seriesNextLabel: 'Siguiente',
+      seriesGraphTip: 'Posición en la cadena de misiones (del grafo de misiones).',
+      seriesListedTip: 'Agrupado por orden de declaración — una asociación más débil que el grafo de misiones.',
       // POI enriquecidos (pass 2026-07-11b): botón hacia la ficha de la
       // enciclopedia + título de lore divergente (locTitle).
       poiLoreBtn: 'Enciclopedia',
@@ -728,6 +755,15 @@ export default {
       valCospawnProbable: 'Co-aparición probable',
       valCospawnProbableTip: 'Asociado por tipo: probable, no garantizado.',
     },
+    // Disposición de una criatura (blueprint §3.3 DispositionBadge): actitud
+    // hacia el jugador — una CLASIFICACIÓN de dominio (como la rareza), NO un
+    // Badge de honestidad; su procedencia va al lado como badge().
+    disposition: {
+      peaceful: 'Pacífico', peacefulTip: 'Nunca ataca — ignora al jugador.',
+      neutral: 'Neutral', neutralTip: 'Solo ataca si se le provoca.',
+      hostile: 'Hostil', hostileTip: 'Ataca al jugador en cuanto lo ve.',
+      other: 'Disposición', otherTip: 'Actitud hacia el jugador.',
+    },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable
     // "Decoración" (js/sidebar.js buildDecorGroup), ver DATA_CONTRACT.md §3.1.
@@ -780,6 +816,19 @@ export default {
     // patrol|buffed — semántica probada byte a byte: base=solo PvE,
     // patrol=única variante en PvP (0.6), buffed=solo PvP 10 %).
     campQualifier: { patrol: 'Patrulla', buffed: 'Reforzado (PvP)' },
+    // Calificadores de miembro del roster (camp_details `mobs[].qualifiers[]`) —
+    // marcadores de VARIANTE descriptivos (chips .roster-qual), distintos del
+    // vocabulario de honestidad Badge. `summon` = miembro campSpawnUnlikely
+    // (invocado por habilidad, no colocado en el campamento; latente hoy).
+    rosterQual: {
+      boss: 'Jefe', bossTip: 'Una variante de nivel jefe de esta criatura.',
+      undead: 'No-muerto', undeadTip: 'Una variante no-muerta de esta criatura.',
+      buffed: 'Reforzado', buffedTip: 'Una variante reforzada (mejorada).',
+      event: 'Evento', eventTip: 'Aparece como parte de un evento especial o limitado.',
+      arena: 'Arena', arenaTip: 'Una variante de arena de esta criatura.',
+      affix: 'Afijo', affixTip: 'Lleva un modificador de afijo adicional.',
+      summon: 'Invocación', summonTip: 'Invocado por habilidad, no colocado en el campamento — invocado en combate.',
+    },
     // Modos de juego de las tablas de presencia (#93, camp_details `modes`).
     campMode: {
       PvE: 'PvE', PvP: 'PvP', SoloPvE: 'PvE individual', SoloPvP: 'PvP individual',

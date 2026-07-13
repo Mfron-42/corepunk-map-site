@@ -12,18 +12,17 @@ import {
   speciesLayerHex, familyLayerHex, entityColor,
 } from '../config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
-import { tr, numberLocale } from '../i18n/index.js';
+import { tr, tbl, numberLocale } from '../i18n/index.js';
 import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
 import { clearLocator } from '../pins.js';
 import { unfocus } from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
+import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems, dispositionFor, creepFor } from '../data.js';
 import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { mobLabelHtml } from '../popups.js';
-import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, gotoBtn, farmCapRows, farmCampRow, farmUnjoinedRow } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, gotoBtn, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers } from './core.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -39,6 +38,59 @@ import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, 
    FAUNE a un sens -- un camp de minerai/herboristerie n'a simplement aucune
    créature à lister, ce n'est pas un trou de donnée. */
 const MONSTER_ISH_CAMP_KINDS = new Set(['monsters', 'creeps', 'wildlife']);
+
+/* ── DispositionBadge (blueprint §3.3) ───────────────────────────────────────
+   La posture d'une créature envers le joueur (peaceful / neutral / hostile).
+   C'est une CLASSIFICATION de domaine (comme la rareté), PAS un énoncé
+   d'honnêteté : elle se rend donc en chip coloré PROPRE, et l'énoncé
+   d'honnêteté (D'OÙ vient la valeur) l'accompagne en Badge de provenance
+   (badge(), axe provenance). Provenance : les creeps portent `dispositionProv`
+   "official" (creeps.bin) — un fait client byte-prouvé → badge « officiel » ;
+   une disposition heuristique (jointure de nom/famille) → badge « inféré ».
+   `monsters.disposition` est une CHAÎNE, `creeps.disposition` un OBJET {value}
+   (data/SCHEMA.md §5.2) : normalisés à la lecture par data.js
+   (normDisposition/dispositionFor), on reçoit ici la chaîne normalisée. Repli
+   honnête : disposition inconnue -> rien (jamais un « peaceful » inventé). */
+const DISPOSITION_KNOWN = new Set(['peaceful', 'neutral', 'hostile']);
+function dispositionChip(disp, prov = 'official') {
+  if (!disp) return '';
+  const variant = DISPOSITION_KNOWN.has(disp) ? disp : 'other';
+  const label = tbl('disposition', disp) || capitalize(disp);
+  const tip = tbl('disposition', disp + 'Tip') || tbl('disposition', 'otherTip') || '';
+  const chip = `<span class="disposition-badge disposition-badge--${variant}" title="${esc(tip)}">${esc(label)}</span>`;
+  const provBadge = prov ? badge({ axis: 'provenance', value: prov }) : '';
+  return `<span class="disposition-row">${chip}${provBadge}</span>`;
+}
+/* Chaîne de disposition normalisée d'un enregistrement creep (creeps.bin —
+   déjà une chaîne aujourd'hui, mais objet {value} toléré par robustesse, même
+   contrat que data.js normDisposition). */
+function creepDisp(c) {
+  const d = c && c.disposition;
+  if (typeof d === 'string') return d;
+  if (d && typeof d === 'object') return d.value || null;
+  return null;
+}
+/* Disposition HONNÊTE d'une espèce de faune (openWildlifeFiche) : creeps.bin
+   porte la disposition (fait client officiel) mais la jointure wildlife→creep
+   n'est PAS 1:1. On collecte les creeps candidats par (a) clé directe = l'id
+   d'espèce, (b) famille RÉELLE partagée (jamais family=null → jointure vide
+   ambiguë), (c) clés de mob (key/species) des camps de l'espèce
+   (camp_details). On ne renvoie une disposition que si TOUS les candidats
+   s'accordent (sinon rien : jamais trancher/inventer une disposition douteuse).
+   8/25 espèces résolvent proprement ; les 17 autres n'affichent HONNÊTEMENT
+   aucun badge plutôt qu'un « peaceful » deviné. */
+function wildlifeDisposition(id, w) {
+  const vals = new Set();
+  const addKey = k => { const c = creepFor(k); if (c) { const d = creepDisp(c); if (d) vals.add(d); } };
+  addKey(id);
+  const fam = w && w.family;
+  if (fam) for (const c of Object.values(S.creeps || {})) if (c.family === fam) { const d = creepDisp(c); if (d) vals.add(d); }
+  for (const cmp of (w && w.camps) || []) {
+    const det = S.campDetails[cmp.camp];
+    for (const m of (det && det.mobs) || []) { addKey(m.key); addKey(m.species); }
+  }
+  return vals.size === 1 ? [...vals][0] : null;
+}
 /* Ligne muette « niv <min>–<max> ×N · <attaque> » d'une ligne de faune de
    camp (camp_details `mobs[]`, folded PAR ESPÈCE — task #80) : `lvl`/`lvlMax`
    sont la fourchette de niveau RÉELLE de cette espèce dans CE camp précis
@@ -55,6 +107,185 @@ function campMobLevelLine(m) {
   const withCount = m.count > 1 ? `${lvlTxt} ×${m.count}` : lvlTxt;
   return [withCount, m.atk ? monsterAttackLabel(m.atk) : null].filter(Boolean).join(' · ');
 }
+
+/* ── Qualificatifs de membre de roster (E′c-4b) ──────────────────────────────
+   camp_details `mobs[].qualifiers[]` (boss / undead / buffed / event / arena /
+   affix — désormais CUIT par le client, ce commentaire notait auparavant une
+   absence côté données maintenant comblée) : des marqueurs de VARIANTE
+   DESCRIPTIFS par membre, PAS un énoncé d'honnêteté (provenance/précision). Ils
+   se rendent donc en petit chip PROPRE (.roster-qual), visuellement distinct de
+   la famille .badge du vocabulaire d'honnêteté ET de .disposition-badge : lire
+   « Boss / Mort-vivant / Événement » ne doit jamais se lire comme une
+   revendication de provenance. Ordre de rendu FIXE (déterministe, indépendant
+   de l'ordre où le pipeline les a cuits ; jamais une mutation de m.qualifiers).
+   `mobs[].campSpawnUnlikely` (aucun dans les bins expédiés aujourd'hui —
+   lecteur DORMANT écrit contre le contrat) : ce membre est INVOQUÉ par capacité,
+   jamais placé dans le camp → note « invocation », jamais un « ×N » de camp. */
+const ROSTER_QUAL_ORDER = ['boss', 'arena', 'event', 'undead', 'buffed', 'affix'];
+function rosterQualRank(q) { const i = ROSTER_QUAL_ORDER.indexOf(q); return i < 0 ? 99 : i; }
+function rosterQualChip(q) {
+  const label = tbl('rosterQual', q) || capitalize(q);
+  const tip = tbl('rosterQual', q + 'Tip') || '';
+  const mod = q === 'boss' ? ' roster-qual--boss' : '';
+  return `<span class="roster-qual${mod}" title="${esc(tip)}">${esc(label)}</span>`;
+}
+function rosterQualChips(m) {
+  const qs = (m.qualifiers || []).slice().sort((a, b) => rosterQualRank(a) - rosterQualRank(b));
+  const summon = m.campSpawnUnlikely
+    ? `<span class="roster-qual roster-qual--summon" title="${esc(tbl('rosterQual', 'summonTip') || '')}">${esc(tbl('rosterQual', 'summon') || 'Summon')}</span>` : '';
+  const chips = qs.map(rosterQualChip).join('') + summon;
+  return chips ? `<span class="roster-quals">${chips}</span>` : '';
+}
+
+/* ── RosterRow (blueprint §3.3) ──────────────────────────────────────────────
+   Une ligne de roster de camp : la référence ESPÈCE `[Espèce(●)] Nom` (la
+   pastille bascule les spawns de cette espèce, comme partout — remplace l'ancien
+   `.link` mobLabelHtml, kill-list §3.5) + les chips de qualificatif DESCRIPTIFS
+   (rosterQualChips, à côté de la réf, jamais du texte d'honnêteté) + la ligne de
+   niveau muette (« lvl 3–20 ×15 · Melee »). `monsterKeyFor(m.key, m.name, m.lvl)`
+   résout la variante d'espèce la plus proche du niveau de CE camp (indice
+   `m.lvl`, task #80) ; un creep sauvage (m.wild, clé hors S.monsters) dégrade en
+   libellé teinté nu (honnête, aucune fiche monstre). `m.species` alimente la
+   couche même sans clé de spawn résolue. Un membre sans qualificatif rend une
+   ligne IDENTIQUE à l'ancienne (rosterQualChips='' → aucun artefact vide). */
+function rosterRow(m) {
+  const mk = monsterKeyFor(m.key, m.name, m.lvl);
+  const icon = m.icon ? `icons/${esc(m.icon)}` : null;
+  const line = campMobLevelLine(m);
+  return `<div class="frow">
+    ${iconTag(icon, 'fr-icon', initials(m.name))}
+    ${speciesRef({ key: mk, spId: m.species, name: m.name })}${rosterQualChips(m)}
+    ${line ? `<span class="muted">${esc(line)}</span>` : ''}
+  </div>`;
+}
+/* Point le plus dense parmi les camps « monster-ish » de la carte active — le
+   dénominateur HONNÊTE de la DensityBar (une échelle relative à la carte
+   affichée, jamais un maximum inventé). Recalculé à chaque ouverture (quelques
+   centaines de groupes, négligeable) pour rester juste après un changement de
+   carte. */
+function campMaxMonsterishPts() {
+  let max = 0;
+  for (const st of Object.values(S.camps || {})) for (const gg of (st.groups || []))
+    if (MONSTER_ISH_CAMP_KINDS.has(gg.kind) && gg.pts.length > max) max = gg.pts.length;
+  return max;
+}
+/* DensityBar (blueprint §3.3) : la densité de spawn depuis le nuage de points
+   COMPLET du camp (g.pts — jamais positions[0], contrat SCHEMA §0.4/§3.4). Le
+   NOMBRE affiché est réel (g.pts.length) ; la barre n'est qu'une visualisation
+   RELATIVE au camp le plus dense de la carte active (provenance derived,
+   info-bulle honnête). */
+function campDensityBar(g) {
+  const n = g.pts.length;
+  if (!n) return '';
+  const max = campMaxMonsterishPts();
+  const pct = max > 0 ? Math.max(3, Math.round(n / max * 100)) : 0;
+  return `<div class="density-row">
+    <span class="density-label">${esc(tr('spawnDensityLabel'))}${badge({ axis: 'provenance', value: 'derived', extra: tr('spawnDensityNote') })}</span>
+    <div class="density-bar" role="img" aria-label="${esc(tr('spawnPointsCount', n))}"><span class="density-fill" style="width:${pct}%"></span></div>
+    <span class="muted density-count">${esc(tr('spawnPointsCount', n))}</span>
+  </div>`;
+}
+/* Le Badge « roster serveur » (valeur roster-server-side, blueprint §5.2) —
+   JAMAIS silencieux quand un roster existe (camp_details `roster`
+   {state,count,pts,speciesToken}) :
+     - state "server"     : le roster exact est décidé serveur (aucune liste de
+       membres) — badge + compte du vivier quand connu (>0).
+     - state "candidates" : les membres LISTÉS ci-dessus sont des candidats
+       inférés (jointure de jeton de famille) ; le serveur tranche le vrai
+       roster — badge + note « candidats ».
+   La distinction vit dans l'info-bulle (`extra`), l'étiquette reste le résumé
+   fermé « roster serveur » (aucune prose d'honnêteté hors du vocabulaire clos). */
+function campRosterBadge(det) {
+  const r = det && det.roster;
+  if (!r || !r.state) return '';
+  const extra = r.state === 'candidates'
+    ? tr('campRosterCandidatesNote')
+    : (r.count > 0 ? tr('campRosterServerCountNote', r.count) : tr('campRosterServerNote'));
+  return `<p class="hint">${badge({ axis: 'value', value: 'roster-server-side', extra })}</p>`;
+}
+/* Co-spawn PROBABLE (blueprint §1.2/§5.2) : camp_details `cospawnProbable`
+   [{family, confidence:"probable"}] — une famille ASSOCIÉE par type, jamais
+   affirmée aux côtés de la famille placée. Chaque entrée = réf `[Famille(●)]`
+   (pastille = couche famille de l'arbre quand elle a des points) + le Badge
+   valeur `cospawn-probable` (« associé par type — probable, pas garanti »).
+   Famille sans membre catalogue -> libellé nu + badge (jamais un lien mort). */
+function campCospawnSection(det) {
+  const cs = det && det.cospawnProbable;
+  if (!cs || !cs.length) return '';
+  const rows = cs.map(c => {
+    const fam = familyKey(c.family);
+    const has = familyHasMembers(fam);
+    const res = has ? familyPoints(fam) : null;
+    const famRef = has
+      ? ref({ kind: 'family', key: fam, family: fam, label: pretty(c.family), hex: familyLayerHex(fam),
+              hasFiche: true, drawable: !!res, count: res ? res.nPts : 0, drawn: !!(S.monfam[fam] && S.monfam[fam].on) })
+      : `<span class="fr-label">${esc(pretty(c.family))}</span>`;
+    return `<div class="frow">${famRef}${badge({ axis: 'value', value: 'cospawn-probable' })}</div>`;
+  }).join('');
+  return `<div class="fiche-section"><h3>${esc(tr('cospawnTitle'))}</h3>${rows}</div>`;
+}
+
+/* ── Contexte de camp : région + bande de niveau (E′c-4b) ────────────────────
+   camp_details expédie au niveau CAMP :
+   - `zones[]` (régions localisées que le nuage de spawn du camp recouvre —
+     attribution point-en-polygone) + `dominantZone` (la région principale, déjà
+     localisée). Provenance DERIVED (géométrie). dominantZone se rend en TEXTE
+     localisé NU aujourd'hui — la fiche région n'existe pas encore (vague E′c-R),
+     prête à devenir une réf `[Région]` alors.
+   - `tierBand{bands{low?,base?,high?,highest?}, elite?}` : les fourchettes de
+     niveau (issues du nommage des tables de butin — un fait client) que ce camp
+     couvre + drapeau élite. Provenance OFFICIAL. Rendu en une ligne « bande de
+     niveau » compacte : fourchettes ordonnées PAR NIVEAU puis dédupliquées
+     (« 16-20 » + « 16-20 » ne s'affiche qu'une fois), jamais les jetons internes
+     low/base/high/highest à l'écran. */
+const CAMP_BAND_ORDER = ['low', 'base', 'high', 'highest'];
+function campTierBandRow(det) {
+  const tb = det && det.tierBand;
+  const bands = tb && tb.bands;
+  if (!bands) return '';
+  const seen = new Set();
+  const ranges = [];
+  const push = r => { if (r && !seen.has(r)) { seen.add(r); ranges.push(r); } };
+  for (const k of CAMP_BAND_ORDER) push(bands[k]);
+  for (const k of Object.keys(bands)) if (!CAMP_BAND_ORDER.includes(k)) push(bands[k]);
+  if (!ranges.length) return '';
+  const disp = ranges.map(r => esc(String(r).replace('-', '–'))).join(' · ');
+  const elite = tb.elite
+    ? `<span class="tierband-elite" title="${esc(tr('tierBandEliteTip'))}">${esc(tr('tierBandElite'))}</span>` : '';
+  return `<div class="tierband-row">
+    <span class="tierband-label">${esc(tr('levelBandLabel'))}</span>
+    <span class="tierband-vals">${disp}</span>${elite}
+    ${badge({ axis: 'provenance', value: 'official', extra: tr('levelBandNote') })}
+  </div>`;
+}
+function campRegionRow(det) {
+  const dom = det && det.dominantZone;
+  const zones = (det && det.zones) || [];
+  if (!dom && !zones.length) return '';
+  // dominantZone : texte localisé NU (deviendra une réf `[Région]` en vague E′c-R).
+  const domHtml = dom ? `<span class="camp-region-name">${esc(dom)}</span>` : '';
+  // Liste COMPLÈTE des AUTRES régions couvertes (la dominante est déjà mise en
+  // avant ci-dessus — jamais répétée ; noms déjà échappés puis passés au
+  // gabarit i18n de confiance, pas de double-échappement).
+  const others = zones.filter(z => z !== dom);
+  const othersHtml = others.length
+    ? `<span class="camp-region-others">${tr('campRegionAlsoIn', others.map(esc).join(' · '))}</span>` : '';
+  return `<div class="camp-region-row">
+    <span class="camp-region-label">${esc(tr('campRegionLabel'))}</span>
+    ${domHtml}${othersHtml}
+    ${badge({ axis: 'provenance', value: 'derived', extra: tr('campRegionNote') })}
+  </div>`;
+}
+/* Section CONTEXTE (région + bande de niveau) — vide (aucun octet) quand
+   camp_details ne porte ni zones ni tierBand : une fiche camp sans ce contexte
+   reste octet-pour-octet identique (insérée adjacente à presenceHtml). */
+function campContextSection(det) {
+  const region = campRegionRow(det);
+  const tier = campTierBandRow(det);
+  if (!region && !tier) return '';
+  return `<div class="fiche-section camp-context">${region}${tier}</div>`;
+}
+
 function openCampFiche(key) {
   const det = S.campDetails[key] || null;
   const g = Object.values(S.camps).flatMap(st => st.groups).find(c => c.k === key);
@@ -67,26 +298,24 @@ function openCampFiche(key) {
   // fusionné dans `name` (name sert aussi de data-label de goto, texte brut).
   const name = campLabel(key, g.kind, g.name, g.subtype);
   const qualChip = campQualifierChip(g.qualifier);
-  const mobs = (det?.mobs || []).map(m => `
-    <div class="frow">
-      ${iconTag(m.icon ? `icons/${esc(m.icon)}` : null, 'fr-icon', initials(m.name))}
-      ${mobLabelHtml(m, 'fr-label')}
-      <span class="muted">${esc(campMobLevelLine(m))}</span>
-    </div>`).join('');
-  // Faune honnêtement vide (unknown_states_DESIGN.md #4/#10, task #67) : un
-  // camp "monster-ish" dont AUCUNE espèce n'a pu être résolue par le
-  // pipeline (heuristique de nom sur le manager du camp -- byte-prouvé que
-  // les points de spawn eux-mêmes ne portent aucune référence d'entité,
-  // data/SCHEMA.md "camp fauna") n'a même pas d'entrée dans camp_details.json
-  // (build_site_data.py::camp_details() saute tout camp sans monstres NI
-  // loot_tables) -- `det` est alors carrément `null`, et la section
-  // disparaissait en silence jusqu'ici (43/128 camps monster-ish, voir
-  // tmp/regen_20260710.log). Remplacé par une pastille + note honnêtes,
-  // jamais une liste inventée ni un silence qui se lit comme "pas de
-  // monstres ici du tout".
-  const faunaUnknown = (!mobs && MONSTER_ISH_CAMP_KINDS.has(g.kind))
-    ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', 0))}</h3>
-        <p class="hint">${badge({ axis: 'value', value: 'roster-server-side', extra: tr('campFaunaUnknownNote') })}</p></div>` : '';
+  // ROSTER (blueprint §1.2) : lignes RosterRow (réf ESPÈCE + niveau) + Badge
+  // « roster serveur » (JAMAIS silencieux quand un roster existe) + DensityBar
+  // (nuage COMPLET, jamais positions[0]). Un camp "monster-ish" dont AUCUNE
+  // espèce n'a été résolue (les points de spawn ne portent aucune référence
+  // d'entité côté client, data/SCHEMA.md "camp fauna") garde une note honnête
+  // (roster décidé serveur) plutôt qu'un silence qui se lit « pas de monstres
+  // ici ». Un camp de ressource (logging/mining/…) sans faune n'a simplement
+  // pas de section (pas un trou de donnée).
+  const rosterRowsHtml = (det?.mobs || []).map(rosterRow).join('');
+  const rosterBadgeHtml = campRosterBadge(det);
+  const densityHtml = MONSTER_ISH_CAMP_KINDS.has(g.kind) ? campDensityBar(g) : '';
+  const rosterSection = (rosterRowsHtml || rosterBadgeHtml || MONSTER_ISH_CAMP_KINDS.has(g.kind))
+    ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det?.mobs?.length || 0))}</h3>
+        ${rosterRowsHtml || (rosterBadgeHtml ? '' : `<p class="hint">${badge({ axis: 'value', value: 'roster-server-side', extra: tr('campFaunaUnknownNote') })}</p>`)}
+        ${rosterBadgeHtml}
+        ${densityHtml}</div>`
+    : '';
+  const cospawnHtml = campCospawnSection(det);
   // Butin : seulement quand la fiche détaillée a de la SUBSTANCE (mobs ou
   // drops). camp_details expédie désormais ~150 entrées mode/activité-SEULES
   // (mobs/drops vides — #93, pipeline pass 2026-07-11b) : leur coller une
@@ -127,8 +356,9 @@ function openCampFiche(key) {
     <div class="fiche-section"><div class="pop-actions">
       ${g.pts.length ? `<button class="act primary" data-act="goto" data-x="${g.pts[0][0]}" data-z="${g.pts[0][1]}" data-label="${esc(name)}" data-cat="camp:${esc(g.kind)}">${esc(tr('viewOnMapBtn'))}</button>` : ''}
     </div></div>
-    ${presenceHtml}
-    ${mobs ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', det.mobs.length))}</h3>${mobs}</div>` : faunaUnknown}
+    ${campContextSection(det)}${presenceHtml}
+    ${rosterSection}
+    ${cospawnHtml}
     ${drops}
     ${tableHtml}`);
   setFicheHash('camp', key);
@@ -253,12 +483,17 @@ function openWildlifeFiche(id) {
     ? { kind: 'species', key: id, label: w.name, hex, hasFiche: false,
         drawable: true, count: spRes.nPts, drawn: !!S.monsp[id]?.on }
     : null;
+  // DispositionBadge : la posture de l'animal (peaceful/neutral) résolue depuis
+  // creeps.bin (fait client officiel) par jointure honnête (voir
+  // wildlifeDisposition) — 8/25 espèces résolvent proprement, les autres
+  // n'affichent AUCUN badge (jamais un « peaceful » deviné).
+  const dispHtml = dispositionChip(wildlifeDisposition(id, w), 'official');
   const variants = (w.namesAll || []).filter(nm => fold(nm) !== fold(w.name));
   const variantsHtml = variants.length
     ? `<p class="hint">${esc(tr('wildlifeVariants', variants.join(' · ')))}</p>` : '';
   const lootHtml = `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}${w.harvestMethod ? ' · ' + esc(harvestMethodLabel(w.harvestMethod)) : ''}</h3>${lootRowsHtml(w.loot, 'noLootCatalogued')}</div>`;
   openFiche(`
-    ${ficheHeader({ name: w.name, hex, dot: speciesDot, sub: esc(kindLine) })}
+    ${ficheHeader({ name: w.name, hex, dot: speciesDot, sub: esc(kindLine), below: dispHtml })}
     ${variantsHtml}
     ${wildlifeWhereHtml(id, spRes)}
     ${lootHtml}`);
@@ -373,6 +608,10 @@ function statsFixedProvenanceHtml(fr) {
     <p class="hint">${esc(tr('statsFixedProvenanceDetail', fr.src, fr.cbt, lvlText))}</p>
   </details>`;
 }
+/* Réduction de dégâts (0..1) -> pourcentage localisé (« 16 % »). */
+function fmtMitigation(frac) {
+  return frac.toLocaleString(numberLocale(), { style: 'percent', maximumFractionDigits: 0 });
+}
 function perTierStatsSection(level, sf, fixedReading) {
   const tiers = PER_TIER_ORDER.filter(t => sf.tiers[t]);
   if (!tiers.length) return '';
@@ -381,9 +620,29 @@ function perTierStatsSection(level, sf, fixedReading) {
   const head = `<tr><th scope="col"></th>${tiers.map(t => `<th scope="col">${esc(statTierLabel(t))}${_UNVERIFIED_TIERS.has(t) ? `<span class="tier-caveat-mark" title="${esc(tr('statsBossEliteCaveat'))}">*</span>` : ''}</th>`).join('')}</tr>`;
   const body = PER_TIER_STATS.map(s =>
     `<tr><th scope="row">${esc(statLabel(s))}</th>${tiers.map(t => `<td>${esc(fmtStatNum(computed[t][s]))}</td>`).join('')}</tr>`).join('');
+  // MitigationCurve (blueprint §3.3) : la réduction de dégâts DÉRIVÉE de
+  // l'armure de chaque palier via la courbe UNIQUE du client (il_formulas
+  // `mitigationK` = 100, publiée dans site_meta.json) — mitigation =
+  // armure / (armure + K), la fraction de dégâts entrants absorbée. Une COURBE
+  // across les 5 paliers, dans le même tableau (l'armure ≈ la résistance
+  // magique dans la formule -> « une seule courbe générique pour les deux »).
+  // Provenance derived (déjà portée par l'en-tête « Stats »). K absent
+  // (site_meta non chargé, panne réseau) -> pas de ligne (jamais un chiffre
+  // fabriqué). Non appliquée aux bosses/relevés propres : eux gardent leurs
+  // vraies stats intactes (statsBossDifficulty/record_own), aucune armure de
+  // formule à réduire.
+  const K = S.meta?.ilFormulas?.mitigationK;
+  const mitigRow = K != null
+    ? `<tr class="ptr-mitig"><th scope="row">${esc(tr('mitigationRowLabel'))}</th>${tiers.map(t => {
+        const a = computed[t].armor;
+        const mit = a > 0 ? a / (a + K) : 0;
+        return `<td>${esc(fmtMitigation(mit))}</td>`;
+      }).join('')}</tr>`
+    : '';
   return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'derived', text: tr('levelAbbrev', level) })}</h3>
-    <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}${mitigRow}</tbody></table></div>
     <p class="hint">${esc(tr('statsPerTierNote'))}</p>
+    ${K != null ? `<p class="hint">${esc(tr('mitigationNote'))}</p>` : ''}
     ${hasUnverified ? `<p class="hint">${esc(tr('statsBossEliteCaveat'))}</p>` : ''}
     ${statsFixedProvenanceHtml(fixedReading)}</div>`;
 }
@@ -702,11 +961,19 @@ function openMonsterFiche(key) {
   // est "inconnu" -- Badge précision unlocated dans monsterCampsHtml) -> tags ->
   // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
   // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
+  // DispositionBadge : la posture du monstre (hostile/neutral/…), résolue par
+  // data.js dispositionFor(key) — `monsters.disposition` est une CHAÎNE
+  // (data/SCHEMA.md §5.2). Le champ n'est PAS encore cuit dans monsters.bin
+  // (DATA_CONTRACT.md §2 « monsters.bin +fields disposition ») : lecteur écrit
+  // CONTRE le contrat (404/null-tolérant, blueprint §7), aujourd'hui DORMANT
+  // (dispositionFor -> null pour tous les monstres) donc AUCUN badge rendu —
+  // s'allumera dès que le pipeline publiera le champ, sans toucher le front.
+  const dispHtml = dispositionChip(dispositionFor(key), 'official');
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(icon, 'fiche-avatar', initials(m.name)),
       name: m.name, hex: speciesLayerHex(spId), dot: speciesDot,
-      sub: `${esc(kindLine)}${devMark}`,
+      sub: `${esc(kindLine)}${devMark}`, below: dispHtml,
     })}
     ${variantSelectHtml}
     ${rawRecordsHtml}
@@ -838,6 +1105,36 @@ function priceHtml(price) {
   if (price == null) return '';
   return `<span class="muted fr-price" title="${esc(tr('priceTitle'))}">${esc(price.toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
 }
+/* Drapeaux honnêtes d'un article de stock (contrat vendor_stock : `infinity` =
+   stock illimité, `chance` = probabilité d'être en stock). DORMANTS tant que
+   vendors.bin n'expédie qu'un `{key, price}` (aucun de ces champs) — rendus dès
+   qu'ils arrivent, jamais fabriqués. */
+function stockFlags(s) {
+  if (typeof s === 'string') return '';
+  const inf = s.infinity ? `<span class="stock-flag" title="${esc(tr('stockInfinityTitle'))}">${esc(tr('stockInfinity'))}</span>` : '';
+  const chance = (s.chance != null && s.chance < 1)
+    ? `<span class="stock-flag stock-flag-muted" title="${esc(tr('stockChanceTitle'))}">${esc(tr('stockChance', Math.round(s.chance * 100)))}</span>` : '';
+  return inf + chance;
+}
+/* PriceBandRow (blueprint §3.3) — le prix d'un article affiché en BANDE
+   (min–max) quand la donnée le porte, jamais un point-prix fabriqué. Contrat
+   vendor_stock : prix = base × `buy_price_multiplier`{min,max} × `gold`{min,max}
+   -> une BANDE (min×min … max×max). Le bin vendors.bin EXPÉDIÉ aujourd'hui ne
+   porte qu'un `price` SCALAIRE (survey : `{key, price}` universel, aucun champ
+   de bande) : ce cas rend EXACTEMENT l'ancien prix (priceHtml) — bande +
+   drapeaux DORMANTS jusqu'à l'arrivée du bin enrichi (lecteur écrit contre le
+   contrat, blueprint §7 ; jamais un min/max inventé autour d'un scalaire). */
+function priceBandCell(s) {
+  if (typeof s === 'string') return priceHtml(null);
+  const bpm = s.buy_price_multiplier, gold = s.gold;
+  const lo = s.priceMin != null ? s.priceMin : (bpm && gold ? bpm.min * gold.min : null);
+  const hi = s.priceMax != null ? s.priceMax : (bpm && gold ? bpm.max * gold.max : null);
+  const flags = stockFlags(s);
+  const priceCell = (lo != null && hi != null && Math.round(hi) !== Math.round(lo))
+    ? `<span class="muted fr-price" title="${esc(tr('priceBandTitle'))}">${esc(Math.round(lo).toLocaleString(numberLocale()))}&nbsp;–&nbsp;${esc(Math.round(hi).toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`
+    : priceHtml(s.price != null ? s.price : lo);
+  return flags ? `${flags}${priceCell}` : priceCell;
+}
 function vendorStockSection(vendorKey) {
   const v = S.vendors[vendorKey];
   if (!v) return '';
@@ -859,7 +1156,6 @@ function vendorStockSection(vendorKey) {
   }
   const rows = v.sells.map(s => {
     const key = typeof s === 'string' ? s : s.key;
-    const price = typeof s === 'string' ? null : s.price;
     const it = S.items[key];
     const name = it?.name || pretty(key);
     const icon = it?.icon ? `icons/${it.icon}` : null;
@@ -878,7 +1174,7 @@ function vendorStockSection(vendorKey) {
     return `<div class="frow" data-n="${esc(fold(name))}">
       ${iconTag(icon, 'fr-icon', itemGlyph(it))}
       ${itemRef}
-      ${priceHtml(price)}
+      ${priceBandCell(s)}
     </div>`;
   }).join('');
   const filter = v.sells.length > 15

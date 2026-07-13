@@ -134,6 +134,47 @@ function questCompletenessBadge(q) {
   return `<div class="quest-grade-badge">${badge({ axis: 'precision', value })}</div>`;
 }
 
+/* ── Navigation de série de quêtes (blueprint §2.4) ──────────────────────────
+   `sequence[]` + `sequenceSource` DEVRAIENT porter la CHAÎNE de quêtes (les
+   slugs ORDONNÉS de la série dont cette quête fait partie) : prev/suivant +
+   position « 2 / 4 » dans l'en-tête, chaque maillon une réf quête (q=<slug>).
+   FINDING E′c-4b — dans les bins EXPÉDIÉS aujourd'hui, `sequence` porte en
+   réalité les goalId ORDONNÉS de la quête ELLE-MÊME (l'ordre de ses étapes
+   internes), PAS une chaîne de quêtes sœurs : 781/790 entrées == un goalId de
+   la quête courante, et 0 quête n'inclut son propre slug NI aucun autre slug de
+   quête dans sa `sequence`. Le lecteur est donc écrit CONTRE le contrat et
+   GARDÉ : il ne rend une nav de série QUE lorsque la `sequence` décrit vraiment
+   une chaîne — c.-à-d. inclut le slug de la quête COURANTE (requis pour calculer
+   « position dans la série » ET les voisins prev/suivant). Aujourd'hui cette
+   garde ne passe JAMAIS → aucune nav rendue (absence honnête, jamais une fausse
+   série bâtie sur des goalId ; même patron dormant que dispositionChip/
+   PriceBandRow, inséré SANS octet quand vide → fiche quête inchangée). Elle
+   s'allumera d'elle-même dès que le pipeline expédiera `sequence` = slugs de la
+   chaîne (mismatch signalé à la vague pipeline). `sequenceSource` : "graph" =
+   vraie chaîne du graphe de quêtes (fort) ; "listed" = regroupement par ordre
+   de déclaration (plus faible → marqueur discret). Un maillon dont le slug n'est
+   pas dans S.quests → dégradé honnête (texte nu, jamais un lien mort). */
+function questSeriesNav(q, slug) {
+  const seq = q.sequence;
+  if (!Array.isArray(seq) || seq.length < 2) return '';
+  const idx = seq.indexOf(slug);
+  if (idx < 0) return '';   // quête absente de sa propre séquence → pas une vraie série (goalId aujourd'hui)
+  const weak = q.sequenceSource === 'listed';
+  const linkChip = (s, dirKey) => {
+    const qq = S.quests.get(s);
+    const label = qq ? qq.name : pretty(s);
+    const inner = qq
+      ? ref({ kind: 'quest', key: s, label, hasFiche: true })
+      : `<span class="fr-label">${esc(label)}</span>`;
+    return `<span class="series-nav-step series-nav-${dirKey}"><span class="series-nav-dir">${esc(tr(dirKey === 'prev' ? 'seriesPrevLabel' : 'seriesNextLabel'))}</span>${inner}</span>`;
+  };
+  const prev = idx > 0 ? linkChip(seq[idx - 1], 'prev') : '';
+  const next = idx < seq.length - 1 ? linkChip(seq[idx + 1], 'next') : '';
+  const posTip = weak ? tr('seriesListedTip') : tr('seriesGraphTip');
+  const pos = `<span class="series-nav-pos${weak ? ' series-nav-pos--weak' : ''}" title="${esc(posTip)}">${esc(tr('seriesPositionLabel', idx + 1, seq.length))}</span>`;
+  return `<div class="series-nav">${pos}${prev}${next}</div>`;
+}
+
 /* Journal : texte de présentation de la quête (ambiance), sorti du tiroir
    replié -- rendu tel quel juste sous le titre (revue de layout, juillet
    2026) comme un paragraphe stylé ordinaire, sans étiquette de section (même
@@ -387,6 +428,10 @@ function openQuestFiche(slug) {
         drawable: true, pos: { x: giverX, z: giverZ } }
     : null;
   const gradeBadge = questCompletenessBadge(q);
+  // Nav de série (blueprint §2.4) — DORMANTE aujourd'hui (voir questSeriesNav) :
+  // '' tant que `sequence` ne décrit pas une vraie chaîne de quêtes → insérée
+  // sans octet devant gradeBadge, l'en-tête reste inchangé.
+  const seriesNav = questSeriesNav(q, slug);
   const journalHtml = questJournalSection(q);
   // « Sur la carte » (acteurs de la quête, positionnés ou non) : PAS
   // redondant avec les cartes d'étape (goalTargetChip) malgré l'apparence --
@@ -406,7 +451,7 @@ function openQuestFiche(slug) {
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver)),
       name: q.name, hex: questHex, dot: questDot,
       sub: esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : '')),
-      below: `${gradeBadge}
+      below: `${seriesNav}${gradeBadge}
       ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: true })}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}`,
     })}
