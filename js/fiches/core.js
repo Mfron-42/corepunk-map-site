@@ -66,32 +66,29 @@ function ficheHeader({ avatar = '', name, hex = null, dot = null, sub = '', name
    quasi-totalité de la masse pondérée de sa table ; la règle a été durcie,
    un simple poids `w`>=1 NE PROUVE PLUS rien seul -- ~93,6 % des lignes du
    dataset étaient marquées « garanti » à tort avant ce correctif, voir
-   data/SCHEMA.md "guaranteed") soit la part APPROXIMATIVE `d.ch` (weight /
-   poids total de la table, 0..1, voir data/SCHEMA.md "chance") dans le pool
-   -- jamais une probabilité par KILL : le nombre réel de tirages par kill
-   vit côté serveur, absent des données client. Un titre (tooltip) explicite
-   ce caveat au survol de la pastille. `d.ch` absent (part non calculable) :
-   on n'affiche PLUS le poids brut `w` comme un faux pourcentage (c'était le
-   bug -- un poids de 1.0 pouvait se lire « 100 % » pour une part réelle de
-   l'ordre de 1 %) -- juste la quantité connue, honnêtement. */
-function dropChancePctText(ch) {
-  const pct = ch * 100;
-  if (pct < 1) return tr('dropChanceBelowOne');
-  const rounded = pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct < 10 ? 1 : 0 });
-  return tr('dropChanceApprox', rounded);
-}
+   data/SCHEMA.md "guaranteed") soit la Badge FERMÉE `weight-share` (blueprint
+   §5.2, même composant que l'obtain block de la fiche objet, item.js
+   obtainDropRowHtml) quand `d.ch` (la weight_share de l'objet dans la table,
+   0..1) est calculable -- jamais un « % de chance » : la vraie probabilité par
+   KILL est décidée côté serveur, absente des données client (honesty fix,
+   voir data/DATA_CONTRACT.md §3 -- l'ancien rendu ≈N% sous un intitulé
+   "Chance" faisait passer une PART de table pour une chance de drop, le même
+   bug que l'obtain block d'item.js corrigeait déjà). La Badge porte ce
+   caveat dans son info-bulle (i18n `badge` section, valWeightShare/Tip,
+   E'c-0/E'c-1 -- aucune clé nouvelle). `d.ch` absent (part non calculable) :
+   on n'affiche PAS le poids brut `w` comme un faux pourcentage (c'était le
+   bug d'origine -- un poids de 1.0 pouvait se lire « 100 % » pour une part
+   réelle de l'ordre de 1 %) -- juste la quantité connue, honnêtement. */
 function dropRateHtml(d) {
-  const countBit = d.c > 1 ? `×${d.c}` : '';
-  if (d.g) return `<span class="muted">${esc([countBit, tr('guaranteedLabel')].filter(Boolean).join(' '))}</span>`;
-  if (d.ch != null) {
-    const pctText = dropChancePctText(d.ch);
-    return `<span class="muted" title="${esc(tr('dropChanceCaveat'))}">${esc([countBit, pctText].filter(Boolean).join(' · '))}</span>`;
-  }
-  return countBit ? `<span class="muted">${esc(countBit)}</span>` : '';
+  const countBit = d.c > 1 ? `<span class="muted">×${d.c}</span>` : '';
+  if (d.g) return `<span class="muted">${esc([d.c > 1 ? `×${d.c}` : '', tr('guaranteedLabel')].filter(Boolean).join(' '))}</span>`;
+  if (d.ch != null) return `${countBit}${badge({ axis: 'value', value: 'weight-share' })}`;
+  return countBit;
 }
 
 /* Ligne de butin commune (fiche monstre/camp) : icône + nom cliquable vers
-   la fiche item quand connue + taux (dropRateHtml : ×N/garanti/%). */
+   la fiche item quand connue + taux (dropRateHtml : ×N/garanti/Badge
+   weight-share). */
 function monsterLootRow(d) {
   return dropRow(d.icon ? `icons/${esc(d.icon)}` : null, d.name,
     S.items[d.key] ? 'fiche-item' : null, d.key, dropRateHtml(d), itemGlyph(S.items[d.key]));
@@ -103,9 +100,14 @@ function lootRowsHtml(list, emptyKey) {
   // (voir noLootCatalogued/noHarvestCatalogued -- suivi ouvert, pas final).
   if (!list?.length) return `<p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr(emptyKey) })}</p>`;
   const guaranteed = list.filter(d => d.g);
-  const chance = list.filter(d => !d.g);
+  const shareRows = list.filter(d => !d.g);
+  // Intitulé du 2e groupe (honesty fix) : PLUS "Chance" (laissait croire à une
+  // probabilité par kill) -- réutilise le libellé fermé de la Badge
+  // weight-share (tbl('badge','valWeightShare'), déjà expédié ×5 locales,
+  // AUCUNE clé nouvelle) : "Table share" / "Part de la table" -- le même mot
+  // que la Badge posée sur chacune de ces lignes juste dessous.
   return (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(monsterLootRow).join('')}` : '')
-    + (chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(monsterLootRow).join('')}` : '');
+    + (shareRows.length ? `<h4 class="fiche-sub">${esc(tbl('badge', 'valWeightShare'))}</h4>${shareRows.map(monsterLootRow).join('')}` : '');
 }
 
 /* Nombre générique (coefficients de formule, rarity_scaling/tier_scaling) :
@@ -685,7 +687,7 @@ function disambiguatedItemName(base, ref, disambig) {
 }
 
 /* Ligne de butin partagée (fiche monstre/camp/coffre/table) : icône + nom
-   cliquable + taux (dropRateHtml : ×N/garanti/%). Couleur d'entité (task
+   cliquable + taux (dropRateHtml : ×N/garanti/Badge weight-share). Couleur d'entité (task
    #77) dérivée du linkAct : une ligne "fiche-item" est un OBJET (couleur de
    rareté, ou RECIPE_HEX + la bonne fiche si la clé résout en fait à un
    pseudo-item recette, voir itemFicheAct/itemEcHex/itemEcKind) ; une ligne
