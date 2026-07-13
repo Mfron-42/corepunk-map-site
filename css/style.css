@@ -3094,3 +3094,28 @@ button.ref-dot-btn {
 }
 button.ref-dot-btn:hover { background: color-mix(in srgb, var(--ref-c) 15%, transparent); border-color: transparent; }
 .ref-dot-btn .ref-bubble { width: 11px; height: 11px; }
+
+/* ── Pilule de kind « [Kind] » dans l'arbre + la légende vivante (vague 6) ─────
+   L'arbre de gauche et le bandeau « couches actives » rendent « [Kind(●)] Nom »
+   (species → « Monster », family → « Family ») : la pastille d'état est le
+   swatch / l'atag-dot existant (recette byte-identique à .ref-bubble), le nom
+   est le libellé (souligné ⇔ fiche), et .ref-tree-tag est la PILULE de kind —
+   la recette .ref-tag COMPACTÉE pour les lignes denses / les tags ≤18ch. Teinte
+   = --ref-kc (ancre du kind, posée en inline sur la ligne/le tag). Elle ne
+   s'affiche QUE pour les kinds entité (nom ≠ kind) ; les catégories gardent le
+   kind dans leur libellé — pas de pilule redondante. Aucune enveloppe .ref
+   n'est posée sur .filter-row/.species-row/.atag (leur flex resterait en
+   conflit avec display:inline-flex de .ref) : on réutilise la seule recette
+   AUTONOME .ref-tag/.ref-kindword, sans toucher au mécanisme natif. */
+.ref-tree-tag {
+  flex: none;
+  padding: 1px 5px;
+  font-size: .52rem;
+  letter-spacing: .07em;
+  border-radius: 3px;
+  align-self: center;
+}
+.species-row .ref-tree-tag { font-size: .5rem; padding: 0 4px; }
+/* Dans une tag de légende, la pilule ne doit jamais pousser le nom hors de ses
+   18ch : elle reste atomique (flex:none) à gauche du libellé tronqué. */
+.atag .ref-tree-tag { margin-right: -1px; }

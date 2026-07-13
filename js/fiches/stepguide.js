@@ -423,11 +423,49 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const differing = !!(t.item_key && t.item_key !== t.key);
     const primaryKey = differing ? t.item_key : (t.item_key || t.key);
     const approxForItem = t.item_key ? t.item_approx : t.approx;
-    // (Retour QA 2026-07-11, 23 occurrences : le tag [Objet] SANS libellé ni
-    // pastille lisait comme un élément cassé — l'ancien badge « Activable »
-    // ne se traduit plus en badge muet : le kind qao voyage désormais avec
-    // la PASTILLE DE POSITION de l'objet — voir objPosRow au retour de la
-    // branche — une seule référence qui dit à la fois « objet » et « ici ».)
+    // [collect-ITEM-from-object] (retour owner 2026-07-13, priorité #1
+    // followability -- « Quest item should be itself [Item(●)] : no need object
+    // position normally, self item knows where / how to find ») : un but qui
+    // RAMASSE un item (t.item_key présent) mène désormais sa carte de cible par
+    // l'IDENTITÉ DE L'ITEM ; l'objet/conteneur n'est plus qu'un contexte
+    // secondaire léger, JAMAIS une seconde entrée « Objet … à <position> »
+    // co-égale (le double-listage exact que l'owner a signalé, ex. Souvenir
+    // Sword). La position éventuelle de l'objet devient le « trouvé à » de
+    // l'ITEM : une pastille [Position ●] locate posée EN LIGNE avec son identité
+    // (extraBadge de goalTargetItemRow — même idiome que questItemRow, où le
+    // placement d'un item vit dans une pastille adjacente, jamais une entité
+    // distincte). Sans item ramassé (use_object pur, ex. l'aéronef « soplo » :
+    // t.item_key absent) l'objet RESTE la cible `[Qao(●)]` (repli activable plus
+    // bas) — inchangé.
+    //
+    // DISCRIMINATEUR HONNÊTE : l'item ne mène QUE lorsqu'il est lié au but par
+    // le MÉCANISME du jeu (`item_join === "mechanism"`) — le seul join prouvé,
+    // jamais un match inféré. Deux mécanismes le portent : collect_from_object
+    // (relation collect_from) et kill_collect sur un objet (relation drops_from
+    // — détruire un conteneur/coffre/veine pour en récolter l'item). Les
+    // vraies interactions d'objet (use_object / talk / harvest) rattachent leur
+    // item par déduction (item_join token_overlap / sole_candidate / archetype) :
+    // là, l'OBJET est le but, l'item n'est qu'un candidat — ils GARDENT la cible
+    // `[Qao(●)]` (repli conteneur/activable inchangé), exactement le « ne change
+    // pas les vraies interactions d'objet » de la consigne owner.
+    const collectsItem = !!t.item_key && t.item_join === 'mechanism';
+    // Conteneur NOMMÉ et DISTINCT (differing + label réel : interagir avec un
+    // AUTRE objet — « Old crate » — pour produire l'item) : il vaut d'être nommé
+    // en contexte (« found in ») et porte lui-même le pin. Un objet
+    // NON-differing (item_key === key) ne fait que ré-étiqueter l'item
+    // (casse/apostrophes : « Sword » vs « Souvenir Sword » — 13/13 des libellés
+    // « distincts » mesurés sont la MÊME entité) : aucun conteneur réel à
+    // nommer, l'item seul suffit.
+    const namedContainer = differing && !!t.label;
+    // « Trouvé à » de l'item : la position de l'objet réutilisée comme pastille
+    // LOCATE de l'ITEM (mode L togglable, Q7 — apparaît sous la barre de
+    // recherche, retirable, comme tout pin). Seulement quand un item est
+    // réellement ramassé ET qu'aucun conteneur nommé ne porte déjà ce pin
+    // (sinon deux pins pour le même point). Jamais fabriqué : uniquement quand
+    // t.x existe vraiment (sinon l'item se tient seul, sa fiche EST le guide).
+    const itemFoundAt = (collectsItem && !namedContainer && t.x != null)
+      ? ref({ kind: 'position', mode: 'L', pos: { x: posX, z: posZ }, label: '' })
+      : '';
     // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
     // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
     // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
@@ -435,34 +473,38 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // clic d'un chip objet devra cocher la ligne de SON type (placements
     // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
     // t.label — 45), même clic-double-effet que les chips monstre.
-    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem);
+    // L'item MÈNE — son « trouvé à » (itemFoundAt) posé EN LIGNE (extraBadge),
+    // jamais une ligne de position séparée co-égale.
+    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, itemFoundAt);
     let relRow = '';
-    // Quand la référence objet porte ELLE-MÊME la pastille de position
-    // (locate), la ligne position séparée disparaît — une seule affordance
-    // carte par cible, jamais deux boutons pour le même point (loi
-    // d'uniformisation, même logique que hasLayerResolution côté monstre).
-    let posInRef = false;
-    if (itemRow && differing) {
-      // collect_from_object (mechanism): the ONLY mech that ever attaches an
-      // item_key distinct from the object's own key (use_object never does,
-      // see geo.py's _resolve_target_mech) -- named "container" wording +
-      // the actual container's own label when known (t.label, e.g. "Old
-      // crate"), never a fabricated container name when it isn't (falls
-      // back to the previous generic "obtained here" phrasing untouched).
-      // EntityRef (vague 1) : le conteneur nommé est une référence [Objet]
-      // — avec pastille locate quand son placement est byte-joint (t.x).
-      if (t.label) {
-        const canPing = t.x != null;
-        posInRef = canPing;
-        relRow = `<div class="goal-target-row goal-target-row-rel">
+    // Quand l'item porte déjà son pin (itemFoundAt) OU qu'un conteneur nommé le
+    // porte, la ligne position séparée disparaît — une seule affordance carte
+    // par cible, jamais deux pins pour le même point (loi d'uniformisation,
+    // même logique que hasLayerResolution côté monstre).
+    let posInRef = !!itemFoundAt;
+    if (itemRow && namedContainer) {
+      // collect_from_object avec un conteneur DISTINCT nommé : « found in
+      // [Objet ●] <conteneur> » — contexte secondaire léger (verbe + nom),
+      // jamais une entrée co-égale. Pastille locate quand son placement est
+      // byte-joint (t.x) : le CONTENEUR porte alors le pin (pas l'item), jamais
+      // un nom de conteneur fabriqué.
+      const canPing = t.x != null;
+      posInRef = canPing;
+      // NB whitespace : l'indentation INTERNE de ce littéral (12/10 espaces)
+      // est volontairement conservée telle quelle malgré le dé-imbriquement du
+      // bloc — le blanc à l'intérieur des backticks est rendu littéralement,
+      // donc la garder identique laisse les buts « found in » NON concernés
+      // (use_object inféré) byte-identiques (render-diff : seuls les buts
+      // réellement modifiés changent).
+      relRow = `<div class="goal-target-row goal-target-row-rel">
             <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
             ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
           </div>`;
-      } else {
-        // Conteneur anonyme : le verbe honnête seul (« obtenu ici ») — plus
-        // jamais un badge de kind sans nom à côté (retour QA).
-        relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
-      }
+    } else if (itemRow && differing && !itemFoundAt) {
+      // Conteneur DISTINCT mais anonyme ET sans position : le verbe honnête seul
+      // (« obtenu ici ») — quand une position existe, itemFoundAt la porte déjà
+      // (le « trouvé à » de l'item) et rend ce verbe redondant, donc omis.
+      relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
     // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
@@ -480,9 +522,12 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: label || '' })}
       </div>`;
     }
-    // Position d'un OBJET : la référence porte le kind honnête [Objet ●]
-    // (locate) au lieu de la [Position ●] générique — le placement EST
-    // l'objet activable (l'information de l'ex-badge, portée par la pastille).
+    // Position restante : l'item ramassé porte son « trouvé à » en ligne
+    // (itemFoundAt) ET l'objet activable pur porte son pin [Qao ●] en ligne
+    // (repli ci-dessus) — dans les deux cas posInRef supprime la ligne séparée.
+    // Ne reste ici que l'objet activable PUR encore positionné (aucun item, kind
+    // honnête [Objet ●]) ou le repli zone/dynamique (t.x absent : search_zone
+    // estimée / « non localisé »), jamais un pin fabriqué.
     const objPosRow = posInRef ? '' : (t.x != null
       ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
       : posRow);

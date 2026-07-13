@@ -4,7 +4,7 @@ import { S, LS, save } from './state.js';
 import {
   CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyLayerHex,
   chestDisplayName, chestHex, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
-  speciesLayerHex, POI_TYPES, poiTypeLabel,
+  speciesLayerHex, POI_TYPES, poiTypeLabel, kindBaseHex,
 } from './config.js';
 import { $, $$, esc, fmtCoord, pretty, fold } from './utils.js';
 import { tr, numberLocale } from './i18n/index.js';
@@ -182,17 +182,60 @@ function hiddenBadge(hidden) {
   const label = tr('filterHiddenTooltip', hidden);
   return `<span class="fcount-hidden" title="${esc(label)}" aria-label="${esc(label)}">+${hidden.toLocaleString(numberLocale())}</span>`;
 }
-function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '') {
+/* ── EntityRef (◇) dans l'arbre + la légende vivante (vague 6, spec §4.7) ──────
+   L'arbre de GAUCHE et le bandeau « couches actives » deviennent des instances
+   EntityRef « [Kind(●)] Nom » : la pastille (swatch / atag-dot — recette
+   byte-identique à .ref-bubble) EST le point d'état ●/○/◐/⊘, le nom EST le
+   libellé (souligné ⇔ fiche, loi §1.1), et une PILULE de kind (mot localisé via
+   refKindLabel — AUCUNE clé i18n neuve) nomme le KIND en tête. C'est un AJOUT de
+   contrat (identité data-kind/data-mode, source du pill de la légende + loi du
+   même-état ; teinte deux-tons --ref-c/--ref-kc depuis la source couleur UNIQUE
+   de config.js) — jamais une réécriture : le mécanisme natif (case à cocher /
+   bouton .atag) et TOUS les sélecteurs/harnais restent intacts, le geste dessin
+   reste la case / l'atag, jamais un 3ᵉ état (modèle « légende vivante » §2.5).
+   La PILULE ne s'affiche que pour les kinds ENTITÉ (nom ≠ kind : species →
+   « Monster », family → « Family », en.js:804) ; les lignes de CATÉGORIE portent
+   déjà le mot de kind DANS leur libellé (« NPCs », « Peaceful animals »…) — pas
+   de pilule redondante, juste identité + teinte. Le contrat .ref n'est PAS posé
+   comme CLASSE sur la ligne (display:inline-flex de .ref se battrait avec le
+   flex des .filter-row/.species-row/.atag existants, et syncEntityRefDots ne
+   doit pas doubler la cascade native) : on réutilise les recettes AUTONOMES
+   .ref-tag/.ref-kindword + les variables --ref-c/--ref-kc, sans l'enveloppe. */
+const PILL_KINDS = new Set(['species', 'family']);
+const refKcHex = (kind, subrole) => kindBaseHex(kind, subrole) || '';
+function refKindPill(kind, opts = {}) {
+  return `<span class="ref-tag ref-tag-inert ref-tree-tag"><span class="ref-kindword">${esc(refKindLabel(kind, opts))}</span></span>`;
+}
+/* Pose le contrat EntityRef sur un <li>/<details> de l'arbre : identité
+   (data-kind/mode/subrole — lue telle quelle par collectActiveTags pour le pill
+   de la légende) + teinte deux-tons (--ref-c = teinte PRÉCISE de la ligne ;
+   --ref-kc = ancre du KIND, config.js — repli mono-ton). L'appelant FOURNIT le
+   kind (jamais re-dérivé côté front, loi générique). */
+function stampRef(el, hex, ref) {
+  if (!ref || !ref.kind) return;
+  el.dataset.kind = ref.kind;
+  el.dataset.mode = ref.mode || 'C';
+  if (ref.subrole) el.dataset.subrole = ref.subrole;
+  el.style.setProperty('--ref-c', hex || 'var(--muted)');
+  el.style.setProperty('--ref-kc', refKcHex(ref.kind, ref.subrole) || hex || 'var(--muted)');
+}
+
+function filterRow(key, label, hex, count, hidden, on, toggle, extraClass = '', ref = null) {
   const li = document.createElement('li');
   // Clé de couche stampée sur le <li> : identité stable pour le bandeau des
   // couches actives (renderActiveTags — dédup des copies miroir Creeps,
   // résolution de l'<input> par clé au moment du clic).
   li.dataset.fkey = key;
+  // Pilule de kind « [Kind] » : lignes ENTITÉ seulement (nom ≠ kind — ici les
+  // familles ; les catégories gardent le kind dans leur libellé). Insérée entre
+  // la pastille et le nom, HORS de .flabel (les harnais lisent .flabel = le nom).
+  const pill = ref && ref.pill && PILL_KINDS.has(ref.kind) ? refKindPill(ref.kind, { plural: ref.plural }) : '';
   li.innerHTML = `<label class="filter-row ${extraClass} ${on ? '' : 'off'}">
     <input type="checkbox" ${on ? 'checked' : ''}>
     <span class="swatch" style="background:${hex}"></span>
-    <span class="flabel">${esc(label)}</span>
+    ${pill}<span class="flabel">${esc(label)}</span>
     <span class="fcount">${count.toLocaleString(numberLocale())}</span>${hiddenBadge(hidden)}</label>`;
+  stampRef(li, hex, ref);
   li.querySelector('input').addEventListener('change', e => {
     li.querySelector('.filter-row').classList.toggle('off', !e.target.checked);
     toggle(e.target.checked);
@@ -330,14 +373,21 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
   const wildId = !key && S.wildlifeSpecies?.[id] ? id : null;
   const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
   const nameAttrs = key ? ` data-act="fiche-monster" data-id="${esc(key)}"` : '';
+  const spHex = speciesLayerHex(id);
   const li = document.createElement('li');
   li.dataset.species = id;
+  // EntityRef « [Monster(●)] Nom » (vague 6) : pastille .swatch = point d'état,
+  // pilule « Monster » (refKindLabel — pas de clé neuve), nom souligné ⇔ fiche.
+  // La pilule vit HORS de .flabel (harnais : .flabel/.sp-name = le nom seul) ;
+  // cliquée, elle passe par le handler de ligne ci-dessous (= bascule dessin,
+  // geste tag→draw), n'étant ni .sp-check ni [data-act].
   li.innerHTML = `<div class="filter-row species-row ${st.on ? '' : 'off'}${res ? '' : ' sp-zero'}">
     <label class="sp-check"><input type="checkbox" ${st.on ? 'checked' : ''} aria-label="${esc(sp.name)}">
-      <span class="swatch" style="background:${speciesLayerHex(id)}"></span></label>
-    <span class="flabel"><span class="sp-name${key || wildId ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
+      <span class="swatch" style="background:${spHex}"></span></label>
+    ${refKindPill('species')}<span class="flabel"><span class="sp-name${key || wildId ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
     <span class="sp-meta">${esc(meta)}</span>
   </div>`;
+  stampRef(li, spHex, { kind: 'species', mode: 'E' });
   if (wildId) li.querySelector('.sp-name').addEventListener('click', e => {
     e.stopPropagation();
     pushFocusState();
@@ -463,7 +513,7 @@ function familyRowLi(fam, f, hex, withNode) {
     setFamilyOn(fam, on);
     scheduleRedraw();
     buildGroupMonsters();
-  }, 'filter-row-sub' + (zero ? ' fam-zero' : ''));
+  }, 'filter-row-sub' + (zero ? ' fam-zero' : ''), { kind: 'family', mode: 'E', pill: true });
   row.querySelector('.flabel').insertAdjacentHTML('afterend', famCampsMeta(f.nCamps));
   if (withNode) return attachFamilyNode(row, fam);
   row.dataset.fam = fam;   // copie miroir : resynchronisée par refreshParentChecks
@@ -498,8 +548,11 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
   const rest = kindRestPoints(kind);
   if (!rest.nPts) return;
   const label = tr(kind === 'wildlife' ? 'wildlifeRestRow' : 'kindRestRow');
+  // « Peaceful animals » = couche camp:wildlife (kind wildlife) ; « Unidentified
+  // spawns » = camps monsters/creeps sans espèce jointe (kind générique camp).
+  const rk = kind === 'wildlife' ? 'wildlife' : 'camp';
   ul.appendChild(filterRow('camp:' + kind, label, CAMP_COLORS[kind] || '#888',
-    rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, extraClass));
+    rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, extraClass, { kind: rk, mode: 'C', subrole: kind }));
 }
 
 /* ── Arbre de couches : structure FINALE du panneau gauche (2026-07-11,
@@ -576,6 +629,10 @@ const campRowLabel = kind => CAMP_ROW_LABEL_KEY[kind] ? tr(CAMP_ROW_LABEL_KEY[ki
    même corps que l'ancienne boucle Object.entries(CATS) de buildFilters(),
    appelable PAR CLÉ depuis chaque groupe. extraClass ('filter-row-sub')
    quand la ligne vit dans un sous-groupe. */
+// Clé CATS → kind EntityRef (identité + teinte du contrat, PAS de pilule : le
+// libellé EST déjà le mot de kind pour ces couches de catégorie). Table
+// d'AFFICHAGE (même registre que CAMP_ROW_LABEL_KEY), pas une classification.
+const CATS_REF_KIND = { npc: 'npc', workshop: 'workshop', poi: 'poi', searchable_chest: 'searchable_chest', camp_chest: 'chest' };
 function catRow(key, extraClass = '') {
   const c = CATS[key];
   const { shown, hidden } = catStats(key);
@@ -583,7 +640,7 @@ function catRow(key, extraClass = '') {
     c.on = on;
     if (c.dense) scheduleRedraw();
     else on ? map.addLayer(layers[key]) : map.removeLayer(layers[key]);
-  }, extraClass);
+  }, extraClass, CATS_REF_KIND[key] ? { kind: CATS_REF_KIND[key], mode: 'C' } : null);
 }
 /* ── Sous-groupe « Points d'intérêt » (poiType, job pass 2026-07-11b) ────
    Remplace l'ancienne ligne plate catRow('poi') par un nœud dépliable — 8
@@ -611,14 +668,14 @@ function buildPoiSubGroup(ul) {
   if (!(S.data.poi || []).length) return;   // carte sans POI : pas de coquille vide
   let total = 0, totalHidden = 0;
   for (const t of POI_TYPES) { const s = poiTypeStats(t); total += s.shown; totalHidden += s.hidden; }
-  const grp = buildSubGroup('world-poi', catLabel('poi'), CATS.poi.hex, poiTypeLeaves, total, totalHidden);
+  const grp = buildSubGroup('world-poi', catLabel('poi'), CATS.poi.hex, poiTypeLeaves, total, totalHidden, 'poi');
   for (const t of POI_TYPES) {
     const { shown, hidden } = poiTypeStats(t);
     const st = S.poiTypes[t] || (S.poiTypes[t] = { on: true });
     grp.ul.appendChild(filterRow('poi.' + t, poiTypeLabel(t), CATS.poi.hex, shown, hidden, st.on, on => {
       st.on = on;
       scheduleRedraw();
-    }, 'filter-row-sub'));
+    }, 'filter-row-sub', { kind: 'poi', mode: 'C' }));
   }
   ul.appendChild(grp.li);
 }
@@ -627,13 +684,27 @@ function buildPoiSubGroup(ul) {
    loadDeferred/loadMapData). `label` : surcharge d'AFFICHAGE seule (libellé
    honnête des gardes, désambiguïsation « (camps) » des kinds rangés à côté
    de props placés — le token de hash reste camp.<kind>, inchangé). */
+// Kind de camp → kind EntityRef (identité + teinte ; pas de pilule : le libellé
+// EST le mot de kind). MÊME liste close que le registre KINDS de mapref.js —
+// table d'AFFICHAGE (comme CAMP_ROW_LABEL_KEY), jamais une re-classification de
+// données. Les kinds sans mapping (monsters/creeps/other/searchable…) retombent
+// sur le kind générique « camp », avec le kind moteur en subrole (loi §5.3).
+const CAMP_REF_KIND = {
+  shrines: 'shrine', soulkeeper: 'soulkeeper', guards: 'guard',
+  mining: 'harvest', logging: 'harvest', herbalism: 'harvest',
+  destroyable: 'destructible', reactive: 'reactive', wildlife: 'wildlife',
+};
+function campRefOpt(kind) {
+  const rk = CAMP_REF_KIND[kind] || 'camp';
+  return { kind: rk, mode: 'C', subrole: rk === 'camp' || rk === 'harvest' ? kind : undefined };
+}
 function campRow(kind, label = null, extraClass = '') {
   const st = S.camps[kind];
   if (!st) return null;
   // st.points vient directement de g.pts (data.js/multimap.js loadMapData) :
   // chaque entrée a TOUJOURS x/z, jamais de gap position -- hidden fixé à 0.
   return filterRow('camp:' + kind, label || campKindLabel(kind), CAMP_COLORS[kind] || '#888',
-    st.points.length, 0, st.on, on => { st.on = on; scheduleRedraw(); }, extraClass);
+    st.points.length, 0, st.on, on => { st.on = on; scheduleRedraw(); }, extraClass, campRefOpt(kind));
 }
 function loadingHintLi() {
   const li = document.createElement('li');
@@ -889,6 +960,7 @@ function collectActiveTags() {
         label: el.querySelector(':scope > summary .flabel')?.textContent || el.dataset.subgroup,
         hex: input.style.getPropertyValue('--dot').trim(),
         partial: input.indeterminate,
+        kind: el.dataset.kind || null,   // légende vivante : source du pill = data-kind du bucket
       });
     } else if (el.dataset.fkey) {
       if (el.closest('details.decor-group')) continue;   // représentée par la tag de son bucket
@@ -905,6 +977,7 @@ function collectActiveTags() {
         label: el.querySelector('.flabel')?.textContent || el.dataset.fkey,
         hex: el.querySelector('.swatch')?.style.background || '',
         partial: input.indeterminate,
+        kind: el.dataset.kind || null,   // ex. family → pilule « [Family] »
       });
     } else {
       // Sous-ligne espèce d'une famille : représentée par la tag FAMILLE
@@ -918,6 +991,7 @@ function collectActiveTags() {
         sp: true, key: el.dataset.species,
         label: el.querySelector('.sp-name')?.textContent || el.dataset.species,
         hex: el.querySelector('.swatch')?.style.background || '',
+        kind: 'species',
       });
     }
   }
@@ -932,7 +1006,7 @@ function collectActiveTags() {
     const sp = S.species?.[id];
     const fam = sp ? familyKey(sp.family || 'other') : null;
     if (fam && S.monfam[fam]?.on) continue;
-    push({ sp: true, key: id, label: sp?.name || pretty(id), hex: speciesLayerHex(id) });
+    push({ sp: true, key: id, label: sp?.name || pretty(id), hex: speciesLayerHex(id), kind: 'species' });
   }
   // Pins LOCATE (Q7) : chaque pin actif est une tag de légende comme les
   // couches — libellé = celui de la référence qui l'a posé (repli : mot de
@@ -943,7 +1017,7 @@ function collectActiveTags() {
   // 0 point locaux, qui gardent leur tag). Retrait : buildTagEl route la
   // tag/le ✕ vers removeLocatePin (l'alias dot-off ratifié §2.5).
   for (const [key, p] of S.locates || []) {
-    push({ locate: true, key, label: p.label || refKindLabel(p.kind || 'position'), hex: p.hex || 'var(--accent)' });
+    push({ locate: true, key, label: p.label || refKindLabel(p.kind || 'position'), hex: p.hex || 'var(--accent)', kind: p.kind || 'position' });
   }
   return tags;
 }
@@ -954,6 +1028,13 @@ function buildTagEl(d) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'atag' + (d.partial ? ' partial' : '');
+  // Contrat EntityRef sur la tag (identité + teinte deux-tons pour la pilule) —
+  // le geste reste : tout le bouton = dot-off (le ✕ n'est qu'un alias, §2.5).
+  if (d.kind) {
+    b.dataset.kind = d.kind;
+    b.style.setProperty('--ref-c', d.hex || 'var(--accent)');
+    b.style.setProperty('--ref-kc', refKcHex(d.kind) || d.hex || 'var(--accent)');
+  }
   const dot = document.createElement('span');
   dot.className = 'atag-dot';
   dot.style.setProperty('--c', d.hex);
@@ -964,7 +1045,18 @@ function buildTagEl(d) {
   x.className = 'atag-x';
   x.setAttribute('aria-hidden', 'true');
   x.textContent = '✕';
-  b.append(dot, label, x);
+  // Légende vivante « [Kind ●] Nom » : pilule de kind pour les kinds ENTITÉ
+  // (species/family) seulement — les tags de catégorie portent déjà le kind
+  // dans leur libellé (« NPCs »…). Mot localisé (refKindLabel), aucune clé neuve.
+  const parts = [dot];
+  if (d.kind && PILL_KINDS.has(d.kind)) {
+    const pill = document.createElement('span');
+    pill.className = 'ref-tag ref-tag-inert ref-tree-tag';
+    pill.innerHTML = `<span class="ref-kindword">${esc(refKindLabel(d.kind, { plural: d.plural }))}</span>`;
+    parts.push(pill);
+  }
+  parts.push(label, x);
+  b.append(...parts);
   b.title = d.label;
   b.setAttribute('aria-label', tr('activeTagRemove', d.label));
   b.addEventListener('click', () => {
@@ -1089,11 +1181,14 @@ const subOpen = new Set();
    `count` null = pas de compteur agrégé (un sous-groupe qui RECOUVRE ses
    propres lignes mentirait avec une somme ; les buckets disjoints
    affichent leur somme honnête). */
-function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0) {
+function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0, kind = null) {
   const li = document.createElement('li');
   const det = document.createElement('details');
   det.className = 'decor-group';
   det.dataset.subgroup = key;
+  // Contrat EntityRef sur le bucket (identité + teinte ; pas de pilule : c'est
+  // une CATÉGORIE). collectActiveTags relit det.dataset.kind pour la légende.
+  if (kind) stampRef(det, hex, { kind, mode: 'C' });
   if (subOpen.has(key)) det.open = true;
   const summary = document.createElement('summary');
   summary.innerHTML = `<input type="checkbox" class="subgrp-check" style="--dot:${hex}" aria-label="${esc(tr('groupToggleAria'))}">
@@ -1155,7 +1250,7 @@ function buildGroupWorld() {
   if (S.zonesGeo.length) {
     // Pas de notion de "sans position" pour une région (zones_geo est déjà
     // 100% ce qui est dessiné) : hidden fixé à 0, jamais de badge ici.
-    ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX, S.zonesGeo.length, 0, S.zonesOn, toggleZones));
+    ul.appendChild(filterRow('zones', tr('zonesLabel'), ZONE_HEX, S.zonesGeo.length, 0, S.zonesOn, toggleZones, '', { kind: 'zone', mode: 'C' }));
   }
   ul.appendChild(catRow('npc'));
   buildPoiSubGroup(ul);
@@ -1182,7 +1277,7 @@ function buildGroupWorld() {
   if (otherRows.length) {
     const total = otherKinds.reduce((s, k) => s + (S.camps[k]?.points.length || 0), 0);
     const grp = buildSubGroup('world-others', tr('subWorldOthers'), CAMP_COLORS.other,
-      () => campLeavesOf(otherKinds), total);
+      () => campLeavesOf(otherKinds), total, 0, 'camp');
     for (const r of otherRows) grp.ul.appendChild(r);
     ul.appendChild(grp.li);
   }
@@ -1325,9 +1420,12 @@ function buildGroupContainers() {
         for (const f of decorFamsOfCategory('interactable.other')) { const li = decorRow(f); if (li) u.appendChild(li); }
       }],
   ];
+  // Bucket → kind EntityRef (identité + teinte du sous-groupe ; pas de pilule —
+  // catégorie). Table d'affichage, pas une re-classification.
+  const BUCKET_REF_KIND = { 'inter-chests': 'chest', 'inter-destroyable': 'destructible', 'inter-interactives': 'reactive', 'inter-other': 'qao' };
   for (const [key, labelKey, hex, leavesFn, cats, decorCat, kindsFn, fill] of BUCKETS) {
     const { count, hidden } = bucketStats(cats, decorFamsOfCategory(decorCat), deferredReady ? kindsFn() : []);
-    const grp = buildSubGroup(key, tr(labelKey), hex, leavesFn, count, hidden);
+    const grp = buildSubGroup(key, tr(labelKey), hex, leavesFn, count, hidden, BUCKET_REF_KIND[key] || null);
     fill(grp.ul);
     if (grp.ul.children.length) ul.appendChild(grp.li);
   }
