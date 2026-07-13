@@ -534,6 +534,14 @@ body {
    pas le même rôle le dit aussi à l'œil, pas seulement par son texte). */
 #search-results li.sr-family-row { border-left: 2px solid var(--accent); padding-left: 6px; }
 #search-results li.sr-family-row .sr-label { font-weight: 600; }
+/* Ligne de résultat en EntityRef « [Kind(●)] Nom » (owner 2026-07-13, vague 4
+   du SPEC : le NOM ouvre la fiche, la pastille épingle/bascule la carte) : la
+   réf prend l'espace souple et son libellé s'ellipse ; le tag de kind + la
+   pastille restent atomiques à gauche, le sous-libellé muet (rareté/région/
+   « sans position ») à droite via son margin-left:auto existant. */
+#search-results .sr-row > .ref { flex: 1 1 auto; min-width: 0; gap: 6px; }
+#search-results .sr-row > .ref .ref-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#search-results li.sr-family-row .ref-label { font-weight: 600; }
 /* Puce de résultat pour un nœud de l'arbre de filtres (mission "search
    categories" 2026-07-11c — kind de camp/décor/type de POI/bucket
    Interactables…, js/search.js buildCategorySearchIndex/iconWithRing) :

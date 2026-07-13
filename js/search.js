@@ -12,7 +12,8 @@ import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, prett
 import { tr, tbl, numberLocale } from './i18n/index.js';
 import { map, toLL, toggleZones, showHighlight } from './mapview.js';
 import { pushFocusState } from './urlstate.js';
-import { goTo } from './pins.js';
+import { addLocatePin, removeLocatePin } from './pins.js';
+import { ref, locateRefKey } from './mapref.js';
 import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
@@ -1330,9 +1331,86 @@ document.addEventListener('keydown', e => {
     searchInput.blur();
   }
 });
+/* ── Lignes de résultat en EntityRef « [Kind(●)] Nom » (owner 2026-07-13,
+   « la quête doit être [Quest(●)] épinglable, plus de Position séparée — cette
+   quête ET TOUTES les quêtes » ; vague 4 du contrat mapref_component_SPEC.md) ──
+   Chaque ligne d'ENTITÉ rend le composant unique (mapref.js ref()) au lieu de
+   l'ancien cat-chip + libellé + coordonnée : le NOM souligné ouvre la fiche
+   (closure `open` existante), la PASTILLE épingle la position (kinds locate,
+   Q7) ou bascule/surligne la couche (kinds catégorie/groupe) — DEUX cibles de
+   clic, plus le clic-ligne historique préservé sur le corps (voir le délégué).
+   Un nœud d'ARBRE (catnode) n'a AUCUN kind d'entité unique (kind de camp /
+   famille décor / type de POI / bucket Interactables) → il garde sa puce 🗂
+   legacy (le kind y vit dans le libellé de la ligne, pas dans une pilule). */
+const SEARCH_REF_KIND = {
+  npc: 'npc', poi: 'poi', quest: 'quest', qao: 'qao', workshop: 'workshop',
+  item: 'item', recipe: 'recipe', monster: 'species', family: 'family',
+  zone: 'zone', location: 'location', ability: 'ability', event: 'event',
+  chest: 'chest', searchable_chest: 'searchable_chest', node: 'node',
+  talent: 'talent', specialization: 'specialization', profession: 'profession',
+};
+/* Kinds mono-entité à POSITION unique → la pastille pose/retire un pin LOCATE
+   (Q7 verbatim owner : « épinglable, apparaît sous la barre, retirable ») quand
+   x est connu — c'est LE geste que l'owner réclamait pour la quête. */
+const SEARCH_LOCATE_CATS = new Set(['npc', 'poi', 'quest', 'qao', 'workshop', 'searchable_chest', 'location', 'event']);
+/* Kinds « groupe de points » (camp / skin de coffre) : aucun nœud d'arbre, aucun
+   pin unique — la pastille rejoue leur surlignage de LOT (closure showHighlight). */
+const SEARCH_HIGHLIGHT_CATS = new Set(['camp', 'chest']);
+
+/* Clé STABLE du pin locate d'une ligne — la MÊME source pour l'état affiché de
+   la pastille (drawn) ET la bascule au clic, jamais re-dérivée séparément. */
+function entryLocateKey(it) {
+  return locateRefKey(it.cat, it.ref, it.x, it.z, it.map);
+}
+/* La pastille de cette ligne pose/retire un pin locate ? (kind mono-entité + x connu) */
+function entryPins(it) {
+  return SEARCH_LOCATE_CATS.has(it.cat) && it.x != null;
+}
+/* HTML « [Kind(●)] Nom » d'une ligne — null pour un nœud d'arbre (rendu legacy).
+   Souligné (fiche) ⇔ la closure `open` ouvre une VRAIE fiche (pas un simple
+   surlignage) ; zone : seulement si une fiche région cataloguée porte ce nom
+   (honnêteté §3.5). Pastille ⇔ position (locate) OU couche (catégorie/groupe) ;
+   aucune sinon (objet/recette/capacité/nœud, ou entité sans position) → nom
+   souligné seul, honnête (les états questNoPos/posUnknown restent en méta). */
+function searchRefHtml(it) {
+  const kind = SEARCH_REF_KIND[it.cat];
+  if (!kind) return null;
+  const highlight = SEARCH_HIGHLIGHT_CATS.has(it.cat);
+  const hasFiche = it.cat === 'zone' ? regionFicheExists(it.label)
+    : highlight ? false : !!it.open;
+  const desc = { kind, key: it.ref || undefined, label: it.label, hex: it.hex, hasFiche };
+  if (entryPins(it)) {
+    // Pin LOCATE : la pastille reflète l'appartenance à S.locates (même clé que
+    // la bascule) et bascule ce pin (dropdown transitoire re-rendu à chaque frappe).
+    desc.mode = 'L';
+    desc.pos = { x: it.x, z: it.z, map: it.map };
+    desc.drawable = true;
+    desc.drawn = !!(S.locates && S.locates.has(entryLocateKey(it)));
+  } else if (highlight) {
+    desc.drawable = true; desc.drawn = false;   // surlignage de lot transitoire, jamais persisté
+  } else if (kind === 'zone') {
+    desc.drawable = true; desc.drawn = !!S.zonesOn;   // la pastille suit la couche « Zones »
+  } else if (kind === 'species' || kind === 'family') {
+    // Couche d'arbre : pastille dessinable ; la bascule/le double-effet passe par
+    // la closure `open` (activateSpeciesLayer/activateFamilyLayers) — jamais une
+    // seconde sémantique. État non résolu ici (dropdown transitoire) → ○ honnête.
+    desc.drawable = true; desc.drawn = false;
+  } else {
+    // Aucune position, aucune couche (objet/recette/capacité/nœud, ou entité
+    // sans position connue) → aucune pastille : « [Kind] Nom » souligné seul.
+    desc.drawable = false;
+  }
+  return ref(desc);
+}
+
+/* Dernière liste rendue — le délégué de résultats retrouve l'entrée par index
+   (data-i) plutôt qu'une closure par ligne (une seule écoute déléguée, posée une
+   fois sur #search-results, survit à chaque reconstruction du dropdown). */
+let searchResults = [];
 function renderSearch(raw) {
   const v = raw.trim();
   resBox.innerHTML = ''; resBox.hidden = !v;
+  searchResults = [];
   if (!v) return;
   const res = runSearch(v);
   if (!res.length) {
@@ -1342,49 +1420,101 @@ function renderSearch(raw) {
     </li>`;
     return;
   }
-  res.forEach(it => {
+  searchResults = res;
+  res.forEach((it, i) => {
     const li = document.createElement('li');
+    li.dataset.i = i;   // ancre stable pour le délégué (jamais une closure par ligne)
     // Ligne de contexte (mission "search activation" — species rows show
     // their family context) : "Famille Wolf · 4 camps · 926 pts", posée par
-    // buildMonsterSearchIndex ci-dessus — même style discret que le
-    // bodyHit ci-dessous (les deux peuvent coexister : un alias trouvé PAR
-    // le corpus n'empêche pas d'afficher aussi le contexte famille).
+    // buildMonsterSearchIndex ci-dessus — même style discret que le bodyHit.
     const ctxLine = it.ctx ? `<div class="sr-hint sr-ctx">${esc(it.ctx)}</div>` : '';
-    // Indice discret : la quête sort sur un mot de son déroulé, pas de son
-    // titre — on montre la phrase qui a matché pour que ce soit lisible.
+    // Indice discret : la quête sort sur un mot de son déroulé, pas de son titre.
     const hint = it.bodyHit ? `<div class="sr-hint">${esc(tr('searchBodyHintPrefix'))}${esc(it.bodyHit)}</div>` : '';
     // Résultat d'une AUTRE carte : badge de carte discret + le clic bascule.
     const otherMap = it.map && it.map !== S.map;
     const mapBadge = otherMap
       ? `<span class="map-badge" title="${esc(tr('mapBadgeTitle', mapName(it.map)))}">${esc(mapName(it.map))}</span>` : '';
-    // Ligne FAMILLE (mission #1) : classe dédiée -- distinction visuelle
-    // légère (liseré + libellé en gras, voir style.css .sr-family-row),
-    // en plus de la puce de catégorie "Famille" -- jamais qu'un seul canal
-    // de distinction pour un rôle de ligne aussi différent (un filtre
-    // d'arbre, pas une entité vers une fiche).
+    // Ligne FAMILLE : classe dédiée (liseré + libellé en gras, voir style.css).
     if (it.cat === 'family') li.className = 'sr-family-row';
-    li.innerHTML = `<div class="sr-row">
-      <span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>
+    const refHtml = searchRefHtml(it);
+    let rowInner;
+    if (refHtml) {
+      // Sous-libellé HONNÊTE conservé (rareté/niveau/région/« sans position
+      // fixe »…) ; la COORDONNÉE séparée disparaît — la pastille porte
+      // désormais la position (owner 2026-07-13, « plus de Position séparée »).
+      const metaHtml = it.sub ? `<span class="muted">${esc(it.sub)}</span>` : '';
+      rowInner = `${iconWithRing(it)}${refHtml}${mapBadge}${metaHtml}`;
+    } else {
+      // Nœud d'arbre (catnode) : rendu legacy inchangé (puce 🗂 + libellé).
+      rowInner = `<span class="cat-chip" style="--chip-c:${it.hex}">${esc(searchCatLabel(it.cat))}</span>
       ${iconWithRing(it)}
       <span class="sr-label">${esc(it.label)}</span>
       ${mapBadge}
-      <span class="muted">${it.x != null ? fmtCoord(it.x, it.z) : esc(it.sub || '')}</span>
-    </div>${ctxLine}${hint}`;
-    li.onclick = () => {
-      pushFocusState();   // avant mutation — voir pushFocusState()'s doc
-      resBox.hidden = true; $('#search').value = it.label;
-      const focus = () => {
-        if (it.x != null) goTo(it.x, it.z, 3, it.label, it.pinCat ? { cat: it.pinCat } : null);
-        if (it.open) it.open();
-      };
-      // Cross-carte : basculer d'abord (charge la carte cible), PUIS focus —
-      // les x/z de l'entrée sont dans le repère de it.map, donc le goTo tombe
-      // juste une fois la bascule faite. Même carte : comportement inchangé.
-      if (otherMap) switchMap(it.map, { keepView: true }).then(focus);
-      else focus();
-    };
+      <span class="muted">${it.x != null ? fmtCoord(it.x, it.z) : esc(it.sub || '')}</span>`;
+    }
+    li.innerHTML = `<div class="sr-row">${rowInner}</div>${ctxLine}${hint}`;
     resBox.appendChild(li);
   });
+}
+
+/* Délégué de la liste de résultats (§1/§4.6 SPEC EntityRef) : chaque ligne a
+   DEUX cibles — le NOM (data-act ref-open) ouvre la fiche via la closure `open`
+   existante ; la PASTILLE (data-act ref-draw) épingle/bascule la carte. On
+   ARRÊTE la propagation : la recherche possède le routage de SES lignes (closures
+   bespoke — cross-carte, surlignage de lot, nœud d'arbre, double-effet espèce/
+   famille — que le délégué EntityRef GLOBAL de main.js ne saurait rejouer depuis
+   un simple kind/clé), jamais un double déclenchement. Un clic AILLEURS sur la
+   ligne (icône/corps) rejoue le geste « clic-ligne » historique : ouvre la fiche,
+   ou pour une ligne SANS fiche, l'action carte — comportement d'avant intégralement
+   préservé (les tests whole-row du harnais restent verts). */
+resBox.addEventListener('click', e => {
+  const li = e.target.closest('li');
+  if (!li || !resBox.contains(li) || li.dataset.i == null) return;
+  const it = searchResults[+li.dataset.i];
+  if (!it) return;
+  e.stopPropagation();
+  if (e.target.closest('[data-act="ref-draw"]')) drawSearchResult(it);
+  else openSearchResult(it);
+});
+function selectSearchResult(it) {
+  resBox.hidden = true;
+  $('#search').value = it.label;
+}
+/* Clic NOM / corps de ligne : ouvre la fiche (closure `open` — inclut le
+   double-effet espèce/famille et la bascule cross-carte). Une ligne SANS fiche
+   (poi/qao/atelier/événement, camp/coffre en surlignage) fait son action carte —
+   le clic n'est jamais mort. Une entrée d'historique par navigation (modèle existant). */
+function openSearchResult(it) {
+  pushFocusState();
+  selectSearchResult(it);
+  const run = () => { if (it.open) it.open(); else drawSearchMap(it); };
+  if (it.map && it.map !== S.map) switchMap(it.map, { keepView: true }).then(run);
+  else run();
+}
+/* Clic PASTILLE : action carte SEULE (pas de fiche, pas d'historique — même
+   registre qu'un toggle d'arbre/de légende). */
+function drawSearchResult(it) {
+  selectSearchResult(it);
+  drawSearchMap(it);
+}
+function drawSearchMap(it) {
+  if (entryPins(it)) { toggleSearchPin(it); return; }   // locate → pin épinglable/retirable
+  // Espèce/famille/zone/camp/coffre : leur couche/surlignage = exactement ce que
+  // la closure `open` fait pour ces kinds (aucune fiche à part) — jamais re-dérivé.
+  const run = () => { if (it.open) it.open(); };
+  if (it.map && it.map !== S.map) switchMap(it.map, { keepView: true }).then(run);
+  else run();
+}
+/* Pin LOCATE d'un résultat (Q7) : TOGGLE — déjà épinglé ⇒ retrait ; sinon pose
+   (caméra centrée par addLocatePin), cross-carte ⇒ bascule d'abord. Teinte/nom
+   du pin = ceux de la ligne (mêmes données que le bandeau-légende affichera). */
+function toggleSearchPin(it) {
+  const key = entryLocateKey(it);
+  if (!key) return;
+  if (S.locates && S.locates.has(key)) { removeLocatePin(key); return; }
+  const pin = { x: it.x, z: it.z, map: it.map || S.map, label: it.label, hex: it.hex, kind: it.cat };
+  if (it.map && it.map !== S.map) switchMap(it.map, { keepView: true }).then(() => addLocatePin(key, pin));
+  else addLocatePin(key, pin);
 }
 document.addEventListener('click', e => {
   if (!e.target.closest('.search-wrap')) resBox.hidden = true;

@@ -141,6 +141,10 @@ const KINDS = {
   talent:       { word: () => sc('talent'),                             fiche: true, mode: 'N' },
   specialization: { word: () => sc('specialization'),                  fiche: true, mode: 'N' },
   profession:   { word: () => sc('profession'),                        fiche: true, mode: 'N' },
+  // Événement de monde NOMMÉ (search.js buildEventSearchIndex) : positionné,
+  // SANS fiche — la pastille LOCATE épingle son point (mode L, Q7). Mot déjà
+  // expédié côté i18n (searchCat.event ×5), réutilisé tel quel, aucune clé neuve.
+  event:        { word: () => sc('event'),                              fiche: false, mode: 'L' },
   // ── Localise / libellé seul (pas de fiche) ──
   position:     { word: () => kindWord('position'),                     fiche: false, mode: 'L' },
   players:      { word: () => kindWord('players'),                      fiche: false, mode: 'N' },

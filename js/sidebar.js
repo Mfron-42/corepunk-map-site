@@ -192,27 +192,21 @@ function hiddenBadge(hidden) {
    réécriture : le mécanisme natif (case à cocher / bouton .atag) et TOUS les
    sélecteurs/harnais restent intacts, le geste dessin reste la case / l'atag,
    jamais un 3ᵉ état (modèle « légende vivante » §2.5).
-   PILULE DE KIND — RETIRÉE DE L'ARBRE (owner 2026-07-13, « restore the cleaner
-   dot ») : l'arbre de gauche est DÉJÀ groupé par kind via ses <details>
-   (Monsters/Creeps/World…), donc une pilule « [Monster] »/« [Family] » par
-   LIGNE était du bruit redondant. Les lignes d'arbre redeviennent le rendu
-   propre `[pastille d'état] Nom` — teinte + identité data-kind conservées
-   (stampRef), seul le libellé de kind visible disparaît de la ligne. La pilule
-   (refKindPill/PILL_KINDS ci-dessous) ne sert plus QUE le bandeau-légende
-   (buildTagEl), une liste PLATE (non groupée par kind) où le mot de kind
-   distingue encore une espèce « Rat » d'une famille « Rat ». Le contrat .ref
-   n'est PAS posé comme CLASSE sur la ligne (display:inline-flex de .ref se
-   battrait avec le flex des .filter-row/.species-row/.atag existants, et
-   syncEntityRefDots ne doit pas doubler la cascade native) : on réutilise les
-   recettes AUTONOMES .ref-tag/.ref-kindword + les variables --ref-c/--ref-kc,
-   sans l'enveloppe. */
-const PILL_KINDS = new Set(['species', 'family']);
+   PILULE DE KIND — RETIRÉE PARTOUT À GAUCHE (owner 2026-07-13, « remove the tags
+   on the left, keep the colored dots we had before ») : d'abord de l'ARBRE
+   (déjà groupé par kind via ses <details> Monsters/Creeps/World…, la pilule par
+   ligne y était du bruit redondant), et MAINTENANT du bandeau-légende
+   (buildTagEl) aussi — le bandeau se lit déjà par la COULEUR de chaque pastille
+   (une espèce « Rat » et une famille « Rat » portent des teintes distinctes),
+   la pilule n'y ajoutait rien que l'owner ne voulait pas voir. Lignes d'arbre ET
+   tags de légende redeviennent le rendu propre `[pastille d'état] Nom` — teinte
+   + identité data-kind conservées (stampRef / stamp de buildTagEl), seul le mot
+   de kind visible disparaît. Le contrat .ref n'est PAS posé comme CLASSE sur la
+   ligne (display:inline-flex de .ref se battrait avec le flex des .filter-row/
+   .species-row/.atag existants, et syncEntityRefDots ne doit pas doubler la
+   cascade native) : on réutilise la seule recette AUTONOME de la pastille
+   (.swatch/.atag-dot) + les variables --ref-c/--ref-kc, sans l'enveloppe. */
 const refKcHex = (kind, subrole) => kindBaseHex(kind, subrole) || '';
-/* Pilule de kind inerte — bandeau-légende SEULEMENT (buildTagEl ; retirée des
-   lignes d'arbre 2026-07-13, voir ci-dessus). */
-function refKindPill(kind, opts = {}) {
-  return `<span class="ref-tag ref-tag-inert ref-tree-tag"><span class="ref-kindword">${esc(refKindLabel(kind, opts))}</span></span>`;
-}
 /* Pose le contrat EntityRef sur un <li>/<details> de l'arbre : identité
    (data-kind/mode/subrole — lue telle quelle par collectActiveTags pour le pill
    de la légende) + teinte deux-tons (--ref-c = teinte PRÉCISE de la ligne ;
@@ -1037,8 +1031,9 @@ function buildTagEl(d) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'atag' + (d.partial ? ' partial' : '');
-  // Contrat EntityRef sur la tag (identité + teinte deux-tons pour la pilule) —
-  // le geste reste : tout le bouton = dot-off (le ✕ n'est qu'un alias, §2.5).
+  // Contrat EntityRef sur la tag (identité data-kind + teinte deux-tons —
+  // NON VISIBLE, conservé pour la traçabilité/le même-état) : le geste reste
+  // tout le bouton = dot-off (le ✕ n'est qu'un alias, §2.5).
   if (d.kind) {
     b.dataset.kind = d.kind;
     b.style.setProperty('--ref-c', d.hex || 'var(--accent)');
@@ -1054,18 +1049,13 @@ function buildTagEl(d) {
   x.className = 'atag-x';
   x.setAttribute('aria-hidden', 'true');
   x.textContent = '✕';
-  // Légende vivante « [Kind ●] Nom » : pilule de kind pour les kinds ENTITÉ
-  // (species/family) seulement — les tags de catégorie portent déjà le kind
-  // dans leur libellé (« NPCs »…). Mot localisé (refKindLabel), aucune clé neuve.
-  const parts = [dot];
-  if (d.kind && PILL_KINDS.has(d.kind)) {
-    const pill = document.createElement('span');
-    pill.className = 'ref-tag ref-tag-inert ref-tree-tag';
-    pill.innerHTML = `<span class="ref-kindword">${esc(refKindLabel(d.kind, { plural: d.plural }))}</span>`;
-    parts.push(pill);
-  }
-  parts.push(label, x);
-  b.append(...parts);
+  // Légende PROPRE « [pastille ●] Nom [✕] » — PLUS de pilule de kind (owner
+  // 2026-07-13, « remove the tags on the left, keep the colored dots we had
+  // before ») : la COULEUR de la pastille distingue déjà une espèce « Rat »
+  // d'une famille « Rat », la pilule était le bruit que l'owner voulait ôter.
+  // Même forme épurée que l'arbre de gauche ; le geste (tout le bouton = dot-off)
+  // et le même-état sont inchangés.
+  b.append(dot, label, x);
   b.title = d.label;
   b.setAttribute('aria-label', tr('activeTagRemove', d.label));
   b.addEventListener('click', () => {
