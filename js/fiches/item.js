@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, gotoBtn, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, dropRow, dropRateHtml, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, gotoBtn, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -47,17 +47,26 @@ function openLootTableFiche(label) {
   setFicheHash(null);
 }
 
+/* Glyphe de TYPE d'un nœud de récolte : nodes.bin ne porte AUCUN champ icon
+   (honnêtement absent -- audit L2), donc l'avatar retombe sur un glyphe de
+   MÉTIER (jamais l'icône d'un autre nœud/objet ni un faux). Repli 🌾 quand le
+   métier n'est pas connu. */
+const NODE_GLYPH = { fishing: '🎣', herbalism: '🌿', logging: '🪓', mining: '⛏' };
+const nodeGlyph = n => NODE_GLYPH[(n?.prof || '').toLowerCase()] || '🌾';
+
 /* Fiche « nœud de récolte » (#81, site/data/<lang>/nodes.bin -- 30 types
    gn_*) : nom + palier (T1-T3, texte brut comme it.tier ailleurs) + métier
    (professionLabel) + ses propres lignes de butin agrégées (drops[], même
    lootRowsHtml que monstre/camp/coffre/table -- garanti/chance, jamais un
-   rendu réinventé). `generic:true` (9/30, aucune localisation en jeu pour ce
-   type -- voir build_site_data.py resource_nodes_site()) : Badge provenance
-   absent honnête à côté du nom plutôt qu'un faux nom localisé -- même
-   vocabulaire Badge que partout ailleurs (blueprint §5.2), jamais un
-   texte libre inventé. Pas de position/couche carte (le lien nœud->point
-   n'existe pas côté client, byte-prouvé) : pas de lien profond dédié
-   (setFicheHash(null)), même traitement que openRecipeFiche/openChestFiche. */
+   rendu réinventé) + alias internes (aliases[]). `generic:true` (9/30, aucune
+   localisation en jeu pour ce type -- voir build_site_data.py
+   resource_nodes_site()) : Badge provenance absent honnête à côté du nom plutôt
+   qu'un faux nom localisé -- même vocabulaire Badge que partout ailleurs
+   (blueprint §5.2), jamais un texte libre inventé. ICÔNE honnêtement ABSENTE
+   (nodes.bin sans champ icon) -> avatar = glyphe de type (nodeGlyph). AUCUNE
+   position/couche carte (le lien nœud->point n'existe pas côté client,
+   byte-prouvé) : pas de pastille, pas de lien profond dédié (setFicheHash(null)),
+   même traitement que openRecipeFiche/openChestFiche. */
 function openNodeFiche(key) {
   const n = S.nodes?.[key];
   if (!n) return;
@@ -65,11 +74,26 @@ function openNodeFiche(key) {
   const hex = nodeHex(n);
   const tierLine = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
   const genericChip = n.generic ? ` ${badge({ axis: 'provenance', value: 'absent', extra: tr('nodeGenericNote') })}` : '';
+  // Icône HONNÊTEMENT absente (nodes.bin ne porte aucun champ icon) : avatar de
+  // repli = glyphe de métier via iconTag(null, …) (rend le span icon-broken
+  // avec le glyphe en data-fb, exactement comme un item sans icône) -- jamais
+  // un faux visuel emprunté à un voisin.
+  const avatar = iconTag(null, 'fiche-avatar', nodeGlyph(n));
+  // Alias internes (nodes.bin `aliases`, 9/30 nœuds génériques) : les clés de
+  // récolte hn_* -- seuls identifiants pour un type SANS localisation en jeu.
+  // Prettifiés (jamais le jeton brut hn_ à l'écran) et dédupliqués contre le
+  // nom (sinon pure répétition du titre).
+  const aliasNames = (n.aliases || [])
+    .map(a => pretty(String(a).replace(/^hn_/, '')))
+    .filter(a => fold(a) !== fold(n.name));
+  const aliasesHtml = aliasNames.length
+    ? `<div class="fiche-section"><p class="hint">${esc(tr('nodeAliasesLabel', aliasNames.join(', ')))}</p></div>` : '';
   // Nœud de récolte : AUCUNE pastille (mode N — le lien nœud→point n'existe pas
   // côté client, byte-prouvé ; la couche de récolte est le relais dessinable).
   openFiche(`
-    ${ficheHeader({ name: n.name, hex, nameSuffix: genericChip, sub: `${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}` })}
-    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>`);
+    ${ficheHeader({ avatar, name: n.name, hex, nameSuffix: genericChip, sub: `${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}` })}
+    <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>
+    ${aliasesHtml}`);
   setFicheHash(null);
 }
 
@@ -967,6 +991,79 @@ function openRecipeFiche(key) {
   setFicheHash(null);
 }
 
+/* ── Bloc « obtenu depuis » (item_source.json -> items[guid], DATA_CONTRACT §2)
+   ──────────────────────────────────────────────────────────────────────────
+   Surface d'obtention HONNÊTE. Lignes de DROP : la `weight_share` de l'objet
+   dans une table nommée, rendue par la Badge FERMÉE weight-share -- JAMAIS un
+   « % de chance » (la vraie proba par tirage est côté serveur, SCHEMA §0.3 ;
+   la Badge porte ce caveat dans son info-bulle). Lignes VENDEUR : le prix
+   d'achat en BANDE (min–max), jamais un point-prix fabriqué (blueprint §3.3
+   PriceBandRow). Le CRAFT garde ses blocs de recette existants. */
+
+/* Normalise une entrée de drop depuis it.obtain.drop[] ({table,ws,c,g}) OU la
+   forme héritée it.drops[] ({label,ws|ch,c,g}) vers une seule forme, puis plie
+   les paliers L01-14 (dedupeTierDrops) et trie garanti d'abord, part
+   décroissante ensuite. `obtain.drop` est préféré (superset propre : ni poids
+   brut ni faux `ch`), it.drops sert de repli pour les rares objets sans bloc
+   obtain. */
+function obtainDropRows(it) {
+  const src = it.obtain?.drop?.length
+    ? it.obtain.drop.map(d => ({ label: d.table, w: d.ws, c: d.c, g: !!d.g, ws: d.ws }))
+    : (it.drops || []).map(d => ({ label: d.label, w: d.ws ?? d.ch, c: d.c, g: !!d.g, ws: d.ws ?? d.ch }));
+  if (!src.length) return [];
+  return dedupeTierDrops(src)
+    .sort((a, b) => (b.g === a.g ? 0 : b.g ? 1 : -1) || ((b.ws ?? 0) - (a.ws ?? 0)));
+}
+/* Une ligne de drop (ObtainRow) : `[Loot table] Nom` (souligné -> fiche table
+   quand elle résout, lootTableItems ; jamais un lien mort) + ×quantité +
+   la Badge weight-share (part de la table, pas une chance de drop). Un drop
+   garanti (d.g) montre « Garanti » au lieu d'une part. La part n'est jamais
+   rendue en « % » ni nommée « chance » : la Badge EST la représentation
+   honnête de ws (son info-bulle dit « part de la table, pas une proba par kill »). */
+function obtainDropRowHtml(d) {
+  const tableKey = d.first || d.label;
+  const tableRef = ref({ kind: 'loot', key: tableKey, label: d.label, hasFiche: !!lootTableItems(tableKey) });
+  const countBit = d.c > 1 ? `<span class="muted">×${d.c}</span>` : '';
+  const share = d.g
+    ? `<span class="muted">${esc(tr('guaranteedLabel'))}</span>`
+    : badge({ axis: 'value', value: 'weight-share' });
+  return `<div class="frow" data-n="${esc(fold(d.label))}">${tableRef}${countBit}${share}</div>`;
+}
+
+/* Drapeaux honnêtes d'un article de stock vendeur (contrat vendor_stock :
+   `infinity` = stock illimité, `chance` = probabilité d'être proposé au
+   réassort) -- même composant .stock-flag que la fiche PNJ (entity.js), rendus
+   dès que la donnée les porte, jamais fabriqués. */
+function itemStockFlags(s) {
+  const inf = s.infinity ? `<span class="stock-flag" title="${esc(tr('stockInfinityTitle'))}">${esc(tr('stockInfinity'))}</span>` : '';
+  const chance = (s.chance != null && s.chance < 1)
+    ? `<span class="stock-flag stock-flag-muted" title="${esc(tr('stockChanceTitle'))}">${esc(tr('stockChance', Math.round(s.chance * 100)))}</span>` : '';
+  return inf + chance;
+}
+/* PriceBandRow (blueprint §3.3) pour l'article `s` (S.vendors[vk].sells) : prix
+   d'achat en BANDE min–max (priceMin/priceMax, ou base × buy_price_multiplier ×
+   gold en repli), JAMAIS un point-prix fabriqué -- une bande dégénérée
+   (min===max) retombe sur le prix unique. Qualité teintée + drapeaux de stock.
+   Même rendu (.fr-price/.coin/.stock-flag) et mêmes clés i18n (priceBandTitle…)
+   que la table de stock de la fiche PNJ, pour une seule grammaire de prix. */
+function itemPriceBandRow(s) {
+  if (!s || typeof s === 'string') return '';
+  const bpm = s.buy_price_multiplier, gold = s.gold;
+  const lo = s.priceMin != null ? s.priceMin : (bpm && gold ? bpm.min * gold.min : (s.price ?? null));
+  const hi = s.priceMax != null ? s.priceMax : (bpm && gold ? bpm.max * gold.max : lo);
+  const qual = s.quality
+    ? `<span class="fr-quality" style="color:${RARITY[s.quality]?.hex || 'var(--muted)'}">${esc(rarityLabel(s.quality) || s.quality)}</span>` : '';
+  const flags = itemStockFlags(s);
+  let price = '';
+  if (lo != null && hi != null && Math.round(lo) !== Math.round(hi)) {
+    price = `<span class="muted fr-price" title="${esc(tr('priceBandTitle'))}">${esc(Math.round(lo).toLocaleString(numberLocale()))}&nbsp;–&nbsp;${esc(Math.round(hi).toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
+  } else if (lo != null) {
+    price = `<span class="muted fr-price" title="${esc(tr('priceTitle'))}">${esc(Math.round(lo).toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
+  }
+  if (!qual && !flags && !price) return '';
+  return `<div class="vendor-price">${qual}${flags}${price}</div>`;
+}
+
 function openItemFiche(key) {
   const it = S.items[key];
   if (!it) return;
@@ -1017,18 +1114,17 @@ function openItemFiche(key) {
   const formulaHtmlBlock = it.artifact_formula ? formulaHtml(it.artifact_formula, { rarityNote: true }) : '';
   const scalingHtml = scalingSection(it);
 
+  // Bloc DROP (ObtainRow, obtain block) : les tables de butin où l'objet
+  // apparaît, avec sa part de table (Badge weight-share, JAMAIS un « % de
+  // chance » trompeur) + quantité + « Garanti » quand d.g -- voir
+  // obtainDropRows/obtainDropRowHtml ci-dessus. Remplace l'ancien rendu ≈%
+  // (dropRateHtml, core.js) qui présentait la part de table comme un
+  // pourcentage lisible comme une proba par kill (SCHEMA §0.3 : la vraie
+  // chance est côté serveur).
   let dropsHtml = '';
-  if (it.drops?.length) {
-    const drops = dedupeTierDrops(it.drops);
-    // d.label = nom lisible de la table de butin (camp/source), pas d'un
-    // autre item -- pas d'icône/clé propre, seul le taux (dropRateHtml)
-    // est commun avec monsterLootRow ci-dessus.
-    const guaranteed = drops.filter(d => d.g);
-    const chance = drops.filter(d => !d.g);
-    dropsHtml = `<div class="fiche-section"><h3>${esc(tr('dropRatesTitle'))}</h3>
-      ${guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(d => dropRow(null, d.label, 'fiche-loot', d.first, dropRateHtml(d))).join('')}` : ''}
-      ${chance.length ? `<h4 class="fiche-sub">${esc(tr('chanceLabel'))}</h4>${chance.map(d => dropRow(null, d.label, 'fiche-loot', d.first, dropRateHtml(d))).join('')}` : ''}
-    </div>`;
+  const dropRows = obtainDropRows(it);
+  if (dropRows.length) {
+    dropsHtml = `<div class="fiche-section"><h3>${esc(tr('obtainDropsTitle'))}</h3>${dropRows.map(obtainDropRowHtml).join('')}</div>`;
   }
 
   const farmHtml = farmSectionHtml(it);
@@ -1060,7 +1156,14 @@ function openItemFiche(key) {
       // En-tête technique du stand (« Tt Trader Drek ») masqué quand des PNJ
       // nommés existent en dessous — bruit d'asset, pas un nom joueur.
       const showName = !(npcs.length && /^tt[\s_]/i.test(v.name || ''));
-      return `<div class="vendor-block">${showName ? `<div class="vendor-name">${esc(v.name)}</div>` : ''}${npcRows || `<p class="hint">${esc(tr('merchantPosUnknown'))}</p>`}${more}</div>`;
+      // PriceBandRow (blueprint §3.3) : le prix d'achat de CET objet chez CE
+      // vendeur -- une BANDE min–max (S.vendors[vk].sells, le même stock
+      // byte-exact que la fiche PNJ), jamais un point-prix fabriqué. La donnée
+      // de bande vit sur soldBy->sells (résolvable, avec noms de PNJ) plutôt
+      // que sur obtain.vendor.npcKeys (clés npc_* non résolvables côté client).
+      const sell = v.sells?.find(s => (typeof s === 'string' ? s : s.key) === key);
+      const priceRow = itemPriceBandRow(sell);
+      return `<div class="vendor-block">${showName ? `<div class="vendor-name">${esc(v.name)}</div>` : ''}${priceRow}${npcRows || `<p class="hint">${esc(tr('merchantPosUnknown'))}</p>`}${more}</div>`;
     }).join('');
     if (blocks) vendorsHtml = `<div class="fiche-section"><h3>${esc(tr('soldByTitle'))}</h3>${blocks}</div>`;
   }

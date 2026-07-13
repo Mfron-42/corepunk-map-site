@@ -24,6 +24,44 @@ import { ref, refDot } from '../mapref.js';
 
 import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, gotoBtn, badge, speciesRef } from './core.js';
 
+/* Icône de coffre : chests.bin stocke un chemin client brut
+   `UI/Icons/HeroAvatars/Chest/<leaf>` (694/3834 placements) ; le fichier réel
+   vit sous `icons/chest/<leaf>.png` (transform de feuille vérifié 694/694).
+   Les autres coffres n'ont pas d'icône -> glyphe honnête (iconTag rend le span
+   icon-broken avec le glyphe en data-fb), jamais l'icône d'un voisin. */
+const CHEST_GLYPH = '📦';
+const chestIconUrl = r => (r.icon ? `icons/chest/${String(r.icon).split('/').pop()}.png` : null);
+
+/* Durée serveur (objectStats) : secondes -> ~N min au-delà d'une minute, N s en
+   deçà -- jamais un faux zéro de précision. */
+const fmtChestDuration = s => (s >= 60 ? tr('unitMinutesApprox', Math.round(s / 60)) : tr('unitSeconds', s));
+
+/* TimerRow (blueprint §3.3) depuis objectStats (2850/3834 coffres, provenance/
+   opcode déjà strippés côté données) : SEULES les valeurs porteuses de sens
+   sont rendues -- time_to_destroy=0 / champ absent / objectStats manquant sont
+   une ABSENCE honnête, JAMAIS un « 0 » fabriqué. Un vrai coffre (camp/legacy/
+   interactable.chests) sans timer décodé montre une Badge d'absence ; un pur
+   décor/destructible (aucune stat d'interaction par nature, DATA_CONTRACT §2)
+   n'affiche simplement pas de section. Réutilise la grille .stat-grid partagée. */
+function chestTimersHtml(r) {
+  const os = r.objectStats;
+  const rows = [];
+  if (os) {
+    if (os.time_to_regenerate_loot > 0) rows.push([tr('chestRegenLabel'), fmtChestDuration(os.time_to_regenerate_loot)]);
+    if (os.loot_cone_radius > 0) rows.push([tr('chestPickupRadiusLabel'), tr('unitMeters', os.loot_cone_radius)]);
+    if (os.time_to_destroy > 0) rows.push([tr('chestBreakTimeLabel'), fmtChestDuration(os.time_to_destroy)]);
+    if (os.give_karma_by_open) rows.push([tr('chestKarmaLabel'), tr('chestKarmaYes')]);
+  }
+  if (rows.length) {
+    const grid = rows.map(([l, v]) => `<div class="stat-row-label">${esc(l)}</div><div class="stat-row-value">${esc(v)}</div>`).join('');
+    return `<div class="fiche-section"><h3>${esc(tr('chestTimersTitle'))}</h3><div class="stat-grid">${grid}</div></div>`;
+  }
+  const isChest = r.group === 'camp_chest' || r.group === 'legacy_chest' || r.category === 'interactable.chests';
+  return isChest
+    ? `<div class="fiche-section"><h3>${esc(tr('chestTimersTitle'))}</h3><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('chestTimersAbsentNote') })}</p></div>`
+    : '';
+}
+
 /* Fiche coffre (S.data.chest, placements tc_* : camp_chest/legacy_chest/
    décor — voir DATA_CONTRACT.md §3) : nom d'affichage = type physique réel
    localisé (chestDisplayName, js/config.js — r.type est le vrai classifieur
@@ -42,7 +80,11 @@ function openChestFiche(i) {
   const r = S.data.chest[i];
   if (!r) return;
   S.openFiche = { kind: 'chest', id: i };
-  const name = chestDisplayName(r);
+  // Nom = vrai nom localisé officiel (r.displayName, 57 coffres -- ex. « Trash
+  // can » au lieu du placeholder brut « Chest trash 01 ») quand il existe,
+  // sinon le classifieur de TYPE localisé (chestDisplayName) -- jamais le nom
+  // d'asset bruité.
+  const name = r.displayName || chestDisplayName(r);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
   // Note honnête (r.lootGeneric) : ce placement n'a AUCUNE table de butin
   // dédiée — le seul lien de butin connu est un pool générique fouillable
@@ -60,11 +102,18 @@ function openChestFiche(i) {
   const chestDot = r.x != null
     ? { kind: 'chest', mode: 'L', key: 'chest:' + i, label: name, hex: chestHex(r), drawable: true, pos: { x: r.x, z: r.z } }
     : null;
+  // Région (r.zone, nom de zone localisé, présent sur tous les coffres) : réf
+  // `[Région] Nom` NON dessinable / NON soulignée (la fiche région arrive en
+  // vague E'c-R -- honnête : le tag nomme le kind, jamais un lien mort ni un
+  // faux tracé). ICÔNE réelle du coffre (chestIconUrl, 694) ou glyphe honnête.
+  const zoneRef = r.zone
+    ? `<div class="fiche-region">${ref({ kind: 'zone', label: r.zone, hasFiche: false, drawable: false })}</div>` : '';
   openFiche(`
-    ${ficheHeader({ name, hex: chestHex(r), dot: chestDot, sub: esc(chestKindLabel(r)) })}
+    ${ficheHeader({ avatar: iconTag(chestIconUrl(r), 'fiche-avatar', CHEST_GLYPH), name, hex: chestHex(r), dot: chestDot, sub: esc(chestKindLabel(r)), below: zoneRef })}
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, name, chestCat)}
     </div></div>
+    ${chestTimersHtml(r)}
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${genericNote}${drops}</div>`);
   setFicheHash(null);
 }
@@ -85,13 +134,19 @@ function openSearchableChestFiche(k) {
   const region = prettyRegion(r.region);
   const drops = lootRowsHtml(r.loot, 'noLootCatalogued');
   // EN-TÊTE PARTAGÉ (TASK 1) : titre coloré + pastille LOCATE (mode L, Q7) sur
-  // sa position — pin persistant retirable ; le sous-titre porte la région.
+  // sa position — pin persistant retirable.
   const scDot = r.x != null
     ? { kind: 'searchable_chest', mode: 'L', key: r.k, label: tr('searchableChestTitle'),
         hex: CATS.searchable_chest.hex, drawable: true, pos: { x: r.x, z: r.z } }
     : null;
+  // Région : réf `[Région] Nom` NON dessinable / NON soulignée (fiche région en
+  // vague E'c-R), cohérente avec la fiche coffre placé -- la région devient une
+  // entité référençable au lieu d'un simple sous-titre en texte brut. Le nom
+  // reste honnête (jeton prettifié : aucun libellé fourni côté données, §4).
+  const regionRef = r.region
+    ? `<div class="fiche-region">${ref({ kind: 'zone', label: region, hasFiche: false, drawable: false })}</div>` : '';
   openFiche(`
-    ${ficheHeader({ name: tr('searchableChestTitle'), hex: CATS.searchable_chest.hex, dot: scDot, sub: esc(region) })}
+    ${ficheHeader({ name: tr('searchableChestTitle'), hex: CATS.searchable_chest.hex, dot: scDot, sub: '', below: regionRef })}
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
     </div></div>

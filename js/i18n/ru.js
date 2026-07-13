@@ -494,6 +494,19 @@ export default {
       // выдуманное локализованное имя.
       nodeGenericNote: 'Внутреннее имя — для этого типа узла нет локализации в игре.',
       harvestedOnTitle: 'Добывается на',
+      // ── E′c-5 · блок получения + таймеры сундука + псевдонимы узла ──────
+      obtainDropsTitle: 'Добыча',
+      chestTimersTitle: 'Взаимодействие',
+      chestRegenLabel: 'Возрождение добычи',
+      chestPickupRadiusLabel: 'Радиус подбора',
+      chestBreakTimeLabel: 'Время разрушения',
+      chestKarmaLabel: 'При открытии',
+      chestKarmaYes: 'Даёт карму',
+      chestTimersAbsentNote: 'В данных клиента для этого сундука не записано время взаимодействия.',
+      unitMinutesApprox: n => `~${n} мин`,
+      unitSeconds: n => `${n} с`,
+      unitMeters: n => `${n} м`,
+      nodeAliasesLabel: names => `Также известен как: ${names}`,
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальные',
       // Подсказка бейджа «реальные» (monsters.md finding #1): явно отличает

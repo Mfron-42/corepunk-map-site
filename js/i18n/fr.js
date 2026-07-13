@@ -530,6 +530,19 @@ export default {
       // jamais un faux nom localisé inventé.
       nodeGenericNote: "Nom interne — aucune localisation en jeu n'existe pour ce type de nœud.",
       harvestedOnTitle: 'Récolté sur',
+      // ── E′c-5 · bloc obtention + timers de coffre + alias de nœud ──────
+      obtainDropsTitle: 'Butin',
+      chestTimersTitle: 'Interaction',
+      chestRegenLabel: 'Réapparition du butin',
+      chestPickupRadiusLabel: 'Rayon de ramassage',
+      chestBreakTimeLabel: 'Temps pour casser',
+      chestKarmaLabel: "À l'ouverture",
+      chestKarmaYes: 'Donne du karma',
+      chestTimersAbsentNote: "Aucun minutage d'interaction n'est enregistré dans les données du client pour ce coffre.",
+      unitMinutesApprox: n => `~${n} min`,
+      unitSeconds: n => `${n} s`,
+      unitMeters: n => `${n} m`,
+      nodeAliasesLabel: names => `Aussi appelé : ${names}`,
       statsTitle: 'Statistiques',
       realStatsBadge: 'réel',
       // Info-bulle du badge « réel » (monsters.md finding #1) : distingue

@@ -556,6 +556,28 @@ export default {
       // note, never a fabricated display name.
       nodeGenericNote: 'Internal name — no in-game localization exists for this node type.',
       harvestedOnTitle: 'Harvested from',
+      // ── E′c-5 · obtain block + chest timers + node aliases ──────────────
+      // Item obtain DROP section (item.js obtainDropRows): the loot tables an
+      // item appears in, each carrying the closed weight-share Badge — NOT a
+      // "% chance" (the true per-roll chance is server-side, SCHEMA §0.3).
+      obtainDropsTitle: 'Drops',
+      // Chest TimerRow (world.js chestTimersHtml, chests.bin objectStats):
+      // interaction timings — only meaningful values shown; a 0 / missing
+      // field renders as honest absence, never a fabricated "0".
+      chestTimersTitle: 'Interaction',
+      chestRegenLabel: 'Loot respawns',
+      chestPickupRadiusLabel: 'Pickup radius',
+      chestBreakTimeLabel: 'Time to break',
+      chestKarmaLabel: 'On opening',
+      chestKarmaYes: 'Grants karma',
+      chestTimersAbsentNote: 'No interaction timing is recorded in the client data for this chest.',
+      unitMinutesApprox: n => `~${n} min`,
+      unitSeconds: n => `${n} s`,
+      unitMeters: n => `${n} m`,
+      // Gathering-node internal aliases (nodes.bin `aliases`, generic node
+      // types): the harvest-node keys, prettified — the only identifiers for a
+      // node type with no in-game localization.
+      nodeAliasesLabel: names => `Also known as: ${names}`,
       statsTitle: 'Stats',
       realStatsBadge: 'real',
       // "real" badge tooltip (monsters.md finding #1): explicitly distinguish

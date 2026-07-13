@@ -497,6 +497,19 @@ export default {
       // локалізована назва.
       nodeGenericNote: 'Внутрішня назва — для цього типу вузла немає локалізації в грі.',
       harvestedOnTitle: 'Здобувається на',
+      // ── E′c-5 · блок отримання + таймери скрині + псевдоніми вузла ──────
+      obtainDropsTitle: 'Здобич',
+      chestTimersTitle: 'Взаємодія',
+      chestRegenLabel: 'Відновлення здобичі',
+      chestPickupRadiusLabel: 'Радіус підбирання',
+      chestBreakTimeLabel: 'Час руйнування',
+      chestKarmaLabel: 'При відкритті',
+      chestKarmaYes: 'Дає карму',
+      chestTimersAbsentNote: 'У даних клієнта для цієї скрині не записано час взаємодії.',
+      unitMinutesApprox: n => `~${n} хв`,
+      unitSeconds: n => `${n} с`,
+      unitMeters: n => `${n} м`,
+      nodeAliasesLabel: names => `Також відомий як: ${names}`,
       statsTitle: 'Характеристики',
       realStatsBadge: 'реальні',
       // Підказка бейджа «реальні» (monsters.md finding #1): явно відрізняє

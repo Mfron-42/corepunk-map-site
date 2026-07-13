@@ -513,6 +513,19 @@ export default {
       // state-chip, nunca un nombre localizado inventado.
       nodeGenericNote: 'Nombre interno — no existe localización en el juego para este tipo de nodo.',
       harvestedOnTitle: 'Recolectado en',
+      // ── E′c-5 · bloque de obtención + temporizadores de cofre + alias ──
+      obtainDropsTitle: 'Botín',
+      chestTimersTitle: 'Interacción',
+      chestRegenLabel: 'Reaparición del botín',
+      chestPickupRadiusLabel: 'Radio de recogida',
+      chestBreakTimeLabel: 'Tiempo para romper',
+      chestKarmaLabel: 'Al abrir',
+      chestKarmaYes: 'Otorga karma',
+      chestTimersAbsentNote: 'No hay ningún tiempo de interacción registrado en los datos del cliente para este cofre.',
+      unitMinutesApprox: n => `~${n} min`,
+      unitSeconds: n => `${n} s`,
+      unitMeters: n => `${n} m`,
+      nodeAliasesLabel: names => `También conocido como: ${names}`,
       statsTitle: 'Estadísticas',
       realStatsBadge: 'real',
       // Info-bulle del badge « real » (monsters.md finding #1): distingue un
