@@ -18,7 +18,7 @@
     (Node, sans DOM ni `location`) : ne
    lit RIEN de global, uniquement la chaîne passée en argument. Priorité
    (une seule pseudo-page à la fois, mêmes clés que urlstate.js carryKeys) :
-   q > i > mon > fam > npc > camp > zone > map (absent ⇒ Kwalat, cf. readHash). Jamais de
+   q > i > mon > fam > npc > camp > zone > ch > sc > lt > node > loc > ab > rec > map (absent ⇒ Kwalat, cf. readHash). Jamais de
    querystring, jamais `lang`, jamais x/z/zm — le pan/zoom ne doit JAMAIS
    compter une visite (voir dédoublonnage de l'effet de bord plus bas). */
 export function hashToPseudoPath(hash) {
@@ -32,6 +32,18 @@ export function hashToPseudoPath(hash) {
   // Fiche RÉGION (vague E'c-R) : jeton `zone=<zone_id>`, même carry-key que les
   // autres jetons de fiche (urlstate.js) — une pseudo-page par région ouverte.
   if (p.has('zone')) return '/zone/' + encodeURIComponent(p.get('zone'));
+  // Vague E'c-6 — les 7 surfaces nouvellement deep-linkables (coffre placé,
+  // coffre fouillable, table de butin, noeud de recolte, chronique/lore,
+  // capacite, recette) : une pseudo-page dediee par type, memes carry-keys que
+  // ci-dessus (urlstate.js FICHE_HASH_KEYS). Jetons mutuellement exclusifs :
+  // l'ordre ci-dessous n'est un departage que theorique.
+  if (p.has('ch')) return '/chest/' + encodeURIComponent(p.get('ch'));
+  if (p.has('sc')) return '/searchable-chest/' + encodeURIComponent(p.get('sc'));
+  if (p.has('lt')) return '/loot/' + encodeURIComponent(p.get('lt'));
+  if (p.has('node')) return '/node/' + encodeURIComponent(p.get('node'));
+  if (p.has('loc')) return '/lore/' + encodeURIComponent(p.get('loc'));
+  if (p.has('ab')) return '/ability/' + encodeURIComponent(p.get('ab'));
+  if (p.has('rec')) return '/recipe/' + encodeURIComponent(p.get('rec'));
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');
 }
 

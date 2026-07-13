@@ -33,6 +33,68 @@ import { map, toWorld } from './mapview.js';
    Vérifié par harnais : aller-retour état→hash→reload→état identique, hash
    minimal en vue par défaut, repli poi/famille, exclusion d'espèce
    ( §hash). */
+/* ── Résolveurs jeton de fiche ↔ index (vague E'c-6) ─────────────────────────
+   Trois kinds de fiche sont adressés en interne par un INDEX POSITIONNEL dans
+   un tableau (S.openFiche.id = index), mais un index n'est PAS stable à travers
+   une reconstruction de données : il glisse silencieusement et casse les liens
+   partagés (blueprint §1.2 / §8-R3). Le lien profond doit donc sérialiser une
+   CLÉ STABLE, résolue à l'index à la restauration. Ces helpers portent les deux
+   sens, partagés par le sérialiseur (fiches/core.js setFicheHash) et les
+   restaurateurs (router.js pour npc, main.js pour chest/lore) — jamais
+   re-dérivés par surface. Repli honnête : donnée non résolue → jeton brut /
+   index -1 (l'appelant n'ouvre alors rien plutôt qu'une mauvaise fiche).
+
+   PNJ (npc=<key>) — MIGRATION depuis l'ancien `npc=<idx>` : la clé stable est
+   le slug `npc:<slug>` (champ `ids` du record, ex. "npc:lyra_thornfeld"),
+   sérialisé sans son préfixe. REDIRECTION LEGACY (une release) : un ancien
+   `npc=<nombre>` (index pur) reste résolu tant qu'il est dans les bornes —
+   dégrade honnêtement (index -1) sinon. Un slug n'est jamais tout-chiffres, la
+   distinction est donc sûre. */
+/* Liste CANONIQUE des paramètres de hash « jeton de fiche » — mutuellement
+   exclusifs (une seule fiche ouverte à la fois). Source unique partagée :
+   fiches/core.js s'en sert pour vider les autres avant d'en poser un (exclusion
+   mutuelle), buildHash ci-dessous pour tous les reporter à travers un pan/zoom.
+   Les 8 premiers sont historiques ; les 7 derniers arrivent vague E'c-6. */
+const FICHE_HASH_KEYS = ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'wsp', 'zone',
+  'ch', 'sc', 'lt', 'node', 'loc', 'ab', 'rec'];
+
+const isLegacyIndex = tok => /^\d+$/.test(tok);
+function npcTokenForIndex(idx) {
+  const raw = S.data?.npc?.[idx]?.ids?.[0];
+  return raw ? String(raw).replace(/^npc:/, '') : (idx != null ? String(idx) : null);
+}
+function npcIndexForToken(tok) {
+  if (tok == null || tok === '') return -1;
+  const arr = S.data?.npc || [];
+  if (isLegacyIndex(tok)) {                 // ancien index positionnel (redirection legacy)
+    const i = +tok;
+    return (i >= 0 && i < arr.length) ? i : -1;   // hors bornes après reconstruction → dégrade honnêtement
+  }
+  const want = 'npc:' + tok;
+  let i = arr.findIndex(r => r.ids?.includes(want));
+  if (i < 0) i = arr.findIndex(r => r.ids?.includes(tok));   // tolère un id déjà préfixé passé tel quel
+  return i;
+}
+/* Coffre placé (ch=<key>) : la clé stable est le type d'asset `k` (jamais
+   individuellement unique — ~132 types pour 3834 placements ; le lien rouvre un
+   coffre REPRÉSENTATIF de ce type, la fiche étant par-type : nom + butin). */
+function chestTokenForIndex(idx) {
+  return S.data?.chest?.[idx]?.k ?? (idx != null ? String(idx) : null);
+}
+function chestIndexForToken(tok) {
+  if (tok == null || tok === '') return -1;
+  return (S.data?.chest || []).findIndex(c => c.k === tok);
+}
+/* Chronique / lore (loc=<id>) : la clé stable est le champ `id` du lieu
+   (S.locations, ex. "GoldenfieldTown" — 202/202 présents, 0 collision). */
+function locationTokenForIndex(idx) {
+  return S.locations?.[idx]?.id ?? (idx != null ? String(idx) : null);
+}
+function locationIndexForToken(tok) {
+  if (tok == null || tok === '') return -1;
+  return (S.locations || []).findIndex(l => l.id === tok);
+}
+
 const CATS_DEFAULT_ON = Object.fromEntries(Object.entries(CATS).map(([k, v]) => [k, !!v.on]));
 function fltTokens() {
   const t = [];
@@ -84,7 +146,11 @@ function buildHash() {
   // écrits ci-dessus depuis S.locator et les reporter aussi les dupliquerait.
   const p = new URLSearchParams(location.hash.slice(1));
   const carry = new URLSearchParams();
-  const carryKeys = S.locator ? ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'wsp', 'zone'] : ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'wsp', 'zone', 'at', 'atl'];
+  // Tous les jetons de fiche mutuellement exclusifs (les 8 historiques + les 7
+  // ajoutés vague E'c-6 : ch/sc/lt/node/loc/ab/rec) DOIVENT être reportés à
+  // travers un pan/zoom, sinon syncHash() les effacerait du hash — une fiche
+  // ouverte disparaîtrait du lien partageable au premier déplacement de carte.
+  const carryKeys = S.locator ? FICHE_HASH_KEYS : [...FICHE_HASH_KEYS, 'at', 'atl'];
   for (const k of carryKeys) if (p.has(k)) carry.set(k, p.get(k));
   if ([...carry.keys()].length) h += '&' + carry.toString().replace(/%2C/g, ',');
   return h;
@@ -218,4 +284,10 @@ function unfocus(clearFn) {
   else clearFn();                            // pas d'historique local sûr → nettoyage sur place
 }
 
-export { buildHash, syncHash, readHash, pushFocusState, canGoBackLocally, unfocus };
+export {
+  buildHash, syncHash, readHash, pushFocusState, canGoBackLocally, unfocus,
+  FICHE_HASH_KEYS,
+  npcTokenForIndex, npcIndexForToken,
+  chestTokenForIndex, chestIndexForToken,
+  locationTokenForIndex, locationIndexForToken,
+};

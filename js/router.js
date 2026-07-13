@@ -4,7 +4,7 @@
    utilisateur (#84, clic droit) ne vivent PAS ici : localStorage par carte,
    restaurés par main.js (renderUserFlags), pas d'état de hash à relire. */
 import { S } from './state.js';
-import { readHash } from './urlstate.js';
+import { readHash, npcIndexForToken } from './urlstate.js';
 import { switchMap } from './multimap.js';
 import { map, toLL, worldBounds, denseRenderers, toggleZones } from './mapview.js';
 import { setLocator, clearLocator } from './pins.js';
@@ -34,6 +34,11 @@ import { applySpeciesTokens, setFamilyOn } from './specieslayer.js';
 async function applyLocationState() {
   S.restoring = true;
   const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, family, wsp, at, atl, map: mapId } = readHash();
+  // PNJ : le jeton `npc=` est désormais une CLÉ stable (`npc=<slug>`, migration
+  // vague E'c-6) — mais un ancien `npc=<index>` partagé reste résolu une release
+  // (redirection legacy dans npcIndexForToken ; -1 si hors bornes après
+  // reconstruction → on n'ouvre alors rien, dégradation honnête).
+  const npcIdx = npc != null ? npcIndexForToken(npc) : -1;
 
   // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
   // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
@@ -63,8 +68,8 @@ async function applyLocationState() {
   } else if (!view && quest && S.quests.has(quest) && S.quests.get(quest).x != null) {
     const q = S.quests.get(quest);
     map.setView(toLL(q.x, q.z), Math.max(map.getZoom(), 2.5));
-  } else if (!view && npc && S.data.npc[+npc]) {
-    const r = S.data.npc[+npc];
+  } else if (!view && npcIdx >= 0 && S.data.npc[npcIdx]) {
+    const r = S.data.npc[npcIdx];
     map.setView(toLL(r.x, r.z), Math.max(map.getZoom(), 2.5));
   }
 
@@ -159,7 +164,7 @@ async function applyLocationState() {
   closeFiche();
   if (quest && S.quests.has(quest)) openQuestFiche(quest);
   else if (item && S.items[item]) openItemFiche(item);
-  else if (npc && S.data.npc[+npc]) openNpcFiche(+npc);
+  else if (npcIdx >= 0 && S.data.npc[npcIdx]) openNpcFiche(npcIdx);
   else whenDeferred(() => {
     // openCampFiche n'exige plus de fiche détaillée (contenants typés sans
     // camp_details) : il vérifie lui-même que le camp existe sur la carte.

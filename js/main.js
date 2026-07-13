@@ -35,7 +35,7 @@ import { buildSearch, hideSearchResults } from './search.js';
 import {
   buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode,
 } from './sidebar.js';
-import { syncHash, pushFocusState, unfocus } from './urlstate.js';
+import { syncHash, pushFocusState, unfocus, chestIndexForToken, locationIndexForToken } from './urlstate.js';
 import {
   goTo, clearLocator, renderUserFlags, removeUserFlag, clearAllUserFlags,
   addLocatePin, removeLocatePin, renderLocatePins,
@@ -661,20 +661,37 @@ async function setLang(code) {
     buildDevToggle();  // le compte de monstres isTest n'est connu qu'ici
   });
 }
-/* ── Restauration d'état + fiche RÉGION par lien profond (vague E'c-R) ────────
-   applyLocationState() (router.js) restaure caméra/filtres/fiche pour tous les
-   jetons de fiche SAUF `zone=<zone_id>` (la fiche région, nouvelle surface,
-   route et restaure ici — main.js porte le routage EntityRef + ce jeton). Le
-   jeton est LU AVANT applyLocationState : sa closeFiche() supprime `zone` du
-   hash (jeton de fiche mutuellement exclusif), donc on le capture d'abord puis
-   on rouvre la fiche région APRÈS. whenDeferred : la fiche a besoin de
-   zones_contents.bin (chargement différé, comme camp/monster) — synchrone si
-   déjà prêt (popstate après boot), différé au tout premier chargement (le hash
-   `zone` est re-posé par openRegionFiche quand la donnée arrive). */
+/* ── Restauration d'état + fiches « nouvelles surfaces » par lien profond ─────
+   applyLocationState() (router.js) restaure caméra/filtres/fiche pour les jetons
+   HISTORIQUES (q/i/npc/mon/fam/wsp/camp) ; les 8 jetons de fiche AJOUTÉS hors de
+   router (zone= vague E'c-R, puis ch/sc/lt/node/loc/ab/rec vague E'c-6) routent
+   et restaurent ICI — main.js porte le routage EntityRef + ces jetons. TOUS lus
+   AVANT applyLocationState : sa closeFiche() supprime chaque jeton de fiche du
+   hash (mutuellement exclusifs, un seul à la fois), donc on les capture d'abord
+   puis on rouvre la bonne fiche APRÈS (elle re-pose son propre jeton).
+   Timing : chest/searchable-chest s'appuient sur des données CRITIQUES (déjà là)
+   → ouverture immédiate ; loot/node/lore/ability/recipe s'appuient sur le lot
+   DIFFÉRÉ (loot_table_contents/nodes/locations/abilities/recipes) → whenDeferred,
+   synchrone si déjà prêt (popstate après boot), différé au tout premier
+   chargement (le jeton est re-posé quand la donnée arrive). Un jeton index→clé
+   non résolu (coffre/lore d'une reconstruction ou d'une autre carte) dégrade
+   honnêtement : index -1 → on n'ouvre rien plutôt qu'une mauvaise fiche. */
 async function restoreState() {
-  const zone = new URLSearchParams(location.hash.slice(1)).get('zone');
+  const p = new URLSearchParams(location.hash.slice(1));
+  const zone = p.get('zone');
+  const ch = p.get('ch'), sc = p.get('sc'), lt = p.get('lt');
+  const node = p.get('node'), loc = p.get('loc'), ab = p.get('ab'), rec = p.get('rec');
   await applyLocationState();
+  // Jetons de fiche mutuellement exclusifs → au plus un présent ; on route le
+  // seul capturé (chaîne else-if : rien d'autre ne peut coexister).
   if (zone) whenDeferred(() => openRegionFiche(zone));
+  else if (ch != null) { const i = chestIndexForToken(ch); if (i >= 0) openChestFiche(i); }
+  else if (sc != null) openSearchableChestFiche(sc);
+  else if (lt != null) whenDeferred(() => openLootTableFiche(lt));
+  else if (node != null) whenDeferred(() => openNodeFiche(node));
+  else if (loc != null) whenDeferred(() => { const i = locationIndexForToken(loc); if (i >= 0) openLocationFiche(i); });
+  else if (ab != null) whenDeferred(() => openAbilityFiche(ab));
+  else if (rec != null) whenDeferred(() => openRecipeFiche(rec));
 }
 /* ── Démarrage ──────────────────────────────────────────────── */
 (async function init() {

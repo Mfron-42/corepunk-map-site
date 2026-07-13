@@ -17,7 +17,10 @@ import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, prett
 import { tr, tbl, numberLocale } from '../i18n/index.js';
 import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
 import { clearLocator } from '../pins.js';
-import { unfocus } from '../urlstate.js';
+import {
+  unfocus, FICHE_HASH_KEYS,
+  npcTokenForIndex, chestTokenForIndex, locationTokenForIndex,
+} from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
 import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
@@ -187,26 +190,46 @@ function openFiche(html) {
   $('#detail-body').innerHTML = html;
   detail.classList.add('open');
 }
-/* Lien profond de fiche dans le hash (q=<slug> / camp=<clé> / i=<clé item> /
-   npc=<idx>) — mutuellement exclusifs, une seule fiche ouverte à la fois.
-   `history.state` (pas `null`) : préserve le marqueur {cpm,cpmSeq} de
-   l'entrée courante — posé soit par la restauration initiale, soit par
-   pushFocusState() juste avant que cette fonction ne soit appelée (voir
-   plus bas) — sans quoi CE replaceState l'effacerait à chaque ouverture de
-   fiche et canGoBackLocally()/unfocus() ne fonctionneraient plus jamais. */
+/* Lien profond de fiche dans le hash — les 15 kinds sont mutuellement exclusifs,
+   une seule fiche ouverte à la fois (blueprint §1.2, objectif 17/17 des surfaces
+   deep-linkables). Table UNIQUE kind→jeton ci-dessous ; la liste des noms de
+   paramètre vit dans urlstate.js (FICHE_HASH_KEYS) — même source pour l'exclusion
+   mutuelle ici et le report à travers un pan/zoom (buildHash).
+   `history.state` (pas `null`) : préserve le marqueur {cpm,cpmSeq} de l'entrée
+   courante — posé soit par la restauration initiale, soit par pushFocusState()
+   juste avant que cette fonction ne soit appelée — sans quoi CE replaceState
+   l'effacerait à chaque ouverture de fiche et canGoBackLocally()/unfocus() ne
+   fonctionneraient plus jamais. */
+const FICHE_TOKEN = {
+  quest: 'q', item: 'i', npc: 'npc', monster: 'mon', family: 'fam',
+  wildlife: 'wsp', camp: 'camp', region: 'zone',
+  // Vague E'c-6 — les 7 surfaces nouvellement deep-linkables.
+  chest: 'ch', searchable_chest: 'sc', loot: 'lt', node: 'node',
+  location: 'loc', ability: 'ab', recipe: 'rec',
+};
+/* npc/chest/location portent un INDEX POSITIONNEL dans S.openFiche.id ; on
+   SÉRIALISE une clé STABLE (un index glisse à la reconstruction → lien cassé,
+   blueprint §8-R3). Résolu à l'index à la restauration (urlstate.js / main.js). */
+function ficheTokenValue(kind, id) {
+  if (kind === 'npc') return npcTokenForIndex(id);
+  if (kind === 'chest') return chestTokenForIndex(id);
+  if (kind === 'location') return locationTokenForIndex(id);
+  return id;
+}
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam'); p.delete('wsp'); p.delete('zone');
-  if (kind === 'quest') p.set('q', id);
-  else if (kind === 'item') p.set('i', id);
-  else if (kind === 'npc') p.set('npc', id);
-  else if (kind === 'monster') p.set('mon', id);
-  else if (kind === 'family') p.set('fam', id);
-  else if (kind === 'wildlife') p.set('wsp', id);
-  // Fiche RÉGION (vague E'c-R) : jeton `zone=<zone_id>`, mutuellement exclusif
-  // des autres jetons de fiche (tous supprimés ci-dessus, un seul à la fois).
-  else if (kind === 'region') p.set('zone', id);
-  else if (kind) p.set('camp', id);
+  for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul jeton de fiche
+  // Openers historiques du monde/objet (coffre, coffre fouillable, chronique,
+  // table de butin, nœud, capacité, recette) : ils posent S.openFiche puis
+  // appellent setFicheHash(null) (leur module précède le deep-link) — on dérive
+  // alors le jeton de S.openFiche. closeFiche() met S.openFiche à null AVANT cet
+  // appel, ce chemin reste donc un pur nettoyage quand aucune fiche n'est ouverte.
+  if (kind == null && S.openFiche) { kind = S.openFiche.kind; id = S.openFiche.id; }
+  const tok = kind && FICHE_TOKEN[kind];
+  if (tok) {
+    const v = ficheTokenValue(kind, id);
+    if (v != null && v !== '') p.set(tok, String(v));
+  }
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
 
