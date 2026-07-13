@@ -24,80 +24,40 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { disambiguatedItemName, currentGoalZones, npcRef, gotoBtn, isRecipeKind, itemEcHex, familyHasMembers, stateChip } from './core.js';
+import { disambiguatedItemName, currentGoalZones, npcRef, gotoBtn, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 
-/* Libellé + éventuel bouton pour une cible sans position fixe. `regionHint`
-   (facultatif) = région du journal de la quête, affichée en cas (c) quand
-   aucune zone n'est disponible du tout — mieux que rien pour se repérer.
-   BUG FIX (popup/bubble layout cleanup pass) : le rappel de région vivait
-   dans un <span class="pos-region"> FRÈRE de .pos-dynamic, pas un enfant —
-   sur une bulle étroite (fiche de quête, ~300px), le conteneur flex-wrap
-   parent (.goal-target) pouvait donc les scinder sur deux lignes ("Dynamic
-   position" seul puis "(Westwind Woods)" seul, visuellement cramé/décousu),
-   et le rappel de région n'héritait pas la teinte muette de .pos-dynamic
-   (étant un frère, pas un descendant) — il ressortait à pleine opacité,
-   comme une info plus importante que le badge discret juste à côté. Les deux
-   segments sont maintenant un seul fragment de texte cohérent (« Dynamic
-   position · Westwind Woods »), jamais scindable par le flex-wrap parent, et
-   le rappel de région hérite nativement la couleur/l'italique de son parent
-   (voir .pos-region dans style.css, dé-italique seulement). */
-/* États (unknown_states_DESIGN.md #2/#3/#4/#5, task #67) : ces 3 niveaux
-   rendaient jusqu'ici TOUS le même texte muet/italique sans jamais dire au
-   survol POURQUOI la position n'est pas un simple bouton carte -- un `title`
-   par branche adopte maintenant le vocabulaire d'état partagé (stateChip),
-   sans toucher aux libellés visibles eux-mêmes (ils restent plus spécifiques
-   et plus utiles que "Dynamic"/"Unknown" tout court) :
-   - confiance HAUTE (b) : un vrai fait étayé par une preuve de drop/farm --
-     title "dynamic".
-   - confiance MOYENNE (b') et « monstre non catalogué » (c, camps.json ~25 %
-     de couverture seulement) : une hypothèse, jamais une preuve de spawn --
-     title "unknown" (cohérent avec leurs libellés déjà prudents, "Zone
-     estimée"/"Position non cataloguée").
-   - repli générique (tout autre acteur sans x/z ni search_zone) : le libellé
-     "Position dynamique" reste sa propre affirmation -- AUCUN classificateur
-     par instance n'est exposé côté client aujourd'hui pour prouver ou
-     infirmer ce cas au cas par cas (voir §2 re-check #3 -- 18 PNJ
-     d'Extraction Island sont byte-prouvés dynamiques côté pipeline, data/
-     quests.json pos_source=server_spawn, mais ce classifieur n'est publié
-     dans AUCUN .bin du site) ; changer sa sémantique sans preuve serait
-     l'inverse du problème que cette passe corrige. Title "dynamic" par
-     cohérence avec son propre libellé -- un vrai audit par échantillonnage
-     (déjà flaggé comme suivi séparé dans le design doc) reste à faire avant
-     de le reclasser. */
+/* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
+   PRÉCISION (blueprint §5.2), plus l'ancienne échelle posDynamic/posEstimatedZone/
+   posUncatalogued (chacune son propre libellé/idiome). Trois rendus :
+   - search_zone (confiance HAUTE ou MOYENNE) → précision `area` + la référence
+     [Région(●)] qui DESSINE la zone (viewGoalZone, routé par main.js sur
+     data-subrole "goal-zone", key = index dans currentGoalZones). Une zone
+     confiance MOYENNE n'est qu'une proximité, jamais une preuve de spawn : sa
+     confiance plus faible passe en info-bulle (extra), jamais en libellé plus
+     affirmatif que la confiance haute.
+     (EXCEPTION Q7 : ces refs goal-zone ne sont PAS des pins locate togglables —
+     leur machinerie est single-slot, effacée à la fermeture de fiche, et leur
+     clé n'est qu'un index ré-attribué à chaque openQuestFiche ; sidebar.js/
+     mapref.js les excluent du jeu de pins via data-subrole="goal-zone".)
+   - monstre non référencé par un camp (camps.json ~25 % de couverture) → aucune
+     position connue à dessiner ou épingler → précision `unlocated`.
+   - repli générique (tout autre acteur sans x/z ni zone) → précision `unlocated`
+     (spawn dynamique/serveur, aucun point fixe) ; la région du journal, quand
+     elle existe, l'accompagne en rappel muet d'orientation (.pos-region),
+     jamais une affirmation dessinable. */
 function dynamicPosBadge(t, regionHint) {
   const sz = t && t.search_zone;
   if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
     const zi = currentGoalZones.push(sz) - 1;
-    // Confiance MOYENNE = proximité seule, jamais une preuve de spawn (voir
-    //  zone_confidence) : libellé + bouton distincts de la
-    // confiance haute (posEstimatedZone/viewEstimatedZoneBtn), jamais
-    // "Spawn zone"/"View zone" pour un simple calcul de voisinage.
     const isEstimate = sz.confidence === 'medium';
-    const label = isEstimate ? tr('posEstimatedZone') : tr('posDynamicZone');
-    const title = tr(isEstimate ? 'stateUnknownTitle' : 'stateDynamicTitle');
-    // EntityRef (vague 1) : l'ancien bouton « Voir la zone » (zoneViewBtn,
-    // supprimé) devient une référence [Région ●] — la pastille dessine la
-    // zone de recherche (viewGoalZone, routé par main.js sur data-subrole
-    // "goal-zone", key = index dans currentGoalZones). drawn:false explicite
-    // — jamais l'état de la couche Régions (S.zonesOn), qui est un AUTRE
-    // toggle. EXCEPTION Q7 DOCUMENTÉE (suivi honnête, pas un hack) : ces
-    // refs goal-zone ne sont PAS des pins locate togglables — leur
-    // machinerie est single-slot (goalZoneLayer/clearGoalZone, cercle OU
-    // vrais points selon la confiance, effacée à la fermeture de fiche) et
-    // leur clé n'est qu'un INDEX dans currentGoalZones, ré-attribué à chaque
-    // openQuestFiche (aucune identité stable à mettre dans S.locates, et la
-    // géométrie n'est pas un point). Les faire entrer dans le modèle Q7
-    // demanderait des pins-zone multi-slots à géométrie persistée — suivi
-    // séparé ; en attendant, comportement historique inchangé (dessin
-    // one-shot), et sidebar.js/mapref.js les EXCLUENT explicitement du jeu
-    // de pins (data-subrole="goal-zone").
-    return `<span class="pos-dynamic" title="${esc(title)}">${esc(label)}</span>${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false })}`;
+    const areaBadge = badge({ axis: 'precision', value: 'area', extra: isEstimate ? tr('stateUnknownTitle') : null });
+    return `${areaBadge}${ref({ kind: 'zone', key: zi, subrole: 'goal-zone', drawn: false })}`;
   }
   if (t && t.kind === 'monster' && !t.camp) {
-    return `<span class="pos-dynamic" title="${esc(tr('stateUnknownTitle'))}">${esc(tr('posUncatalogued'))}</span>`;
+    return badge({ axis: 'precision', value: 'unlocated' });
   }
   const region = regionHint ? ` <span class="pos-region">· ${esc(regionHint)}</span>` : '';
-  return `<span class="pos-dynamic" title="${esc(tr('stateDynamicTitle'))}">${esc(tr('posDynamic'))}${region}</span>`;
+  return `${badge({ axis: 'precision', value: 'unlocated' })}${region}`;
 }
 
 /* Map de désambiguïsation de la fiche QUÊTE ouverte (même cycle de vie que
@@ -711,7 +671,22 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // condition que rendaient spawnBtn/familyBtn.)
     const hasLayerResolution = !!spPts
       || (isFamilyScope && famTokens.some(f => !!familyPoints(f)));
-    const monsterPosRow = hasLayerResolution ? '' : posRow;
+    // « Où » TYPÉ explicitement (blueprint §2.2.4/§2.3 : « chaque localisation
+    // non-exacte est typée, jamais un faux pin »). Un monstre n'a jamais de pin
+    // fixe (spawn dynamique) — sa position se résout À TRAVERS sa couche de
+    // spawn (espèce/famille) : quand cette couche a RÉELLEMENT des points sur la
+    // carte active, on remplace l'ancien vide par un Badge PRÉCISION `via-chain`
+    // (« localiser via la couche liée — bascule la pastille de la réf ci-dessus »),
+    // le vocabulaire d'honnêteté fermé (blueprint §5) plutôt que le silence : le
+    // joueur sait alors COMMENT trouver la cible (allumer ses spawns), pas juste
+    // qu'un nom existe. Couche sans point (espèce errante/donjon, ex.
+    // a_quiet_disposal Scolopendra) -> `posRow` garde son Badge `unlocated`
+    // honnête (spawn serveur, rien à dessiner ici). Le badge via-chain vit dans
+    // sa PROPRE ligne `-where` (jamais `-pos` : la position reste « aucun pin
+    // fixe » — l'affordance carte EST la pastille du tag, pas une seconde ligne).
+    const monsterPosRow = hasLayerResolution
+      ? `<div class="goal-target-row goal-target-row-where">${badge({ axis: 'precision', value: 'via-chain' })}</div>`
+      : posRow;
     return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}</div>`;
   }
 
@@ -898,7 +873,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
   // ni "dev", ni "dynamique", juste non déterminable depuis les données
   // extraites, voir QUEST_FORMAT.md §12). Jamais pour le contenu de test (déjà
   // couvert par isTest ailleurs) -- pas de double pastille sur le même but.
-  const unknownChip = isTestQuest ? '' : ` ${stateChip('unknown')}`;
+  const unknownChip = isTestQuest ? '' : ` ${badge({ axis: 'provenance', value: 'absent' })}`;
   return `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span>${unknownChip}</div></div>`;
 }
 

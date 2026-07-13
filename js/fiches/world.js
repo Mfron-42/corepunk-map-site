@@ -22,7 +22,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, gotoBtn, stateChip, speciesRef } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, gotoBtn, badge, speciesRef } from './core.js';
 
 /* Fiche coffre (S.data.chest, placements tc_* : camp_chest/legacy_chest/
    décor — voir DATA_CONTRACT.md §3) : nom d'affichage = type physique réel
@@ -95,7 +95,7 @@ function openSearchableChestFiche(k) {
     <div class="fiche-section"><div class="pop-actions">
       ${gotoBtn(r.x, r.z, tr('searchableChestTitle'), 'searchable_chest')}
     </div></div>
-    <div class="fiche-section"><p class="hint">${stateChip('dynamic')} ${esc(tr('searchableChestRarityNote'))}</p></div>
+    <div class="fiche-section"><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('searchableChestRarityNote') })}</p></div>
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${drops}</div>`);
   setFicheHash(null);
 }

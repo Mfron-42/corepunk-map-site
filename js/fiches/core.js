@@ -13,8 +13,8 @@ import {
   chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
   speciesLayerHex, familyLayerHex, entityColor,
 } from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
-import { tr, numberLocale } from '../i18n/index.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, cleanLabel } from '../utils.js';
+import { tr, tbl, numberLocale } from '../i18n/index.js';
 import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
 import { clearLocator } from '../pins.js';
 import { unfocus } from '../urlstate.js';
@@ -101,7 +101,7 @@ function lootRowsHtml(list, emptyKey) {
   // partagé (monstre/camp/coffre/table) dit "rien de catalogué" -- un vrai
   // trou de couverture connu, jamais un aveu que le jeu n'a pas de butin ici
   // (voir noLootCatalogued/noHarvestCatalogued -- suivi ouvert, pas final).
-  if (!list?.length) return `<p class="hint">${stateChip('unknown')} ${esc(tr(emptyKey))}</p>`;
+  if (!list?.length) return `<p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr(emptyKey) })}</p>`;
   const guaranteed = list.filter(d => d.g);
   const chance = list.filter(d => !d.g);
   return (guaranteed.length ? `<h4 class="fiche-sub">${esc(tr('guaranteedLabel'))}</h4>${guaranteed.map(monsterLootRow).join('')}` : '')
@@ -205,26 +205,67 @@ function setFicheHash(kind, id) {
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
 
-/* ── Pastille d'état "on ne sait pas" (unknown_states_DESIGN.md, task #67) ──
-   Taxonomie PARTAGÉE (voir style.css .state-chip) pour toute incertitude
-   honnête affichée sur le site -- remplace ~6 idiomes bespoke qui
-   coexistaient déjà (chacun sa classe, son texte, jamais partagés).
-   "dev" réutilise .dev-mark/devBadge tel quel PARTOUT ailleurs dans ce
-   fichier (jamais dupliqué via cette pastille) -- "dynamic"/"unknown" sont
-   les 2 variantes d'origine ; "fixed" (task #80, monsterStatsSection) est un
-   4ᵉ état ajouté pour le badge « relevé fixe » (record_fixed_sibling) --
-   même composant/CSS que les 3 autres, juste son propre couple libellé/
-   info-bulle (stateFixed/stateFixedTitle, i18n), jamais le badge « réel »
-   (.stats-badge) qui affirme un relevé PROPRE au mob. `extraTitle`
-   (facultatif) ajoute le SEUL fait concret qui rend la phrase générique
-   utile pour cet appel précis (ex. "camp fauna is spawned server-side") sans
-   forker la phrase de base par site d'appel -- même idée que
-   dynamicPosBadge's regionHint. */
-function stateChip(state, extraTitle) {
-  const label = state === 'dev' ? tr('devBadge') : tr(`state${capitalize(state)}`);
-  const titleBase = state === 'dev' ? tr('devBadgeTitle') : tr(`state${capitalize(state)}Title`);
-  const title = extraTitle ? `${titleBase} — ${extraTitle}` : titleBase;
-  return `<span class="state-chip state-chip-${state}" title="${esc(title)}">${esc(label)}</span>`;
+/* ── Badge — the ONE closed honesty vocabulary (blueprint §5.2) ──────────────
+   The single honesty primitive (E'c-1). Collapses the three parallel systems
+   that coexisted before — .state-chip (4 states), the position-confidence
+   ladder (posDynamic/…), .stats-badge (real/estimated) — AND the .effect-var-*
+   runtime placeholders, into one closed component on 3 orthogonal axes plus 3
+   typed value-renders. Every honesty statement in the UI is now a Badge from
+   this closed set; its hedging prose lives in the tooltip (ONTOLOGY §F: no
+   free-floating hedging prose). Labels + tooltips come EXCLUSIVELY from the
+   i18n `badge` section (E'c-0, tbl('badge', <key>)) — the front never invents
+   a honesty word of its own.
+     axis 'provenance' — where a fact comes from: official / derived / inferred / absent
+     axis 'precision'  — how exact a location is: pinned / area / via-chain / unlocated
+     axis 'content'    — orthogonal flag: dev (danger-red, NOT a fact-provenance)
+     axis 'value'      — the 3 typed value-renders: weight-share / roster-server-side / cospawn-probable
+   { axis, value } select the i18n label key + its `*Tip` tooltip + the CSS
+   variant `.badge--<axis>-<value>` (see style.css). Options:
+     text  — override the visible label with a DATA value (a level/tier, an
+             activity %, a table share) while keeping the axis/value tooltip +
+             tone — for the value-carrying badges.
+     extra — append one concrete clause to the tooltip (this is how an
+             ex-adjacent hedging sentence is folded INTO the badge — the
+             tooltip carries the specific reason, the label the summary).
+     inline — the compact chip modifier used by the runtime-value placeholder
+             (varPlaceholder below). */
+const BADGE_KEY = {
+  provenance: { official: 'provOfficial', derived: 'provDerived', inferred: 'provInferred', absent: 'provAbsent' },
+  precision: { pinned: 'precPinned', area: 'precArea', 'via-chain': 'precViaChain', unlocated: 'precUnlocated' },
+  content: { dev: 'contentDev' },
+  value: { 'weight-share': 'valWeightShare', 'roster-server-side': 'valRosterServerSide', 'cospawn-probable': 'valCospawnProbable' },
+};
+function badge({ axis, value, text = null, extra = null, inline = false }) {
+  const key = BADGE_KEY[axis]?.[value];
+  if (!key) return '';                     // outside the closed enum → nothing, never a raw token
+  const label = text != null ? text : tbl('badge', key);
+  const tip = tbl('badge', key + 'Tip');
+  const title = extra ? (tip ? `${tip} — ${extra}` : extra) : tip;
+  return `<span class="badge badge--${axis}-${value}${inline ? ' badge--inline' : ''}" title="${esc(title)}">${esc(label)}</span>`;
+}
+
+/* Legacy .state-chip token → Badge — for the ONE site whose state is a runtime
+   value (empty/absent vendor stock, v.stockState ∈ {dynamic,dev,unknown}).
+   'dev' → the orthogonal content flag; 'dynamic'/'unknown' empty stock both
+   read as an honest absence (server-decided, or simply not in the client
+   data). Everywhere else the axis/value is known statically → call badge()
+   directly. */
+function stateBadge(state, extra) {
+  if (state === 'dev') return badge({ axis: 'content', value: 'dev', extra });
+  return badge({ axis: 'provenance', value: 'absent', extra });
+}
+
+/* Sanctioned runtime-value placeholder (DATA_CONTRACT §3.2) — the compact "?"
+   that stands in for an unresolved {{mustache}} inside an effect/ability line,
+   rendered through the Badge family (badge--inline). `runtime` true = a value
+   the game computes live by nature (ShieldValue/CurrentStack) — never a data
+   hole, accent tone; false = a real value simply not yet extracted from the
+   client (Modifiers/TotalTime…) — muted tone, same register as an absent
+   provenance. The raw {{token}} rides in the tooltip, never inline. */
+function varPlaceholder(runtime, token) {
+  const tip = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');
+  const title = token ? `${tip} — ${token}` : tip;
+  return `<span class="badge badge--inline badge--var-${runtime ? 'runtime' : 'unextracted'}" title="${esc(title)}">?</span>`;
 }
 
 /* Bouton « Carte » standard (icône + libellé) pour tout slot localisable —
@@ -790,7 +831,7 @@ function viewGoalZone(zi) {
 }
 
 export {
-  ficheHeader, openFiche, closeFiche, setFicheHash, stateChip,
+  ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
   gotoBtn, crossMapBtn, fmtNum, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
   qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef,

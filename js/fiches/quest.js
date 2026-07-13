@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, npcRef, gotoBtn, crossMapBtn, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, npcRef, gotoBtn, crossMapBtn, qtyItemChip, qtyChipList, disambiguateQuestItems, resetGoalZones, clearGoalZone, badge } from './core.js';
 import { goalStepsSection, questItemRow, questItemAddsInfo, dynamicPosBadge, setQuestItemDisambig, setQuestItemFlags } from './stepguide.js';
 
 /* Avatar HeroAvatars -- traite le leaf générique `Dwarf_dark` comme "pas
@@ -107,26 +107,31 @@ function questRewardsSection(q) {
   return `<div class="fiche-section"><h3>${esc(tr('rewardsTitle'))}</h3>${fixedHtml}${choicesHtml}</div>`;
 }
 
-/* Pastille de confiance : `q.explained` {goals_total, goals_resolved, pct}
-   vient tel quel du décodeur de graphe de quête (
-   -- jamais recalculé ici). 333 quêtes sur 335 dotées d'un graphe de buts sont
-   intégralement expliquées (chaque but a un mécanisme/une cible résolus) ; les
-   2 restantes gardent au moins un but non résolu -- le badge le dit sans
-   détour plutôt que de laisser croire que CHAQUE étape vient à coup sûr des
-   données du jeu (honnêteté > fabrication, voir project memory). Repli
-   silencieux (pas de badge du tout) sur les quêtes sans graphe de buts décodé
-   (dialogues-barks, quelques gabarits internes) -- rien à confirmer/infirmer.
-   Discret dans les deux cas : la variante "tout expliqué" (l'écrasante
-   majorité) reste presque invisible (texte atténué, pas de fond), seule la
-   variante "incertain" (rarissime) est un peu plus visible -- jamais une
-   couleur criarde ni un `title` supplémentaire redondant avec le texte. */
-function questExplainedBadge(q) {
-  const e = q.explained;
-  if (!e || !e.goals_total) return '';
-  const uncertain = e.goals_total - e.goals_resolved;
-  return uncertain <= 0
-    ? `<div class="quest-explain-badge quest-explain-full"><span aria-hidden="true">✓</span> ${esc(tr('questExplainedFull'))}</div>`
-    : `<div class="quest-explain-badge quest-explain-partial"><span aria-hidden="true">⚠</span> ${esc(tr('questExplainedPartial', uncertain))}</div>`;
+/* Badge de complétude AU NIVEAU PAGE (blueprint §2.3) — la SEULE source est
+   `q.followGrade.grade` ∈ FULL / PARTIAL / HOLED (l'audit de suivabilité, jamais
+   recalculé ici : la raison d'un PARTIAL — décodage partiel, cible famille,
+   compteur non encodé — n'est pas reproductible côté front, donc on FAIT
+   CONFIANCE au verdict serveur plutôt que d'inventer un compte contradictoire).
+   Le grade s'exprime dans le vocabulaire d'honnêteté FERMÉ (Badge, blueprint
+   §5 : « toute affirmation d'honnêteté est un Badge ») sur l'axe PRÉCISION —
+   c'est littéralement l'agrégat de la précision « où » des buts ci-dessous :
+     • FULL   → precision `pinned`   (chaque but est localisable exactement / via
+                sa couche) — ton accent PLEIN, l'info-bulle « coordonnées exactes ».
+     • PARTIAL→ precision `area`     (au moins un but n'est qu'approximatif) —
+                ton accent DOUX, « approximatif : une région, pas un point ».
+     • HOLED  → precision `unlocated`(au moins un but n'a AUCUNE cible localisable :
+                boss scripté, faune serveur, famille non placée) — ton muet
+                pointillé, « aucune position client ». Jamais un faux pin.
+   Les buts dialogue/greeting/no_objective n'ont pas de grade de suivabilité
+   (DIALOGUE/GREETING/NOOBJ) → aucun badge ici (leur mise en page propre s'en
+   charge, voir l'aiguillage quest_class dans openQuestFiche). Une prose de grade
+   dédiée (« Entièrement suivable / Partiellement localisé / Comporte des trous »)
+   affinerait la lisibilité — signalée à la vague i18n, pas inventée ici. */
+const GRADE_PRECISION = { FULL: 'pinned', PARTIAL: 'area', HOLED: 'unlocated' };
+function questCompletenessBadge(q) {
+  const value = GRADE_PRECISION[q.followGrade?.grade];
+  if (!value) return '';
+  return `<div class="quest-grade-badge">${badge({ axis: 'precision', value })}</div>`;
 }
 
 /* Journal : texte de présentation de la quête (ambiance), sorti du tiroir
@@ -204,7 +209,15 @@ function openQuestFiche(slug) {
   // cas on ne rend PAS une fiche de quête vide (l'ancien comportement : titre
   // "Hello Blitz Hyperstorm" + zéro objectif/récompense/item), mais une fiche
   // clairement étiquetée « Dialogue PNJ (pas une quête) » avec ses répliques.
-  if (q.isDialogue) { openDialogueFiche(q, slug); return; }
+  // Aiguillage de mise en page par quest_class (blueprint §2.1) : greeting/
+  // dialogue -> fiche LÉGÈRE (openDialogueFiche : donneur localisé + barks, PAS
+  // de timeline d'objectifs — dé-cluttering demandé) ; objective -> timeline
+  // complète d'étapes ci-dessous ; no_objective -> chip système/brouillon
+  // honnête (questStatusHtml plus bas). `q.isDialogue` (drapeau hérité du
+  // pipeline) reste un repli : il coïncide aujourd'hui EXACTEMENT avec
+  // greeting|dialogue|28 no_objective-dialogue — quest_class est désormais la
+  // source primaire, jamais un re-calcul front.
+  if (q.questClass === 'greeting' || q.questClass === 'dialogue' || q.isDialogue) { openDialogueFiche(q, slug); return; }
   // Recalculée AVANT la construction des sections (items + étapes) : la même
   // Map sert questItemRow ET goalTargetItemRow — voir currentQuestItemDisambig.
   setQuestItemDisambig(q.items?.length ? disambiguateQuestItems(q.items) : null);
@@ -307,8 +320,13 @@ function openQuestFiche(slug) {
   // (drift futur) → formulation générique, jamais une clé brute ; repli
   // anglais en dur si une locale n'a pas encore la clé (même filet que
   // mapref.js uiRef — tr() renvoie la clé brute quand elle manque).
+  // Aiguillage no_objective (blueprint §2.1) : une quête de grade NOOBJ (ou
+  // portant l'ancien `questStatus`) sans étape ni repli objectifs énonce
+  // honnêtement ce que la DONNÉE définit — chip système/brouillon minimal, jamais
+  // une page nue Suivre/Fait ni « quête cassée ». `NOOBJ` sans `questStatus`
+  // précis retombe sur la formulation générique questStatusNoObjectives.
   let questStatusHtml = '';
-  if (q.questStatus && !goalSteps && !objectives) {
+  if ((q.questStatus || q.followGrade?.grade === 'NOOBJ') && !goalSteps && !objectives) {
     const QUEST_STATUS_KEY = {
       extractionMarker: 'questStatusExtractionMarker',
       devShell: 'questStatusDevShell',
@@ -368,7 +386,7 @@ function openQuestFiche(slug) {
     ? { kind: 'quest', mode: 'L', key: slug, label: q.name, hex: questHex,
         drawable: true, pos: { x: giverX, z: giverZ } }
     : null;
-  const explainBadge = questExplainedBadge(q);
+  const gradeBadge = questCompletenessBadge(q);
   const journalHtml = questJournalSection(q);
   // « Sur la carte » (acteurs de la quête, positionnés ou non) : PAS
   // redondant avec les cartes d'étape (goalTargetChip) malgré l'apparence --
@@ -388,7 +406,7 @@ function openQuestFiche(slug) {
       avatar: iconTag(avatar, 'fiche-avatar', initials(q.giver)),
       name: q.name, hex: questHex, dot: questDot,
       sub: esc(tr('questFicheKind', q.regions?.length ? q.regions[0] : '')),
-      below: `${explainBadge}
+      below: `${gradeBadge}
       ${q.giver ? `<div class="reward-chips quest-giver-row">${npcRef(q.giver, { ni: giverNi, locate: true })}</div>` : ''}
       ${q.maps?.length > 1 ? `<span class="pop-coords">${esc(tr('questMapsLine', q.maps.map(mapName).join(' · ')))}</span>` : ''}`,
     })}

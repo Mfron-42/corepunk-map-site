@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, gotoBtn, lootRowsHtml, stateChip, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, dropRow, dropRateHtml, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, gotoBtn, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, dropRow, dropRateHtml, speciesRef, npcRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    (loot.md finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -52,9 +52,9 @@ function openLootTableFiche(label) {
    (professionLabel) + ses propres lignes de butin agrégées (drops[], même
    lootRowsHtml que monstre/camp/coffre/table -- garanti/chance, jamais un
    rendu réinventé). `generic:true` (9/30, aucune localisation en jeu pour ce
-   type -- voir build_site_data.py resource_nodes_site()) : pastille
-   "unknown" honnête à côté du nom plutôt qu'un faux nom localisé -- même
-   vocabulaire state-chip que partout ailleurs (COORDINATION.md), jamais un
+   type -- voir build_site_data.py resource_nodes_site()) : Badge provenance
+   absent honnête à côté du nom plutôt qu'un faux nom localisé -- même
+   vocabulaire Badge que partout ailleurs (blueprint §5.2), jamais un
    texte libre inventé. Pas de position/couche carte (le lien nœud->point
    n'existe pas côté client, byte-prouvé) : pas de lien profond dédié
    (setFicheHash(null)), même traitement que openRecipeFiche/openChestFiche. */
@@ -64,7 +64,7 @@ function openNodeFiche(key) {
   S.openFiche = { kind: 'node', id: key };
   const hex = nodeHex(n);
   const tierLine = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
-  const genericChip = n.generic ? ` ${stateChip('unknown', tr('nodeGenericNote'))}` : '';
+  const genericChip = n.generic ? ` ${badge({ axis: 'provenance', value: 'absent', extra: tr('nodeGenericNote') })}` : '';
   // Nœud de récolte : AUCUNE pastille (mode N — le lien nœud→point n'existe pas
   // côté client, byte-prouvé ; la couche de récolte est le relais dessinable).
   openFiche(`
@@ -297,7 +297,7 @@ function formulaHtml(formula, { rarityNote = false } = {}) {
   // pas trancher entre mise à l'échelle côté serveur et une autre règle du
   // jeu (voir le mot i18n reformulé qui a retiré l'implication "probablement
   // côté serveur").
-  const note = rarityNote ? `<p class="hint">${stateChip('unknown')} ${esc(tr('scalingServerSide'))}</p>` : '';
+  const note = rarityNote ? `<p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('scalingServerSide') })}</p>` : '';
   return `<div class="fiche-section"><h3>${esc(tr('formulaTitle'))}</h3>${lines}${note}</div>`;
 }
 
@@ -354,12 +354,9 @@ function effectVarChip(u) {
     const title = `${tr('effectVarPerRarityTooltip')} — ${RARITY_BANDS.map(r => `${bandRarityLabel(r)}: ${u.values[r] ?? '—'}`).join(', ')}`;
     return vals.length
       ? `<span class="effect-var-inline effect-var-rarity" title="${esc(title)}">${inner}</span>`
-      : `<span class="effect-var effect-var-unknown" title="${esc(tr('effectVarUnextractedTooltip'))}">?</span>`;
+      : varPlaceholder(false, null);
   }
-  const runtime = u.kind === 'runtime';
-  const cls = runtime ? 'effect-var effect-var-runtime' : 'effect-var effect-var-unknown';
-  const label = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');
-  return `<span class="${cls}" title="${esc(`${label} — ${u.token}`)}">?</span>`;
+  return varPlaceholder(u.kind === 'runtime', u.token);
 }
 
 /* Texte résolu -> HTML : découpe sur les sentinels \x01N\x01, échappe et
@@ -470,7 +467,7 @@ function scalingSection(it) {
   } else if (it.rarity_scaling_status === 'no_template') {
     // Pastille "unknown" (unknown_states_DESIGN.md #13, task #67) : contenu
     // déjà correct, juste enveloppé dans le composant d'état partagé.
-    parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('scalingNotLocated'))}</p></div>`);
+    parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('scalingNotLocated') })}</p></div>`);
   }
   // Mise à l'échelle par rareté décodée via l'opérande 0x62 (rune_ability_
   // scaling, valeurs jointes côté données) :
@@ -496,7 +493,7 @@ function scalingSection(it) {
     const rows = rarityColsGridHtml(it.overclock_scaling);
     if (rows) parts.push(`<div class="fiche-section oc-section"><h3>${esc(tr('overclockScalingTitle'))}</h3><div class="stat-grid">${rows}</div><p class="hint">${esc(tr('overclockNote'))}</p></div>`);
   } else if (it.overclock_status === 'no_rarity_table') {
-    parts.push(`<div class="fiche-section oc-section"><h3>${esc(tr('overclockScalingTitle'))}</h3><p class="hint">${stateChip('unknown')} ${esc(tr('overclockServerSide'))}</p></div>`);
+    parts.push(`<div class="fiche-section oc-section"><h3>${esc(tr('overclockScalingTitle'))}</h3><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('overclockServerSide') })}</p></div>`);
   }
   if (it.tier_scaling) {
     const rows = ['t1', 't2', 't3'].map(tk => {
@@ -579,7 +576,7 @@ function effectLinesSection(it) {
       // variante attestée par les octets mais au contenu côté serveur —
       // l'énoncer vaut mieux qu'une ligne absente (même famille de note
       // honnête qu'overclockServerSide).
-      body = `<p class="hint">${stateChip('unknown')} ${esc(tr('variantServerSide'))}</p>`;
+      body = `<p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('variantServerSide') })}</p>`;
     }
     const ocCls = v.variant === 'overclocked' ? ' oc-section' : '';
     const header = showHeader ? `<h4 class="fiche-sub">${esc(label)}${nameBit}</h4>` : '';

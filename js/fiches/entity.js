@@ -23,7 +23,7 @@ import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
 import { mobLabelHtml } from '../popups.js';
-import { ficheHeader, openFiche, setFicheHash, stateChip, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, gotoBtn, farmCapRows, farmCampRow, farmUnjoinedRow } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, gotoBtn, farmCapRows, farmCampRow, farmUnjoinedRow } from './core.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
    (camp_details ne couvre que les camps de monstres/ressources : les
@@ -86,7 +86,7 @@ function openCampFiche(key) {
   // monstres ici du tout".
   const faunaUnknown = (!mobs && MONSTER_ISH_CAMP_KINDS.has(g.kind))
     ? `<div class="fiche-section"><h3>${esc(tr('likelyMonsters', 0))}</h3>
-        <p class="hint">${stateChip('dynamic')} ${esc(tr('campFaunaUnknownNote'))}</p></div>` : '';
+        <p class="hint">${badge({ axis: 'value', value: 'roster-server-side', extra: tr('campFaunaUnknownNote') })}</p></div>` : '';
   // Butin : seulement quand la fiche détaillée a de la SUBSTANCE (mobs ou
   // drops). camp_details expédie désormais ~150 entrées mode/activité-SEULES
   // (mobs/drops vides — #93, pipeline pass 2026-07-11b) : leur coller une
@@ -139,7 +139,7 @@ function openCampFiche(key) {
    - `activity` (0–0.95, présent SEULEMENT quand < 1.0) : poids du registre
      d'apparitions serveur — unité exacte inconnue (absence = toujours actif
      ou registre absent, jamais distinguable) → ligne douce « Activité :
-     ~N % » en chip affirmatif (state-chip-dynamic : c'est un FAIT serveur
+     ~N % » en Badge affirmative (provenance official : c'est un FAIT serveur
      byte-prouvé, pas une incertitude) + tooltip honnête. JAMAIS présenté
      comme un taux de spawn/timer.
    - `modes` (îles d'Extraction seulement) : poids d'activation par mode de
@@ -169,7 +169,7 @@ function campPresenceHtml(det) {
   const modes = det.modes ? Object.keys(det.modes).sort(campModeSort) : [];
   if (!hasActivity && !modes.length) return '';
   const activityLine = hasActivity
-    ? `<p class="camp-activity"><span class="state-chip state-chip-dynamic" title="${esc(tr('campActivityTitle'))}">${esc(tr('campActivityLine', Math.round(det.activity * 100)))}</span></p>` : '';
+    ? `<p class="camp-activity">${badge({ axis: 'provenance', value: 'official', text: tr('campActivityLine', Math.round(det.activity * 100)), extra: tr('campActivityTitle') })}</p>` : '';
   const modeRows = modes.map(mk => {
     const [base, tier] = mk.split('@');
     const label = tier ? tr('campModeTier', campModeLabel(base), tier) : campModeLabel(base);
@@ -213,7 +213,7 @@ function wildlifeWhereHtml(id, spRes) {
         <span class="farm-group-label" style="color:${CAMP_COLORS.wildlife}">${esc(tr('wildlifeRestRow'))}</span>
         ${ref({ kind: 'wildlife', mode: 'C', fkey: 'camp:wildlife', hex: CAMP_COLORS.wildlife, drawn: !!S.camps.wildlife?.on, count: rest.nPts })}
       </div>`
-    : `<p class="hint">${stateChip('unknown')} ${esc(tr('wildlifeNoZonesNote'))}</p>`;
+    : `<p class="hint">${badge({ axis: 'precision', value: 'unlocated', extra: tr('wildlifeNoZonesNote') })}</p>`;
   return `<div class="fiche-section"><h3>${esc(tr('wildlifeWhereTitle'))}</h3>
     <p class="hint">${esc(tr('wildlifePeacefulNote'))}</p>
     ${affordance}</div>`;
@@ -381,7 +381,7 @@ function perTierStatsSection(level, sf, fixedReading) {
   const head = `<tr><th scope="col"></th>${tiers.map(t => `<th scope="col">${esc(statTierLabel(t))}${_UNVERIFIED_TIERS.has(t) ? `<span class="tier-caveat-mark" title="${esc(tr('statsBossEliteCaveat'))}">*</span>` : ''}</th>`).join('')}</tr>`;
   const body = PER_TIER_STATS.map(s =>
     `<tr><th scope="row">${esc(statLabel(s))}</th>${tiers.map(t => `<td>${esc(fmtStatNum(computed[t][s]))}</td>`).join('')}</tr>`).join('');
-  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('levelAbbrev', level))}</span></h3>
+  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'derived', text: tr('levelAbbrev', level) })}</h3>
     <div class="ptr-wrap"><table class="ptr-table"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <p class="hint">${esc(tr('statsPerTierNote'))}</p>
     ${hasUnverified ? `<p class="hint">${esc(tr('statsBossEliteCaveat'))}</p>` : ''}
@@ -391,12 +391,12 @@ function perTierStatsSection(level, sf, fixedReading) {
    `m.statsProvenance` (task #80, mandatory honest display enum, voir
    data/SCHEMA.md "Monster stats") plutôt que de déduire l'état à partir de
    `statsSource`/`level`/présence de champs comme avant cette passe :
-     - record_own    -> badge « réel » (inchangé, un relevé client PROPRE à
+     - record_own    -> Badge provenance official (un relevé client PROPRE à
                         CE mob : mbt_10_troll_rusty_boss + les bosses
                         d'arène nommés récupérés via m_abs_*).
-     - record_fixed_sibling -> NOUVEAU badge « relevé fixe » (state-chip
-                        dédié, vocabulaire .state-chip partagé avec
-                        dynamic/unknown/dev, voir stateChip()) : les nombres
+     - record_fixed_sibling -> Badge provenance official + qualificateur
+                        « relevé fixe » (badge() axe provenance, blueprint
+                        §5.1) : les nombres
                         SONT montrés (de vrais octets client, jamais une
                         invention) mais jamais confondus avec un relevé
                         propre au mob -- indépendant de son niveau, non
@@ -413,20 +413,20 @@ function monsterStatsSection(m) {
   //    mobs à bloc complet) : grille numérique + badge « réel » avec
   //    info-bulle explicite.
   if (m.statsProvenance === 'record_own' && m.stats && Object.keys(m.stats).length) {
-    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge" title="${esc(tr('realStatsTooltip'))}">${esc(tr('realStatsBadge'))}</span></h3>${statsGridHtml(m.stats)}</div>`;
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'official', extra: tr('realStatsTooltip') })}</h3>${statsGridHtml(m.stats)}</div>`;
   }
   // 1-bis. Mob portant DIRECTEMENT des stats calculées par la formule (palier
   //    résolu côté données — dormant aujourd'hui, aucun mob non-template n'en
   //    a, mais honoré si un décodage futur en publie) : grille + badge
   //    « calculé (formule du jeu) ».
   if (m.statsComputed) {
-    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge">${esc(tr('computedStatsBadge'))}</span></h3>${computedStatsGridHtml(m.statsComputed)}</div>`;
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'derived', extra: tr('computedStatsBadge') })}</h3>${computedStatsGridHtml(m.statsComputed)}</div>`;
   }
   // 2. record_fixed_sibling : relevé fixe (arène/CBT) — le template m_abs_*
   //    sœur porte un bloc de stats RÉEL, mais partagé et indépendant du
   //    niveau ; état chip dédié, jamais le badge « réel » ci-dessus.
   if (m.statsProvenance === 'record_fixed_sibling' && m.stats && Object.keys(m.stats).length) {
-    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${stateChip('fixed')}</h3>${statsGridHtml(m.stats)}</div>`;
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'official', text: tr('stateFixed'), extra: tr('stateFixedTitle') })}</h3>${statsGridHtml(m.stats)}</div>`;
   }
   // 2-ter. Boss sur-mesure (recalibration 2026-07-12, 3 vraies valeurs de PV
   //    observées en jeu) : la fourchette générique par palier est FAUSSE pour
@@ -445,7 +445,7 @@ function monsterStatsSection(m) {
     const liveRow = (band && m.level === 20)
       ? `<div class="frow"><span class="muted">${esc(tr('bossLiveHpLabel'))}</span><b>≈ ${esc(fmtNum(bd.base_hp * band[0]))} – ${esc(fmtNum(bd.base_hp * band[1]))}</b></div>`
       : '';
-    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tr('bossHpBadge'))}</span></h3>
+    return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'derived', extra: tr('bossHpBadge') })}</h3>
       <div class="frow"><span class="muted">${esc(tr('bossBaseHpLabel'))}</span><b>${esc(fmtNum(bd.base_hp))}</b></div>
       ${liveRow}
       <p class="hint">${esc(tr('bossDifficultyNote'))}</p></div>`;
@@ -464,7 +464,7 @@ function monsterStatsSection(m) {
   if (m.level == null) return '';
   const tier = guessStatTier(m);
   const tierLine = [tr('levelAbbrev', m.level), statTierLabel(tier)].filter(Boolean).join(' · ');
-  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}<span class="stats-badge estimated">${esc(tierLine)}</span></h3>
+  return `<div class="fiche-section"><h3>${esc(tr('statsTitle'))}${badge({ axis: 'provenance', value: 'derived', text: tierLine })}</h3>
     <p class="hint">${esc(tr('statsServerNote'))}</p></div>`;
 }
 
@@ -699,7 +699,7 @@ function openMonsterFiche(key) {
   // Ordre de la fiche (manager feedback, task #80/#79) : identité (tête,
   // zone, sélecteur de variante) -> SPAWNS (la question n°1 d'un joueur qui
   // arrive depuis une quête, "où farmer ça ?", honnête même quand la réponse
-  // est "inconnu" -- stateChip('unknown') dans monsterCampsHtml) -> tags ->
+  // est "inconnu" -- Badge précision unlocated dans monsterCampsHtml) -> tags ->
   // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
   // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
   openFiche(`
@@ -848,12 +848,14 @@ function vendorStockSection(vendorKey) {
     // ci-dessus disait manquer) + `stockStateReason` -- une phrase COURTE en
     // anglais, jamais localisée (c'est une note de provenance technique pour
     // qui creuse, pas un texte joueur, voir wave_pipeline_FRONT_TODO.md #4) --
-    // portée en info-bulle du chip via le 2ᵉ paramètre de stateChip (même
-    // mécanique que campFaunaUnknownNote/extraTitle ailleurs dans ce
-    // fichier). Repli "unknown" nu pour tout futur vendeur non classifié
-    // (aucun aujourd'hui, filet de sécurité seulement).
-    const chip = v.stockState ? stateChip(v.stockState, v.stockStateReason) : stateChip('unknown');
-    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${chip} ${esc(tr('noVendorItems'))}</p></div>`;
+    // portée en info-bulle de la Badge via le paramètre `extra` de stateBadge
+    // (même mécanique que campFaunaUnknownNote ailleurs dans ce fichier).
+    // stateBadge mappe dev -> contenu dev, dynamic/unknown -> provenance absent
+    // (stock vide décidé serveur ou simplement hors données client). Repli
+    // Badge absent nu pour tout futur vendeur non classifié (filet de sécurité).
+    const reason = v.stockStateReason ? `${tr('noVendorItems')} — ${v.stockStateReason}` : tr('noVendorItems');
+    const chip = v.stockState ? stateBadge(v.stockState, reason) : badge({ axis: 'provenance', value: 'absent', extra: tr('noVendorItems') });
+    return `<div class="fiche-section"><h3>${esc(tr('vendorStockTitle'))}</h3><p class="hint">${chip}</p></div>`;
   }
   const rows = v.sells.map(s => {
     const key = typeof s === 'string' ? s : s.key;
@@ -906,7 +908,7 @@ function openNpcFiche(idx) {
   // Some NPCs are known only from dialog/quest-slot text, with no world
   // placement or map pin at all (site/js/i18n.js's generic posUnknown, same
   // label already used for a merchant/object with no extracted position --
-  // never the quest-goal-specific posDynamic/posDynamicZone wording, which
+  // never the quest-goal precision Badge (area/via-chain/unlocated), which
   // implies a real server-side spawn rather than "not extracted").
   const posLine = r.x != null ? `<span class="pop-coords">${fmtCoord(r.x, r.z)}</span>`
     : `<span class="pos-unknown">${esc(tr('posUnknown'))}</span>`;
@@ -1010,7 +1012,7 @@ function monsterCampsHtml(m) {
   const title = esc(tr('monsterCampsN', camps.length));
   if (!camps.length) {
     return `<div class="fiche-section"><h3>${title}</h3>
-      <p class="hint">${stateChip('unknown')} ${esc(tr('noCampsKnown'))}</p></div>`;
+      <p class="hint">${badge({ axis: 'precision', value: 'unlocated', extra: tr('noCampsKnown') })}</p></div>`;
   }
   const joined = [], unjoined = [];
   for (const c of camps) {

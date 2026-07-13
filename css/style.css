@@ -1617,6 +1617,14 @@ body {
    faire couper au milieu du nom du donneur. Marge légère seulement, la
    pastille de badge juste au-dessus a déjà son propre espacement. */
 .quest-giver-row { margin: 4px 0 2px; }
+/* Badge de complétude au niveau page (fiches/quest.js questCompletenessBadge,
+   blueprint §2.3) : un simple bloc qui donne un contexte de bloc au Badge
+   PRÉCISION du grade (FULL/PARTIAL/HOLED -> pinned/area/unlocated) — même rôle
+   que .quest-giver-row (terminer le contexte inline du Badge inline-flex pour
+   que la ligne donneur qui suit ne se coupe pas). Le ton/liseré vient
+   entièrement de la famille .badge--precision-* (vocabulaire d'honnêteté
+   unifié E'c-1), aucun style de couleur propre ici. */
+.quest-grade-badge { margin: 4px 0 2px; }
 /* Chip [Recette : X] de l'en-tête d'une fiche objet craftable (task #78b) /
    chip "produit →" de l'en-tête d'une fiche recette (openRecipeFiche) — même
    raison d'être que .quest-giver-row juste au-dessus (.reward-chips termine
@@ -1706,40 +1714,12 @@ body {
   opacity: .92;
   white-space: pre-line;
 }
-/* Pastille de variable non résolue : jamais le {{chemin.brut}} affiché en
-   ligne (override UX du manager) -- une petite pastille "?" au survol de
-   laquelle le `title` porte le chemin brut, avec DEUX styles distincts selon
-   la nature du trou (voir js/fiches.js effectVarChip) :
-   - .effect-var-runtime : valeur calculée EN JEU par nature (ShieldValue/
-     CurrentStack) -- jamais un trou de donnée, teinte accent pleine.
-   - .effect-var-unknown : valeur réelle mais pas encore extraite des
-     données client (Modifiers/TotalTime/etc) -- teinte neutre en pointillés,
-     même esprit que .formula-partial ci-dessous. */
-.effect-var {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.15em;
-  height: 1.15em;
-  padding: 0 .3em;
-  margin: 0 1px;
-  border-radius: 4px;
-  font-family: var(--font-display);
-  font-size: .66rem;
-  line-height: 1;
-  cursor: help;
-  vertical-align: baseline;
-}
-.effect-var-runtime {
-  color: var(--accent-hi);
-  border: 1px solid var(--line-strong);
-  background: var(--accent-soft);
-}
-.effect-var-unknown {
-  color: var(--muted);
-  border: 1px dashed var(--muted);
-  opacity: .85;
-}
+/* Pastille de variable non résolue "?" (runtime / unextracted) : a MIGRÉ vers
+   la famille Badge — voir .badge--inline / .badge--var-* (bloc Badge plus bas)
+   et fiches/core.js varPlaceholder (wave E'c-1). Le {{chemin.brut}} n'est
+   jamais affiché en ligne, il vit dans le title. Restent ci-dessous les rendus
+   de VALEUR décodée (base/formula/rarity) — du vrai contenu en ligne, pas des
+   trous, hors du périmètre honnêteté. */
 /* Valeurs SUBSTITUÉES par le décodage Phase C (Modifiers/TotalTime) -- du
    vrai contenu en ligne, pas des pastilles-trous :
    - .effect-var-base    : chiffre exact pour un personnage de base (la
@@ -1901,9 +1881,18 @@ body {
    après la ligne de position, même bouton fantôme que partout ailleurs
    (fiche monstre/objet), juste un peu de respiration au-dessus. */
 .goal-target-row-spawns { margin-top: 4px; }
-/* .pos-dynamic's own extra padding inside a target card is set once, further
-   down next to its base rule (.goal-target .pos-dynamic) -- not duplicated
-   here, the descendant selector still matches through the row wrapper. */
+/* Ligne « OÙ » typée (fiches/stepguide.js, blueprint §2.2.4) : occupe le MÊME
+   emplacement visuel que .goal-target-row-pos (détachée du « quoi » par un
+   liseré, en dernier), mais porte un Badge PRÉCISION `via-chain` au lieu d'un
+   bouton carte — une cible dont la position se résout via sa couche de spawn
+   (pas de pin fixe : l'affordance carte est la pastille du tag espèce/famille
+   au-dessus). Classe distincte de `-pos` À DESSEIN : ce n'est PAS une ligne de
+   position (aucune coordonnée), et les gardes de rendu comptent `-pos` pour
+   décider si une cible garde une affordance carte propre. */
+.goal-target-row-where {
+  margin-top: 3px; padding-top: 5px;
+  border-top: 1px solid var(--line-soft);
+}
 .goal-target-icon {
   width: 20px; height: 20px;
   border-radius: 50%;
@@ -2109,41 +2098,17 @@ body {
   padding: 0 2px;
 }
 
-/* Objectif de quête sans position fixe (spawn dynamique côté serveur) —
-   jamais « position inconnue » : voir dynamicPosBadge() dans app.js. Même
-   traitement visuel discret que .pos-unknown (texte muet, pas une erreur),
-   avec un bouton « Voir la zone » (.goto) accolé quand une zone de spawn
-   confiance haute est disponible. */
-.pos-dynamic {
-  flex: none;
+/* Rappel de région d'un objectif à spawn dynamique (dynamicPosBadge, fiches/
+   stepguide.js) : le libellé de position est désormais une Badge de précision
+   (.badge--precision-unlocated, bloc Badge plus bas) et la région du journal
+   l'accompagne en rappel muet d'orientation. N'étant plus un descendant de
+   l'ancien .pos-dynamic, sa teinte muette est posée explicitement ici. */
+.pos-region {
+  font-style: normal;
   font-size: .7rem;
-  font-style: italic;
+  opacity: .8;
   color: var(--muted);
-  padding: 0 2px;
-  /* Anti-débordement (même famille que le fix E de .goal-target/.frow) : ce
-     badge porte maintenant TOUJOURS le texte de position ET (s'il existe) le
-     rappel de région comme un seul fragment (voir dynamicPosBadge, fiches.js)
-     — un nom de région exceptionnellement long doit se replier en interne
-     plutôt que dépasser la bulle. `white-space: nowrap` (retiré) empêchait
-     tout repli et ne servait qu'à garder un court libellé seul sur une ligne
-     -- inutile, un texte court ne se replie de toute façon jamais tant qu'il
-     tient dans la largeur disponible. */
-  max-width: 100%;
 }
-/* Rappel de région (fix bulle « position dynamique » scindée) : un seul
-   fragment de texte cohérent avec le libellé qui précède (dynamicPosBadge le
-   compose maintenant DANS le même <span class="pos-dynamic">, plus comme un
-   <span> frère séparé) — un élément-frère pouvait finir seul sur sa propre
-   ligne de flex-wrap (« Dynamic position » / « (Westwind Woods) » scindés en
-   deux lignes cramées) et, n'étant plus un DESCENDANT de .pos-dynamic à
-   l'époque, n'héritait pas sa teinte muette : il s'affichait à pleine
-   opacité/couleur d'encre, comme une info plus importante que le badge
-   discret juste au-dessus au lieu d'en faire partie. Nesté maintenant, il
-   hérite nativement la couleur/l'italique de son parent ; seul le
-   dé-italique reste nécessaire ici pour distinguer visuellement le nom de
-   région du mot « Dynamique ». */
-.pos-region { font-style: normal; opacity: .8; }
-.goal-target .pos-dynamic { padding: 0 4px 0 3px; }
 
 /* Objectif agrégat (checklist header, target.kind === "multiple") : un peu
    plus discret que ses enfants (mêmes puces numérotées, pas de traitement
@@ -2373,22 +2338,26 @@ button.rar-pill:hover {
   vertical-align: middle;
 }
 
-/* ── Pastille d'état « on ne sait pas » (unknown_states_DESIGN.md, task #67)
+/* ── Badge — la SEULE vocabulaire d'honnêteté (blueprint §5.2, wave E'c-1) ───
    ─────────────────────────────────────────────────────────────────────────
-   Taxonomie à 3 états partagée pour TOUTE incertitude affichée sur le site
-   (position, butin, stock vendeur, mise à l'échelle rareté/palier, résidu de
-   but de quête non résolu…) — un seul composant + un seul vocabulaire au
-   lieu des ~6 idiomes bespoke qui coexistaient déjà (chacun sa classe, son
-   texte, jamais partagés). "dev" RÉUTILISE .dev-mark tel quel ci-dessus (pas
-   de doublon de badge « Test ») — seuls dynamic/unknown sont de nouvelles
-   variantes. Voir js/fiches.js stateChip(). Un `title` (info-bulle courte)
-   accompagne toujours la pastille.
-   - .state-chip-dynamic : un FAIT confirmé (décidé par le serveur, prouvé
-     par le pipeline) — teinte accent, aussi affirmative qu'un fait réel.
-   - .state-chip-unknown : une incertitude honnête (non déterminable depuis
-     les données client extraites) — muette, en pointillés, jamais alarmante
-     (même registre visuel que .pos-dynamic/.effect-var-unknown ailleurs). */
-.state-chip {
+   Un composant (fiches/core.js badge()) qui remplace les TROIS systèmes
+   parallèles d'avant — .state-chip (4 états), l'échelle de position .pos-dynamic
+   (posDynamic/…), .stats-badge (réel/estimé) — plus les pastilles-trous
+   .effect-var. Trois axes orthogonaux (provenance × précision × contenu) + 3
+   rendus-valeur typés, tous tirés d'UN petit jeu de tons pour que tout le site
+   parle une seule langue d'honnêteté ; chaque hedge est un Badge, sa prose vit
+   dans le title (ONTOLOGY §F : aucune prose d'honnêteté flottante) :
+     • accent PLEIN    — un fait client affirmatif (provenance official, une
+                         position pinned exacte). Le plus fort « c'est réel ».
+     • accent DOUX     — réel mais nuancé : derived/computed, une aire
+                         approximative, un locate via-couche, un roster serveur.
+     • muet POINTILLÉ  — une absence honnête / heuristique / approximation :
+                         provenance absent & inferred, position unlocated, les
+                         qualificateurs-valeur doux (weight-share, co-spawn probable).
+     • rouge DANGER    — contenu dev/test UNIQUEMENT (orthogonal, jamais une
+                         provenance de fait).
+   Chaque variante porte un `title` (son info-bulle) — cursor:help partout. */
+.badge {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-display);
@@ -2400,17 +2369,28 @@ button.rar-pill:hover {
   cursor: help;
   vertical-align: middle;
 }
-.state-chip-dynamic {
+/* accent PLEIN — fait client affirmatif */
+.badge--provenance-official,
+.badge--precision-pinned {
   color: var(--accent-hi);
   background: var(--accent-soft);
   border: 1px solid var(--line-strong);
 }
-.state-chip-dev {
-  color: var(--danger);
-  background: rgba(224, 100, 92, .14);
-  border: 1px solid rgba(224, 100, 92, .4);
+/* accent DOUX — réel mais nuancé (dérivé / aire / via-couche / roster serveur) */
+.badge--provenance-derived,
+.badge--precision-area,
+.badge--precision-via-chain,
+.badge--value-roster-server-side {
+  color: var(--accent-hi);
+  background: var(--accent-soft-2);
+  border: 1px solid var(--accent);
 }
-.state-chip-unknown {
+/* muet POINTILLÉ — absence honnête / heuristique / approximation */
+.badge--provenance-absent,
+.badge--provenance-inferred,
+.badge--precision-unlocated,
+.badge--value-weight-share,
+.badge--value-cospawn-probable {
   color: var(--muted);
   background: transparent;
   border: 1px dashed var(--muted);
@@ -2418,45 +2398,39 @@ button.rar-pill:hover {
   font-style: italic;
   text-transform: none;
 }
-/* .state-chip-fixed (task #80, monsterStatsSection "relevé fixe") : un
-   4ᵉ état -- un relevé RÉEL (de vrais octets client, jamais une invention)
-   mais partagé/indépendant du niveau, donc jamais aussi affirmatif que
-   .stats-badge (« réel », teinte --core) ni aussi muet que .state-chip-unknown
-   ci-dessus -- solide (bordure pleine, pas de dashed) mais dans la teinte
-   --accent déjà réservée aux faits "décidés ailleurs" (cf. .state-chip-dynamic),
-   pour rester visuellement dans la même famille "confirmé mais à nuancer". */
-.state-chip-fixed {
+/* rouge DANGER — contenu dev/test uniquement (orthogonal à la provenance) */
+.badge--content-dev {
+  color: var(--danger);
+  background: rgba(224, 100, 92, .14);
+  border: 1px solid rgba(224, 100, 92, .4);
+}
+/* Placeholder "?" compact d'une valeur runtime non résolue (varPlaceholder,
+   DATA_CONTRACT §3.2) — la famille Badge dans une petite forme carrée inline.
+   Ton `runtime` = valeur calculée en jeu (accent, jamais un trou de donnée) ;
+   ton `unextracted` = valeur réelle pas encore décodée (muet pointillé). */
+.badge--inline {
+  justify-content: center;
+  min-width: 1.15em;
+  height: 1.15em;
+  padding: 0 .3em;
+  margin: 0 1px;
+  font-size: .66rem;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: baseline;
+}
+.badge--var-runtime {
   color: var(--accent-hi);
-  background: var(--accent-soft-2);
-  border: 1px solid var(--accent);
+  border: 1px solid var(--line-strong);
+  background: var(--accent-soft);
+}
+.badge--var-unextracted {
+  color: var(--muted);
+  border: 1px dashed var(--muted);
+  opacity: .85;
 }
 
-/* ── Fiche monstre : grille de statistiques ──────────────────────────
-   Réel (relevé client, mbt_10_troll_rusty_boss & cie) vs estimé (courbe de
-   template appliquée au niveau du monstre, aucun relevé par-monstre n'existe
-   côté client — voir data/SCHEMA.md "Monster stats"). Même distinction
-   visuelle que .pos-dynamic/.pos-unknown ailleurs dans ce fichier : le réel
-   est affirmatif (badge plein, teinte --core, même famille que .goal-count),
-   l'estimé reste en italique muette, jamais présenté avec la même assurance
-   qu'une valeur relevée. */
-.stats-badge {
-  display: inline-flex; align-items: center;
-  font-family: var(--font-mono);
-  font-size: .64rem;
-  letter-spacing: .04em;
-  color: var(--core);
-  background: var(--core-soft);
-  border-radius: 4px;
-  padding: 1px 7px;
-  margin-left: 7px;
-  text-transform: none;
-}
-.stats-badge.estimated {
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--line-soft);
-  font-style: italic;
-}
 /* Marqueur "*" sur les en-têtes Élite/Boss du tableau par-palier (monsters.md
    finding #2) : ces deux colonnes n'ont jamais été vérifiées contre une
    source externe, contrairement à easy/medium/hard -- info-bulle honnête au
