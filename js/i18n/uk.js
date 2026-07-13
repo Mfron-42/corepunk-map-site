@@ -233,6 +233,10 @@ export default {
       vendorStockTitleN: n => `Товари торговця (${n})`,
       noVendorItems: 'Немає відомих товарів у цього торговця.',
       npcCat: 'НПС',
+      // Vendor/Merchant unification (blueprint §4.1): the EN/FR Merchant↔Vendor
+      // split does not exist in UK — one consistent seller word ("торговець") is
+      // already used across every vendor key, so nothing to unify. TODO-loc: swap
+      // to the game's own UK term if the client ever exposes one.
       vendorSuffix: ' · Торговець',
       questsGivenN: n => `Видані квести (${n})`,
       noQuestsForNpc: 'Немає відомих квестів для цього НПС.',
@@ -605,6 +609,20 @@ export default {
       variantTierT3: 'Рівень T3',
       variantServerSide: 'Цей варіант є в даних гри, але його величини зберігаються на сервері — точні числа показати неможливо.',
       effectVarPerRarityTooltip: 'Декодоване значення за рідкістю (Звичайна / Незвичайна / Рідкісна / Епічна)',
+      // ── Канонічна лексика (blueprint §4 — SCAFFOLDING E′c-0) ──────────────
+      // НОВІ ключі для наступних хвиль; місця виклику тут НЕ переприв’язуються.
+      // Розв’язують колізії §4.1 (регіон ≠ достовірність позиції, табір здобичі
+      // замість «searchable», реквізит завдання ≠ предмет завдання, тип декору ≠
+      // родина, хроніка ≠ місце, реактивний об’єкт, «область» замість «зона»).
+      regionLabel: 'Регіон',
+      regionFicheKind: 'Регіон',
+      lootCampLabel: 'Табір здобичі',
+      questPropLabel: 'Реквізит завдання',
+      reactiveObjectLabel: 'Реактивний об’єкт',
+      decorTypeLabel: 'Тип декору',
+      loreEntryLabel: 'Хроніка',
+      spawnAreaLabel: 'Зона появи',
+      estimatedAreaLabel: 'Приблизна зона',
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
@@ -614,7 +632,7 @@ export default {
       // §1/§3.1 та js/config.js CATS.
       searchable_chest: 'Обшукувані скрині', camp_chest: 'Табірні скрині',
     },
-    rarity: { Common: 'Звичайний', Uncommon: 'Незвичайний', Rare: 'Рідкісний', Epic: 'Епічний' },
+    rarity: { Common: 'Звичайний', Uncommon: 'Незвичайний', Rare: 'Рідкісний', Epic: 'Епічний', Legendary: 'Легендарний' },
     kind: { npc: 'НПС', object: 'Об’єкт', item: 'Предмет', other: '—' },
     itemKind: {
       weapon: 'Зброя', resource: 'Ресурс', rune: 'Руна', consumable: 'Витратні предмети',
@@ -659,6 +677,41 @@ export default {
     refGeneric: {
       position: 'Точка завдання', object: 'Об’єкт завдання',
       area: 'Область завдання', target: 'Ціль завдання',
+    },
+    // ── Значок чесності — ЄДИНИЙ закритий словник (blueprint §5.2) ──────────
+    // SCAFFOLDING E′c-0: закритий набір Badge за 3 ортогональними осями
+    // (походження × точність × контент) + 3 типізовані значення. Наступні хвилі
+    // згортають сюди .state-chip / шкалу позиції / .stats-badge / .effect-var-*;
+    // пояснювальний текст живе в підказках *Tip. tbl('badge', <ключ>).
+    badge: {
+      // Вісь походження — звідки взято факт
+      provOfficial: 'Офіційно',
+      provOfficialTip: 'Зчитано напряму з клієнта гри.',
+      provDerived: 'Похідне',
+      provDerivedTip: 'Обчислено з офіційних значень (геометрія або арифметика).',
+      provInferred: 'Припущення',
+      provInferredTip: 'Зіставлено евристично (за назвою, близькістю або текстом) — імовірно, не точно.',
+      provAbsent: 'Відсутнє',
+      provAbsentTip: 'Чесно відсутнє у витягнутих даних.',
+      // Вісь точності — наскільки точна позиція
+      precPinned: 'Точно',
+      precPinnedTip: 'Точні координати.',
+      precArea: 'Область',
+      precAreaTip: 'Приблизно — регіон або зона, не точна точка.',
+      precViaChain: 'Через ланцюг',
+      precViaChainTip: 'Визначається через пов’язаний шар (його появу або розміщення).',
+      precUnlocated: 'Без позиції',
+      precUnlocatedTip: 'Немає клієнтської позиції — визначається на сервері або відсутня.',
+      // Прапорець контенту (ортогонально, червоний-небезпека — не провенанс факту)
+      contentDev: 'Dev',
+      contentDevTip: 'Незавершений або тестовий контент, який є в грі, але не використовується.',
+      // Три типізовані значення (та сама візуальна родина, свій текст)
+      valWeightShare: 'Частка таблиці',
+      valWeightShareTip: 'Частка цього предмета в таблиці — не шанс випадання за вбивство.',
+      valRosterServerSide: 'Ростер сервера',
+      valRosterServerSideTip: 'Сервер вирішує, які істоти з’являються тут.',
+      valCospawnProbable: 'Імовірний ко-спавн',
+      valCospawnProbableTip: 'Пов’язано за типом — імовірно, але не гарантовано.',
     },
     // Категорії декору (chests.bin group="decor" за family, + "legacy" для
     // group="legacy_chest") — підрядки згортної групи "Декор"

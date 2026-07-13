@@ -236,9 +236,12 @@ export default {
       questNoPos: 'Sin punto en el mapa',
       vendorStockTitle: 'Inventario del vendedor',
       vendorStockTitleN: n => `Inventario del vendedor (${n})`,
-      noVendorItems: 'No se conocen artículos para este comerciante.',
+      noVendorItems: 'No se conocen artículos para este vendedor.',
       npcCat: 'PNJ',
-      vendorSuffix: ' · Comerciante',
+      // Término canónico «Vendedor» (⚑ palabra del juego) — «Comerciante»
+      // retirado (blueprint §4.1/§4.2): vendorSuffix/noVendorItems/moreMerchants/
+      // merchantPosUnknown unificados en Vendedor, igual que vendorStockTitle.
+      vendorSuffix: ' · Vendedor',
       questsGivenN: n => `Misiones otorgadas (${n})`,
       noQuestsForNpc: 'No se conocen misiones para este PNJ.',
       questItemBadge: 'Objeto de misión',
@@ -382,8 +385,8 @@ export default {
       // listados como el contenido dev, siempre abribles por sus enlaces.
       internalBadge: 'Interno',
       internalBadgeTitle: 'Registro técnico del juego (efecto/habilidad/talento) presente en el cliente pero que el jugador nunca posee como objeto.',
-      moreMerchants: n => `+ ${n} comerciantes más`,
-      merchantPosUnknown: 'Posición del comerciante no especificada.',
+      moreMerchants: n => `+ ${n} vendedores más`,
+      merchantPosUnknown: 'Posición del vendedor no especificada.',
       recipeTitle: 'Receta',
       producesArrow: 'produce → ',
       recipeChipLabel: name => `Receta: ${name}`,
@@ -620,6 +623,21 @@ export default {
       variantTierT3: 'Nivel T3',
       variantServerSide: 'Esta variante existe en los datos del juego, pero sus magnitudes se almacenan en el servidor — no se pueden mostrar números exactos.',
       effectVarPerRarityTooltip: 'Valor decodificado por rareza (Común / Poco común / Rara / Épica)',
+      // ── Vocabulario canónico (blueprint §4 — SCAFFOLDING E′c-0) ───────────
+      // Claves NUEVAS que consumen las oleadas posteriores; los puntos de uso NO
+      // se reconectan aquí. Resuelven las colisiones §4.1 (región ≠ confianza de
+      // posición, campamento de botín en vez de «searchable», accesorio de misión
+      // ≠ objeto de misión, tipo de decoración ≠ familia, crónica ≠ lugar, objeto
+      // reactivo, «área» nunca «zona»).
+      regionLabel: 'Región',
+      regionFicheKind: 'Región',
+      lootCampLabel: 'Campamento de botín',
+      questPropLabel: 'Accesorio de misión',
+      reactiveObjectLabel: 'Objeto reactivo',
+      decorTypeLabel: 'Tipo de decoración',
+      loreEntryLabel: 'Crónica',
+      spawnAreaLabel: 'Área de aparición',
+      estimatedAreaLabel: 'Área estimada',
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
@@ -629,7 +647,7 @@ export default {
       // DATA_CONTRACT.md §1/§3.1 y js/config.js CATS.
       searchable_chest: 'Cofres registrables', camp_chest: 'Cofres de campamento',
     },
-    rarity: { Common: 'Común', Uncommon: 'Poco común', Rare: 'Raro', Epic: 'Épico' },
+    rarity: { Common: 'Común', Uncommon: 'Poco común', Rare: 'Raro', Epic: 'Épico', Legendary: 'Legendario' },
     kind: { npc: 'PNJ', object: 'Objeto', item: 'Ítem', other: '—' },
     itemKind: {
       weapon: 'Arma', resource: 'Recurso', rune: 'Runa', consumable: 'Consumible',
@@ -674,6 +692,41 @@ export default {
     refGeneric: {
       position: 'Posición de misión', object: 'Objeto de misión',
       area: 'Área de misión', target: 'Objetivo',
+    },
+    // ── Insignia de honestidad — el ÚNICO vocabulario cerrado (blueprint §5.2) ─
+    // SCAFFOLDING E′c-0: el conjunto cerrado Badge en 3 ejes ortogonales
+    // (procedencia × precisión × contenido) + 3 valores tipados. Las oleadas
+    // posteriores pliegan aquí .state-chip / escala de posición / .stats-badge /
+    // .effect-var-*; la prosa vive en los tooltips *Tip. tbl('badge', <clave>).
+    badge: {
+      // Eje de procedencia — de dónde viene un dato
+      provOfficial: 'Oficial',
+      provOfficialTip: 'Leído directamente del cliente del juego.',
+      provDerived: 'Derivado',
+      provDerivedTip: 'Calculado a partir de valores oficiales (geometría o aritmética).',
+      provInferred: 'Inferido',
+      provInferredTip: 'Emparejado de forma heurística (por nombre, proximidad o texto): probable, no seguro.',
+      provAbsent: 'Ausente',
+      provAbsentTip: 'Honestamente ausente de los datos extraídos.',
+      // Eje de precisión — cuán exacta es una posición
+      precPinned: 'Exacto',
+      precPinnedTip: 'Coordenadas exactas.',
+      precArea: 'Área',
+      precAreaTip: 'Aproximado: una región o zona, no un punto exacto.',
+      precViaChain: 'Por cadena',
+      precViaChainTip: 'Se localiza a través de la capa vinculada (su aparición o colocación).',
+      precUnlocated: 'Sin ubicar',
+      precUnlocatedTip: 'Sin posición en el cliente: se resuelve en el servidor o está ausente.',
+      // Marca de contenido (ortogonal, rojo-peligro — no es procedencia del dato)
+      contentDev: 'Dev',
+      contentDevTip: 'Contenido de prueba o sin terminar que el juego incluye pero nunca usa.',
+      // Tres valores tipados (misma familia visual, texto propio)
+      valWeightShare: 'Parte de la tabla',
+      valWeightShareTip: 'La parte de este objeto en la tabla, no una probabilidad por muerte.',
+      valRosterServerSide: 'Lista del servidor',
+      valRosterServerSideTip: 'El servidor decide qué criaturas aparecen aquí.',
+      valCospawnProbable: 'Co-aparición probable',
+      valCospawnProbableTip: 'Asociado por tipo: probable, no garantizado.',
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable

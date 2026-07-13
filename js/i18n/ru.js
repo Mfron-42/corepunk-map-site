@@ -234,6 +234,10 @@ export default {
       vendorStockTitleN: n => `Товары торговца (${n})`,
       noVendorItems: 'Нет известных товаров у этого торговца.',
       npcCat: 'НПС',
+      // Vendor/Merchant unification (blueprint §4.1): the EN/FR Merchant↔Vendor
+      // split does not exist in RU — one consistent seller word ("торговец") is
+      // already used across every vendor key, so nothing to unify. TODO-loc: swap
+      // to the game's own RU term if the client ever exposes one.
       vendorSuffix: ' · Торговец',
       questsGivenN: n => `Выданные задания (${n})`,
       noQuestsForNpc: 'Нет известных заданий для этого НПС.',
@@ -603,6 +607,20 @@ export default {
       variantTierT3: 'Уровень T3',
       variantServerSide: 'Этот вариант есть в данных игры, но его величины хранятся на сервере — точные числа показать невозможно.',
       effectVarPerRarityTooltip: 'Декодированное значение по редкости (Обычная / Необычная / Редкая / Эпическая)',
+      // ── Каноническая лексика (blueprint §4 — SCAFFOLDING E′c-0) ───────────
+      // НОВЫЕ ключи для последующих волн; места вызова здесь НЕ перепроводятся.
+      // Разрешают коллизии §4.1 (регион ≠ достоверность позиции, лагерь добычи
+      // вместо «searchable», реквизит задания ≠ предмет задания, тип декора ≠
+      // семейство, хроника ≠ место, реактивный объект, «область» вместо «зона»).
+      regionLabel: 'Регион',
+      regionFicheKind: 'Регион',
+      lootCampLabel: 'Лагерь добычи',
+      questPropLabel: 'Реквизит задания',
+      reactiveObjectLabel: 'Реактивный объект',
+      decorTypeLabel: 'Тип декора',
+      loreEntryLabel: 'Хроника',
+      spawnAreaLabel: 'Зона появления',
+      estimatedAreaLabel: 'Расчётная зона',
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
@@ -612,7 +630,7 @@ export default {
       // §1/§3.1 и js/config.js CATS.
       searchable_chest: 'Обыскиваемые сундуки', camp_chest: 'Лагерные сундуки',
     },
-    rarity: { Common: 'Обычное', Uncommon: 'Необычное', Rare: 'Редкое', Epic: 'Эпическое' },
+    rarity: { Common: 'Обычное', Uncommon: 'Необычное', Rare: 'Редкое', Epic: 'Эпическое', Legendary: 'Легендарное' },
     kind: { npc: 'НПС', object: 'Объект', item: 'Предмет', other: '—' },
     itemKind: {
       weapon: 'Оружие', resource: 'Ресурс', rune: 'Руна', consumable: 'Расходники',
@@ -657,6 +675,42 @@ export default {
     refGeneric: {
       position: 'Точка задания', object: 'Объект задания',
       area: 'Область задания', target: 'Цель задачи',
+    },
+    // ── Значок честности — ЕДИНЫЙ закрытый словарь (blueprint §5.2) ─────────
+    // SCAFFOLDING E′c-0: закрытый набор Badge по 3 ортогональным осям
+    // (происхождение × точность × контент) + 3 типизированных значения.
+    // Последующие волны сворачивают сюда .state-chip / шкалу позиции /
+    // .stats-badge / .effect-var-*; поясняющий текст живёт в подсказках *Tip.
+    // tbl('badge', <ключ>).
+    badge: {
+      // Ось происхождения — откуда взят факт
+      provOfficial: 'Официально',
+      provOfficialTip: 'Считано напрямую из клиента игры.',
+      provDerived: 'Производное',
+      provDerivedTip: 'Вычислено из официальных значений (геометрия или арифметика).',
+      provInferred: 'Предположительно',
+      provInferredTip: 'Сопоставлено эвристически (по имени, близости или тексту) — вероятно, не точно.',
+      provAbsent: 'Отсутствует',
+      provAbsentTip: 'Честно отсутствует в извлечённых данных.',
+      // Ось точности — насколько точна позиция
+      precPinned: 'Точно',
+      precPinnedTip: 'Точные координаты.',
+      precArea: 'Область',
+      precAreaTip: 'Приблизительно — регион или зона, не точная точка.',
+      precViaChain: 'Через цепочку',
+      precViaChainTip: 'Определяется через связанный слой (его появление или размещение).',
+      precUnlocated: 'Без позиции',
+      precUnlocatedTip: 'Нет клиентской позиции — определяется на сервере или отсутствует.',
+      // Флаг контента (ортогонально, красный-опасность — не провенанс факта)
+      contentDev: 'Dev',
+      contentDevTip: 'Незавершённый или тестовый контент, который есть в игре, но не используется.',
+      // Три типизированных значения (та же визуальная семья, свой текст)
+      valWeightShare: 'Доля таблицы',
+      valWeightShareTip: 'Доля этого предмета в таблице — не шанс выпадения за убийство.',
+      valRosterServerSide: 'Ростер сервера',
+      valRosterServerSideTip: 'Сервер решает, какие существа появляются здесь.',
+      valCospawnProbable: 'Вероятный ко-спавн',
+      valCospawnProbableTip: 'Связано по типу — вероятно, но не гарантировано.',
     },
     // Категории декора (chests.bin group="decor" по family, + "legacy" для
     // group="legacy_chest") — подстроки сворачиваемой группы "Декор"

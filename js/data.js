@@ -172,7 +172,7 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies, classLabels] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies, classLabels, zonesContents, creeps, talents, specializations, professions] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
@@ -224,6 +224,25 @@ async function loadDeferred() {
     // LANGUE (jamais par carte) : rechargé par setLang via ce même load.
     // 404-tolérant -> null (les libellés ◇ restent, jamais un plantage).
     fetchJson(dataPath('class_labels.bin')).catch(() => null),
+    // ── Nouveaux jeux différés (SCAFFOLDING E′c-0, DATA_CONTRACT.md §2) ──
+    // Enregistrés ici EXACTEMENT comme species.bin/nodes.bin ci-dessus, tous
+    // 404-tolérants (doctrine additive : un déploiement partiel dégrade en
+    // silence, jamais un plantage). Ils EXISTENT déjà sur disque (construits en
+    // amont) mais RIEN ne consomme encore leurs index (zoneContentsFor/
+    // creepFor/dispositionFor plus bas) — le rendu reste donc identique, ils se
+    // chargent silencieusement en attendant leurs vagues (région E′c-R, faune/
+    // disposition E′c-4, builds E′c-8).
+    // Contenus inversés par région (zones_contents.bin) : zone_id -> {display,
+    // camps, monsters, creeps, objects, quests} — future fiche région.
+    fetchJson(dataPath('zones_contents.bin')).catch(() => ({})),
+    // Creeps (creeps.bin) : clé -> {name, family, disposition, …} — catalogue
+    // GLOBAL (indépendant de la carte, comme species.bin), jamais une couche.
+    fetchJson(dataPath('creeps.bin')).catch(() => ({})),
+    // Builds (opt L3, blueprint §5 R5) : talents/spécialisations/métiers —
+    // recherche + fiche seulement, aucune surface carte (aucune position).
+    fetchJson(dataPath('talents.bin')).catch(() => ({})),
+    fetchJson(dataPath('specializations.bin')).catch(() => ({})),
+    fetchJson(dataPath('professions.bin')).catch(() => ({})),
   ]);
   setClassLabels(classLabels);
   S.campDetails = campDetails;
@@ -237,10 +256,20 @@ async function loadDeferred() {
   S.lootTableContents = lootTableContents;
   S.nodes = nodes;
   S.wildlifeSpecies = wildlifeSpecies;
+  // Nouveaux jeux différés (SCAFFOLDING E′c-0) — posés sur S comme le reste ;
+  // aucun lecteur aujourd'hui (voir le bloc Promise.all ci-dessus).
+  S.zonesContents = zonesContents;
+  S.creeps = creeps;
+  S.talents = talents;
+  S.specializations = specializations;
+  S.professions = professions;
   monsterNameIdx = null;   // index paresseux mob→monstre (voir monsterKeyFor)
   speciesNameIdx = null;   // index paresseux nom (replié, alias namesAll inclus) → id d'espèce (voir monsterKeyFor)
   monsterLoreIdx = null;   // index paresseux monstre→entrée de bestiaire (voir loreIndexFor)
   locationIdIdx = null;    // index paresseux id de lieu (POI `loc`) → index S.locations (voir locationIndexForId)
+  zoneContentsIdx = null;  // index paresseux zone_id→contenu de région (voir zoneContentsFor)
+  creepIdx = null;         // index paresseux clé→creep (voir creepFor)
+  dispositionIdx = null;   // index paresseux entity→disposition normalisée (voir dispositionFor)
   // Camps are PER-MAP: Kwalat's live in the root camps.bin loaded here; other
   // maps ship their own in their bundle (loadMapData). This deferred load is
   // Kwalat's — only apply it to S.camps when Kwalat is the ACTIVE map, else it
@@ -412,6 +441,85 @@ function lootTableItems(label) {
   return lootTableIdxFallback.get(label) || null;
 }
 
+/* ── Index paresseux des nouveaux jeux différés (SCAFFOLDING E′c-0) ──────────
+   Mêmes idiomes que monsterKeyFor/loreIndexFor/lootTableItems ci-dessus : une
+   variable d'index au niveau module, construite à la PREMIÈRE lecture et
+   invalidée (=null) au rechargement des jeux différés (loadDeferred/setLang).
+   RIEN ne les appelle aujourd'hui — ils ne se construisent donc jamais et le
+   rendu reste identique ; ils attendent leurs vagues (région/faune/build). */
+
+/* Contenu inversé d'une région (zones_contents.bin, DATA_CONTRACT.md §2) :
+   zone_id -> {display, camps, monsters, creeps, objects, quests}. Le bundle est
+   déjà un objet indexé par zone_id (accès direct comme lootTableContents) ; le
+   Map paresseux tolère aussi une forme tableau {zone_id|id, …} par robustesse.
+   Consommé par la future fiche région (openRegionFiche, vague E′c-R). */
+let zoneContentsIdx = null;
+function zoneContentsFor(zoneId) {
+  if (zoneId == null) return null;
+  if (!zoneContentsIdx) {
+    zoneContentsIdx = new Map();
+    const zc = S.zonesContents;
+    if (Array.isArray(zc)) {
+      zc.forEach(z => { const id = z && (z.zone_id != null ? z.zone_id : z.id); if (id != null && !zoneContentsIdx.has(id)) zoneContentsIdx.set(id, z); });
+    } else if (zc && typeof zc === 'object') {
+      for (const [id, z] of Object.entries(zc)) zoneContentsIdx.set(id, z);
+    }
+  }
+  const v = zoneContentsIdx.get(zoneId);
+  return v == null ? null : v;
+}
+
+/* Creep par clé (creeps.bin, DATA_CONTRACT.md §2) : clé -> {name, family,
+   disposition, …}. Objet indexé par clé (le cas courant) ou tableau {key|id, …}
+   par robustesse. Consommé par la future fiche faune/creep (openWildlifeFiche)
+   et dispositionFor ci-dessous. */
+let creepIdx = null;
+function creepFor(key) {
+  if (!key) return null;
+  if (!creepIdx) {
+    creepIdx = new Map();
+    const cr = S.creeps;
+    if (Array.isArray(cr)) {
+      cr.forEach(c => { const k = c && (c.key != null ? c.key : c.id); if (k != null && !creepIdx.has(k)) creepIdx.set(k, c); });
+    } else if (cr && typeof cr === 'object') {
+      for (const [k, c] of Object.entries(cr)) creepIdx.set(k, c);
+    }
+  }
+  const v = creepIdx.get(key);
+  return v == null ? null : v;
+}
+
+/* Disposition NORMALISÉE d'une entité -> "peaceful"|"neutral"|"hostile"|… :
+   `creeps.disposition` est une CHAÎNE (creeps.bin) ; une future disposition de
+   monstre pourra arriver en chaîne OU en objet {value} (DATA_CONTRACT.md §2 /
+   blueprint §3.3 « normalize on read ») — aplatie ici à la lecture. Index
+   paresseux fusionnant S.creeps puis S.monsters (le creep gagne si les deux
+   portent la clé). Consommé par la future DispositionBadge (vague E′c-4). */
+let dispositionIdx = null;
+function normDisposition(d) {
+  if (d == null) return null;
+  if (typeof d === 'string') return d;
+  if (typeof d === 'object') return d.value != null ? d.value : null;
+  return null;
+}
+function dispositionFor(key) {
+  if (!key) return null;
+  if (!dispositionIdx) {
+    dispositionIdx = new Map();
+    for (const [k, c] of Object.entries(S.creeps || {})) {
+      const d = normDisposition(c && c.disposition);
+      if (d != null) dispositionIdx.set(k, d);
+    }
+    for (const [k, m] of Object.entries(S.monsters || {})) {
+      if (dispositionIdx.has(k)) continue;
+      const d = normDisposition(m && m.disposition);
+      if (d != null) dispositionIdx.set(k, d);
+    }
+  }
+  const v = dispositionIdx.get(key);
+  return v == null ? null : v;
+}
+
 /* Zones nommées où un monstre apparaît : désormais SERVIES par le pipeline
    (champ `m.zones`, build_site_data.py::_monster_zone_names — croisement camps
    ⨯ régions, hors zone attrape-tout « Restricted Area »). L'ancien calcul
@@ -426,5 +534,6 @@ function resetDeferred() { deferredReady = false; }
 export {
   fetchJson, dataPath, loadCritical, loadDeferred, whenDeferred,
   resetDeferred, monsterKeyFor, npcIndexByName, loreIndexFor, locationIndexForId, lootTableItems,
+  zoneContentsFor, creepFor, dispositionFor,
   buildDecorGroups, initVersion, bootVersionStamp, fetchVersionStamp,
 };

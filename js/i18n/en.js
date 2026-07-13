@@ -255,9 +255,12 @@ export default {
       questNoPos: 'No point on the map',
       vendorStockTitle: 'Vendor stock',
       vendorStockTitleN: n => `Vendor stock (${n})`,
-      noVendorItems: 'No known items for this merchant.',
+      noVendorItems: 'No known items for this vendor.',
       npcCat: 'NPC',
-      vendorSuffix: ' · Merchant',
+      // Canonical term is "Vendor" (⚑ game word) — "Merchant" retired site-wide
+      // (blueprint §4.1/§4.2: vendorSuffix/noVendorItems/moreMerchants/
+      // merchantPosUnknown unified onto Vendor, matching vendorStockTitle).
+      vendorSuffix: ' · Vendor',
       questsGivenN: n => `Quests given (${n})`,
       noQuestsForNpc: 'No known quests for this NPC.',
       questItemBadge: 'Quest item',
@@ -417,8 +420,8 @@ export default {
       // openable through their joins — the badge says what it is.
       internalBadge: 'Internal',
       internalBadgeTitle: 'Technical game record (effect/ability/talent data) the game ships but players never hold as an item.',
-      moreMerchants: n => `+ ${n} more merchants`,
-      merchantPosUnknown: 'Merchant position not specified.',
+      moreMerchants: n => `+ ${n} more vendors`,
+      merchantPosUnknown: 'Vendor position not specified.',
       recipeTitle: 'Recipe',
       producesArrow: 'produces → ',
       // Prominent recipe chip on a craftable item's own fiche (task #78b) +
@@ -658,6 +661,21 @@ export default {
       variantTierT3: 'Tier T3',
       variantServerSide: 'This variant exists in the game data, but its magnitudes are stored server-side — no exact numbers can be shown.',
       effectVarPerRarityTooltip: 'Decoded value per rarity (Common / Uncommon / Rare / Epic)',
+      // ── Canonical vocabulary (blueprint §4 — SCAFFOLDING E′c-0) ───────────
+      // NEW keys the later waves consume; call-sites are NOT rewired here.
+      // These resolve §4.1's collisions (region≠zone-confidence, loot-camp off
+      // "searchable", quest-prop≠quest-item, decor-type≠family, lore≠place,
+      // reactive-object, "area" never "zone"). ◇ = ours-by-necessity (no game
+      // term) — do NOT "correct" toward a nonexistent game word.
+      regionLabel: 'Region',
+      regionFicheKind: 'Region',
+      lootCampLabel: 'Loot camp',
+      questPropLabel: 'Quest prop',
+      reactiveObjectLabel: 'Reactive object',
+      decorTypeLabel: 'Decor type',
+      loreEntryLabel: 'Lore entry',
+      spawnAreaLabel: 'Spawn area',
+      estimatedAreaLabel: 'Estimated area',
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
@@ -667,7 +685,7 @@ export default {
       // DATA_CONTRACT.md §1/§3.1 and js/config.js CATS.
       searchable_chest: 'Searchable chests', camp_chest: 'Camp chests',
     },
-    rarity: { Common: 'Common', Uncommon: 'Uncommon', Rare: 'Rare', Epic: 'Epic' },
+    rarity: { Common: 'Common', Uncommon: 'Uncommon', Rare: 'Rare', Epic: 'Epic', Legendary: 'Legendary' },
     kind: { npc: 'NPC', object: 'Object', item: 'Item', other: '—' },
     itemKind: {
       weapon: 'Weapon', resource: 'Resource', rune: 'Rune', consumable: 'Consumable',
@@ -713,6 +731,42 @@ export default {
     refGeneric: {
       position: 'Quest position', object: 'Quest object',
       area: 'Quest area', target: 'Objective target',
+    },
+    // ── Honesty Badge — the ONE closed vocabulary (blueprint §5.2) ──────────
+    // SCAFFOLDING E′c-0: the closed Badge enum on 3 orthogonal axes
+    // (provenance × precision × content) + 3 typed value-renders. Later waves
+    // (E′c-1 Badge primitive) fold .state-chip / pos-ladder / .stats-badge /
+    // .effect-var-* onto these keys; prose lives in the *Tip tooltips (no free
+    // hedging prose ships outside this set). tbl('badge', <key>).
+    badge: {
+      // Provenance axis — where a fact comes from
+      provOfficial: 'Official',
+      provOfficialTip: 'Read directly from the game client.',
+      provDerived: 'Derived',
+      provDerivedTip: 'Computed from official values (geometry or arithmetic).',
+      provInferred: 'Inferred',
+      provInferredTip: 'Matched heuristically (by name, proximity or text) — likely, not certain.',
+      provAbsent: 'Missing',
+      provAbsentTip: 'Honestly absent from the extracted data.',
+      // Precision axis — how exact a location is
+      precPinned: 'Pinned',
+      precPinnedTip: 'Exact coordinates.',
+      precArea: 'Area',
+      precAreaTip: 'Approximate — a region or zone, not an exact point.',
+      precViaChain: 'Via chain',
+      precViaChainTip: 'Locate it through the linked layer (its spawn or placement).',
+      precUnlocated: 'Unlocated',
+      precUnlocatedTip: 'No client position — resolved server-side or absent.',
+      // Content flag (orthogonal, danger-red — not a fact-provenance)
+      contentDev: 'Dev',
+      contentDevTip: 'Unfinished or test content the game ships but never uses.',
+      // Three typed value-renders (same visual family, bespoke content)
+      valWeightShare: 'Table share',
+      valWeightShareTip: "This item's share of the table — not a per-kill drop chance.",
+      valRosterServerSide: 'Server roster',
+      valRosterServerSideTip: 'The server decides which creatures spawn here.',
+      valCospawnProbable: 'Probable co-spawn',
+      valCospawnProbableTip: 'Associated by type — probable, not guaranteed.',
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group

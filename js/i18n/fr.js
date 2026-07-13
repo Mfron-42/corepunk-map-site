@@ -259,9 +259,12 @@ export default {
       questNoPos: 'Pas de point sur la carte',
       vendorStockTitle: 'Stock du vendeur',
       vendorStockTitleN: n => `Stock du vendeur (${n})`,
-      noVendorItems: 'Aucun article connu pour ce marchand.',
+      noVendorItems: 'Aucun article connu pour ce vendeur.',
       npcCat: 'PNJ',
-      vendorSuffix: ' · Marchand',
+      // Terme canonique « Vendeur » (⚑ mot du jeu) — « Marchand » retiré
+      // partout (blueprint §4.1/§4.2 : vendorSuffix/noVendorItems/moreMerchants/
+      // merchantPosUnknown unifiés sur Vendeur, cohérent avec vendorStockTitle).
+      vendorSuffix: ' · Vendeur',
       questsGivenN: n => `Quêtes données (${n})`,
       noQuestsForNpc: 'Aucune quête connue pour ce PNJ.',
       questItemBadge: 'Objet de quête',
@@ -410,8 +413,8 @@ export default {
       // listage comme le contenu dev, toujours ouvrables via leurs jointures.
       internalBadge: 'Interne',
       internalBadgeTitle: 'Donnée technique du jeu (effet/capacité/talent) présente dans le client mais jamais détenue comme objet par le joueur.',
-      moreMerchants: n => `+ ${n} autres marchands`,
-      merchantPosUnknown: 'Position du marchand non précisée.',
+      moreMerchants: n => `+ ${n} autres vendeurs`,
+      merchantPosUnknown: 'Position du vendeur non précisée.',
       recipeTitle: 'Recette',
       producesArrow: 'produit → ',
       recipeChipLabel: name => `Recette : ${name}`,
@@ -650,6 +653,22 @@ export default {
       variantTierT3: 'Palier T3',
       variantServerSide: 'Cette variante existe dans les données du jeu, mais ses valeurs sont stockées côté serveur — impossible d’afficher des nombres exacts.',
       effectVarPerRarityTooltip: 'Valeur décodée par rareté (Commun / Peu commun / Rare / Épique)',
+      // ── Vocabulaire canonique (blueprint §4 — SCAFFOLDING E′c-0) ──────────
+      // NOUVELLES clés consommées par les vagues ultérieures ; aucun site
+      // d'appel recâblé ici. Résolvent les collisions §4.1 (région ≠ confiance
+      // de position, camp de butin hors « searchable », prop de quête ≠ objet
+      // de quête, type de décor ≠ famille, chronique ≠ lieu, objet réactif,
+      // « aire » jamais « zone »). ◇ = maison-par-nécessité (aucun mot du jeu)
+      // — ne pas « corriger » vers un terme de jeu inexistant.
+      regionLabel: 'Région',
+      regionFicheKind: 'Région',
+      lootCampLabel: 'Camp de butin',
+      questPropLabel: 'Prop de quête',
+      reactiveObjectLabel: 'Objet réactif',
+      decorTypeLabel: 'Type de décor',
+      loreEntryLabel: 'Chronique',
+      spawnAreaLabel: "Aire d'apparition",
+      estimatedAreaLabel: 'Aire estimée',
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
@@ -659,7 +678,7 @@ export default {
       // DATA_CONTRACT.md §1/§3.1 et js/config.js CATS.
       searchable_chest: 'Coffres fouillables', camp_chest: 'Coffres de camp',
     },
-    rarity: { Common: 'Commun', Uncommon: 'Peu commun', Rare: 'Rare', Epic: 'Épique' },
+    rarity: { Common: 'Commun', Uncommon: 'Peu commun', Rare: 'Rare', Epic: 'Épique', Legendary: 'Légendaire' },
     kind: { npc: 'PNJ', object: 'Objet', item: 'Item', other: '—' },
     itemKind: {
       weapon: 'Arme', resource: 'Ressource', rune: 'Rune', consumable: 'Consommable',
@@ -711,6 +730,42 @@ export default {
     refGeneric: {
       position: 'Position de quête', object: 'Objet de quête',
       area: 'Zone de quête', target: 'Cible d’objectif',
+    },
+    // ── Badge d'honnêteté — LE vocabulaire fermé unique (blueprint §5.2) ────
+    // SCAFFOLDING E′c-0 : l'enum fermé sur 3 axes orthogonaux (provenance ×
+    // précision × contenu) + 3 rendus de valeur typés. Les vagues ultérieures
+    // (E′c-1) y replient .state-chip / échelle de position / .stats-badge /
+    // .effect-var-* ; la prose vit dans les tooltips *Tip (aucune prose de
+    // nuance libre hors de cet ensemble). tbl('badge', <clé>).
+    badge: {
+      // Axe provenance — d'où vient un fait
+      provOfficial: 'Officiel',
+      provOfficialTip: 'Lu directement dans le client du jeu.',
+      provDerived: 'Dérivé',
+      provDerivedTip: 'Calculé à partir de valeurs officielles (géométrie ou arithmétique).',
+      provInferred: 'Inféré',
+      provInferredTip: 'Rapproché par heuristique (nom, proximité ou texte) — probable, pas certain.',
+      provAbsent: 'Manquant',
+      provAbsentTip: 'Honnêtement absent des données extraites.',
+      // Axe précision — quelle est l'exactitude d'une position
+      precPinned: 'Précis',
+      precPinnedTip: 'Coordonnées exactes.',
+      precArea: 'Aire',
+      precAreaTip: 'Approximatif — une région ou zone, pas un point exact.',
+      precViaChain: 'Par chaîne',
+      precViaChainTip: 'Localisable via la couche liée (son apparition ou son placement).',
+      precUnlocated: 'Non localisé',
+      precUnlocatedTip: 'Aucune position client — résolu côté serveur ou absent.',
+      // Flag de contenu (orthogonal, rouge-danger — pas une provenance de fait)
+      contentDev: 'Dev',
+      contentDevTip: 'Contenu de test ou inachevé, présent dans le jeu mais jamais utilisé.',
+      // Trois rendus de valeur typés (même famille visuelle, contenu propre)
+      valWeightShare: 'Part de table',
+      valWeightShareTip: 'La part de cet objet dans la table — pas une probabilité par kill.',
+      valRosterServerSide: 'Roster serveur',
+      valRosterServerSideTip: 'Le serveur décide quelles créatures apparaissent ici.',
+      valCospawnProbable: 'Co-spawn probable',
+      valCospawnProbableTip: 'Associé par type — probable, pas garanti.',
     },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"

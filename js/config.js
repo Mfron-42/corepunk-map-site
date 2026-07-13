@@ -106,7 +106,15 @@ const poiTypeLabel = key => tbl('poiType', key) || pretty(key);
 const CAMP_COLORS = {
   monsters: '#ef476f', creeps: '#f78c6b', wildlife: '#a3b18a',
   herbalism: '#cd42d7', logging: '#3949ac', mining: '#258a93',
-  searchable: '#ffd166', destroyable: '#e07a5f',
+  // Résolution de collision de teinte (blueprint §3.5, « searchable-chest/camp ») :
+  // le kind de camp `searchable` partageait EXACTEMENT #ffd166 avec la vraie
+  // couche conteneur `searchable_chest` (CATS.searchable_chest.hex) — deux
+  // concepts distincts, une seule couleur. Décalé vers un or-bronze foncé
+  // distinct (le conteneur garde son or clair #ffd166) : harmonieux avec l'ADN
+  // ambre, et la couche camp étant DÉCOCHÉE par défaut, zéro changement au boot.
+  // (Le renommage du LIBELLÉ « searchable » → « Loot camp » reste une vague
+  // dédiée — blueprint R2 ; ici on ne casse que l'égalité de couleur.)
+  searchable: '#c9982e', destroyable: '#e07a5f',
   reactive: '#06d6a0', shrines: '#bdb2ff', soulkeeper: '#7b2cbf',
   quest: '#c77dff', guards: '#778da9', event: '#f4a259', other: '#6c757d',
 };
@@ -142,6 +150,34 @@ const RECIPE_HEX = '#c2a83f';
    RECIPE_HEX (brasage cuivré neutre) seulement quand le nœud n'est pas encore
    résolu (course de chargement différé, voir js/fiches.js nodeChip). */
 const nodeHex = n => CAMP_COLORS[(n?.prof || '').toLowerCase()] || RECIPE_HEX;
+/* ── Couleurs de nouvelles familles de kind (SCAFFOLDING E′c-0) ────────────
+   Constantes pré-posées pour des vagues E′c ultérieures (région, disposition,
+   palier de nœud) — RIEN ne les consomme aujourd'hui, donc zéro changement de
+   rendu. Toutes COHÉRENTES avec la palette existante (ADN cartographe bleu
+   nuit + accent ambre --accent #e0a23f), jamais une teinte neuve gratuite. */
+/* Région/zone : MÊME teinte que la couche polygone « Zones (régions) »
+   (ZONE_HEX) — le vocabulaire renomme zone→région (blueprint §4.1), la teinte
+   du polygone ne bouge pas. Alias nommé pour la future fiche région
+   (openRegionFiche, vague E′c-R). */
+const REGION_HEX = ZONE_HEX;
+/* Disposition (creeps.disposition chaîne, future monsters.disposition — voir
+   data.js dispositionFor) : triade « feu tricolore » sobre, harmonieuse avec
+   la palette et distincte des hex existants (jamais l'exact vert Uncommon, ni
+   l'ambre npc, ni le rouge --danger réservé au flag « dev »). Consommée par la
+   future DispositionBadge (vague E′c-4). */
+const DISPOSITION_HEX = {
+  peaceful: '#5cae7a',   // vert calme
+  neutral:  '#d1a054',   // ambre prudence
+  hostile:  '#d1495b',   // rouge hostile — distinct du rouge-danger « dev »
+};
+const dispositionHex = d => DISPOSITION_HEX[d] || 'var(--muted)';
+/* Palier de nœud de récolte (échelle de tier de la fiche nœud, blueprint
+   §1.2/§3.3) : rampe métallique chaude, monotone en luminosité (T1 bronze mat
+   → T5 or clair), lisible sur fond sombre. Axe ORTHOGONAL à la couleur de
+   métier (nodeHex ci-dessus) : le métier dit QUOI, le palier dit COMBIEN.
+   Consommée par la future fiche nœud enrichie (vague E′c-5). */
+const NODE_TIER_HEX = ['#9a8c78', '#b08d57', '#c9a24a', '#e0b93f', '#f2d06b'];
+const nodeTierHex = t => NODE_TIER_HEX[Math.max(0, Math.min(NODE_TIER_HEX.length - 1, (t | 0) - 1))] || RECIPE_HEX;
 const monsterAttackLabel = key => tbl('monsterAttack', key) || pretty(key);
 const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
 /* Statistiques de monstre (stats_decoded / stat_curve) — voir
@@ -168,6 +204,14 @@ const RARITY = {
   Uncommon: { hex: '#6fbf73' },
   Rare:     { hex: '#4cc9f0' },
   Epic:     { hex: '#c77dff' },
+  // Legendary (5ᵉ palier — RARITY_ORDER slot 4 déjà réservé, voir rarity.js) :
+  // teinte orange « légendaire » suivant la convention universelle du ladder
+  // (commun gris → peu commun vert → rare bleu → épique violet → LÉGENDAIRE
+  // orange), franchement distincte de l'épique violet. Corrige un bug de rendu
+  // à BLANC latent : un item de rareté Legendary n'avait ni hex (RARITY était
+  // sans entrée → var(--muted)) ni libellé (rarity.Legendary manquant des
+  // locales). Libellé ajouté aux 5 locales (section rarity).
+  Legendary: { hex: '#ff8c26' },
 };
 const rarityLabel = key => tbl('rarity', key);
 const itemKindLabel = key => tbl('itemKind', key);
@@ -625,6 +669,7 @@ export {
   SPECIES_LAYER_HEX_CYCLE, speciesLayerHex, entityColor, kindBaseHex,
   CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
+  REGION_HEX, DISPOSITION_HEX, dispositionHex, NODE_TIER_HEX, nodeTierHex,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
