@@ -731,6 +731,14 @@ export default {
       loreEntryLabel: 'Chronique',
       spawnAreaLabel: "Aire d'apparition",
       estimatedAreaLabel: 'Aire estimée',
+      // Fiches Build (opt L3, blueprint §1.2/§7 E'c-8 — talent/spécialisation/
+      // métier, recherche + fiche seulement, aucune surface carte, voir
+      // fiches/build.js).
+      talentFicheKind: 'Talent',
+      specFicheKind: 'Spécialisation',
+      professionFicheKind: 'Métier',
+      professionTiersTitle: 'Paliers',
+      professionItemsTitle: n => `Objets (${n})`,
     },
     cat: {
       npc: 'PNJ', poi: "Points d'intérêt", quest: 'Quêtes',
@@ -780,6 +788,8 @@ export default {
       // la ligne "Famille Wolf" (chip "Famille" + libellé "Wolf") d'une
       // ligne espèce "Monstre" (chip "Monstre" + libellé "Wolf Alpha").
       family: 'Famille',
+      // Build (E'c-8, opt L3) : rangées de recherche talent/spé/métier.
+      talent: 'Talent', specialization: 'Spécialisation', profession: 'Métier',
     },
     // EntityRef (◇) : mots de kind non couverts par searchCat (table de
     // butin / position nue / joueurs PvP) — singulier seul, jamais une
@@ -792,6 +802,19 @@ export default {
     refGeneric: {
       position: 'Position de quête', object: 'Objet de quête',
       area: 'Zone de quête', target: 'Cible d’objectif',
+    },
+    // Taxonomie de talent (E'c-8, blueprint §1.2 opt L3) — jetons `system`/
+    // `subtype` de talents.bin (5 + 9 valeurs, la forme RÉELLE expédiée —
+    // aucun champ niveau/position d'arbre séparé, voir fiches/build.js).
+    talentSystem: {
+      unclassified: 'Non classé', class_spec: 'Spécialisation de classe',
+      weapon_mastery: "Maîtrise d'arme", universal: 'Universel',
+      artifact_chip: "Puce d'artefact",
+    },
+    talentSubtype: {
+      ui_or_misc: 'Interface / divers', grid_transition: 'Nœud de grille', ability: 'Capacité',
+      ability_variant: 'Variante de capacité', base: 'Base', proc: 'Proc',
+      artifact: 'Artefact', other: 'Autre', chip: 'Puce',
     },
     // ── Badge d'honnêteté — LE vocabulaire fermé unique (blueprint §5.2) ────
     // SCAFFOLDING E′c-0 : l'enum fermé sur 3 axes orthogonaux (provenance ×

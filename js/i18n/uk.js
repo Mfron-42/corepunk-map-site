@@ -685,6 +685,13 @@ export default {
       loreEntryLabel: 'Хроніка',
       spawnAreaLabel: 'Зона появи',
       estimatedAreaLabel: 'Приблизна зона',
+      // Фіші Build (опц. L3, blueprint §1.2/§7 E'c-8 — талант/спеціалізація/
+      // професія, лише пошук + фіша, без карти, див. fiches/build.js).
+      talentFicheKind: 'Талант',
+      specFicheKind: 'Спеціалізація',
+      professionFicheKind: 'Професія',
+      professionTiersTitle: 'Рівні',
+      professionItemsTitle: n => `Предмети (${n})`,
     },
     cat: {
       npc: 'НПС', poi: 'Точки інтересу', quest: 'Квести',
@@ -727,6 +734,8 @@ export default {
       // "Wolf") від рядка виду "Монстр" (чіп "Монстр" + мітка "Wolf
       // Alpha").
       family: 'Родина',
+      // Build (E'c-8, опц. L3): рядки пошуку талант/спеціалізація/професія.
+      talent: 'Талант', specialization: 'Спеціалізація', profession: 'Професія',
     },
     // EntityRef (◇): слова kind, не покриті searchCat (таблиця здобичі /
     // позиція / гравці PvP) — лише однина, ніколи не категорія. Див.
@@ -739,6 +748,19 @@ export default {
     refGeneric: {
       position: 'Точка завдання', object: 'Об’єкт завдання',
       area: 'Область завдання', target: 'Ціль завдання',
+    },
+    // Таксономія талантів (E'c-8, blueprint §1.2 опц. L3) — токени `system`/
+    // `subtype` talents.bin (5 + 9 значень, РЕАЛЬНА форма даних — немає
+    // окремого поля рівня/позиції в дереві, див. fiches/build.js).
+    talentSystem: {
+      unclassified: 'Без категорії', class_spec: 'Спеціалізація класу',
+      weapon_mastery: 'Майстерність зброї', universal: 'Універсальний',
+      artifact_chip: 'Чіп артефакту',
+    },
+    talentSubtype: {
+      ui_or_misc: 'Інтерфейс / інше', grid_transition: 'Вузол сітки', ability: 'Здібність',
+      ability_variant: 'Варіант здібності', base: 'База', proc: 'Прок',
+      artifact: 'Артефакт', other: 'Інше', chip: 'Чіп',
     },
     // ── Значок чесності — ЄДИНИЙ закритий словник (blueprint §5.2) ──────────
     // SCAFFOLDING E′c-0: закритий набір Badge за 3 ортогональними осями

@@ -18,8 +18,10 @@ import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
   openRecipeFiche, openNodeFiche, openWildlifeFiche, openRegionFiche,
+  openTalentFiche, openSpecFiche, openProfessionFiche,
 } from './fiches.js';
 import { regionFicheExists } from './fiches/zone.js';
+import { TALENT_HEX, SPEC_HEX, PROFESSION_HEX } from './fiches/build.js';
 import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
 import { switchMap } from './multimap.js';
@@ -61,6 +63,11 @@ const CAT_GLYPH = {
   // (searchCatLabel, "Famille"/"Family"…) porte l'essentiel de la
   // distinction visuelle (voir buildFamilySearchIndex/renderSearch).
   family: '🧬',
+  // Build (E'c-8, blueprint §1.2 opt L3) : talent/spécialisation/métier —
+  // recherche + fiche seulement, jamais une couche carte (aucune position,
+  // voir fiches/build.js). 3 glyphes distincts, aucune collision avec les
+  // glyphes ci-dessus (workshop garde 🛠, chest garde 🧰).
+  talent: '🧩', specialization: '🎭', profession: '⚒',
   // Nœud GÉNÉRIQUE de l'arbre de filtres (mission "search categories"
   // 2026-07-11c — kind de camp/décor/type de POI/bucket Interactables…) :
   // AUCUNE clé i18n searchCat.catnode n'existe (et n'en ajoute pas ici,
@@ -131,6 +138,12 @@ const KIND_QUERY_ALIASES = {
   camp: ['camp', 'лагерь', 'табір', 'campamento'],
   recipe: ['recipe', 'recette', 'рецепт', 'receta'],
   family: ['family', 'famille', 'семья', "сімя", 'familia'],
+  // Build (E'c-8, blueprint §1.2 opt L3) : mêmes alias multilingues À LA MAIN
+  // que la table ci-dessus (jamais une clé i18n — cette table technique
+  // n'est jamais affichée, voir la doc de tête du fichier).
+  talent: ['talent', 'талант'],
+  specialization: ['specialization', 'spec', 'spécialisation', 'специализация', 'спеціалізація', 'especialización'],
+  profession: ['profession', 'métier', 'metier', 'профессия', 'професія', 'profesión'],
 };
 const KIND_QUERY_TOKEN_TO_CAT = new Map();
 for (const [cat, words] of Object.entries(KIND_QUERY_ALIASES))
@@ -399,6 +412,12 @@ function buildSearch() {
   whenDeferred(buildAbilitySearchIndex);
   whenDeferred(buildEventSearchIndex);
   whenDeferred(buildNodeSearchIndex);
+  // Build (E'c-8, opt L3) : mêmes 3 bins que data.js charge en différé
+  // (talents/specializations/professions.bin, 404-tolérants) -- whenDeferred
+  // les attend exactement comme les autres catalogues globaux ci-dessus.
+  whenDeferred(buildTalentSearchIndex);
+  whenDeferred(buildSpecSearchIndex);
+  whenDeferred(buildProfessionSearchIndex);
   // Recherche CROSS-CARTE : les entités des AUTRES cartes (non chargées
   // localement) viennent de search_index.bin. Ajoutées ici pour que la
   // recherche spanne tout dès le boot, quelle que soit la carte active.
@@ -897,6 +916,46 @@ function buildNodeSearchIndex() {
   Object.entries(S.nodes || {}).forEach(([key, n]) => {
     const sub = [n.tier || null, n.prof ? professionLabel(n.prof) : null].filter(Boolean).join(' · ');
     pushSearchEntry(n.name, 'node', nodeHex(n), null, null, () => openNodeFiche(key), null, sub, '🌿');
+  });
+}
+
+/* ── Build (E'c-8, blueprint §1.2/§7 opt L3) : talent/spécialisation/métier —
+   recherche + fiche seulement, jamais une position/couche carte (voir
+   fiches/build.js pour la forme réelle des 3 bins). Même idiome que
+   buildAbilitySearchIndex/buildNodeSearchIndex ci-dessus (catalogue GLOBAL,
+   chargé en différé comme S.abilities/S.nodes). ── */
+/* Talents (S.talents[], tableau — 1462 entrées) : seules celles avec un `name`
+   ET un `node` (clé stable de la fiche) sont indexées -- les 76 stubs
+   "artifact_chip" sans l'un ni l'autre n'ont RIEN à chercher ni à ouvrir
+   (absence honnête, voir la doc de fiches/build.js), jamais un résultat vide
+   de sens. Sous-libellé = système/sous-type (même mot que la fiche, tbl). */
+function buildTalentSearchIndex() {
+  (S.talents || []).forEach(t => {
+    if (!t || !t.name || !t.node) return;
+    const sub = [tbl('talentSystem', t.system) || null, tbl('talentSubtype', t.subtype) || null]
+      .filter(Boolean).join(' · ');
+    pushSearchEntry(t.name, 'talent', TALENT_HEX, null, null,
+      () => openTalentFiche(t.node), null, sub, '🧩', 0, null, { ref: 'talent:' + t.node });
+  });
+}
+/* Spécialisations (S.specializations[], 20 entrées) : sous-libellé = jeton de
+   classe brut (même repli honnête que la fiche, aucune table de traduction
+   fiable pour ces abréviations — voir fiches/build.js openSpecFiche). */
+function buildSpecSearchIndex() {
+  (S.specializations || []).forEach(s => {
+    if (!s || !s.name) return;
+    pushSearchEntry(s.name, 'specialization', SPEC_HEX, null, null,
+      () => openSpecFiche(s.code), null, s.class || null, '🎭', 0, null, { ref: 'spec:' + s.code });
+  });
+}
+/* Métiers (S.professions[], 18 entrées) : libellé affiché = professionLabel()
+   (même traduction que item.prof ailleurs, réutilisée telle quelle — voir
+   fiches/build.js openProfessionFiche). */
+function buildProfessionSearchIndex() {
+  (S.professions || []).forEach(p => {
+    if (!p || !p.key) return;
+    pushSearchEntry(professionLabel(p.display_name), 'profession', PROFESSION_HEX, null, null,
+      () => openProfessionFiche(p.key), null, null, '⚒', 0, null, { ref: 'profession:' + p.key });
   });
 }
 

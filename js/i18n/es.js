@@ -700,6 +700,14 @@ export default {
       loreEntryLabel: 'Crónica',
       spawnAreaLabel: 'Área de aparición',
       estimatedAreaLabel: 'Área estimada',
+      // Fichas Build (opt L3, blueprint §1.2/§7 E'c-8 — talento/
+      // especialización/profesión, solo búsqueda + ficha, sin mapa, ver
+      // fiches/build.js).
+      talentFicheKind: 'Talento',
+      specFicheKind: 'Especialización',
+      professionFicheKind: 'Profesión',
+      professionTiersTitle: 'Niveles',
+      professionItemsTitle: n => `Objetos (${n})`,
     },
     cat: {
       npc: 'PNJ', poi: 'Puntos de interés', quest: 'Misiones',
@@ -742,6 +750,8 @@ export default {
       // Wolf" (chip "Familia" + etiqueta "Wolf") de una fila de especie
       // "Monstruo" (chip "Monstruo" + etiqueta "Wolf Alpha").
       family: 'Familia',
+      // Build (E'c-8, opt L3): filas de búsqueda talento/especialización/profesión.
+      talent: 'Talento', specialization: 'Especialización', profession: 'Profesión',
     },
     // EntityRef (◇): palabras de kind no cubiertas por searchCat (tabla de
     // botín / posición / jugadores PvP) — solo singular, nunca una
@@ -754,6 +764,19 @@ export default {
     refGeneric: {
       position: 'Posición de misión', object: 'Objeto de misión',
       area: 'Área de misión', target: 'Objetivo',
+    },
+    // Taxonomía de talentos (E'c-8, blueprint §1.2 opt L3) — tokens `system`/
+    // `subtype` de talents.bin (5 + 9 valores, la forma REAL enviada — sin
+    // campo de nivel/posición de árbol separado, ver fiches/build.js).
+    talentSystem: {
+      unclassified: 'Sin clasificar', class_spec: 'Especialización de clase',
+      weapon_mastery: 'Maestría de arma', universal: 'Universal',
+      artifact_chip: 'Chip de artefacto',
+    },
+    talentSubtype: {
+      ui_or_misc: 'Interfaz / varios', grid_transition: 'Nodo de cuadrícula', ability: 'Habilidad',
+      ability_variant: 'Variante de habilidad', base: 'Base', proc: 'Proc',
+      artifact: 'Artefacto', other: 'Otro', chip: 'Chip',
     },
     // ── Insignia de honestidad — el ÚNICO vocabulario cerrado (blueprint §5.2) ─
     // SCAFFOLDING E′c-0: el conjunto cerrado Badge en 3 ejes ortogonales

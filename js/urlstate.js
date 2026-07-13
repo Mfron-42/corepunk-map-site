@@ -54,9 +54,18 @@ import { map, toWorld } from './mapview.js';
    exclusifs (une seule fiche ouverte à la fois). Source unique partagée :
    fiches/core.js s'en sert pour vider les autres avant d'en poser un (exclusion
    mutuelle), buildHash ci-dessous pour tous les reporter à travers un pan/zoom.
-   Les 8 premiers sont historiques ; les 7 derniers arrivent vague E'c-6. */
+   Les 8 premiers sont historiques ; les 7 suivants arrivent vague E'c-6. Les 3
+   derniers (tal/spec/prof, fiches/build.js vague E'c-8) complètent ici le
+   câblage deep-link : le jeton était déjà RÉSERVÉ et ÉCRIT par
+   fiches/core.js::setFicheHash (FICHE_TOKEN + BUILD_FICHE_HASH_KEYS, exclusion
+   mutuelle locale à ce fichier tant que cette liste ne les portait pas), mais
+   jamais reporté à travers un pan/zoom (buildHash ci-dessous ne le connaissait
+   pas) ni relu au chargement (main.js restoreState()) — les deux moitiés
+   manquantes que cette liste + main.js ferment. Adressés par CLÉ directe
+   (node/code/key), aucun résolveur index→clé requis (même famille que q/i/
+   camp/fam ci-dessus, contrairement à npc/ch/loc). */
 const FICHE_HASH_KEYS = ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'wsp', 'zone',
-  'ch', 'sc', 'lt', 'node', 'loc', 'ab', 'rec'];
+  'ch', 'sc', 'lt', 'node', 'loc', 'ab', 'rec', 'tal', 'spec', 'prof'];
 
 const isLegacyIndex = tok => /^\d+$/.test(tok);
 function npcTokenForIndex(idx) {

@@ -130,6 +130,17 @@ const KINDS = {
   location:     { word: () => sc('location'),                           fiche: true, mode: 'N' },
   loot:         { word: () => kindWord('loot'),                         fiche: true, mode: 'N' },
   ability:      { word: () => sc('ability'),                            fiche: true, mode: 'N' },
+  // Build (vague E'c-8, fiches/build.js) : talent/spécialisation/métier —
+  // catalogues globaux SANS position (blueprint §1.2/§5 R5, opt L3) → aucune
+  // pastille possible, mode 'N' honnête comme item/recipe/quest ci-dessus.
+  // Mots déjà expédiés côté i18n (searchCat.talent/specialization/profession,
+  // E'c-8) — réutilisés tels quels, aucune nouvelle clé. Le kind mapref
+  // 'specialization' reste distinct du kind interne S.openFiche 'spec' (voir
+  // fiches/core.js FICHE_TOKEN / fiches/build.js) : ce registre ne connaît que
+  // le vocabulaire ref(), jamais le kind interne d'un opener.
+  talent:       { word: () => sc('talent'),                             fiche: true, mode: 'N' },
+  specialization: { word: () => sc('specialization'),                  fiche: true, mode: 'N' },
+  profession:   { word: () => sc('profession'),                        fiche: true, mode: 'N' },
   // ── Localise / libellé seul (pas de fiche) ──
   position:     { word: () => kindWord('position'),                     fiche: false, mode: 'L' },
   players:      { word: () => kindWord('players'),                      fiche: false, mode: 'N' },

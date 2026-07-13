@@ -22,6 +22,7 @@ import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
   openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche, openRegionFiche,
+  openTalentFiche, openSpecFiche, openProfessionFiche,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -234,6 +235,15 @@ initMapRefDelegation(document, {
       // atteignable que par la recherche — une référence [Capacité] à clé
       // prouvée (S.abilities) est désormais soulignée et route ici.
       case 'ability': openAbilityFiche(info.key); break;
+      // Fiches BUILD (vague E'c-8, câblage complété ici) : talent/spécialisation/
+      // métier — catalogues globaux SANS position (mode 'N' de mapref.js, aucune
+      // pastille de tracé) ; la clé porte directement l'id stable consommé par
+      // l'ouvreur (node/code/key, voir fiches/build.js). `info.kind` ici est le
+      // kind mapref ('specialization'), distinct du kind interne S.openFiche
+      // ('spec') que l'ouvreur pose lui-même.
+      case 'talent': openTalentFiche(info.key); break;
+      case 'specialization': openSpecFiche(info.key); break;
+      case 'profession': openProfessionFiche(info.key); break;
       // Fiche RÉGION (vague E'c-R) : une réf `[Région]` soulignée (nom résolu à
       // une région cataloguée, zone.js regionFicheExists) ouvre sa fiche. La
       // clé porte le NOM (réfs monster-zone/region/camp) ou est absente (réf
@@ -663,24 +673,31 @@ async function setLang(code) {
 }
 /* ── Restauration d'état + fiches « nouvelles surfaces » par lien profond ─────
    applyLocationState() (router.js) restaure caméra/filtres/fiche pour les jetons
-   HISTORIQUES (q/i/npc/mon/fam/wsp/camp) ; les 8 jetons de fiche AJOUTÉS hors de
-   router (zone= vague E'c-R, puis ch/sc/lt/node/loc/ab/rec vague E'c-6) routent
-   et restaurent ICI — main.js porte le routage EntityRef + ces jetons. TOUS lus
-   AVANT applyLocationState : sa closeFiche() supprime chaque jeton de fiche du
-   hash (mutuellement exclusifs, un seul à la fois), donc on les capture d'abord
-   puis on rouvre la bonne fiche APRÈS (elle re-pose son propre jeton).
+   HISTORIQUES (q/i/npc/mon/fam/wsp/camp) ; les 10 jetons de fiche AJOUTÉS hors de
+   router (zone= vague E'c-R, puis ch/sc/lt/node/loc/ab/rec vague E'c-6, puis
+   tal/spec/prof — câblage complété ici, fiches/build.js posait déjà le jeton en
+   écriture mais ne le relisait jamais) routent et restaurent ICI — main.js porte
+   le routage EntityRef + ces jetons. TOUS lus AVANT applyLocationState : sa
+   closeFiche() supprime chaque jeton de fiche du hash (mutuellement exclusifs,
+   un seul à la fois), donc on les capture d'abord puis on rouvre la bonne fiche
+   APRÈS (elle re-pose son propre jeton).
    Timing : chest/searchable-chest s'appuient sur des données CRITIQUES (déjà là)
-   → ouverture immédiate ; loot/node/lore/ability/recipe s'appuient sur le lot
-   DIFFÉRÉ (loot_table_contents/nodes/locations/abilities/recipes) → whenDeferred,
-   synchrone si déjà prêt (popstate après boot), différé au tout premier
-   chargement (le jeton est re-posé quand la donnée arrive). Un jeton index→clé
-   non résolu (coffre/lore d'une reconstruction ou d'une autre carte) dégrade
-   honnêtement : index -1 → on n'ouvre rien plutôt qu'une mauvaise fiche. */
+   → ouverture immédiate ; loot/node/lore/ability/recipe/talent/spec/profession
+   s'appuient sur le lot DIFFÉRÉ (loot_table_contents/nodes/locations/abilities/
+   recipes/talents/specializations/professions, même Promise.all data.js
+   loadDeferred) → whenDeferred, synchrone si déjà prêt (popstate après boot),
+   différé au tout premier chargement (le jeton est re-posé quand la donnée
+   arrive). Un jeton index→clé non résolu (coffre/lore d'une reconstruction ou
+   d'une autre carte) dégrade honnêtement : index -1 → on n'ouvre rien plutôt
+   qu'une mauvaise fiche ; les 3 jetons build sont adressés par CLÉ directe
+   (node/code/key) — même dégradation honnête, l'ouvreur (fiches/build.js)
+   renvoie sans rien ouvrir si la clé est inconnue. */
 async function restoreState() {
   const p = new URLSearchParams(location.hash.slice(1));
   const zone = p.get('zone');
   const ch = p.get('ch'), sc = p.get('sc'), lt = p.get('lt');
   const node = p.get('node'), loc = p.get('loc'), ab = p.get('ab'), rec = p.get('rec');
+  const tal = p.get('tal'), spec = p.get('spec'), prof = p.get('prof');
   await applyLocationState();
   // Jetons de fiche mutuellement exclusifs → au plus un présent ; on route le
   // seul capturé (chaîne else-if : rien d'autre ne peut coexister).
@@ -692,6 +709,9 @@ async function restoreState() {
   else if (loc != null) whenDeferred(() => { const i = locationIndexForToken(loc); if (i >= 0) openLocationFiche(i); });
   else if (ab != null) whenDeferred(() => openAbilityFiche(ab));
   else if (rec != null) whenDeferred(() => openRecipeFiche(rec));
+  else if (tal != null) whenDeferred(() => openTalentFiche(tal));
+  else if (spec != null) whenDeferred(() => openSpecFiche(spec));
+  else if (prof != null) whenDeferred(() => openProfessionFiche(prof));
 }
 /* ── Démarrage ──────────────────────────────────────────────── */
 (async function init() {

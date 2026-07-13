@@ -5,11 +5,15 @@
    `import { … } from './fiches.js'` continue de fonctionner sans changement.
    Répartition : core (briques partagées + zones), stepguide (guide d'étapes),
    quest, entity (monstre/famille/faune/PNJ/camp), item (objet/recette/butin/
-   nœud/capacité), world (coffres/lore). Aucun changement de comportement :
-   rendu byte-identique, gaté par  */
+   nœud/capacité), world (coffres/lore), zone (région), build (talent/
+   spécialisation/métier, E'c-8, opt L3 — NOUVEAU, aucun rendu préexistant à
+   préserver, hors périmètre du gate byte-identique ci-dessous). Aucun
+   changement de comportement sur les types PRÉEXISTANTS : rendu byte-
+   identique, gaté par  */
 export { closeFiche, itemColor, viewGoalZone, viewMonsterZone, drawNamedZone } from './fiches/core.js';
 export { openQuestFiche, flyToQuestZone } from './fiches/quest.js';
 export { openMonsterFiche, openFamilyFiche, openWildlifeFiche, openNpcFiche, openCampFiche } from './fiches/entity.js';
 export { openItemFiche, openRecipeFiche, openLootTableFiche, openNodeFiche, openAbilityFiche, setRollRarity } from './fiches/item.js';
 export { openChestFiche, openSearchableChestFiche, openLocationFiche } from './fiches/world.js';
 export { openRegionFiche } from './fiches/zone.js';
+export { openTalentFiche, openSpecFiche, openProfessionFiche } from './fiches/build.js';

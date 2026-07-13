@@ -206,7 +206,27 @@ const FICHE_TOKEN = {
   // Vague E'c-6 — les 7 surfaces nouvellement deep-linkables.
   chest: 'ch', searchable_chest: 'sc', loot: 'lt', node: 'node',
   location: 'loc', ability: 'ab', recipe: 'rec',
+  // Vague E'c-8 (blueprint §1.2/§7, opt L3) — talent/spécialisation/métier,
+  // fiches/build.js. Jetons RÉSERVÉS par le blueprint (tal=/spec=/prof=) ;
+  // câblés ICI (l'exclusion mutuelle + la sérialisation du jeton, ce qui est
+  // dans le périmètre de ce fichier) mais PAS la restauration entrante
+  // (main.js restoreState()/urlstate.js FICHE_HASH_KEYS sont hors périmètre
+  // de cette vague — voir le rapport de mission : ouvrir une de ces 3 fiches
+  // pose bien le jeton dans le hash, mais coller un lien tal=/spec=/prof= à
+  // froid ne la rouvre pas encore tant qu'un agent futur n'ajoute pas ces 2
+  // lectures dans main.js + les 3 jetons à FICHE_HASH_KEYS).
+  talent: 'tal', spec: 'spec', profession: 'prof',
 };
+/* Jetons de fiche Build (E'c-8) -- PAS encore dans urlstate.js FICHE_HASH_KEYS
+   (fichier hors périmètre de cette vague, voir ci-dessus) : ajoutés à la
+   boucle d'exclusion mutuelle ICI SEULEMENT, pour qu'ouvrir N'IMPORTE QUELLE
+   AUTRE fiche efface bien un tal=/spec=/prof= déjà présent dans le hash (et
+   inversement) -- sans ça, ouvrir par ex. une fiche objet APRÈS une fiche
+   talent laisserait un tal=<node> périmé traîner à côté du nouveau i=<clé>,
+   cassant la règle "un seul jeton de fiche" que FICHE_HASH_KEYS existe pour
+   garantir. Pur ajout local à setFicheHash, aucune modification de
+   urlstate.js. */
+const BUILD_FICHE_HASH_KEYS = ['tal', 'spec', 'prof'];
 /* npc/chest/location portent un INDEX POSITIONNEL dans S.openFiche.id ; on
    SÉRIALISE une clé STABLE (un index glisse à la reconstruction → lien cassé,
    blueprint §8-R3). Résolu à l'index à la restauration (urlstate.js / main.js). */
@@ -219,6 +239,7 @@ function ficheTokenValue(kind, id) {
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
   for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul jeton de fiche
+  for (const t of BUILD_FICHE_HASH_KEYS) p.delete(t); // idem pour tal/spec/prof (E'c-8, voir plus haut)
   // Openers historiques du monde/objet (coffre, coffre fouillable, chronique,
   // table de butin, nœud, capacité, recette) : ils posent S.openFiche puis
   // appellent setFicheHash(null) (leur module précède le deep-link) — on dérive

@@ -683,6 +683,13 @@ export default {
       loreEntryLabel: 'Хроника',
       spawnAreaLabel: 'Зона появления',
       estimatedAreaLabel: 'Расчётная зона',
+      // Фиши Build (опц. L3, blueprint §1.2/§7 E'c-8 — талант/специализация/
+      // профессия, только поиск + фиша, без карты, см. fiches/build.js).
+      talentFicheKind: 'Талант',
+      specFicheKind: 'Специализация',
+      professionFicheKind: 'Профессия',
+      professionTiersTitle: 'Уровни',
+      professionItemsTitle: n => `Предметы (${n})`,
     },
     cat: {
       npc: 'НПС', poi: 'Точки интереса', quest: 'Задания',
@@ -725,6 +732,8 @@ export default {
       // "Семейство" + метка "Wolf") от строки вида "Монстр" (чип "Монстр" +
       // метка "Wolf Alpha").
       family: 'Семейство',
+      // Build (E'c-8, опц. L3): строки поиска талант/специализация/профессия.
+      talent: 'Талант', specialization: 'Специализация', profession: 'Профессия',
     },
     // EntityRef (◇): слова kind, не покрытые searchCat (таблица добычи /
     // позиция / игроки PvP) — только единственное число, никогда не
@@ -737,6 +746,19 @@ export default {
     refGeneric: {
       position: 'Точка задания', object: 'Объект задания',
       area: 'Область задания', target: 'Цель задачи',
+    },
+    // Таксономия талантов (E'c-8, blueprint §1.2 опц. L3) — токены `system`/
+    // `subtype` talents.bin (5 + 9 значений, РЕАЛЬНАЯ форма данных — нет
+    // отдельного поля уровня/позиции в дереве, см. fiches/build.js).
+    talentSystem: {
+      unclassified: 'Без категории', class_spec: 'Специализация класса',
+      weapon_mastery: 'Мастерство оружия', universal: 'Универсальный',
+      artifact_chip: 'Чип артефакта',
+    },
+    talentSubtype: {
+      ui_or_misc: 'Интерфейс / прочее', grid_transition: 'Узел сетки', ability: 'Способность',
+      ability_variant: 'Вариант способности', base: 'База', proc: 'Прок',
+      artifact: 'Артефакт', other: 'Другое', chip: 'Чип',
     },
     // ── Значок честности — ЕДИНЫЙ закрытый словарь (blueprint §5.2) ─────────
     // SCAFFOLDING E′c-0: закрытый набор Badge по 3 ортогональным осям

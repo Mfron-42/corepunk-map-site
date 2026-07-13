@@ -765,6 +765,13 @@ export default {
       loreEntryLabel: 'Lore entry',
       spawnAreaLabel: 'Spawn area',
       estimatedAreaLabel: 'Estimated area',
+      // Build fiches (opt L3, blueprint §1.2/§7 E'c-8 — talent/specialization/
+      // profession, search+fiche only, no map surface, see fiches/build.js).
+      talentFicheKind: 'Talent',
+      specFicheKind: 'Specialization',
+      professionFicheKind: 'Profession',
+      professionTiersTitle: 'Tiers',
+      professionItemsTitle: n => `Items (${n})`,
     },
     cat: {
       npc: 'NPCs', poi: 'Points of interest', quest: 'Quests',
@@ -807,6 +814,8 @@ export default {
       // (chip "Family" + label "Wolf") from a species "Monster" row (chip
       // "Monster" + label "Wolf Alpha").
       family: 'Family',
+      // Build (E'c-8, opt L3): talent/spec/profession search rows.
+      talent: 'Talent', specialization: 'Specialization', profession: 'Profession',
     },
     // EntityRef (◇) kind words that no searchCat key already covers (loot
     // table / bare position / PvP players). Singular only — these kinds are
@@ -820,6 +829,20 @@ export default {
     refGeneric: {
       position: 'Quest position', object: 'Quest object',
       area: 'Quest area', target: 'Objective target',
+    },
+    // Talent taxonomy (E'c-8, blueprint §1.2 opt L3) — talents.bin `system`/
+    // `subtype` tokens (5 + 9 values, the REAL shape shipped — no separate
+    // level/tree-position field exists, see fiches/build.js doc). Closed
+    // vocabulary, tbl('talentSystem'|'talentSubtype', token).
+    talentSystem: {
+      unclassified: 'Unclassified', class_spec: 'Class specialization',
+      weapon_mastery: 'Weapon mastery', universal: 'Universal',
+      artifact_chip: 'Artifact chip',
+    },
+    talentSubtype: {
+      ui_or_misc: 'UI / misc', grid_transition: 'Grid node', ability: 'Ability',
+      ability_variant: 'Ability variant', base: 'Base', proc: 'Proc',
+      artifact: 'Artifact', other: 'Other', chip: 'Chip',
     },
     // ── Honesty Badge — the ONE closed vocabulary (blueprint §5.2) ──────────
     // SCAFFOLDING E′c-0: the closed Badge enum on 3 orthogonal axes
