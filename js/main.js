@@ -22,7 +22,7 @@ import {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openLootTableFiche, openChestFiche,
   openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche,
-  viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
+  viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
@@ -284,6 +284,11 @@ initMapRefDelegation(document, {
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la
         // zone », key = index dans currentGoalZones de la fiche ouverte).
         if (info.kind === 'zone' && info.subrole === 'goal-zone') { viewGoalZone(info.key); break; }
+        // Région d'une fiche monstre ([Zone(●)] « Présent dans », subrole
+        // « monster-zone ») : dessine CE polygone de région (drawNamedZone —
+        // même primitive single-slot que la zone d'objectif). La clé porte le
+        // NOM de la région (résolu par nom sur S.zonesGeo côté fiches.js).
+        if (info.kind === 'zone' && info.subrole === 'monster-zone') { drawNamedZone(info.key); break; }
         // Camp individuel (mode E) — surlignage transitoire self-toggle (vague
         // 2, remplace l'ex-surlignage de camp, kill-list §7.2) : un camp n'a
         // aucun nœud d'arbre. Un camp CROSS-carte (farmUnjoinedRow) est mode L →

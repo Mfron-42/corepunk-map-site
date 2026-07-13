@@ -10,7 +10,7 @@ import { map, toLL, worldBounds, denseRenderers, toggleZones } from './mapview.j
 import { setLocator, clearLocator } from './pins.js';
 import {
   closeFiche, openQuestFiche, openItemFiche, openNpcFiche,
-  openCampFiche, openMonsterFiche, openFamilyFiche,
+  openCampFiche, openMonsterFiche, openFamilyFiche, openWildlifeFiche,
 } from './fiches.js';
 import { buildFilters } from './sidebar.js';
 import { whenDeferred, deferredReady } from './data.js';
@@ -33,7 +33,7 @@ import { applySpeciesTokens, setFamilyOn } from './specieslayer.js';
    appuis Précédent/Suivant rapprochés (mobile notamment). */
 async function applyLocationState() {
   S.restoring = true;
-  const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, family, at, atl, map: mapId } = readHash();
+  const { view, onSet, fltFamilies, fltSpeciesOff, quest, camp, item, npc, monster, family, wsp, at, atl, map: mapId } = readHash();
 
   // Multi-cartes : basculer sur la carte du hash AVANT de restaurer x/z/fiche
   // (map=<id> absent ⇒ Kwalat). switchMap est silencieux ici (pas de réécriture
@@ -169,6 +169,10 @@ async function applyLocationState() {
     if (camp) openCampFiche(camp);
     else if (monster && S.monsters[monster]) openMonsterFiche(monster);
     else if (family) openFamilyFiche(family);
+    // Fiche FAUNE (lien profond `wsp=`) : différée comme camp/monster — son
+    // catalogue (S.wildlifeSpecies) arrive dans le lot différé ; openWildlifeFiche
+    // est no-op si l'id ne résout pas.
+    else if (wsp && S.wildlifeSpecies?.[wsp]) openWildlifeFiche(wsp);
   });
 
   // Réticule (drapeaux utilisateur #84 : PAS dans le hash, voir pins.js --

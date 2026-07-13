@@ -172,18 +172,12 @@ export let deferredReady = false;
 const onDeferredReady = [];
 function whenDeferred(fn) { deferredReady ? fn() : onDeferredReady.push(fn); }
 async function loadDeferred() {
-  const [camps, campDetails, recipes, vendors, monsters, monsterModels, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies, classLabels] = await Promise.all([
+  const [camps, campDetails, recipes, vendors, monsters, species, locations, abilities, events, lootTableContents, nodes, wildlifeSpecies, classLabels] = await Promise.all([
     fetchJson(dataPath('camps.bin')).catch(() => []),
     fetchJson(dataPath('camp_details.bin')).catch(() => ({})),
     fetchJson(dataPath('recipes.bin')).catch(() => ({})),
     fetchJson(dataPath('vendors.bin')).catch(() => ({})),
     fetchJson(dataPath('monsters.bin')).catch(() => ({})),
-    // Modèles de monstre (feature #12 — un modèle regroupe tous les niveaux/
-    // variantes d'une même créature ; voir data/SCHEMA.md, js/fiches.js
-    // openMonsterFiche « fiche modèle + sélecteur de variante »). Chargé ici
-    // (déferré) plutôt qu'au critique : jamais consulté avant la première
-    // fiche/recherche monstre, comme monsters.bin lui-même.
-    fetchJson(dataPath('monster_models.bin')).catch(() => ({})),
     // Espèces (task #80 — monster-model overhaul part 2, site/data/<lang>/
     // species.bin, voir data/SCHEMA.md "monster_species.json") : l'unité
     // "créature" au sens joueur (~224), un cran plus large que `model`
@@ -236,7 +230,6 @@ async function loadDeferred() {
   S.recipes = recipes;
   S.vendors = vendors;
   S.monsters = monsters;
-  S.monsterModels = monsterModels;
   S.species = species;
   S.locations = locations;
   S.abilities = abilities;

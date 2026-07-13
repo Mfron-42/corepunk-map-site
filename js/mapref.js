@@ -108,6 +108,13 @@ const KINDS = {
   destructible: { word: () => ck('destroyable'),                        fiche: false, mode: 'C' },
   reactive:     { word: () => ck('reactive'),                           fiche: false, mode: 'C' },
   harvest:      { word: d => ck(d.subrole) || sc('node'),               fiche: false, mode: 'C' },
+  // Couche « Animaux paisibles » (pool camp:wildlife) : la LOCALISATION
+  // HONNÊTE par ZONE d'une espèce de faune SANS camp connu (tortues/vache/…,
+  // fiches.js openWildlifeFiche — « montre la zone plutôt que rien »). Mode C
+  // (couche de catégorie, aucune fiche) : la pastille bascule la couche d'arbre
+  // camp:wildlife (fkey `camp:wildlife` → ref-draw retombe sur activateCategoryNode,
+  // main.js) — jamais un point précis présenté comme l'animal lui-même.
+  wildlife:     { word: () => ck('wildlife'),                           fiche: false, mode: 'C' },
   node:         { word: () => sc('node'),                               fiche: true, mode: 'N' },
   // ── Fiche seule (tag + libellé souligné, PAS de pastille) ──
   item:         { word: () => sc('item'),                               fiche: true, mode: 'N' },
@@ -217,6 +224,10 @@ function liveDrawn(desc) {
     case 'species': return !!(S.monsp[desc.key] && S.monsp[desc.key].on);
     case 'family':  return !!(S.monfam[desc.key] && S.monfam[desc.key].on);
     case 'zone':    return !!S.zonesOn;
+    // Couche « Animaux paisibles » (pool camp:wildlife) — l'état vit sur
+    // S.camps.wildlife.on (la MÊME source que sa ligne d'arbre) ; jamais un
+    // état privé. syncEntityRefDots resynchronise en plus par fkey (mode C).
+    case 'wildlife': return !!(S.camps.wildlife && S.camps.wildlife.on);
     case 'poi':     return !!(S.poiTypes[desc.subrole || desc.key] && S.poiTypes[desc.subrole || desc.key].on);
     case 'camp': case 'shrine': case 'soulkeeper': case 'guard':
     case 'harvest': case 'destructible': case 'reactive': {

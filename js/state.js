@@ -94,9 +94,6 @@ const S = {
   recipes: {},              // clé de recette -> {name, icon, output, ingredients}
   vendors: {},              // clé de vendeur -> {name, npcs, sells}
   monsters: {},             // clé de monstre (variante représentative) -> fiche
-  monsterModels: {},        // clé de modèle -> {name, family?, canonicalSiteKey?, levels:[{level,tier?,siteKey}]}
-                            // (site/data/<lang>/monster_models.bin, feature #12 — voir data.js loadDeferred
-                            // et js/fiches.js openMonsterFiche « fiche modèle + sélecteur de variante »)
   species: {},              // clé d'espèce -> {name, namesAll, family?, models, levelMin?, levelMax?,
                             // canonicalSiteKey?, spawns:[{siteKey,name,level,rawKeys,isTest?}]}
                             // (site/data/<lang>/species.bin, task #80 — voir data.js loadDeferred,

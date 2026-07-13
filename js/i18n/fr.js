@@ -196,6 +196,7 @@ export default {
       // reste : toujours utilisée par fiches.js openMonsterFiche (section
       // lore de la fiche monstre), sans rapport avec cette section retirée.
       bestiaryZonesN: n => `${n} zones`,
+      monsterFoundInTitle: 'Présent dans',
       lootTableItemsN: n => `Contenu (${n})`,
       probableLootTitle: 'Butin probable',
       probableLootNote: name => `Table « ${name} » associée par type de contenant — à confirmer en jeu.`,
@@ -469,6 +470,19 @@ export default {
       familyFicheKind: 'Famille de monstres',
       familyMembersTitle: n => `Espèces (${n})`,
       familyQuestsN: n => `Quêtes pour cette famille (${n})`,
+      // Fiche « espèce de faune » (wildlife_species.bin, fiches.js
+      // openWildlifeFiche) : une vraie page pour un animal — nom + famille +
+      // méthode de dépeçage + son butin. « Où les trouver » est HONNÊTE : une
+      // espèce liée à un camp (dinde/lapin/…) utilise la pastille espèce de son
+      // en-tête ; une espèce 0-camp (tortues/vache/…) n'a AUCUN point précis,
+      // seulement le pool générique « Animaux paisibles » — offert en toggle,
+      // jamais un point précis présenté comme l'animal.
+      wildlifeFicheKind: 'Faune',
+      wildlifeVariants: list => `Variantes : ${list}`,
+      wildlifeWhereTitle: 'Où les trouver',
+      wildlifeCampedNote: (n, p) => `Apparaît dans ${n} camp${n === 1 ? '' : 's'} (${p} points sur cette carte) — utilisez la pastille à côté du titre pour les afficher.`,
+      wildlifePeacefulNote: "Aucune position par espèce n'est connue — cette espèce apparaît parmi les animaux paisibles. Afficher ces zones d'apparition :",
+      wildlifeNoZonesNote: "Aucune zone d'apparition connue sur cette carte.",
       abilityLabel: 'Capacité',
       // EntityRef (◇, js/mapref.js — vague 0) : phrases a11y/title des deux
       // cibles de clic (pastille = afficher/masquer, libellé = ouvrir la
@@ -818,6 +832,9 @@ export default {
     // d'activité : "Flayer" -> "Boucherie", "Lumberjack" -> "Bûcheron"…).
     harvestMethod: {
       Flayer: 'Boucherie', Herbalism: 'Herboristerie', Lumberjack: 'Bûcheron', Miner: 'Mineur',
+      // Jetons de dépeçage de la faune (wildlife_species.bin harvestMethod) :
+      // jetons moteur minuscules, distincts des Flayer/Lumberjack ci-dessus.
+      butchering: 'Boucherie', logging: 'Bûcheron',
     },
     // Statistiques de monstre (stats_decoded / stat_curve) -- voir
     // data/SCHEMA.md "Monster stats" + js/fiches.js::openMonsterFiche().

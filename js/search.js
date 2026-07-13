@@ -16,8 +16,8 @@ import { goTo } from './pins.js';
 import { whenDeferred } from './data.js';
 import {
   itemColor, openNpcFiche, openQuestFiche, openItemFiche,
-  openMonsterFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
-  openRecipeFiche, openNodeFiche,
+  openMonsterFiche, openFamilyFiche, openLocationFiche, openAbilityFiche, openSearchableChestFiche,
+  openRecipeFiche, openNodeFiche, openWildlifeFiche,
 } from './fiches.js';
 import { isDeprecatedItem, rarityGroupFor, rarityGroupSwatches } from './rarity.js';
 import { isHiddenTest } from './devcontent.js';
@@ -697,12 +697,15 @@ function buildMonsterSearchIndex() {
    résolveur UNIQUE (pointsets.js monsterFamilies, jamais re-dérivé) pour les
    familles jointes ; complété par un simple parcours du catalogue pour les
    familles sans camp (aucun join ici, juste une énumération de noms).
-   AUCUNE fiche « famille » n'existe (chunk (e)) : le clic ne peut donc pas
-   suivre le modèle espèce ci-dessus — il coche la ligne FAMILLE de l'arbre
-   (cascade toutes ses espèces) + la révèle, EXACTEMENT le même geste que le
-   chip family-layer d'une étape de quête (js/layeractivate.js
-   activateFamilyLayers, résolveur d'orchestration PARTAGÉ — jamais une
-   deuxième implémentation du même clic). Visuellement DISTINCT d'une ligne
+   Le clic fait DEUX choses (même double effet qu'une ligne espèce, section (2)
+   du harness search_activation) : (a) il OUVRE la fiche famille (openFamilyFiche
+   — le roster des membres + le toggle de couche en pastille d'en-tête ; cette
+   fiche EXISTE depuis chunk (e), l'ancien commentaire « aucune fiche famille »
+   était périmé), et (b) il coche la ligne FAMILLE de l'arbre (cascade toutes
+   ses espèces) + la révèle, EXACTEMENT le même geste que le chip family-layer
+   d'une étape de quête (js/layeractivate.js activateFamilyLayers, résolveur
+   d'orchestration PARTAGÉ — jamais une deuxième implémentation du même clic).
+   Visuellement DISTINCT d'une ligne
    espèce (demande mission #1, « visually distinct row stating it's a family
    filter ») : même hue MONSTRE (uniformité demandée, #3) mais une puce de
    catégorie dédiée (searchCat.family, « Famille »/« Family »…) + un glyphe
@@ -726,33 +729,30 @@ function buildFamilySearchIndex() {
   for (const f of familySearchRows()) {
     const sub = f.nPts ? tr('speciesCampsPts', f.nCamps, f.nPts.toLocaleString(numberLocale())) : tr('speciesZeroCamps');
     pushSearchEntry(pretty(f.family), 'family', MONSTER_HEX, null, null,
-      () => activateFamilyLayers([f.family]), null, sub, null, 0, null, { ref: 'family:' + f.family });
+      () => { activateFamilyLayers([f.family]); openFamilyFiche(f.family); }, null, sub, null, 0, null, { ref: 'family:' + f.family });
   }
 }
 
-/* Faune/creeps (wildlife_species.bin, catalogue GLOBAL ~25 espèces SANS
-   record species.bin — ONTOLOGY.md #11) : mission "search activation" —
+/* Faune (wildlife_species.bin, catalogue GLOBAL 25 espèces SANS record
+   species.bin — ONTOLOGY.md #11) : mission "search activation" —
    « searching dinde/turkey surfaces the creeps species similarly ».
-   AUCUNE fiche n'existe pour ces tokens (sidebar.js speciesRowLi : leur nom
-   n'est jamais cliquable dans l'arbre non plus, faute de canonicalSiteKey/
-   spawns) — le clic ENSURE quand même la couche espèce (id = le token
-   moteur partagé S.monsp/hash `monsp.<token>`, voir pointsets.js
-   wildSpeciesIndex, même espace de noms qu'une espèce catalogue) et révèle
-   sa ligne : jamais un clic mort malgré l'absence de fiche, exactement le
-   même geste que le bouton « Afficher » de l'arbre pour ces mêmes lignes.
-   Comptage via le résolveur UNIQUE (pointsets.js speciesPoints, ACTIF-CARTE
-   — même fonction que la ligne de l'arbre) : jamais re-dérivé depuis les
-   champs `camps`/`pts` propres de wildlife_species.bin, qui ne sont PAS
-   scopés à la carte active (ils listent les camps de TOUTES les cartes).
-   Même hue/chip que les espèces catalogue (cat 'monster', uniformité #3) —
-   ce sont des créatures au même titre, seule leur absence de fiche diffère
-   (assumé, comme dans l'arbre). */
+   Le clic OUVRE désormais une VRAIE FICHE (fiches.js openWildlifeFiche) — ces
+   espèces ont une page (nom + famille + méthode de dépeçage + BUTIN) : avant
+   ce correctif, un clic sur « Green Turtle » n'ouvrait RIEN (activateSpeciesLayer
+   seul, aucun point pour les 19 espèces 0-camp → mutation muette). L'affordance
+   carte n'est pas perdue : la fiche porte la pastille ESPÈCE (couche de spawn)
+   pour les espèces campées et le pool « Animaux paisibles » pour les 0-camp
+   (localisation honnête par ZONE). Comptage du sous-libellé via le résolveur
+   UNIQUE (pointsets.js speciesPoints, ACTIF-CARTE) : jamais re-dérivé depuis les
+   champs `camps`/`pts` de wildlife_species.bin, qui listent TOUTES les cartes.
+   Même hue/chip que les espèces catalogue (cat 'monster', uniformité #3) — ce
+   sont des créatures au même titre. */
 function buildWildSpeciesSearchIndex() {
   for (const [id, w] of Object.entries(S.wildlifeSpecies || {})) {
     const res = speciesPoints(id);
     const sub = res ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale())) : tr('wildlifeZeroCamps');
     pushSearchEntry(w.name, 'monster', MONSTER_HEX, null, null,
-      () => activateSpeciesLayer(id), null, sub, null, 0, null, { ref: 'wildsp:' + id });
+      () => openWildlifeFiche(id), null, sub, null, 0, null, { ref: 'wildsp:' + id });
   }
 }
 

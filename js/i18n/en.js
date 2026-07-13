@@ -190,6 +190,7 @@ export default {
       // stays: still used by fiches.js openMonsterFiche (monster fiche's lore
       // section), unrelated to this retired section.
       bestiaryZonesN: n => `${n} zones`,
+      monsterFoundInTitle: 'Found in',
       lootTableItemsN: n => `Contents (${n})`,
       probableLootTitle: 'Likely loot',
       probableLootNote: name => `"${name}" table matched by container type — confirm in game.`,
@@ -476,6 +477,19 @@ export default {
       familyFicheKind: 'Monster family',
       familyMembersTitle: n => `Species (${n})`,
       familyQuestsN: n => `Quests for this family (${n})`,
+      // Wildlife-species fiche (wildlife_species.bin, fiches.js
+      // openWildlifeFiche): a real page for a peaceful animal — name + family +
+      // butchering method + its loot. "Where to find" is HONEST: a camp-bound
+      // species (turkey/rabbit/…) uses its header species dot; a 0-camp species
+      // (turtles/cow/…) has NO precise per-species pin, only the generic
+      // « Peaceful animals » pool — offered as a toggle, never claiming a
+      // specific point IS that animal.
+      wildlifeFicheKind: 'Wildlife',
+      wildlifeVariants: list => `Variants: ${list}`,
+      wildlifeWhereTitle: 'Where to find',
+      wildlifeCampedNote: (n, p) => `Spawns in ${n} camp${n === 1 ? '' : 's'} (${p} points on this map) — use the dot next to the title to show them.`,
+      wildlifePeacefulNote: 'No per-species position is known — this species spawns among the peaceful animals. Show those spawn zones:',
+      wildlifeNoZonesNote: 'No known spawn zones on this map.',
       abilityLabel: 'Ability',
       // EntityRef (◇, js/mapref.js — wave 0): a11y/title phrases of the two
       // hit targets — the tag/dot ("show/hide on map", aria-pressed toggle)
@@ -805,6 +819,9 @@ export default {
     },
     harvestMethod: {
       Flayer: 'Butchery', Herbalism: 'Herbalism', Lumberjack: 'Logging', Miner: 'Mining',
+      // Wildlife-species harvest tokens (wildlife_species.bin harvestMethod):
+      // lowercase engine tokens distinct from the Flayer/Lumberjack ones above.
+      butchering: 'Butchery', logging: 'Logging',
     },
     statLabel: {
       health: 'Health', attack_power: 'Attack power', weapon_damage: 'Weapon damage',

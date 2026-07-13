@@ -18,6 +18,7 @@ import {
   monsterFamilies, speciesPoints, campGroupByKey, wildSpeciesOfKind, kindRestPoints,
 } from './pointsets.js';
 import { setFamilyOn, toggleSpecies } from './specieslayer.js';
+import { openWildlifeFiche } from './fiches.js';
 
 /* ── Suivis / fait ──────────────────────────────────────────── */
 function trackedTargetById(id) {
@@ -320,6 +321,13 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
     ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale()))
     : tr(zeroMetaKey);
   const [key] = speciesRep(sp);
+  // Espèce de faune SANS clé de monstre catalogue (turkey/rabbit/fox/…, tokens
+  // moteur = clés wildlife_species.bin) : son nom ouvre la fiche FAUNE
+  // (openWildlifeFiche), plus jamais un nom mort dans l'arbre — cohérent avec la
+  // recherche. Câblé par écouteur DIRECT (data-act est réservé au délégué
+  // main.js/fiche-monster, verrouillé) ; stopPropagation isole le clic du nom du
+  // toggle de couche de la ligne (name = fiche, reste de ligne = couche).
+  const wildId = !key && S.wildlifeSpecies?.[id] ? id : null;
   const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
   const nameAttrs = key ? ` data-act="fiche-monster" data-id="${esc(key)}"` : '';
   const li = document.createElement('li');
@@ -327,9 +335,14 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
   li.innerHTML = `<div class="filter-row species-row ${st.on ? '' : 'off'}${res ? '' : ' sp-zero'}">
     <label class="sp-check"><input type="checkbox" ${st.on ? 'checked' : ''} aria-label="${esc(sp.name)}">
       <span class="swatch" style="background:${speciesLayerHex(id)}"></span></label>
-    <span class="flabel"><span class="sp-name${key ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
+    <span class="flabel"><span class="sp-name${key || wildId ? ' link' : ''}"${ecAttr(MONSTER_HEX, 'monster')}${nameAttrs}>${esc(sp.name)}</span>${devMark}</span>
     <span class="sp-meta">${esc(meta)}</span>
   </div>`;
+  if (wildId) li.querySelector('.sp-name').addEventListener('click', e => {
+    e.stopPropagation();
+    pushFocusState();
+    openWildlifeFiche(wildId);
+  });
   li.querySelector('input').addEventListener('change', e => {
     st.on = e.target.checked;
     li.querySelector('.species-row').classList.toggle('off', !st.on);

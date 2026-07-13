@@ -21,7 +21,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from './mapview.js'
 import { clearLocator } from './pins.js';
 import { unfocus } from './urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from './data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies } from './pointsets.js';
+import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from './pointsets.js';
 import { mobLabelHtml } from './popups.js';
 import { RARITY_ORDER, rarityGroupFor } from './rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from './devcontent.js';
@@ -341,6 +341,91 @@ function openNodeFiche(key) {
     ${ficheHeader({ name: n.name, hex, nameSuffix: genericChip, sub: `${esc(tr('nodeFicheKind'))}${tierLine ? ' · ' + esc(tierLine) : ''}` })}
     <div class="fiche-section"><h3>${esc(tr('lootBestRates'))}</h3>${lootRowsHtml(n.drops, 'noHarvestCatalogued')}</div>`);
   setFicheHash(null);
+}
+
+/* Section « Où les trouver » d'une fiche de faune (openWildlifeFiche) — la
+   LOCALISATION HONNÊTE d'une espèce, demande owner « montre la ZONE plutôt que
+   RIEN » :
+   - espèce liée à ≥1 camp sur la carte active (`spRes` non nul : turkey/rabbit/
+     fox/squirrel/porcupine) : la pastille ESPÈCE de l'en-tête EST déjà
+     l'affordance « afficher les spawns » (couche espèce = union de ses camps) —
+     JAMAIS un second toggle de la même couche (kill-list §7.2), juste un compte
+     honnête + renvoi à la pastille du titre.
+   - espèce SANS aucun camp (tortues/vache/poule/… — 19/25, `camps:[]` byte-
+     prouvé) : AUCUNE position précise par espèce n'existe côté client ; sa seule
+     localisation connue est le pool générique « Animaux paisibles » (couche
+     camp:wildlife, ~5 900 points, roster attribué serveur). On l'offre en
+     toggle qui RÉUTILISE cette MÊME couche (celle de World, jamais reconstruite)
+     via une référence mode C (fkey `camp:wildlife`) : le clic route par la
+     délégation existante (main.js → activateCategoryNode), l'état se
+     resynchronise par syncEntityRefDots. HONNÊTE : « apparaît PARMI les animaux
+     paisibles », jamais « ce point précis EST une tortue ». Gardé sur
+     l'existence réelle de points sur la carte active (jamais un toggle mort). */
+function wildlifeWhereHtml(id, spRes) {
+  if (spRes) {
+    return `<div class="fiche-section"><h3>${esc(tr('wildlifeWhereTitle'))}</h3>
+      <p class="hint">${esc(tr('wildlifeCampedNote', spRes.nCamps, spRes.nPts.toLocaleString(numberLocale())))}</p></div>`;
+  }
+  const rest = S.camps.wildlife ? kindRestPoints('wildlife') : { nCamps: 0, nPts: 0 };
+  const affordance = rest.nPts
+    // Même patron que containersSectionHtml : libellé de couche (nom + teinte
+    // wildlife) + référence-toggle NUE (tag + pastille, sans libellé propre —
+    // le nom vit dans le span à côté). Réf mode C non-dessinable-en-fiche :
+    // pas de page (couche), la pastille dessine.
+    ? `<div class="farm-group-head">
+        <span class="farm-group-label" style="color:${CAMP_COLORS.wildlife}">${esc(tr('wildlifeRestRow'))}</span>
+        ${ref({ kind: 'wildlife', mode: 'C', fkey: 'camp:wildlife', hex: CAMP_COLORS.wildlife, drawn: !!S.camps.wildlife?.on, count: rest.nPts })}
+      </div>`
+    : `<p class="hint">${stateChip('unknown')} ${esc(tr('wildlifeNoZonesNote'))}</p>`;
+  return `<div class="fiche-section"><h3>${esc(tr('wildlifeWhereTitle'))}</h3>
+    <p class="hint">${esc(tr('wildlifePeacefulNote'))}</p>
+    ${affordance}</div>`;
+}
+
+/* Fiche « espèce de faune » (wildlife_species.bin, S.wildlifeSpecies — 25
+   espèces catalogue SANS record species.bin, ONTOLOGY.md #11) : une VRAIE page
+   pour un animal (nom + famille + méthode de dépeçage + son BUTIN), qui
+   n'existait pas — un clic sur « Green Turtle » (recherche/arbre Creeps)
+   n'ouvrait RIEN (activateSpeciesLayer seul, sans points pour les 0-camp).
+   Corps :
+   - EN-TÊTE PARTAGÉ : titre coloré (teinte d'identité speciesLayerHex, stable
+     ×sessions/cartes, la même que la couche/l'arbre) + pastille ESPÈCE (mode E)
+     UNIQUEMENT quand l'espèce a des points sur la carte active (règle owner
+     2026-07-12) — bascule la couche espèce (token moteur partagé S.monsp[id],
+     ref-draw `species` → toggleSpecies(id)). Sous-titre : « Faune » + famille
+     prettifiée (si distincte du nom, même garde que openMonsterFiche).
+   - variantes de nom (namesAll — goose/cockerel/manta… : plusieurs skins sous
+     une espèce) : ligne muette honnête, jamais un faux « ×N ».
+   - « Où les trouver » (wildlifeWhereHtml) : la localisation HONNÊTE — pastille
+     de l'en-tête pour les espèces campées, pool « Animaux paisibles » pour les
+     0-camp (Request 2).
+   - Butin de dépeçage (w.loot — `lootShared` = table partagée de la famille
+     turtle) : même rendu lootRowsHtml que monstre/camp/coffre, la méthode
+     (harvestMethod) dans le titre.
+   Lien profond `wsp=<id>` (setFicheHash 'wildlife') : partageable + Précédent/
+   Suivant (restauré par router.js, différé comme monstre/camp). */
+function openWildlifeFiche(id) {
+  const w = S.wildlifeSpecies?.[id];
+  if (!w) return;
+  S.openFiche = { kind: 'wildlife', id };
+  const hex = speciesLayerHex(id);
+  const spRes = speciesPoints(id);   // non nul ⇔ espèce liée à ≥1 camp (carte active)
+  const famBit = (w.family && fold(pretty(w.family)) !== fold(w.name)) ? pretty(w.family) : null;
+  const kindLine = [tr('wildlifeFicheKind'), famBit].filter(Boolean).join(' · ');
+  const speciesDot = spRes
+    ? { kind: 'species', key: id, label: w.name, hex, hasFiche: false,
+        drawable: true, count: spRes.nPts, drawn: !!S.monsp[id]?.on }
+    : null;
+  const variants = (w.namesAll || []).filter(nm => fold(nm) !== fold(w.name));
+  const variantsHtml = variants.length
+    ? `<p class="hint">${esc(tr('wildlifeVariants', variants.join(' · ')))}</p>` : '';
+  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}${w.harvestMethod ? ' · ' + esc(harvestMethodLabel(w.harvestMethod)) : ''}</h3>${lootRowsHtml(w.loot, 'noLootCatalogued')}</div>`;
+  openFiche(`
+    ${ficheHeader({ name: w.name, hex, dot: speciesDot, sub: esc(kindLine) })}
+    ${variantsHtml}
+    ${wildlifeWhereHtml(id, spRes)}
+    ${lootHtml}`);
+  setFicheHash('wildlife', id);
 }
 
 /* Rendu commun d'un taux de drop : quantité ("×N", dès que count>1) suivi de
@@ -1147,16 +1232,16 @@ function effectLinesSection(it) {
    désormais la fiche de l'ESPÈCE entière avec un sélecteur pour changer de
    niveau/variante sans revenir à la recherche.
 
-   L'espèce est un cran plus large qu'un MODÈLE (monster_models.json, encore
-   utilisé ailleurs -- voir js/search.js) : "Troll"/"Mighty Troll"/"Overweight
-   Troll" sont 3 modèles DIFFÉRENTS (CamelCase-glué, voir data/SCHEMA.md
-   "Known limitation") qu'un sélecteur par modèle ne réunissait jamais, alors
-   qu'ils désignent la MÊME créature aux yeux du joueur -- la bonne raison de
-   ce changement d'axe (raw cosmetic counts polish, task #80).
+   L'espèce est un cran plus large que l'ancien axe MODÈLE (retiré : plus
+   chargé côté client depuis que l'axe est passé à species.bin, task #80) :
+   "Troll"/"Mighty Troll"/"Overweight Troll" étaient 3 modèles DIFFÉRENTS
+   (CamelCase-glué, voir data/SCHEMA.md "Known limitation") qu'un sélecteur par
+   modèle ne réunissait jamais, alors qu'ils désignent la MÊME créature aux yeux
+   du joueur -- la bonne raison de ce changement d'axe (raw cosmetic counts
+   polish, task #80).
 
-   speciesVariantSpawns ne fait PAS confiance à species.spawns seul (même
-   discipline que l'ancien monsterModelVariants vis-à-vis de
-   monster_models.levels) : la source de vérité reste TOUJOURS S.monsters
+   speciesVariantSpawns ne fait PAS confiance à species.spawns seul : la source
+   de vérité reste TOUJOURS S.monsters
    filtré par `m.species` (garanti présent sur chaque groupe, chargé QUOI
    QU'IL ARRIVE dès que monsters.bin l'est) -- species.bin lui-même ne sert
    qu'à comparer les noms (distinctName ci-dessous) et, ailleurs, à fournir
@@ -1229,27 +1314,36 @@ function openMonsterFiche(key) {
   // Zone(s) où ce monstre apparaît : champ `m.zones` cuit dans les données
   // (build_site_data.py::_monster_zone_names — croisement camps ⨯ régions,
   // hors zone attrape-tout « Restricted Area » qui couvrait 82% de la carte).
-  // Remplace l'ancien monsterZones() côté client (buggé : Restricted Area
-  // partout). Préfixée d'un 📍 : un nom de ZONE du jeu se lisait avant comme
-  // un statut du monstre plutôt qu'un lieu (le nom est déjà localisé côté
-  // données, aucune traduction supplémentaire requise).
+  // PRÉSENTATION (priorité owner) : la répartition famille→région est CE que le
+  // joueur vient chercher (« où sont les imps ? »). Sortie du sous-titre muet
+  // (ex « 📍 4 zones », qui repliait/masquait les noms dès 3 régions) vers une
+  // SECTION « Présent dans » dédiée et proéminente. Le jeu localise par
+  // FAMILLE+région, jamais par espèce : toutes les espèces d'une famille
+  // partagent EXACTEMENT ces mêmes zones — honnête, jamais un lieu par espèce
+  // (le per-espèce n'existe pas côté serveur, ne jamais le fabriquer).
   const zones = m.zones || [];
-  const zoneTxt = zones.length > 2 ? tr('bestiaryZonesN', zones.length) : zones.join(' · ');
   // Sous-titre SANS répéter le NOM (TASK 1, owner) : le token famille ne s'y
   // affiche plus quand il est identique au nom de l'espèce (« Scolopendra »
   // famille == « Scolopendra » titre → doublon supprimé, il ne reste que
   // « Lvl 20 ») ; une vraie famille distincte (« Rat » pour un « Rat King »)
-  // reste, elle n'est pas redondante.
+  // reste, elle n'est pas redondante. Les zones ne vivent plus ici (section
+  // « Présent dans » ci-dessous).
   const famBit = (m.family && fold(pretty(m.family)) !== fold(m.name)) ? pretty(m.family) : null;
   const kindBits = [famBit, m.level != null ? tr('levelAbbrev', m.level) : null,
-    m.attack ? monsterAttackLabel(m.attack) : null, zoneTxt ? `📍 ${zoneTxt}` : null].filter(Boolean);
-  // Affordance « Voir la zone » : dessine le(s) polygone(s) de région sur la
-  // carte (zones_geo, propre à Kwalat) — n'apparaît que quand au moins une des
-  // zones du mob correspond à un polygone chargé (sinon rien à dessiner, ex.
-  // sur une autre carte où S.zonesGeo est vide).
-  const zoneDrawable = zones.length && (S.zonesGeo || []).some(z => zones.some(n => fold(n) === fold(z.name)));
-  const zoneBtnHtml = zoneDrawable
-    ? `<div class="fiche-section"><div class="pop-actions"><button class="goto" data-act="monster-zone" data-id="${esc(key)}">${GOTO_ICON}<span>${esc(tr('viewZoneBtn'))}</span></button></div></div>`
+    m.attack ? monsterAttackLabel(m.attack) : null].filter(Boolean);
+  // « Présent dans » : une référence [Zone(●)] par région. La PASTILLE dessine
+  // CE polygone de région (ref-draw, subrole « monster-zone » → drawNamedZone,
+  // main.js — même primitive single-slot que l'ex-bouton « Voir la zone », mais
+  // par région et déclenchée au clic sur le nom/la pastille). Dessinable ⇔ la
+  // région a un polygone chargé sur la carte active (S.zonesGeo) ; sinon nom nu
+  // (honnête : région réelle, simplement pas traçable ici — cross-carte / non
+  // décodée). `drawn:false` explicite : tracé one-shot, jamais un toggle
+  // persistant (même contrat que la réf goal-zone).
+  const zoneGeoFold = new Set((S.zonesGeo || []).map(z => fold(z.name)));
+  const foundInHtml = zones.length
+    ? `<div class="fiche-section"><h3>${esc(tr('monsterFoundInTitle'))}</h3><div class="reward-chips">${
+      zones.map(zn => ref({ kind: 'zone', subrole: 'monster-zone', key: zn, label: zn, drawable: zoneGeoFold.has(fold(zn)), drawn: false })).join('')
+    }</div></div>`
     : '';
   // Contenu dev (feature #13) : marqueur explicite quand la variante
   // ACTIVEMENT affichée est isTest (toujours ouvrable par lien profond direct,
@@ -1366,9 +1460,9 @@ function openMonsterFiche(key) {
       name: m.name, hex: speciesLayerHex(spId), dot: speciesDot,
       sub: `${esc(kindLine)}${devMark}`,
     })}
-    ${zoneBtnHtml}
     ${variantSelectHtml}
     ${rawRecordsHtml}
+    ${foundInHtml}
     ${campsHtml}
     ${tagsHtml}
     ${statsHtml}
@@ -1608,12 +1702,13 @@ function openFiche(html) {
    fiche et canGoBackLocally()/unfocus() ne fonctionneraient plus jamais. */
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam');
+  p.delete('q'); p.delete('camp'); p.delete('i'); p.delete('npc'); p.delete('mon'); p.delete('fam'); p.delete('wsp');
   if (kind === 'quest') p.set('q', id);
   else if (kind === 'item') p.set('i', id);
   else if (kind === 'npc') p.set('npc', id);
   else if (kind === 'monster') p.set('mon', id);
   else if (kind === 'family') p.set('fam', id);
+  else if (kind === 'wildlife') p.set('wsp', id);
   else if (kind) p.set('camp', id);
   history.replaceState(history.state, '', '#' + p.toString().replace(/%2C/g, ','));
 }
@@ -1792,14 +1887,32 @@ function campPointsForZone(sz) {
   return pts.length ? pts : null;
 }
 /* Zone confiance MOYENNE (search_zone.confidence==="medium") : meilleur
-   effort — les vrais points du camp cité (campPointsForZone, réutilise
-   showHighlight, la même primitive « surligner les N points » que la fiche
-   camp) quand la jointure marche, sinon repli honnête sur le même cercle
-   deviné qu'une zone confiance haute mais visuellement plus prudent
-   (drawGoalZone estimate:true) — jamais un contour inventé de toutes pièces,
-   jamais présenté avec la même autorité qu'une zone étayée par une vraie
-   preuve de drop/farm (voir  zone_confidence). */
+   effort — deux natures de zone possibles, jamais présentées avec la même
+   autorité qu'une zone étayée par une vraie preuve de drop/farm (voir
+    zone_confidence).
+   • Zone de RÉGION (sz.where_kind==="region_zone" : la quête ne nomme qu'UNE
+     région géométrique, sans camp) -> le VRAI polygone de région prudent
+     (drawRegionEstimateZone), et NON un cercle centroïde/bbox qui déborderait
+     sur des aires HORS de la région — un contour de région rendu en cercle
+     surestime toujours l'emprise réelle, exactement ce qu'une estimation ne
+     doit pas faire.
+   • Zone de CAMP (sz.camp) -> les vrais points du camp cité (campPointsForZone,
+     réutilise showHighlight, la même primitive « surligner les N points » que
+     la fiche camp) quand la jointure marche.
+   Dans les deux cas, repli honnête sur le même cercle deviné qu'une zone
+   confiance haute mais visuellement plus prudent (drawGoalZone estimate:true)
+   quand la géométrie exacte manque (région/camp non chargé sur la carte active,
+   ou nom non reconnu) — jamais un contour inventé de toutes pièces. */
 function drawEstimatedZone(sz) {
+  // Zone de région : le vrai polygone prudent plutôt qu'un cercle débordant ;
+  // repli sur le cercle deviné si la région n'est pas chargée sur la carte
+  // active (quête cross-carte, ex. Extraction/Prison Island, ou nom inconnu).
+  if (sz?.where_kind === 'region_zone' && sz.region) {
+    clearHighlight();
+    if (drawRegionEstimateZone(sz)) return;
+    drawGoalZone(sz, { estimate: true });
+    return;
+  }
   const pts = campPointsForZone(sz);
   if (pts) { clearGoalZone(); showHighlight(pts, CATS.quest.hex); return; }
   clearHighlight();
@@ -1808,33 +1921,69 @@ function drawEstimatedZone(sz) {
 /* (zoneViewBtn supprimé — vague 1 EntityRef : la zone de recherche d'un
    objectif est désormais une référence [Région ●] construite directement
    dans dynamicPosBadge, routée par main.js ref-draw → viewGoalZone.) */
-/* Zone(s) de monstre sur la carte (bestiaire / fiche « Voir la zone ») :
-   dessine les VRAIS polygones de région (S.zonesGeo, propre à Kwalat) résolus
-   par NOM depuis m.zones. Réutilise l'infra de zone d'objectif de quête
-   (goalZoneLayer, effacée pareillement par clearGoalZone/closeFiche) — mais
-   trace le polygone réel plutôt qu'un simple cercle centroïde/bbox, puisqu'on
-   a la géométrie exacte. Un nom sans polygone chargé (autre carte) ne dessine
-   rien, jamais de contour inventé. */
-function drawMonsterZone(zoneNames) {
+/* Zone(s) de région sur la carte, résolues par NOM (S.zonesGeo, propre à
+   Kwalat) depuis une liste de noms. Deux appelants, deux niveaux d'autorité
+   visuelle sur la MÊME géométrie exacte :
+   • bestiaire / fiche monstre « Voir la zone » (viewMonsterZone, m.zones) —
+     style AFFIRMÉ (estimate:false, liseré plein) : on montre la vraie aire de
+     vie du mob, un fait catalogué.
+   • zone de recherche d'objectif confiance MOYENNE de type région
+     (drawRegionEstimateZone) — style PRUDENT (estimate:true : liseré fin,
+     pointillé lâche, remplissage faible, mêmes réglages que le cercle
+     drawGoalZone estimate:true) : une simple proximité de région, jamais une
+     preuve de spawn ; le polygone exact évite juste qu'un cercle ne déborde.
+   Trace les VRAIS polygones plutôt qu'un cercle centroïde/bbox, puisqu'on a la
+   géométrie exacte ; réutilise l'infra de zone d'objectif (goalZoneLayer,
+   effacée pareillement par clearGoalZone/closeFiche). Renvoie true si au moins
+   un polygone a été tracé, false si aucun nom ne correspond à un polygone
+   chargé (autre carte / région non chargée) : jamais de contour inventé,
+   l'appelant décide alors du repli. */
+function drawMonsterZone(zoneNames, { estimate = false } = {}) {
   clearGoalZone();
-  if (!zoneNames?.length) return;
+  if (!zoneNames?.length) return false;
   const zones = (S.zonesGeo || []).filter(z => zoneNames.some(n => fold(n) === fold(z.name)));
-  if (!zones.length) return;
+  if (!zones.length) return false;
   const g = L.layerGroup();
   const pts = [];
   zones.forEach(z => (z.rings || []).forEach(ring => {
     L.polygon(ring.map(([x, zz]) => { pts.push(toLL(x, zz)); return toLL(x, zz); }), {
-      color: CATS.quest.hex, weight: 2, dashArray: '5 6',
-      fillColor: CATS.quest.hex, fillOpacity: .12, interactive: false,
+      color: CATS.quest.hex, weight: estimate ? 1.4 : 2,
+      dashArray: estimate ? '2 8' : '5 6',
+      fillColor: CATS.quest.hex, fillOpacity: estimate ? .06 : .12, interactive: false,
     }).addTo(g);
   }));
   goalZoneLayer = g.addTo(map);
   if (pts.length) map.flyToBounds(L.latLngBounds(pts).pad(0.25));
+  return pts.length > 0;
+}
+/* Repli d'une zone de recherche confiance MOYENNE de type région
+   (sz.where_kind==="region_zone" : la quête ne nomme qu'UNE région
+   géométrique, sans camp). Trace le VRAI polygone de région, résolu par NOM
+   sur sz.region via drawMonsterZone (même correspondance repliée fold()), dans
+   le style PRUDENT de l'estimation (estimate:true) — le polygone exact ne
+   déborde pas hors des limites de la région comme le ferait un cercle
+   centroïde/bbox, tout en gardant l'autorité visuelle RÉDUITE d'une simple
+   proximité (jamais l'aspect plein d'une zone confirmée). Renvoie true si la
+   région est chargée sur la carte active (polygone tracé), false sinon (nom
+   cross-carte ou non chargé) — l'appelant retombe alors sur le cercle deviné
+   prudent, jamais un contour inventé de toutes pièces. */
+function drawRegionEstimateZone(sz) {
+  if (!sz?.region) return false;
+  return drawMonsterZone([sz.region], { estimate: true });
 }
 /* Accès délégué (main.js) : dessine la/les zone(s) du monstre `key`. */
 function viewMonsterZone(key) {
   const m = S.monsters[key];
   if (m?.zones) drawMonsterZone(m.zones);
+}
+/* Accès délégué (main.js) : dessine UNE région nommée — la réf [Zone(●)] de la
+   section « Présent dans » d'une fiche monstre (ref-draw, subrole
+   « monster-zone »). Même primitive single-slot (goalZoneLayer, effacée à la
+   fermeture de fiche) que viewMonsterZone/viewGoalZone : jamais un contour
+   inventé quand le nom ne correspond à aucun polygone chargé (drawMonsterZone
+   renvoie false et ne trace rien). */
+function drawNamedZone(name) {
+  if (name) drawMonsterZone([name]);
 }
 /* Libellé + éventuel bouton pour une cible sans position fixe. `regionHint`
    (facultatif) = région du journal de la quête, affichée en cas (c) quand
@@ -2971,15 +3120,26 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // cleanLabel porte désormais la garde générique anti-jeton moteur
     // (underscores → espaces, audit classe E : « use_ability »,
     // « activate_qao_… ») ; première lettre capitalisée pour le chip.
+    const ab = t.key ? S.abilities?.[t.key] : null;
+    // Placeholder de capacité MOTEUR (audit classe E) : « use_ability »,
+    // « quest ability <slug> », « activate_… » — un jeton technique, pas une
+    // capacité NOMMÉE. Non résolu au catalogue ET libellé BRUT à underscore
+    // (= identifiant moteur, même hypothèse vérifiée que cleanLabel utils.js) :
+    // le chip « [Capacité] Use ability » n'ajoute RIEN à côté du texte
+    // d'objectif (« Combine the ingredients », « Repair The Destroyer ») et se
+    // lit comme une référence cassée — on le SUPPRIME (l'action EST tout
+    // l'objectif, aucune cible à montrer, aucune position non plus). Une
+    // capacité vraiment nommée (résolue, ou libellé propre sans underscore)
+    // garde son chip.
+    const genericAbility = !ab && /_/.test(String(t.label || ''));
     const abLabel = t.label ? cleanLabel(t.label).replace(/^./, c => c.toUpperCase()) : null;
-    if (!abLabel) return '';
+    if (!abLabel || genericAbility) return '';
     // EntityRef (vague 1, GAP §7.1 de la spec) : `[Capacité] Nom` — le
     // k-chip détaché devient le kind-tag. Souligné (ref-open →
     // openAbilityFiche, routé main.js) UNIQUEMENT quand la CLÉ de la cible
     // résout sur S.abilities — jamais un match par nom (la garde d'origine
     // de cette branche : un lien de capacité faux serait pire que pas de
     // lien). Jamais de pastille : lancer une capacité n'a pas de lieu.
-    const ab = t.key ? S.abilities?.[t.key] : null;
     return `<div class="goal-target">
       <div class="goal-target-row goal-target-item">
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
@@ -3568,7 +3728,11 @@ function dropRow(icon, label, linkAct, linkId, rateHtml, glyph) {
   } else if (linkAct === 'fiche-loot') {
     refHtml = ref({ kind: 'loot', key: linkId, label, hasFiche: true });
   } else {
-    refHtml = `<span class="fr-label">${esc(label)}</span>`;
+    // Sans lien catalogue : réf [Item] NON soulignée (hasFiche:false) plutôt
+    // qu'un fr-label nu — uniformité avec ses frères (toutes les autres lignes
+    // dropRow sont des réfs). Honnête : le tag nomme le kind, le nom reste en
+    // clair (aucune fiche à ouvrir), teinte objet générique.
+    refHtml = ref({ kind: 'item', label, hasFiche: false });
   }
   // data-n : nom replié pour le filtre local des longues listes (voir le
   // listener .stock-filter posé sur le drawer plus haut).
@@ -3717,14 +3881,21 @@ function farmUnjoinedRow(c) {
   // surlignage possible ici : la pastille est un pin LOCATE cross-carte (mode
   // L) quand une position + une carte connue existent (bascule vers cette
   // carte puis épingle — main.js ref-draw mode L), sinon aucune pastille (rien
-  // à viser honnêtement). Nom souligné → fiche camp ; suffixe méta = nom de la
-  // carte cible (l'info que portait l'ex-bouton cross-carte).
+  // à viser honnêtement). Suffixe méta = nom de la carte cible (l'info que
+  // portait l'ex-bouton cross-carte).
+  // CLIC MORT ÉVITÉ : le nom n'est SOULIGNÉ (→ openCampFiche) que si le camp
+  // résout VRAIMENT sur la carte active (openCampFiche cherche `g.k === key`
+  // dans S.camps de la carte courante ET no-op sinon) — un camp cross-carte
+  // (mid) ou pas-encore-chargé donnerait un lien qui n'ouvre rien. Sinon nom
+  // en clair (honnête : la pastille locate bascule vers sa carte, où la fiche
+  // redevient atteignable). Se répare seul au re-rendu post-loadDeferred.
   const label = campLabel(c.camp, c.kind, c.name, c.subtype);
   const mid = (c.map && c.map !== S.map && S.maps[c.map]) ? c.map : null;
   const canPing = c.x != null;
+  const openable = Object.values(S.camps || {}).some(st => (st.groups || []).some(gr => gr.k === c.camp));
   const campRefHtml = ref({
     kind: 'camp', key: c.camp, label, hex: CAMP_COLORS[c.kind] || '#999',
-    hasFiche: true,
+    hasFiche: openable,
     mode: canPing ? 'L' : undefined, drawable: canPing,
     pos: canPing ? { x: c.x, z: c.z, map: mid || undefined } : undefined,
     meta: mid ? `· ${mapName(mid)}` : '',
@@ -3864,9 +4035,21 @@ function containerRarityLabel(r) {
   return rarityLabel(cap) || pretty(r || '');
 }
 function containerRow(c) {
-  const label = c.group === 'searchable_chest' ? containerRarityLabel(c.rarity) : pretty(c.family || '');
   const chance = c.ch != null ? `<span class="muted">${esc(containerChanceText(c.ch))}</span>` : '';
-  return `<div class="frow"><span class="fr-label">${esc(label)}</span>${chance}</div>`;
+  // Coffre fouillable : le libellé est une RARETÉ (pas une entité) → libellé
+  // simple, jamais une réf.
+  if (c.group === 'searchable_chest') {
+    return `<div class="frow"><span class="fr-label">${esc(containerRarityLabel(c.rarity))}</span>${chance}</div>`;
+  }
+  // Coffre de camp : le libellé est une FAMILLE de monstre → réf [Famille]
+  // (uniformité + le nom devient ouvrable vers la fiche famille, qui montre où
+  // cette famille apparaît). Souligné ⇔ la famille a des membres catalogue ;
+  // teinte famille (Q6) ; pas de pastille (une entrée de contenant n'a rien à
+  // tracer). Repli honnête sur '' quand `family` absent.
+  const fam = familyKey(c.family || 'other');
+  const famRef = ref({ kind: 'family', key: fam, family: fam, label: pretty(c.family || ''),
+    hex: familyLayerHex(fam), hasFiche: familyHasMembers(fam), drawable: false });
+  return `<div class="frow">${famRef}${chance}</div>`;
 }
 function containersSectionHtml(it) {
   if (!it.containers?.length) return '';
@@ -4507,5 +4690,5 @@ function flyToQuestZone(slug) {
 export {
   closeFiche, openNpcFiche, openQuestFiche, openItemFiche, openCampFiche,
   openMonsterFiche, openFamilyFiche, openLocationFiche, openAbilityFiche, openLootTableFiche,
-  openChestFiche, openSearchableChestFiche, openRecipeFiche, openNodeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, setRollRarity,
+  openChestFiche, openSearchableChestFiche, openRecipeFiche, openNodeFiche, openWildlifeFiche, itemColor, viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 };

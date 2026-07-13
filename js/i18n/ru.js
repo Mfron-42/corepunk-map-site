@@ -171,6 +171,7 @@ export default {
       // openMonsterFiche (раздел лора карточки монстра), не связан с этим
       // удалённым разделом.
       bestiaryZonesN: n => `${n} ${pluralSlavic(n, 'зона', 'зоны', 'зон')}`,
+      monsterFoundInTitle: 'Встречается в',
       lootTableItemsN: n => `Содержимое (${n})`,
       probableLootTitle: 'Вероятная добыча',
       probableLootNote: name => `Таблица «${name}» сопоставлена по типу контейнера — проверьте в игре.`,
@@ -433,6 +434,18 @@ export default {
       familyFicheKind: 'Семейство монстров',
       familyMembersTitle: n => `Виды (${n})`,
       familyQuestsN: n => `Задания на это семейство (${n})`,
+      // Карточка вида фауны (wildlife_species.bin, fiches.js openWildlifeFiche):
+      // настоящая страница животного — имя + семейство + способ разделки + его
+      // добыча. «Где найти» — ЧЕСТНО: вид, привязанный к лагерю (индейка/кролик/…),
+      // использует точку вида в заголовке; вид без лагеря (черепахи/корова/…) не
+      // имеет точной точки, только общий пул «Мирные животные» — предлагается
+      // переключателем, никогда не выдавая конкретную точку за это животное.
+      wildlifeFicheKind: 'Фауна',
+      wildlifeVariants: list => `Варианты: ${list}`,
+      wildlifeWhereTitle: 'Где найти',
+      wildlifeCampedNote: (n, p) => `Появляется в ${n} лагерях (${p} точек на этой карте) — используйте точку рядом с названием, чтобы показать их.`,
+      wildlifePeacefulNote: 'Точное положение для каждого вида неизвестно — этот вид появляется среди мирных животных. Показать эти зоны появления:',
+      wildlifeNoZonesNote: 'На этой карте нет известных зон появления.',
       abilityLabel: 'Способность',
       // EntityRef (◇, js/mapref.js — волна 0): a11y/title-фразы двух целей
       // клика (точка = показать/скрыть, метка = открыть карточку). См.
@@ -743,6 +756,9 @@ export default {
     },
     harvestMethod: {
       Flayer: 'Разделка', Herbalism: 'Травничество', Lumberjack: 'Лесозаготовка', Miner: 'Горное дело',
+      // Токены разделки фауны (wildlife_species.bin harvestMethod): движковые
+      // токены в нижнем регистре, отличные от Flayer/Lumberjack выше.
+      butchering: 'Разделка', logging: 'Лесозаготовка',
     },
     statLabel: {
       health: 'Здоровье', attack_power: 'Сила атаки', weapon_damage: 'Урон оружия',

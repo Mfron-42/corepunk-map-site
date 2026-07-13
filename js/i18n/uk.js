@@ -170,6 +170,7 @@ export default {
       // openMonsterFiche (розділ лору картки монстра), не пов'язаний із цим
       // вилученим розділом.
       bestiaryZonesN: n => `${n} ${pluralSlavic(n, 'зона', 'зони', 'зон')}`,
+      monsterFoundInTitle: 'Трапляється в',
       lootTableItemsN: n => `Вміст (${n})`,
       probableLootTitle: 'Ймовірна здобич',
       probableLootNote: name => `Таблицю «${name}» зіставлено за типом контейнера — перевірте у грі.`,
@@ -436,6 +437,18 @@ export default {
       familyFicheKind: 'Родина монстрів',
       familyMembersTitle: n => `Види (${n})`,
       familyQuestsN: n => `Завдання для цієї родини (${n})`,
+      // Картка виду фауни (wildlife_species.bin, fiches.js openWildlifeFiche):
+      // справжня сторінка тварини — назва + родина + спосіб білування + її
+      // здобич. «Де знайти» — ЧЕСНО: вид, прив’язаний до табору (індик/кролик/…),
+      // використовує позначку виду у заголовку; вид без табору (черепахи/корова/…)
+      // не має точної точки, лише загальний пул «Мирні тварини» — пропонується
+      // перемикачем, ніколи не видаючи конкретну точку за цю тварину.
+      wildlifeFicheKind: 'Фауна',
+      wildlifeVariants: list => `Варіанти: ${list}`,
+      wildlifeWhereTitle: 'Де знайти',
+      wildlifeCampedNote: (n, p) => `З’являється у ${n} таборах (${p} точок на цій карті) — скористайтеся позначкою біля назви, щоб показати їх.`,
+      wildlifePeacefulNote: 'Точного розташування для кожного виду немає — цей вид з’являється серед мирних тварин. Показати ці зони появи:',
+      wildlifeNoZonesNote: 'На цій карті немає відомих зон появи.',
       abilityLabel: 'Здібність',
       // EntityRef (◇, js/mapref.js — хвиля 0): a11y/title-фрази двох цілей
       // кліку (крапка = показати/сховати, мітка = відкрити картку). Див.
@@ -745,6 +758,9 @@ export default {
     },
     harvestMethod: {
       Flayer: 'Забій', Herbalism: 'Травництво', Lumberjack: 'Лісорубство', Miner: 'Рудокопство',
+      // Токени білування фауни (wildlife_species.bin harvestMethod): рушійні
+      // токени у нижньому регістрі, відмінні від Flayer/Lumberjack вище.
+      butchering: 'Забій', logging: 'Лісорубство',
     },
     statLabel: {
       health: "Здоров'я", attack_power: 'Сила атаки', weapon_damage: 'Шкода зброї',

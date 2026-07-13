@@ -173,6 +173,7 @@ export default {
       // mantiene: sigue en uso por fiches.js openMonsterFiche (sección de
       // lore de la ficha de monstruo), sin relación con esta sección retirada.
       bestiaryZonesN: n => `${n} zonas`,
+      monsterFoundInTitle: 'Se encuentra en',
       lootTableItemsN: n => `Contenido (${n})`,
       probableLootTitle: 'Botín probable',
       probableLootNote: name => `Tabla «${name}» asociada por tipo de contenedor — confirmar en el juego.`,
@@ -451,6 +452,19 @@ export default {
       familyFicheKind: 'Familia de monstruos',
       familyMembersTitle: n => `Especies (${n})`,
       familyQuestsN: n => `Misiones para esta familia (${n})`,
+      // Ficha de especie de fauna (wildlife_species.bin, fiches.js
+      // openWildlifeFiche): una página real de un animal — nombre + familia +
+      // método de despiece + su botín. «Dónde encontrarlos» es HONESTO: una
+      // especie ligada a un campamento (pavo/conejo/…) usa el punto de especie
+      // de su cabecera; una especie sin campamento (tortugas/vaca/…) no tiene
+      // punto preciso, solo el conjunto genérico «Animales pacíficos» — ofrecido
+      // como interruptor, nunca un punto concreto presentado como el animal.
+      wildlifeFicheKind: 'Fauna',
+      wildlifeVariants: list => `Variantes: ${list}`,
+      wildlifeWhereTitle: 'Dónde encontrarlos',
+      wildlifeCampedNote: (n, p) => `Aparece en ${n} campamento${n === 1 ? '' : 's'} (${p} puntos en este mapa) — usa el punto junto al título para mostrarlos.`,
+      wildlifePeacefulNote: 'No se conoce ninguna posición por especie: esta especie aparece entre los animales pacíficos. Muestra esas zonas de aparición:',
+      wildlifeNoZonesNote: 'No se conocen zonas de aparición en este mapa.',
       abilityLabel: 'Habilidad',
       // EntityRef (◇, js/mapref.js — ola 0): frases a11y/title de los dos
       // objetivos de clic (punto = mostrar/ocultar, etiqueta = abrir la
@@ -760,6 +774,9 @@ export default {
     },
     harvestMethod: {
       Flayer: 'Desuello', Herbalism: 'Herboristería', Lumberjack: 'Tala', Miner: 'Minería',
+      // Tokens de despiece de la fauna (wildlife_species.bin harvestMethod):
+      // tokens de motor en minúsculas, distintos de Flayer/Lumberjack de arriba.
+      butchering: 'Desuello', logging: 'Tala',
     },
     statLabel: {
       health: 'Salud', attack_power: 'Poder de ataque', weapon_damage: 'Daño de arma',
