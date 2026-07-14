@@ -112,8 +112,11 @@ const CAMP_COLORS = {
   // concepts distincts, une seule couleur. Décalé vers un or-bronze foncé
   // distinct (le conteneur garde son or clair #ffd166) : harmonieux avec l'ADN
   // ambre, et la couche camp étant DÉCOCHÉE par défaut, zéro changement au boot.
-  // (Le renommage du LIBELLÉ « searchable » → « Loot camp » reste une vague
-  // dédiée — blueprint R2 ; ici on ne casse que l'égalité de couleur.)
+  // (Le renommage du LIBELLÉ « searchable » est TRANCHÉ — décision ratifiée #4,
+  // 2026-07-14 : la ligne d'arbre/légende dit le CONTENU joueur « Coffres &
+  // corps fouillables » (i18n searchSpotsRow ×5 — vérifié sur camps.bin :
+  // 9 pools de coffres fouillables + 3 pools de corps), jamais la piste
+  // « Loot camp »/« Camp de butin » du blueprint R2, abandonnée.)
   searchable: '#c9982e', destroyable: '#e07a5f',
   reactive: '#06d6a0', shrines: '#bdb2ff', soulkeeper: '#7b2cbf',
   quest: '#c77dff', guards: '#778da9', event: '#f4a259', other: '#6c757d',

@@ -149,6 +149,67 @@ function familyCampSet(family) {
 }
 function familyPoints(family) { return pointsOfCampSet(familyCampSet(family)); }
 
+/* ── Exceptions PAR-ENTITÉ (arbre Option A+, décision ratifiée 2026-07-14) ──
+   L'arbre Monstres vit au grain FAMILLE (« l'arbre reflète ce qui se
+   dessine ») ; une espèce n'y garde une ligne propre QUE si ses camps
+   résolus diffèrent RÉELLEMENT de ceux de sa famille — critère CALCULÉ ici
+   (comparaison des ensembles de camps, jamais une liste en dur) :
+     exception ⇔ speciesCampSet(id) NON VIDE et ≠ familyCampSet(famille).
+   Comme chaque ensemble d'espèce est un sous-ensemble de l'union famille,
+   l'égalité de TAILLE équivaut à l'égalité d'ensemble (comparaison exacte,
+   pas une heuristique). Byte-prouvé sur les bins expédiés : 0 exception sur
+   Kwalat (imp 397 clés → 4 camps au roster identique, wolf/scrag/goblin
+   idem — le dot par-espèce y était un demi-mensonge), 11 exceptions sur
+   Extraction_Island_large (famille werewolf scindée 3/6 camps). Une espèce
+   0-camp n'est PAS une exception (rien à dessiner — elle vit dans la fiche
+   famille et la recherche, plus dans l'arbre). Un id HORS catalogue
+   (token wild de camp_details — turkey/rabbit/…) est par nature au grain
+   espèce : isSpeciesException → true.
+   Table paresseuse, mêmes invalidations que familyTable (+ S.campDetails,
+   dont dépend le canal wild de speciesCampSet). */
+let _excTable = null, _excCamps = null, _excSpecies = null, _excDetails = null, _excDev = null;
+function exceptionTable() {
+  if (_excTable && _excCamps === S.camps && _excSpecies === S.species
+      && _excDetails === S.campDetails && _excDev === S.devOn) return _excTable;
+  const famSize = new Map();   // famille -> taille de l'union de camps
+  const spSize = new Map();    // spId -> taille de son ensemble (non vide seulement)
+  const famSets = new Map();
+  for (const [id, sp] of Object.entries(S.species || {})) {
+    if (isHiddenTest(sp)) continue;
+    const set = speciesCampSet(id);
+    if (!set.size) continue;
+    spSize.set(id, set.size);
+    const fam = familyKey(sp.family || 'other');
+    let fs = famSets.get(fam);
+    if (!fs) famSets.set(fam, fs = new Set());
+    for (const k of set) fs.add(k);
+  }
+  for (const [fam, fs] of famSets) famSize.set(fam, fs.size);
+  const byFam = new Map();     // famille -> [spId…] exceptions
+  for (const [id, size] of spSize) {
+    const fam = familyKey((S.species[id].family) || 'other');
+    if (size === famSize.get(fam)) continue;   // ensemble ≡ union famille : pas une exception
+    let arr = byFam.get(fam);
+    if (!arr) byFam.set(fam, arr = []);
+    arr.push(id);
+  }
+  _excTable = byFam;
+  _excCamps = S.camps; _excSpecies = S.species; _excDetails = S.campDetails; _excDev = S.devOn;
+  return byFam;
+}
+/* Espèces exception d'une famille sur la carte ACTIVE ([] si aucune). */
+function familyExceptionSpecies(family) {
+  return exceptionTable().get(familyKey(family)) || [];
+}
+/* Une espèce garde-t-elle son grain propre ? (exception calculée, ou token
+   hors catalogue — wild — qui n'a pas de famille dans l'arbre). */
+function isSpeciesException(spId) {
+  const sp = (S.species || {})[spId];
+  if (!sp) return true;   // token wild/hors catalogue : grain espèce par nature
+  const fam = familyKey(sp.family || 'other');
+  return (exceptionTable().get(fam) || []).includes(spId);
+}
+
 /* ── Kind → espèces jointes / camps « non identifiés » (IA finale) ───────
    Miroir data-native des kinds moteur dans le panneau (sous-groupes
    Monsters/Creeps/Wildlife, sidebar.js) : pour chaque kind de camp,
@@ -262,6 +323,7 @@ function qaoPoints(sel) {
 export {
   campGroupByKey, speciesCampSet, speciesPoints,
   familyCampSet, familyPoints, monsterFamilies,
+  familyExceptionSpecies, isSpeciesException,
   wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints,
   qaoPoints,
 };

@@ -2373,6 +2373,18 @@ button.rar-pill:hover {
   vertical-align: middle;
 }
 
+/* Fiche famille (Option A+, 2026-07-14) : sous-ligne types/couleurs d'un
+   membre — tags officiels du client (fiches/entity.js memberRow), rendue
+   SOUS la ligne .fam-member correspondante, alignée sur son libellé (retrait
+   = icône 20px + gap). Discrète (muted, plus petite que la méta) : c'est de
+   la taxonomie de référence, jamais un fait de gameplay saillant. */
+.fam-member-sub {
+  margin: -4px 0 8px 30px;
+  font-size: .66rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* ── Badge — la SEULE vocabulaire d'honnêteté (blueprint §5.2, wave E'c-1) ───
    ─────────────────────────────────────────────────────────────────────────
    Un composant (fiches/core.js badge()) qui remplace les TROIS systèmes

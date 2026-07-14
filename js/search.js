@@ -750,11 +750,14 @@ function buildMonsterSearchIndex() {
     const ctx = repM.family ? `${tr('speciesFamilyOf', pretty(repM.family))} · ${campsCtx}` : campsCtx;
     // Clic-double-effet (même modèle EXACT que les chips d'entité de
     // fiche/quête, décision utilisateur  — étendu ici à la
-    // recherche, mission "search activation") : ouvre la fiche ET coche le
-    // nœud ESPÈCE de l'arbre (auto-dépliage de sa famille) quand un
-    // point-set existe (js/layeractivate.js activateSpeciesLayer, résolveur
-    // d'orchestration PARTAGÉ avec main.js — jamais une seconde composition
-    // du même geste) ; sinon fiche seule, comme avant cette passe — le clic
+    // recherche, mission "search activation") : ouvre la fiche ET active le
+    // BON nœud de l'arbre quand un point-set existe (js/layeractivate.js
+    // activateSpeciesLayer, résolveur d'orchestration PARTAGÉ avec main.js —
+    // jamais une seconde composition du même geste). GRAIN Option A+
+    // (2026-07-14) : pour une espèce NON-exceptionnelle (camps ≡ famille,
+    // critère calculé pointsets.js), c'est la ligne FAMILLE qui se coche —
+    // même état partagé, plus de dot par-espèce menteur ; une exception
+    // (camps propres) garde sa ligne espèce. Sinon fiche seule — le clic
     // n'est jamais mort.
     const open = () => {
       openMonsterFiche(repKey);
@@ -1297,12 +1300,20 @@ function runSearch(raw) {
   // search_index). On garde la meilleure occurrence (déjà triée).
   const seen = new Set();
   const out = [];
+  // Plafond de résultats 40 (était 24 — investigation XFAIL « Alpha Undead
+  // Wolf » 2026-07-14) : sur une requête-mot très partagée (« wolf » : 56
+  // titres au mot exact après la regen du 13/07, qui a nommé proprement des
+  // camps « Hunger Wolf »/« Undead Wolf Pearl »…), le tri score-puis-longueur
+  // évinçait silencieusement des ENTITÉS réelles au-delà du 24ᵉ rang — la 7ᵉ
+  // espèce wolf (score 0, titre long) sortait de la liste alors qu'elle est
+  // bel et bien indexée. 40 redonne la marge (le dropdown défile déjà,
+  // style.css #search-results max-height) sans rien changer au classement.
   for (const s of scored) {
     const k = searchDedupKey(s.it);
     if (seen.has(k)) continue;
     seen.add(k);
     out.push({ ...s.it, bodyHit: s.bodyHit });
-    if (out.length >= 24) break;
+    if (out.length >= 40) break;
   }
   return out;
 }

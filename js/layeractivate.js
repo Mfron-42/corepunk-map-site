@@ -21,18 +21,34 @@ import { ensureSpeciesOn, setFamilyOn } from './specieslayer.js';
 import { buildFilters, revealMonsterNode } from './sidebar.js';
 import { scheduleRedraw } from './mapview.js';
 import { syncHash } from './urlstate.js';
+import { S } from './state.js';
+import { isSpeciesException, speciesPoints } from './pointsets.js';
 
-/* Espèce cochable (id = clé S.species, y compris les tokens WILD partagés
+/* Espèce activable (id = clé S.species, y compris les tokens WILD partagés
    par les espèces de faune/creeps sans record species.bin — voir
-   pointsets.js speciesCampSet/wildSpeciesIndex, même espace de noms) : la
-   couche vit au grain ESPÈCE (référence canonique, priorité MAXIMALE du
-   compositeur — espèce > famille > kind). ENSURE (jamais un toggle — le
-   décochage appartient à la case de l'arbre, voir specieslayer.js
-   ensureSpeciesOn) : re-cliquer un chip/résultat déjà coché re-révèle
-   simplement la ligne, jamais un doublon. */
+   pointsets.js speciesCampSet/wildSpeciesIndex, même espace de noms).
+   GRAIN (arbre Option A+, décision ratifiée 2026-07-14) : une espèce
+   catalogue NON-exceptionnelle — ses camps résolus sont EXACTEMENT ceux de
+   sa famille, critère calculé pointsets.js isSpeciesException — active la
+   FAMILLE (setFamilyOn, le même état partagé que la case famille de
+   l'arbre) : « plus de mensonge par-espèce » — activer « Imp witch » ou
+   « Imp executioner » allumait déjà byte-identiquement les mêmes camps,
+   seul l'affichage prétendait le contraire. Une espèce EXCEPTION (camps
+   propres prouvés — boss/scission de camps, ex. werewolf sur l'île) ou un
+   token wild garde le grain espèce historique (ensureSpeciesOn, ligne
+   propre dans l'arbre). Une espèce 0-camp (rien à dessiner) garde aussi
+   l'ENSURE espèce historique : aucune couche ne s'allume, mais on ne
+   propage jamais l'activation à une famille que la donnée ne justifie pas.
+   ENSURE (jamais un toggle — le décochage appartient à la case de l'arbre) :
+   re-cliquer un chip/résultat déjà actif re-révèle simplement la ligne. */
 function activateSpeciesLayer(spId) {
+  const sp = S.species?.[spId];
+  if (sp && !isSpeciesException(spId) && speciesPoints(spId)) {
+    activateFamilyLayers([sp.family || 'other']);
+    return;
+  }
   ensureSpeciesOn(spId);
-  buildFilters();                       // la sous-ligne espèce apparaît (famille auto-dépliée)
+  buildFilters();                       // la sous-ligne espèce (exception) apparaît
   scheduleRedraw();                     // compositeur (points) — priorité espèce, POINTS SEULS
   syncHash();                           // `on=monsp.<id>` (lien partageable)
   revealMonsterNode('species', spId);

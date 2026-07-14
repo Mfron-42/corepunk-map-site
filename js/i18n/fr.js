@@ -74,7 +74,12 @@ export default {
       // mais les ZONES de spawn sont réelles, donc une couche à part entière
       // « Animaux paisibles », pas un compte « donnée manquante ».
       wildlifeRestRow: 'Animaux paisibles',
-      searchSpotsRow: 'Points de fouille (camps)',
+      // Décision ratifiée #4 (2026-07-14) : le libellé de la ligne/légende dit
+      // le CONTENU joueur que la couche dessine réellement — vérifié sur
+      // camps.bin : 12 pools `searchable` = 9 pools de coffres fouillables
+      // (7 845 pts) + 3 pools de corps fouillables (814 pts) — jamais la
+      // taxonomie interne (« points de fouille »/« camp de butin » retirés).
+      searchSpotsRow: 'Coffres & corps fouillables',
       destroyableCampsRow: 'Destructibles (camps)',
       reactiveCampsRow: 'Interactifs (camps)',
       // (pinFiltersTitle retiré avec le concept abandonné de filtres épinglés
@@ -475,6 +480,14 @@ export default {
       familyFicheKind: 'Famille de monstres',
       familyMembersTitle: n => `Espèces (${n})`,
       familyQuestsN: n => `Quêtes pour cette famille (${n})`,
+      // Fiche famille = LA page de bestiaire (arbre Option A+, 2026-07-14) :
+      // sections subRole (tags officiels du client — jetons bruts prettifiés,
+      // jamais une traduction inventée) + panier « autres membres » des
+      // familles mixtes + note de provenance officielle ; familyTypesTitle =
+      // l'info-bulle de la ligne types/couleurs par membre.
+      familyMembersOther: n => `Autres membres (${n})`,
+      familyOfficialTagsNote: 'Tag officiel du client (Boss/Servant/Witch…) — lu tel quel des données du jeu, jamais inventé.',
+      familyTypesTitle: 'Types/skins et couleurs officiels de cette espèce (tags client ; les couleurs suivent le niveau des spawns).',
       // Fiche « espèce de faune » (wildlife_species.bin, fiches.js
       // openWildlifeFiche) : une vraie page pour un animal — nom + famille +
       // méthode de dépeçage + son butin. « Où les trouver » est HONNÊTE : une
@@ -827,6 +840,16 @@ export default {
       neutral: 'Neutre', neutralTip: 'N’attaque que si on le provoque.',
       hostile: 'Hostile', hostileTip: 'Attaque le joueur à vue.',
       other: 'Disposition', otherTip: 'Posture envers le joueur.',
+    },
+    // Couleurs de variante de monstre (monsters.bin `colors` — teintes de
+    // skin cosmétiques, corrélées au niveau des spawns ; lignes membre de la
+    // fiche famille) : des MOTS de couleur génériques, localisables sans
+    // risque — pas du vocabulaire de taxonomie du jeu (contrairement aux
+    // tokens famille/type/subRole, gardés bruts, GLOSSARY-PENDING).
+    monsterColor: {
+      brown: 'Brun', blue: 'Bleu', gray: 'Gris', green: 'Vert', red: 'Rouge',
+      yellow: 'Jaune', orange: 'Orange', white: 'Blanc', black: 'Noir',
+      purple: 'Violet', pink: 'Rose',
     },
     // Familles de décor (chests.bin group="decor" par family, + "legacy"
     // pour group="legacy_chest") : sous-lignes du groupe repliable "Décor"

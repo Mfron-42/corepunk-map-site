@@ -53,7 +53,10 @@ export default {
       // pero las ZONAS de aparición son reales — capa propia « Animales
       // pacíficos », no un recuento de « datos faltantes ».
       wildlifeRestRow: 'Animales pacíficos',
-      searchSpotsRow: 'Puntos de registro (campamentos)',
+      // Decisión ratificada #4 (2026-07-14): la etiqueta dice el CONTENIDO
+      // para el jugador que la capa dibuja realmente (9 pools de cofres
+      // registrables + 3 de cuerpos), nunca la taxonomía interna.
+      searchSpotsRow: 'Cofres y cuerpos registrables',
       destroyableCampsRow: 'Destructibles (campamentos)',
       reactiveCampsRow: 'Interactivos (campamentos)',
       // (pinFiltersTitle retirado con el concepto abandonado de filtros anclados.)
@@ -456,6 +459,14 @@ export default {
       familyFicheKind: 'Familia de monstruos',
       familyMembersTitle: n => `Especies (${n})`,
       familyQuestsN: n => `Misiones para esta familia (${n})`,
+      // Ficha de familia = LA página de bestiario (árbol Opción A+, 2026-07-14):
+      // secciones por subRole (tags oficiales del cliente — tokens en bruto,
+      // nunca una traducción inventada) + cajón «otros miembros» + nota de
+      // procedencia oficial; familyTypesTitle = tooltip de la línea
+      // tipos/colores por miembro.
+      familyMembersOther: n => `Otros miembros (${n})`,
+      familyOfficialTagsNote: 'Tag oficial del cliente (Boss/Servant/Witch…) — leído tal cual de los datos del juego, nunca inventado.',
+      familyTypesTitle: 'Tipos/aspectos y colores oficiales de esta especie (tags del cliente; los colores siguen el nivel de los spawns).',
       // Ficha de especie de fauna (wildlife_species.bin, fiches.js
       // openWildlifeFiche): una página real de un animal — nombre + familia +
       // método de despiece + su botín. «Dónde encontrarlos» es HONESTO: una
@@ -787,6 +798,15 @@ export default {
       neutral: 'Neutral', neutralTip: 'Solo ataca si se le provoca.',
       hostile: 'Hostil', hostileTip: 'Ataca al jugador en cuanto lo ve.',
       other: 'Disposición', otherTip: 'Actitud hacia el jugador.',
+    },
+    // Colores de variante de monstruo (monsters.bin `colors` — tintes de
+    // aspecto cosméticos, correlacionados con el nivel de los spawns; líneas
+    // de miembro de la ficha de familia): PALABRAS de color genéricas,
+    // localizables sin riesgo — no vocabulario de taxonomía del juego.
+    monsterColor: {
+      brown: 'Marrón', blue: 'Azul', gray: 'Gris', green: 'Verde', red: 'Rojo',
+      yellow: 'Amarillo', orange: 'Naranja', white: 'Blanco', black: 'Negro',
+      purple: 'Morado', pink: 'Rosa',
     },
     // Familias de decoración (chests.bin group="decor" por family, +
     // "legacy" para group="legacy_chest") — sub-filas del grupo plegable

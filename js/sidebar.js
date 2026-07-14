@@ -16,6 +16,7 @@ import { whenDeferred, deferredReady } from './data.js';
 import { isHiddenTest, positionCounts } from './devcontent.js';
 import {
   monsterFamilies, speciesPoints, campGroupByKey, wildSpeciesOfKind, kindRestPoints,
+  familyExceptionSpecies,
 } from './pointsets.js';
 import { setFamilyOn, toggleSpecies } from './specieslayer.js';
 import { openWildlifeFiche } from './fiches.js';
@@ -315,24 +316,25 @@ function decorRow(fam, extraClass = 'filter-row-sub') {
    eux-mêmes ont suivi le 2026-07-11 avec la barre « Par famille », jugée
    inutile par l'utilisateur — la cascade des pastilles couvre le besoin.) */
 
-/* ── L'arbre EST le bestiaire (#82 chunk (d), décision utilisateur) ──────
-   Chaque ligne famille du groupe Monsters (rendue DIRECTEMENT dans le
-   groupe racine, voir buildGroupMonsters plus bas — correction de
-   structure 2026-07-11) est un NŒUD DÉPLIABLE :
-   le chevron déplie (rendu PARESSEUX — jamais les ~224 espèces d'un coup)
-   les sous-lignes ESPÈCE de la famille, chacune avec sa case (couche
-   espèce, S.monsp — POINTS seulement, voir specieslayer.js ; plus de ZONE
-   dessinée par camp depuis le retrait du hull convexe, même décision), son
-   nom cliquable → sa fiche (la fonction bestiaire), et sa méta honnête
-   « N camps · M pts » (les points des CAMPS où elle PEUT apparaître, design
-   §13.1) ou « 0 camp » grisé (93/209 espèces sans camp joint : listées
-   quand même — l'accès fiche est la raison d'être — cocher n'allume rien
-   et la méta le dit, jamais masquées). TOUTES les familles du catalogue
-   sont listées (celles sans camp sur la carte active aussi, grisées
-   « 0 camp ») pour que les 224 espèces restent parcourables. État de
-   dépliage : session seule (expandedFams) ; une famille avec ≥1 espèce
-   cochée se déplie d'elle-même à chaque rebuild (la ligne cochée doit
-   rester visible — hash restauré, clic de chip). */
+/* ── L'arbre reflète ce qui se DESSINE (Option A+, décision ratifiée
+   2026-07-14 — supersède « l'arbre EST le bestiaire » #82 chunk (d)) ──────
+   Le groupe Monsters vit au grain FAMILLE : une ligne par famille AVEC
+   camps sur la carte active (monsterFamilies), dot = ses camps. Les lignes
+   ESPÈCE sont SORTIES de l'arbre SAUF exceptions par-entité : une espèce
+   dont les camps résolus diffèrent RÉELLEMENT de ceux de sa famille
+   (critère CALCULÉ — pointsets.js familyExceptionSpecies, comparaison des
+   ensembles de camps, jamais une liste en dur ; byte-prouvé : 0 exception
+   sur Kwalat, 11 sur l'île — famille werewolf scindée 3/6 camps). Une
+   famille AVEC exceptions garde le nœud dépliable (chevron → sous-lignes
+   des seules exceptions, rendu paresseux) ; sans exception, ligne plate.
+   Les lignes « 0 camp » grisées de catalogue (familles ET espèces) sont
+   DÉPLACÉES : la recherche et la fiche famille sont le bestiaire exhaustif,
+   l'arbre ne l'est plus. Le dot par-espèce des familles homogènes était un
+   demi-mensonge prouvé (imp 397 clés → 4 camps au roster byte-identique) —
+   l'activation d'une espèce non-exceptionnelle passe au même état FAMILLE
+   partagé (layeractivate.js/main.js). État de dépliage : session seule
+   (expandedFams) ; une famille avec ≥1 exception cochée se déplie
+   d'elle-même à chaque rebuild (la ligne cochée doit rester visible). */
 const expandedFams = new Set();
 
 /* Espèces du catalogue GLOBAL groupées par famille (post-alias), triées
@@ -428,14 +430,22 @@ function speciesRowLi(id, sp, zeroMetaKey = 'speciesZeroCamps') {
   });
   return li;
 }
+/* Sous-lignes d'un nœud famille = ses seules espèces EXCEPTION (Option A+ —
+   camps propres prouvés, pointsets.js familyExceptionSpecies), dans l'ordre
+   de speciesByFamily (niveau puis nom). Les autres espèces n'ont plus de
+   ligne : leur état EST celui de la famille (même ensemble de camps). */
 function buildSpeciesSublist(fam) {
   const ul = document.createElement('ul');
   ul.className = 'species-sublist';
-  for (const { id, sp } of speciesByFamily().get(fam) || []) ul.appendChild(speciesRowLi(id, sp));
+  const exc = new Set(familyExceptionSpecies(fam));
+  for (const { id, sp } of speciesByFamily().get(fam) || []) {
+    if (exc.has(id)) ul.appendChild(speciesRowLi(id, sp));
+  }
   return ul;
 }
 /* Chevron de dépliage d'un nœud famille — bouton DANS le <label> de la
-   ligne (preventDefault : ne doit jamais basculer la case de la famille). */
+   ligne (preventDefault : ne doit jamais basculer la case de la famille).
+   Posé UNIQUEMENT sur une famille à ≥1 exception (voir familyRowLi). */
 function attachFamilyNode(li, fam) {
   li.dataset.fam = fam;
   const row = li.querySelector('.filter-row');
@@ -475,9 +485,16 @@ function attachFamilyNode(li, fam) {
    #group-monsters-list. AUCUN mouvement caméra (le geste caméra
    reste goto/zone). */
 function revealMonsterNode(kind, id) {
-  const target = kind === 'species'
+  let target = kind === 'species'
     ? document.querySelector(`#filters li[data-species="${CSS.escape(id)}"] .species-row`)
     : document.querySelector(`#filters li[data-fam="${CSS.escape(id)}"] .filter-row`);
+  // Option A+ : une espèce sans ligne propre (non-exceptionnelle — l'arbre
+  // vit au grain famille) révèle la ligne de SA FAMILLE, qui EST son état.
+  if (!target && kind === 'species') {
+    const sp = S.species?.[id];
+    const fam = sp ? familyKey(sp.family || 'other') : null;
+    if (fam) target = document.querySelector(`#filters li[data-fam="${CSS.escape(fam)}"] .filter-row`);
+  }
   if (!target) return;
   for (let el = target.parentElement; el; el = el.parentElement) {
     if (el.tagName === 'DETAILS' && !el.open) el.open = true;
@@ -509,13 +526,16 @@ function famCampsMeta(nCamps) {
 }
 /* Ligne FAMILLE partagée (groupe Monsters + copies MIROIR Creeps) : couche
    S.monfam + parent de cascade (setFamilyOn — cocher coche toutes ses
-   espèces). `withNode` : le nœud dépliable espèces (chevron droit,
-   attachFamilyNode) ne vit QUE dans le groupe Monsters — les copies miroir
-   du groupe Creeps restent plates (le détail par espèce n'est jamais
-   dupliqué). Après un geste : rebuild du groupe Monsters (les sous-lignes
-   espèce dépliées doivent refléter la cascade) — les copies miroir se
-   resynchronisent par refreshParentChecks (déjà joué par l'écouteur
-   générique de filterRow après ce callback). */
+   espèces). `withNode` : le nœud dépliable ne vit QUE dans le groupe
+   Monsters — les copies miroir du groupe Creeps restent plates. Option A+ :
+   même dans Monsters, le chevron n'apparaît QUE si la famille a ≥1 espèce
+   EXCEPTION (camps propres prouvés — familyExceptionSpecies) ; une famille
+   homogène est une ligne PLATE (le détail par espèce serait N copies du
+   même dot, le demi-mensonge que cette refonte retire). Après un geste :
+   rebuild du groupe Monsters (les sous-lignes exception dépliées doivent
+   refléter la cascade) — les copies miroir se resynchronisent par
+   refreshParentChecks (déjà joué par l'écouteur générique de filterRow
+   après ce callback). */
 function familyRowLi(fam, f, hex, withNode) {
   const st = S.monfam[fam] || (S.monfam[fam] = { on: false });
   const zero = !f.nPts;
@@ -525,8 +545,8 @@ function familyRowLi(fam, f, hex, withNode) {
     buildGroupMonsters();
   }, 'filter-row-sub' + (zero ? ' fam-zero' : ''), { kind: 'family', mode: 'E' });
   row.querySelector('.flabel').insertAdjacentHTML('afterend', famCampsMeta(f.nCamps));
-  if (withNode) return attachFamilyNode(row, fam);
-  row.dataset.fam = fam;   // copie miroir : resynchronisée par refreshParentChecks
+  if (withNode && familyExceptionSpecies(fam).length) return attachFamilyNode(row, fam);
+  row.dataset.fam = fam;   // ligne plate/copie miroir : resynchronisée par refreshParentChecks
   return row;
 }
 /* Ligne « reste » d'un kind : les camps du kind SANS aucune espèce jointe
@@ -1313,23 +1333,21 @@ function buildGroupWorld() {
     ul.appendChild(grp.li);
   }
 }
-/* ── Groupe « Monsters » (racine — correction structure 2026-07-11) : les
-   lignes FAMILLE directement dans le groupe (nœuds dépliables → sous-lignes
-   espèce, chevron droit .fam-expand), triées camps joints d'abord (rang =
-   couleur, design §4.3) puis les familles catalogue SANS camp ici
-   (alphabétiques, grisées « 0 camp » — listées quand même : l'arbre est le
-   bestiaire, chunk (d)). Total BRUT affiché par ligne (camps · points — ce
-   qu'elle allumerait seule) : rat et ratmutant partagent les 10 mêmes camps
-   et affichent chacun 4 045, assumé (données réelles, design §13.3) ; le
-   dédoublonnage est un fait de RENDU (main.js compositeCampPoints, priorité
-   espèce > famille > kind), jamais de comptage. La barre « Par famille » +
-   [Tous][Aucun] est RETIRÉE (« useless », correction utilisateur — la
-   cascade des pastilles couvre tout-cocher/tout-décocher). Dernière ligne :
+/* ── Groupe « Monsters » (racine — Option A+, décision ratifiée 2026-07-14,
+   supersède la structure bestiaire 2026-07-11) : les lignes FAMILLE avec
+   camps ICI directement dans le groupe (triées points décroissants — rang =
+   couleur, design §4.3). Nœud dépliable (.fam-expand) UNIQUEMENT pour une
+   famille à ≥1 espèce EXCEPTION (camps propres prouvés) ; les familles
+   « 0 camp » de catalogue ne sont PLUS listées (l'arbre reflète ce qui se
+   dessine — le bestiaire exhaustif vit dans la recherche + les fiches
+   famille, openFamilyFiche). Total BRUT affiché par ligne (camps · points —
+   ce qu'elle allumerait seule) : rat et ratmutant partagent les 10 mêmes
+   camps et affichent chacun 4 045, assumé (données réelles, design §13.3) ;
+   le dédoublonnage est un fait de RENDU (main.js compositeCampPoints,
+   priorité espèce > famille > kind), jamais de comptage. Dernière ligne :
    « Spawns non identifiés » (camps monsters SANS espèce jointe, rest-only —
-   remplace l'ancienne bascule grossière « Camps de monstres », dont le
-   compte incluait des camps déjà couverts par les familles ; la règle
-   rest-only est universelle et data-dérivée, la couche dessine EXACTEMENT
-   ce compte — voir main.js compositeCampPoints).
+   la règle rest-only est universelle et data-dérivée, la couche dessine
+   EXACTEMENT ce compte — voir main.js compositeCampPoints).
    GLOSSARY-PENDING : le nom affiché d'une famille est son token moteur
    prettifié (pretty(f.family) — « Boarmammoth », « Ratmutant »…) : AUCUNE
    table de localisation des familles n'existe dans les données expédiées ;
@@ -1340,18 +1358,18 @@ function buildGroupMonsters() {
   ul.innerHTML = '';
   if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
   const fams = monsterFamilies();               // familles AVEC camps joints ici (triées pts desc)
-  const byFam = speciesByFamily();              // TOUTES les familles du catalogue global
-  if (!fams.length && !byFam.size) return;
-  // Une famille avec ≥1 espèce cochée se déplie d'elle-même : la ligne cochée
-  // doit être VISIBLE (hash restauré, clic de chip — décision utilisateur
-  // « auto-expanding its family so the checked row is visible »).
-  for (const [fam, list] of byFam) {
-    if (list.some(({ id }) => S.monsp[id]?.on)) expandedFams.add(fam);
+  if (!fams.length) { appendKindRestRow(ul, 'monsters'); return; }
+  // Une famille avec ≥1 EXCEPTION cochée se déplie d'elle-même : la ligne
+  // cochée doit être VISIBLE (hash restauré, clic de chip). Seules les
+  // exceptions ont une sous-ligne — une espèce non-exceptionnelle cochée
+  // (lien legacy monsp.*) se lit sur l'état partiel de sa ligne famille.
+  for (const f of fams) {
+    if (familyExceptionSpecies(f.family).some(id => S.monsp[id]?.on)) expandedFams.add(f.family);
   }
-  const withCamps = new Set(fams.map(f => f.family));
-  const zeroFams = [...byFam.keys()].filter(f => !withCamps.has(f)).sort();
+  // Option A+ : SEULES les familles avec camps ici sont listées (l'arbre
+  // reflète ce qui se dessine) — les familles « 0 camp » de catalogue vivent
+  // dans la recherche et les fiches famille, plus dans l'arbre.
   for (const f of fams) ul.appendChild(familyRowLi(f.family, f, familyLayerHex(f.family), true));
-  for (const fam of zeroFams) ul.appendChild(familyRowLi(fam, { nCamps: 0, nPts: 0 }, familyLayerHex(fam), true));
   appendKindRestRow(ul, 'monsters');
 }
 /* ── Groupe « Creeps » (racine) : lignes famille MIROIR jointes au kind

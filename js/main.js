@@ -8,7 +8,7 @@
    coordonnées, hooks de bascule de carte, init. Seul module qui importe
    tout le monde ; aucune logique métier propre. */
 import { S } from './state.js';
-import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyLayerHex } from './config.js';
+import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyLayerHex, familyKey } from './config.js';
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
@@ -27,7 +27,7 @@ import {
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
-  campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys,
+  campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys, isSpeciesException,
 } from './pointsets.js';
 import { toggleSpecies, speciesCampWinner, setFamilyOn } from './specieslayer.js';
 import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
@@ -265,6 +265,25 @@ initMapRefDelegation(document, {
       case 'species': {
         const sp = S.monsters?.[info.key]?.species || info.key;
         if (!sp) break;
+        // GRAIN Option A+ (décision ratifiée 2026-07-14, symétrique de
+        // layeractivate.activateSpeciesLayer) : la pastille d'une espèce
+        // NON-exceptionnelle (camps ≡ ceux de sa famille, critère CALCULÉ —
+        // pointsets.js isSpeciesException) bascule la FAMILLE — le même état
+        // partagé que la case famille de l'arbre (setFamilyOn, cascade), plus
+        // jamais un état par-espèce que la donnée ne distingue pas. Exception
+        // (camps propres) / token wild / espèce 0-camp : grain espèce
+        // historique (toggleSpecies), inchangé.
+        const rec = S.species?.[sp];
+        if (rec && !isSpeciesException(sp) && speciesPoints(sp)) {
+          const fam = familyKey(rec.family || 'other');
+          const on = !S.monfam[fam]?.on;
+          setFamilyOn(fam, on);
+          buildFilters();
+          scheduleRedraw();
+          syncHash();
+          if (on) revealMonsterNode('family', fam);
+          break;
+        }
         const on = toggleSpecies(sp);
         buildFilters();
         scheduleRedraw();

@@ -17,7 +17,7 @@ import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js
 import { clearLocator } from '../pins.js';
 import { unfocus } from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems, dispositionFor, creepFor } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
+import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints, isSpeciesException } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs, visibleQuestSlugsSplit } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
@@ -839,7 +839,12 @@ function openMonsterFiche(key) {
   // reste, elle n'est pas redondante. Les zones ne vivent plus ici (section
   // « Présent dans » ci-dessous).
   const famBit = (m.family && fold(pretty(m.family)) !== fold(m.name)) ? pretty(m.family) : null;
-  const kindBits = [famBit, m.level != null ? tr('levelAbbrev', m.level) : null,
+  // subRole officiel du groupe (monsters.bin `subRole` — Boss/Servant/Elite/
+  // Swarm/Leaf, 153 groupes ; lecteur câblé 2026-07-14 = sortie du registre de
+  // dormance) : tag client BRUT prettifié dans le sous-titre — même doctrine
+  // GLOSSARY-PENDING que le token de famille juste au-dessus, jamais traduit.
+  const subRoleBit = m.subRole ? pretty(m.subRole) : null;
+  const kindBits = [famBit, subRoleBit, m.level != null ? tr('levelAbbrev', m.level) : null,
     m.attack ? monsterAttackLabel(m.attack) : null].filter(Boolean);
   // « Présent dans » : une référence [Zone(●)] par région. La PASTILLE dessine
   // CE polygone de région (ref-draw, subrole « monster-zone » → drawNamedZone,
@@ -1022,6 +1027,11 @@ function openMonsterFiche(key) {
    l'arbre (family-layer, cascade — familyLayerActivateBtn, même modèle que
    les chips de quête). Repli honnête : une famille sans AUCUN membre
    catalogue (jeton inconnu) n'ouvre pas de fiche (jamais une page vide). */
+/* Ordre de rendu FIXE des sections subRole (déterministe, du plus saillant
+   au plus générique) ; un token inconnu d'un futur build se range après,
+   alphabétique — jamais masqué. */
+const FAMILY_SUBROLE_ORDER = ['Boss', 'Elite', 'Servant', 'Swarm', 'Leaf'];
+function familySubRoleRank(sr) { const i = FAMILY_SUBROLE_ORDER.indexOf(sr); return i < 0 ? 90 : i; }
 function familyMembers(fam) {
   const f = familyKey(fam);
   return Object.entries(S.species || {})
@@ -1092,26 +1102,88 @@ function openFamilyFiche(famKey) {
     hex: familyLayerHex(fam), hasFiche: false,
     drawable: !!famRes, count: famRes ? famRes.nPts : 0, drawn: !!S.monfam[fam]?.on,
   };
-  // Membres : portrait/glyphe + référence `[Espèce(●)] Nom` (la pastille
-  // remplace l'ex-bouton « Afficher · N pts » PAR MEMBRE, kill-list §7.2 :
-  // elle bascule SA couche de spawn ; nom souligné → fiche espèce quand une
-  // clé de spawn résout). `spId: id` garantit la résolution de couche même
-  // sans clé de spawn (le routeur fait key→species) ; niveau en méta.
-  const memberRows = members.map(({ id, sp }) => {
+  // ── Option A+ (décision ratifiée 2026-07-14) : la fiche famille est LA
+  // page de vérité du bestiaire — l'arbre latéral ne liste plus les espèces
+  // (sauf exceptions par-entité), c'est ICI que la taxonomie complète vit. ──
+  // Ligne membre : [Espèce] souligné → sa fiche ; DOT seulement si EXCEPTION
+  // par-entité (camps propres prouvés — pointsets.js isSpeciesException,
+  // critère CALCULÉ par comparaison des ensembles de camps) : pour tout
+  // autre membre, « son » dot serait celui de la famille (même ensemble de
+  // camps byte-identique), déjà porté par la pastille de l'en-tête — le
+  // rendre par membre était le demi-mensonge que cette refonte retire.
+  // Méta honnête : niveau + « N camps · M pts »/« 0 camp » (le rôle
+  // bestiaire quitté par l'arbre vit ici). Sous-ligne types/couleurs : tags
+  // OFFICIELS du client (m.types — Witch/Executor/… ; m.colors, corrélées au
+  // niveau des spawns), agrégés des spawns VISIBLES de l'espèce — tokens
+  // bruts prettifiés (GLOSSARY-PENDING, même doctrine que les noms de
+  // famille) ; les couleurs sont localisées (mots génériques, pas du
+  // vocabulaire de jeu).
+  const memberRow = ({ id, sp }) => {
     const repKey = speciesRepKey(sp);
     const icon = sp.portrait ? `icons/${sp.portrait}` : null;
     const mLvl = sp.levelMin != null
       ? (sp.levelMax != null && sp.levelMax !== sp.levelMin ? tr('levelRangeAbbrev', sp.levelMin, sp.levelMax) : tr('levelAbbrev', sp.levelMin))
       : '';
+    const res = speciesPoints(id);
+    const campsMeta = res
+      ? tr('speciesCampsPts', res.nCamps, res.nPts.toLocaleString(numberLocale()))
+      : tr('speciesZeroCamps');
+    const meta = [mLvl, campsMeta].filter(Boolean).join(' · ');
+    const exception = !!res && isSpeciesException(id);
     const devMark = sp.isTest ? `<span class="dev-mark" title="${esc(tr('devBadgeTitle'))}">${esc(tr('devBadge'))}</span>` : '';
+    const spRefHtml = ref({
+      kind: 'species', key: repKey || id, label: sp.name,
+      hex: speciesLayerHex(id), hasFiche: !!repKey,
+      drawable: exception, count: res ? res.nPts : 0,
+      drawn: exception && !!S.monsp[id]?.on, meta,
+    });
+    const types = new Set(), colors = new Set();
+    for (const s of sp.spawns || []) {
+      const mm = S.monsters[s.siteKey];
+      if (!mm || isHiddenTest(mm)) continue;
+      for (const t of mm.types || []) if (fold(t) !== fold(sp.name)) types.add(t);
+      for (const c of mm.colors || []) colors.add(c);
+    }
+    const typesTxt = [...types].map(pretty).join(' · ');
+    const colorsTxt = [...colors].map(c => tbl('monsterColor', c) || pretty(c)).join(' · ');
+    const subLine = (typesTxt || colorsTxt)
+      ? `<div class="fam-member-sub" title="${esc(tr('familyTypesTitle'))}">${esc([typesTxt, colorsTxt].filter(Boolean).join(' — '))}</div>` : '';
     return `<div class="frow fam-member">
       ${iconTag(icon, 'fr-icon', initials(sp.name))}
-      ${speciesRef({ key: repKey, spId: id, name: sp.name, meta: mLvl })}${devMark}
-    </div>`;
-  }).join('');
+      ${spRefHtml}${devMark}
+    </div>${subLine}`;
+  };
+  // Sections par subRole OFFICIEL (species.bin `subRole` — Boss/Elite/
+  // Servant/Swarm/Leaf ; lecteur câblé ici = ce champ SORT du registre de
+  // dormance  En-tête de section = le TAG
+  // BRUT prettifié (vocabulaire officiel du client — jamais une traduction
+  // inventée, GLOSSARY-PENDING) + compte exact + badge de provenance
+  // OFFICIELLE. Famille sans aucun subRole : section unique « Membres (N) »,
+  // identique à avant. Famille MIXTE : les membres sans subRole vont dans
+  // « Autres membres (N) » — jamais un membre silencieusement absent.
+  const bySub = new Map();
+  for (const mrec of members) {
+    const sr = mrec.sp.subRole || null;
+    let arr = bySub.get(sr);
+    if (!arr) bySub.set(sr, arr = []);
+    arr.push(mrec);
+  }
+  let membersHtml;
+  if (bySub.size === 1 && bySub.has(null)) {
+    membersHtml = `<div class="fiche-section"><h3>${esc(tr('familyMembersTitle', members.length))}</h3>${members.map(memberRow).join('')}</div>`;
+  } else {
+    const srKeys = [...bySub.keys()].filter(k => k != null)
+      .sort((a, b) => familySubRoleRank(a) - familySubRoleRank(b) || a.localeCompare(b));
+    const officialBadge = () => badge({ axis: 'provenance', value: 'official', extra: tr('familyOfficialTagsNote') });
+    membersHtml = srKeys.map(sr =>
+      `<div class="fiche-section"><h3>${esc(pretty(sr))} (${bySub.get(sr).length})${officialBadge()}</h3>${bySub.get(sr).map(memberRow).join('')}</div>`).join('');
+    if (bySub.has(null)) {
+      membersHtml += `<div class="fiche-section"><h3>${esc(tr('familyMembersOther', bySub.get(null).length))}</h3>${bySub.get(null).map(memberRow).join('')}</div>`;
+    }
+  }
   openFiche(`
     ${ficheHeader({ avatar: head, name: pretty(fam), hex: familyLayerHex(fam), dot: famDot, sub: esc(kindLine) })}
-    <div class="fiche-section"><h3>${esc(tr('familyMembersTitle', members.length))}</h3>${memberRows}</div>
+    ${membersHtml}
     ${familyScopeQuestRows(fam)}`);
   setFicheHash('family', fam);
 }

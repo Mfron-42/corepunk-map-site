@@ -69,7 +69,12 @@ export default {
       // are real, so this is a first-class « Peaceful animals » layer, not a
       // « missing data » count.
       wildlifeRestRow: 'Peaceful animals',
-      searchSpotsRow: 'Search spots (camps)',
+      // Ratified decision #4 (2026-07-14): the row/legend label says the
+      // PLAYER CONTENT the layer actually draws — verified on camps.bin:
+      // 12 `searchable` pools = 9 searchable-chest spawn pools (7 845 pts)
+      // + 3 searchable-corpse pools (814 pts) — never internal taxonomy
+      // ("search spots"/"loot camp" wordings retired).
+      searchSpotsRow: 'Searchable chests & corpses',
       destroyableCampsRow: 'Destroyables (camps)',
       reactiveCampsRow: 'Interactives (camps)',
       // (pinFiltersTitle removed with the abandoned separate pinned-filters
@@ -500,6 +505,14 @@ export default {
       familyFicheKind: 'Monster family',
       familyMembersTitle: n => `Species (${n})`,
       familyQuestsN: n => `Quests for this family (${n})`,
+      // Family fiche = THE bestiary page (tree Option A+, 2026-07-14):
+      // subRole sections (official client tags — raw tokens prettified,
+      // never an invented translation) + an "other members" bucket for mixed
+      // families + the official-tags provenance note; familyTypesTitle
+      // tooltips the per-member types/colors line.
+      familyMembersOther: n => `Other members (${n})`,
+      familyOfficialTagsNote: 'Official client tag (Boss/Servant/Witch…) — read as-is from the game data, never invented.',
+      familyTypesTitle: 'Official types/skins and colors of this species (client tags; colors correlate with spawn level).',
       // Wildlife-species fiche (wildlife_species.bin, fiches.js
       // openWildlifeFiche): a real page for a peaceful animal — name + family +
       // butchering method + its loot. "Where to find" is HONEST: a camp-bound
@@ -863,6 +876,15 @@ export default {
       neutral: 'Neutral', neutralTip: 'Won’t attack unless provoked.',
       hostile: 'Hostile', hostileTip: 'Attacks the player on sight.',
       other: 'Disposition', otherTip: 'Stance toward the player.',
+    },
+    // Monster color variants (monsters.bin `colors` — cosmetic skin tints,
+    // correlated with spawn level; family-fiche member lines): generic color
+    // WORDS, safely localized — NOT game taxonomy vocabulary (unlike the
+    // family/type/subRole tokens, which stay raw, GLOSSARY-PENDING).
+    monsterColor: {
+      brown: 'Brown', blue: 'Blue', gray: 'Gray', green: 'Green', red: 'Red',
+      yellow: 'Yellow', orange: 'Orange', white: 'White', black: 'Black',
+      purple: 'Purple', pink: 'Pink',
     },
     // Decor families (chests.bin group="decor" by family, + "legacy" for
     // group="legacy_chest") — sub-rows of the collapsible "Decor" group
