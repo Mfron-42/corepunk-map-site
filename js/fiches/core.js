@@ -342,10 +342,31 @@ function varPlaceholder(runtime, token) {
          avec un libellé distinct de « position dynamique » — ce n'est pas la
          même chose qu'un spawn serveur confirmé. */
 export let currentGoalZones = [];
-function resetGoalZones() { currentGoalZones = []; }      // search_zone actives de la fiche quête ouverte
+function resetGoalZones() { currentGoalZones = []; currentGoalZoneIdx = null; }      // search_zone actives de la fiche quête ouverte
 let goalZoneLayer = null;       // cercle dessiné pour la dernière zone consultée
+/* Index (dans currentGoalZones) de la zone d'objectif actuellement dessinée —
+   la pastille de SA référence passe ● pendant que la zone est visible (lot 4,
+   retour user 2026-07-14 « marked as pinable but doesnt show any point or
+   zone ») : sans ce retour d'état, un clic qui dessine des points discrets au
+   milieu des couches déjà affichées se lit comme un clic mort. null = aucune
+   zone d'objectif affichée. Machinerie single-slot inchangée (une seule zone
+   à la fois, effacée à la fermeture de fiche). */
+let currentGoalZoneIdx = null;
+/* Resynchronise les pastilles [Région(●)] goal-zone de la fiche ouverte sur
+   l'état réellement dessiné (data-fill + aria-pressed) — la SEULE écriture de
+   cet état ; jamais dérivé par surface (même contrat que syncEntityRefDots). */
+function syncGoalZoneDots() {
+  document.querySelectorAll('.ref[data-subrole="goal-zone"]').forEach(el => {
+    const on = currentGoalZoneIdx != null && +el.dataset.key === currentGoalZoneIdx;
+    const bub = el.querySelector('.ref-bubble');
+    if (bub) bub.dataset.fill = on ? 'on' : 'off';
+    const btn = el.querySelector('[data-act="ref-draw"]');
+    if (btn) btn.setAttribute('aria-pressed', String(on));
+  });
+}
 function clearGoalZone() {
   if (goalZoneLayer) { map.removeLayer(goalZoneLayer); goalZoneLayer = null; }
+  if (currentGoalZoneIdx != null) { currentGoalZoneIdx = null; syncGoalZoneDots(); }
 }
 /* `estimate` (repli d'une zone confiance MOYENNE dont le camp cité n'a pas pu
    être joint à un vrai point, voir drawEstimatedZone ci-dessous) : même
@@ -423,7 +444,27 @@ function drawEstimatedZone(sz) {
     return;
   }
   const pts = campPointsForZone(sz);
-  if (pts) { clearGoalZone(); showHighlight(pts, CATS.quest.hex); return; }
+  if (pts) {
+    clearGoalZone();
+    // Contour prudent AUTOUR des vrais points (lot 4, retour user 2026-07-14) :
+    // les points seuls (5.5 px, même gabarit que les couches NPC/POI déjà
+    // affichées) se fondaient dans la carte — le clic se lisait « rien ne se
+    // passe ». Le cercle pointillé prudent (mêmes réglages que drawGoalZone
+    // estimate:true) est calculé sur la bbox des points RÉELS (jamais la bbox
+    // devinée du pipeline) : une seule visualisation de zone — points + son
+    // contour — pas deux zones superposées.
+    const xs = pts.map(p => p.x), zs = pts.map(p => p.z);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+    const r = Math.max(35, Math.hypot(Math.max(...xs) - Math.min(...xs),
+                                      Math.max(...zs) - Math.min(...zs)) / 2 + 12);
+    goalZoneLayer = L.layerGroup([L.circle(toLL(cx, cz), {
+      radius: r, color: CATS.quest.hex, weight: 1.4, dashArray: '2 8',
+      fillColor: CATS.quest.hex, fillOpacity: .06, interactive: false,
+    })]).addTo(map);
+    showHighlight(pts, CATS.quest.hex);
+    return;
+  }
   clearHighlight();
   drawGoalZone(sz, { estimate: true });
 }
@@ -852,9 +893,14 @@ function farmCapRows(rows, renderRow, moreLabelFn) {
 function viewGoalZone(zi) {
   const sz = currentGoalZones[+zi];
   if (!sz) return;
-  if (sz.confidence === 'medium') { drawEstimatedZone(sz); return; }
-  clearHighlight();
-  drawGoalZone(sz);
+  // TOGGLE (lot 4) : re-cliquer la zone déjà affichée l'efface — même loi
+  // « la pastille bascule » que toutes les autres références dessinables ;
+  // l'état ● de la pastille suit via syncGoalZoneDots (clearGoalZone).
+  if (currentGoalZoneIdx === +zi) { clearHighlight(); clearGoalZone(); return; }
+  if (sz.confidence === 'medium') drawEstimatedZone(sz);
+  else { clearHighlight(); drawGoalZone(sz); }
+  currentGoalZoneIdx = +zi;
+  syncGoalZoneDots();
 }
 
 export {

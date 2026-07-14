@@ -88,7 +88,13 @@ function dynamicPosBadge(t, regionHint, itemKey) {
   if (t && t.kind === 'monster' && !t.camp) {
     return badge({ axis: 'precision', value: 'unlocated' });
   }
-  const region = regionHint ? ` <span class="pos-region">· ${esc(regionHint)}</span>` : '';
+  // Région GOAL-scopée (pipeline lot 3, t.region : la région que le texte de
+  // la quête nomme pour CET objectif — « Search Goldenfield… ») : prioritaire
+  // sur la région générique du journal (regionHint, qui peut n'être que
+  // l'adresse du donneur). Rendu inchangé : rappel muet d'orientation, jamais
+  // une zone dessinable (aucun point de spawn connu dans cette région).
+  const hint = (t && t.region) || regionHint;
+  const region = hint ? ` <span class="pos-region">· ${esc(hint)}</span>` : '';
   return `${badge({ axis: 'precision', value: 'unlocated' })}${region}`;
 }
 
