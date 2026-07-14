@@ -371,6 +371,19 @@ export default {
       // the reference always carries this explicit wording (or the real
       // region name when the zone IS a named region), never an empty tag.
       goalSearchZoneLabel: 'Estimated area',
+      // Precise container placements (search_zone.basis === "chest_placement"):
+      // the goal carries the REAL positions of the searchable containers
+      // (target.placements). The drawable chip's own label states the honest
+      // precision — "N locations" (never "Estimated area") — and its dot draws
+      // those exact points (campTrace). N = count of container spots.
+      goalLocationsN: n => `${n} locations`,
+      // Honest orientation hint (target.landmark) shown as muted meta beside the
+      // placements chip — never a pin. The shipped landmark is a guidance
+      // sentence (e.g. "…around Goldenfield…"), hence a neutral "Hint:" framing.
+      goalLandmarkLabel: s => `Hint: ${s}`,
+      // Safety cap on the DRAWN points (GOAL_PLACEMENT_CAP): honest "showing N of
+      // M" if a placement set ever exceeds the cap (current cases ≤ 44).
+      goalPlacementsCapped: (shown, total) => `showing ${shown} of ${total}`,
       // receive_reward mechanism (mechanism decode job A): the item is
       // granted by completing a DIFFERENT quest ('s reward_of), not
       // handed over by this quest's own giver — verb only, one clickable

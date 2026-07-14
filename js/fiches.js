@@ -12,6 +12,10 @@
    identique, gaté par  */
 export { closeFiche, itemColor, viewGoalZone, viewMonsterZone, drawNamedZone } from './fiches/core.js';
 export { openQuestFiche, flyToQuestZone } from './fiches/quest.js';
+// Bascule du tracé des placements exacts de conteneurs (chip step-guide
+// [Quest objects(●)] N locations) — routée par main.js ref-draw (subrole
+// "goal-placements"). Vit dans stepguide.js (état + rendu ensemble).
+export { toggleGoalPlacements } from './fiches/stepguide.js';
 export { openMonsterFiche, openFamilyFiche, openWildlifeFiche, openNpcFiche, openCampFiche } from './fiches/entity.js';
 export { openItemFiche, openRecipeFiche, openLootTableFiche, openNodeFiche, openAbilityFiche, setRollRarity } from './fiches/item.js';
 export { openChestFiche, openSearchableChestFiche, openLocationFiche } from './fiches/world.js';

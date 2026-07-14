@@ -16,7 +16,7 @@ import {
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
 import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
-import { clearLocator } from '../pins.js';
+import { clearLocator, addCampTrace, removeCampTrace } from '../pins.js';
 import { unfocus } from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
 import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
@@ -26,6 +26,90 @@ import { ref, refDot } from '../mapref.js';
 
 import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
+
+/* ── Placements EXACTS de conteneurs fouillables (search_zone.basis ===
+   "chest_placement") ────────────────────────────────────────────────────────
+   Un but collect_from_object / kill_collect-sur-conteneur porte parfois les
+   VRAIES positions des conteneurs (target.placements : liste de [x,z]). Le
+   pipeline marque alors sa search_zone `basis:"chest_placement"` + `n_points`
+   (points groupés) — signal que ces points sont EXACTS, pas une proximité
+   estimée. Pour ces buts la bbox de la search_zone est un placeholder constant
+   (jamais la vraie emprise) : dessiner la zone devinée serait activement
+   trompeur. On dessine donc les POINTS eux-mêmes.
+   Mécanisme de dessin RÉUTILISÉ : le registre de tracés de lot de 1re classe
+   (pins.js S.campTraces / addCampTrace) — le MÊME qui porte déjà les nuages de
+   camps (pastille `[Camp(●)]`) et les skins de coffre de la recherche
+   (toggleLotTrace). Un nuage de points exacts de conteneurs EST ce cas :
+   togglable (dessine/efface), listé au bandeau-légende (collectActiveTags le
+   ramasse par refKind), retirable par sa pastille OU le ✕ du bandeau, teinte
+   cohérente (CATS.quest), survit à la fermeture de fiche / à la bascule de
+   carte. (À l'inverse la machinerie currentGoalZones/viewGoalZone est
+   single-slot, effacée à la fermeture de fiche, absente du bandeau et dessine
+   un CERCLE deviné — la mauvaise primitive pour des points exacts.)
+   HONNÊTETÉ : ce sont les emplacements des CONTENEURS fouillables, jamais « la
+   cible de CE joueur » — le libellé le dit (« N locations »), et le serveur
+   choisit dynamiquement lequel spawn. */
+const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN (les cas actuels ≤ 44 ; garde-fou)
+/* Instantané des points par clé de tracé (même idiome module-state que
+   currentGoalZones) : le rendu le peuple, le routeur de dessin (main.js →
+   toggleGoalPlacements) le relit au clic. Content-keyed → stable au re-rendu. */
+const goalPlacementSets = new Map();
+/* Clé de tracé STABLE et disjointe (namespace 'qplace:' — jamais une clé de
+   camp `g.k` ni 'chest:'+skin) dérivée du CONTENU (libellé + compte + 1er/
+   dernier point) : identique au re-rendu de la même fiche (toggle-off marche,
+   la pastille relit l'appartenance à S.campTraces), unique par jeu de
+   placements. Deux buts ciblant les MÊMES conteneurs partageraient un tracé —
+   honnête (ce sont les mêmes points). */
+function goalPlacementKey(t, pl) {
+  const a = pl[0], b = pl[pl.length - 1];
+  return `qplace:${cleanLabel(t.label || '')}:${pl.length}:${a[0]},${a[1]}:${b[0]},${b[1]}`;
+}
+/* Affordance DESSINABLE `[Quest objects(●)] N locations` (+ repère d'orientation
+   honnête) pour un but à placements exacts — renvoie '' si aucun point valide. */
+function goalPlacementsChip(t) {
+  const pl = Array.isArray(t?.placements) ? t.placements : null;
+  if (!pl || !pl.length) return '';
+  const total = pl.length;
+  const pts = pl.slice(0, GOAL_PLACEMENT_CAP)
+    .filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]))
+    .map(([x, z]) => ({ x, z }));
+  if (!pts.length) return '';
+  const label = tr('goalLocationsN', total);
+  const key = goalPlacementKey(t, pl);
+  // Snapshot pour le routeur de dessin (campTrace fige ses points à l'ajout).
+  goalPlacementSets.set(key, { pts, hex: CATS.quest.hex, label });
+  // Cap de sécurité honnête : « · affichage de N sur M » (jamais déclenché ≤ 44).
+  const capMeta = pts.length < total ? `· ${tr('goalPlacementsCapped', pts.length, total)}` : null;
+  // Libellé de PRÉCISION porté par la réf elle-même : « N locations » (PRÉCIS,
+  // basis chest_placement) — plus jamais « zone estimée / area ». La pastille
+  // (mode E, subrole 'goal-placements' → main.js ref-draw) bascule le tracé des
+  // vrais points ; teinte quête cohérente ; pas de fiche (jeu de points synthétique).
+  const chip = ref({
+    kind: 'qao', subrole: 'goal-placements', key,
+    label, hex: CATS.quest.hex, hasFiche: false,
+    drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)),
+    meta: capMeta,
+  });
+  // Repère d'orientation (target.landmark) : texte honnête muet (.pos-region),
+  // jamais un pin — même registre visuel que le rappel de région.
+  const landmark = t.landmark
+    ? ` <span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span>`
+    : '';
+  return `${chip}${landmark}`;
+}
+/* Bascule du tracé des placements exacts (routé par main.js ref-draw sur
+   data-subrole="goal-placements") : self-toggle 1re classe — déjà tracé ⇒
+   retrait (parité re-clic + ✕ du bandeau), sinon pose (nuage dessiné + tag de
+   légende + caméra cadrée + persistance, tout par addCampTrace). refKind 'qao'
+   porte le mot de kind du bandeau (jamais re-déduit de la clé). */
+function toggleGoalPlacements(info) {
+  const key = info?.key;
+  if (!key) return;
+  if (S.campTraces?.has(key)) { removeCampTrace(key); return; }
+  const set = goalPlacementSets.get(key);
+  if (!set || !set.pts.length) return;
+  addCampTrace(key, { pts: set.pts, hex: set.hex, label: set.label, kind: 'qao', refKind: 'qao', map: S.map });
+}
 
 /* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
    PRÉCISION (blueprint §5.2), plus l'ancienne échelle posDynamic/posEstimatedZone/
@@ -53,6 +137,18 @@ import { regionFicheExists } from './zone.js';
      jamais une affirmation dessinable. */
 function dynamicPosBadge(t, regionHint, itemKey) {
   const sz = t && t.search_zone;
+  // PLACEMENTS EXACTS (search_zone.basis === "chest_placement") : quand le
+  // pipeline porte les VRAIES positions des conteneurs fouillables, on rend la
+  // chip DESSINABLE `[Quest objects(●)] N locations` (points exacts via campTrace,
+  // togglable + bandeau) au lieu de la zone devinée — dont la bbox n'est qu'un
+  // placeholder constant pour ces buts. Le libellé de précision dit « N
+  // locations » (PRÉCIS), jamais « area » ; réservé aux search_zone de proximité
+  // (basis proximity/region — repli inchangé plus bas). Priorité absolue : les
+  // points exacts priment sur toute estimation.
+  if (sz && sz.basis === 'chest_placement' && Array.isArray(t.placements) && t.placements.length) {
+    const chip = goalPlacementsChip(t);
+    if (chip) return chip;
+  }
   if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
     // Item COMMUN du catalogue avec de vrais canaux d'obtention (vendu /
     // craftable / loot — les MÊMES puces que questItemRow) : la search_zone
@@ -1265,4 +1361,4 @@ function goalStepsSection(q) {
   return `<div class="fiche-section"><h3>${esc(tr('objectivesN', q.goals.length))}</h3><ol class="goal-steps">${steps}</ol></div>`;
 }
 
-export { goalStepsSection, questItemRow, questItemAddsInfo, dynamicPosBadge };
+export { goalStepsSection, questItemRow, questItemAddsInfo, dynamicPosBadge, toggleGoalPlacements };

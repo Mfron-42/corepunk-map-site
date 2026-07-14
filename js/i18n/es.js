@@ -352,6 +352,18 @@ export default {
       // (dynamicPosBadge): la zona dibujable es una estimación, nunca un
       // spawn confirmado — la referencia nunca queda sin etiqueta.
       goalSearchZoneLabel: 'Zona estimada',
+      // Ubicaciones EXACTAS de contenedores (search_zone.basis ===
+      // "chest_placement"): el objetivo lleva las posiciones REALES de los
+      // contenedores registrables (target.placements). La etiqueta de la ficha
+      // dibujable indica la precisión — « N ubicaciones » (nunca « Zona
+      // estimada ») — y su punto dibuja esos puntos exactos (campTrace).
+      goalLocationsN: n => `${n} ubicaciones`,
+      // Pista de orientación honesta (target.landmark) como meta atenuada junto a
+      // la ficha — nunca un pin. El landmark es una frase de guía, de ahí « Pista: ».
+      goalLandmarkLabel: s => `Pista: ${s}`,
+      // Límite de seguridad de los puntos DIBUJADOS (GOAL_PLACEMENT_CAP):
+      // « mostrando N de M » honesto si un conjunto supera el límite (casos ≤ 44).
+      goalPlacementsCapped: (shown, total) => `mostrando ${shown} de ${total}`,
       objectivesN: n => `Objetivos (${n})`,
       objectivesTitle: 'Objetivos',
       howToTitle: 'Cómo hacerlo',

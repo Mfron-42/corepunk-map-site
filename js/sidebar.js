@@ -878,6 +878,12 @@ function syncEntityRefDots() {
     // ref de CATÉGORIE de camp (mode C, subrole = kind → S.camps[kind]) qui
     // n'entre jamais dans cette boucle mode E.
     else if (d.kind === 'camp' && d.key) { on = !!S.campTraces?.has(d.key); }
+    // Chip de PLACEMENTS exacts (step-guide `[Quest objects(●)] N locations`,
+    // mode E, subrole "goal-placements") : même registre de tracés que les camps
+    // (S.campTraces, pins.js) — l'état ● relu de l'appartenance par sa clé, la
+    // MÊME source que le bandeau ; sans ce resync la pastille resterait ○ après
+    // un clic (retour visuel muet interdit).
+    else if (d.subrole === 'goal-placements' && d.key) { on = !!S.campTraces?.has(d.key); }
     else {
       const k = d.subrole || d.key;
       if (k && S.camps && S.camps[k] !== undefined) on = !!S.camps[k]?.on;

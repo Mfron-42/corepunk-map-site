@@ -26,6 +26,7 @@ import {
   openCatalogFiche, toggleCatFacet, setCatSort, setCatPage, clearCatFacets,
   openAbilityCatalogFiche, toggleAbcFacet, setAbcSort, setAbcPage, clearAbcFacets,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
+  toggleGoalPlacements,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
@@ -330,6 +331,13 @@ initMapRefDelegation(document, {
         break;
       }
       default: {
+        // Placements EXACTS de conteneurs (chip [Quest objects(●)] N locations
+        // de dynamicPosBadge, subrole "goal-placements") : bascule le TRACÉ de
+        // 1re classe (campTrace) des vrais points des conteneurs fouillables —
+        // togglable, listé au bandeau, teinte quête ; jamais la zone devinée.
+        // Placé EN TÊTE (kind qao mode E porté par le subrole) pour précéder les
+        // branches zone/camp/mode-C ci-dessous.
+        if (info.subrole === 'goal-placements') { toggleGoalPlacements(info); break; }
         // Zone de recherche d'un OBJECTIF ([Région ●] de dynamicPosBadge,
         // vague 1) : dessine le cercle/les vrais points de cette search_zone
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la

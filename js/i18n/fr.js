@@ -355,6 +355,19 @@ export default {
       // un spawn confirmé — la réf porte toujours ce libellé explicite (ou le
       // vrai nom de région quand la zone EN est une), jamais un tag vide.
       goalSearchZoneLabel: 'Zone estimée',
+      // Placements EXACTS de conteneurs (search_zone.basis === "chest_placement") :
+      // le but porte les VRAIES positions des conteneurs fouillables
+      // (target.placements). Le libellé de la chip dessinable énonce lui-même la
+      // précision — « N emplacements » (jamais « Zone estimée ») — et sa pastille
+      // dessine ces points exacts (campTrace). N = nombre d'emplacements.
+      goalLocationsN: n => `${n} emplacements`,
+      // Repère d'orientation honnête (target.landmark) en méta muette près de la
+      // chip — jamais un pin. Le landmark livré est une phrase de guidage
+      // (« … autour de Goldenfield… »), d'où le cadre neutre « Indice : ».
+      goalLandmarkLabel: s => `Indice : ${s}`,
+      // Plafond de sécurité du DESSIN (GOAL_PLACEMENT_CAP) : « affichage de N sur
+      // M » honnête si un jeu dépasse le plafond (cas actuels ≤ 44).
+      goalPlacementsCapped: (shown, total) => `affichage de ${shown} sur ${total}`,
       // Mécanisme receive_reward (passe décodage mécanisme, job A) : l'item
       // est obtenu en terminant une AUTRE quête ( reward_of), pas remis
       // par le donneur de cette quête-ci — verbe seul, un span de quête
