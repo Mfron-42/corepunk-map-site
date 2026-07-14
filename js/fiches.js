@@ -18,3 +18,4 @@ export { openChestFiche, openSearchableChestFiche, openLocationFiche } from './f
 export { openRegionFiche } from './fiches/zone.js';
 export { openTalentFiche, openSpecFiche, openProfessionFiche } from './fiches/build.js';
 export { openCatalogFiche, toggleCatFacet, setCatSort, setCatPage, clearCatFacets } from './fiches/catalog.js';
+export { openAbilityCatalogFiche, toggleAbcFacet, setAbcSort, setAbcPage, clearAbcFacets } from './fiches/ability_catalog.js';

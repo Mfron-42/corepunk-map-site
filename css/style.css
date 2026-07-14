@@ -3238,6 +3238,11 @@ button.cat-pill.is-active:hover { background: color-mix(in srgb, var(--chip-c) 3
 }
 .cat-meta-multi { color: var(--muted); }
 .cat-hidden-note { margin-top: 8px; font-size: .72rem; }
+/* Ligne « Cooldown » de la fiche capacité (fiches/item.js openAbilityFiche) :
+   libellé en petites capitales + valeur alignés sur une ligne. */
+.ability-cd-row { display: flex; align-items: baseline; gap: 8px; }
+.ability-cd-val { font-size: .82rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ability-cd-unspec { font-size: .78rem; }
 .cat-no-results { margin: 10px 2px; }
 
 .cat-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }

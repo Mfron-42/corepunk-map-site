@@ -1513,6 +1513,21 @@ function catalogBrowseLi() {
     <span class="sr-browse-hint">${esc(tr('catBrowseHint'))}</span></span>
   </button></li>`;
 }
+/* Ligne d'ACTION « Parcourir les capacités » (référence des capacités à
+   facettes, fiches/ability_catalog.js) — même idiome que la ligne catalogue
+   ci-dessus (data-act abc-open, routé au délégué global de main.js), amorcée
+   (a) dès qu'un résultat CAPACITÉ remonte, et (b) sur une requête « capacité »/
+   « ability »/« skill »… (mots repliés, ×5 locales). */
+const ABILITY_QUERY = new Set(['ability', 'abilities', 'capacite', 'capacites',
+  'skill', 'skills', 'spell', 'spells', 'habilidad', 'habilidades',
+  'способность', 'способности', 'здатнiсть', 'навички']);
+function abilityBrowseLi() {
+  return `<li class="sr-browse-cat"><button type="button" class="sr-browse-btn" data-act="abc-open">
+    <span class="sr-browse-ico" aria-hidden="true">✨</span>
+    <span class="sr-browse-text"><span class="sr-browse-label">${esc(tr('abcBrowse'))}</span>
+    <span class="sr-browse-hint">${esc(tr('abcBrowseHint'))}</span></span>
+  </button></li>`;
+}
 
 /* Dernière liste rendue — le délégué de résultats retrouve l'entrée par index
    (data-i) plutôt qu'une closure par ligne (une seule écoute déléguée, posée une
@@ -1525,7 +1540,8 @@ function renderSearch(raw) {
   if (!v) return;
   const res = runSearch(v);
   const showBrowse = CATALOG_QUERY.has(fold(v)) || res.some(r => r.cat === 'item' || r.cat === 'recipe');
-  const browseHtml = showBrowse ? catalogBrowseLi() : '';
+  const showAbcBrowse = ABILITY_QUERY.has(fold(v)) || res.some(r => r.cat === 'ability');
+  const browseHtml = (showBrowse ? catalogBrowseLi() : '') + (showAbcBrowse ? abilityBrowseLi() : '');
   if (!res.length) {
     resBox.innerHTML = browseHtml + `<li class="hint no-results">
       <span class="no-results-main">${esc(tr('noResults'))}</span>

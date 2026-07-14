@@ -56,6 +56,10 @@ export function hashToPseudoPath(hash) {
   // visites du catalogue, pas chaque filtre appliqué, même esprit que la
   // dérivation sans x/z/zm ci-dessus).
   if (p.has('cat')) return '/catalog';
+  // Référence des capacités à facettes (fiches/ability_catalog.js) : jeton
+  // `abc=<facettes>`. UNE seule pseudo-page « /abilities » (même esprit que
+  // /catalog : on mesure les visites, pas chaque combinaison de facettes).
+  if (p.has('abc')) return '/abilities';
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');
 }
 

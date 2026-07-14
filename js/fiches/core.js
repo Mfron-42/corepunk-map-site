@@ -221,6 +221,10 @@ const FICHE_TOKEN = {
   // garantit une valeur non vide (au moins `so.<tri>`), donc le jeton est
   // toujours écrit quand le catalogue est ouvert.
   catalog: 'cat',
+  // Référence des capacités à facettes (nouvelle surface, fiches/ability_catalog.js) :
+  // le jeton `abc=` porte l'ÉTAT DES FACETTES encodé (même grammaire que `cat=`),
+  // mutuellement exclusif comme les autres jetons de fiche (dans FICHE_HASH_KEYS).
+  ability_catalog: 'abc',
 };
 /* npc/chest/location portent un INDEX POSITIONNEL dans S.openFiche.id ; on
    SÉRIALISE une clé STABLE (un index glisse à la reconstruction → lien cassé,
@@ -309,6 +313,80 @@ function varPlaceholder(runtime, token) {
   const tip = runtime ? tr('effectVarRuntimeTooltip') : tr('effectVarUnextractedTooltip');
   const title = token ? `${tip} — ${token}` : tip;
   return `<span class="badge badge--inline badge--var-${runtime ? 'runtime' : 'unextracted'}" title="${esc(title)}">?</span>`;
+}
+
+/* ── Capacités : LA règle de résolution des chiffres (partagée fiche ↔ catalogue)
+   ─────────────────────────────────────────────────────────────────────────────
+   Une description de capacité (abilities.bin, champ `desc`) porte des jetons
+   mustache `{{[@handle:]Data.<slot>.<CODE>}}` (16 capacités sur 240). La SEULE
+   règle documentée qui résout un de ces jetons en un CHIFFRE prouvé : la valeur
+   du paramètre `CODE` dans le `params` de la formule DÉCODÉE de CETTE MÊME
+   capacité (abilities.bin `formula.params`, byte-prouvé — c'est le même
+   enregistrement, pas une jointure devinée). `CODE` = dernier segment pointé du
+   chemin, après avoir retiré l'éventuel préfixe de localisation `@handle:`
+   (`@2E5Uu1ntIEz:Data.0.ACP5` → `ACP5`, `Data.0.C` → `C`).
+
+   TOUT le reste de l'espace d'opcodes (ADF/AC1/ACP1/ACP5/ZR/T/R/nm/EM/TotalTime…)
+   N'EST PAS dans `params` pour ces capacités : ce sont les mêmes chiffres serveur
+   NON décodés qui bloquent ~90 % des nombres d'items (voir item.js effectVarChip).
+   Un jeton non résolu N'AFFICHE JAMAIS `{{brut}}` : une pastille « ? » honnête
+   (varPlaceholder, kind « non extrait ») porte le chemin brut dans son title.
+   Aujourd'hui seuls 3 jetons se résolvent — tous des cooldowns (params.C). */
+function abilityParamCode(token) {
+  return String(token).split(':').pop().split('.').pop();
+}
+/* Cooldown d'une capacité SELON LA RÈGLE : présent UNIQUEMENT quand la
+   description DÉCLARE un jeton de cooldown (`{{…C}}`) — sinon `null` (la
+   capacité n'a pas de ligne cooldown du tout : ne jamais peindre un champ vide
+   partout). `value` = le chiffre résolu depuis `formula.params.C` (secondes),
+   ou `null` quand ce paramètre n'a pas été décodé (absence honnête « non
+   spécifié »). Le simple mot « cooldown » en prose (« goes on cooldown ») ne
+   déclenche RIEN : seul un vrai jeton `{{…C}}` compte. */
+function abilityCooldown(a) {
+  const desc = a && a.desc;
+  if (!desc) return null;
+  let declared = false;
+  for (const m of desc.matchAll(/\{\{([^}]+)\}\}/g)) {
+    if (abilityParamCode(m[1]) === 'C') { declared = true; break; }
+  }
+  if (!declared) return null;
+  const p = a.formula && a.formula.params;
+  const v = p && p.C != null ? p.C : null;
+  return { value: v };
+}
+/* Description résolue → HTML : découpe sur les jetons mustache, échappe chaque
+   fragment littéral (et \n → <br>), remplace chaque jeton par son chiffre résolu
+   (params[CODE]) ou par la pastille « ? » honnête. Les 209 descriptions sans
+   mustache retombent sur un simple esc()+<br> (aucun jeton = boucle vide). */
+function abilityDescHtml(a) {
+  const desc = a && a.desc;
+  if (!desc) return '';
+  const params = (a.formula && a.formula.params) || {};
+  const re = /\{\{([^}]+)\}\}/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(desc))) {
+    out += esc(desc.slice(last, m.index)).replace(/\n/g, '<br>');
+    const code = abilityParamCode(m[1]);
+    const val = params[code];
+    out += (val != null)
+      ? `<span class="effect-var-inline effect-var-base" title="${esc(tr('abilityParamTooltip') + ' — ' + m[1])}">${esc(fmtNum(val))}</span>`
+      : varPlaceholder(false, m[1]);
+    last = re.lastIndex;
+  }
+  out += esc(desc.slice(last)).replace(/\n/g, '<br>');
+  return out;
+}
+/* Ligne « Cooldown » de la fiche capacité : rendue SEULEMENT quand la règle
+   déclare un cooldown (abilityCooldown non nul) — chiffre résolu, ou « non
+   spécifié » honnête quand le paramètre C n'est pas décodé. Jamais de ligne
+   cooldown sur une capacité qui n'en déclare pas. */
+function abilityCooldownHtml(a) {
+  const cd = abilityCooldown(a);
+  if (!cd) return '';
+  const val = cd.value != null
+    ? `<span class="ability-cd-val">${esc(tr('abilityCooldownSeconds', fmtNum(cd.value)))}</span>`
+    : `<span class="hint ability-cd-unspec">${esc(tr('abilityCooldownUnspecified'))}</span>`;
+  return `<div class="fiche-section ability-cd-row"><span class="rar-select-label">${esc(tr('abilityCooldownLabel'))}</span> ${val}</div>`;
 }
 
 /* gotoBtn / crossMapBtn / crossMapOnlyBtn RETIRÉS — vague E'c-9 (relicat S1) :
@@ -912,6 +990,7 @@ function viewGoalZone(zi) {
 
 export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
+  abilityCooldown, abilityDescHtml, abilityCooldownHtml,
   fmtNum, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
   qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef, questRef,

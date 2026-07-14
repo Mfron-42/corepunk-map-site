@@ -24,6 +24,7 @@ import {
   openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche, openRegionFiche,
   openTalentFiche, openSpecFiche, openProfessionFiche,
   openCatalogFiche, toggleCatFacet, setCatSort, setCatPage, clearCatFacets,
+  openAbilityCatalogFiche, toggleAbcFacet, setAbcSort, setAbcPage, clearAbcFacets,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -157,6 +158,13 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'cat-sort') setCatSort(id);
   else if (b.dataset.act === 'cat-page') setCatPage(id);
   else if (b.dataset.act === 'cat-clear') clearCatFacets();
+  // Référence des capacités à facettes (fiches/ability_catalog.js) : même
+  // câblage que le catalogue d'objets ci-dessus (abc-* au lieu de cat-*).
+  else if (b.dataset.act === 'abc-open') { hideSearchResults(); openAbilityCatalogFiche(null); }
+  else if (b.dataset.act === 'abc-facet' || b.dataset.act === 'abc-unfacet') toggleAbcFacet(b.dataset.facet, id);
+  else if (b.dataset.act === 'abc-sort') setAbcSort(id);
+  else if (b.dataset.act === 'abc-page') setAbcPage(id);
+  else if (b.dataset.act === 'abc-clear') clearAbcFacets();
   // (Les ex-handlers de surlignage transitoire par camp / de la couche
   // coffres — RETIRÉS, kill-list §7.2 : la pastille des références
   // `[Camp(●)]`/`[Chest(●)]` (fiches.js campRef/containersSectionHtml) porte
@@ -738,6 +746,7 @@ async function restoreState() {
   const node = p.get('node'), loc = p.get('loc'), ab = p.get('ab'), rec = p.get('rec');
   const tal = p.get('tal'), spec = p.get('spec'), prof = p.get('prof');
   const cat = p.get('cat');
+  const abc = p.get('abc');
   await applyLocationState();
   // Jetons de fiche mutuellement exclusifs → au plus un présent ; on route le
   // seul capturé (chaîne else-if : rien d'autre ne peut coexister).
@@ -745,6 +754,10 @@ async function restoreState() {
   // chargé ici) — ouverture immédiate, jamais whenDeferred ; l'état des
   // facettes est reconstruit depuis le jeton (deep-link, aller-retour prouvé).
   if (cat != null) openCatalogFiche(cat);
+  // Référence des capacités (abc=<facettes>) : S.abilities est DIFFÉRÉ (comme le
+  // jeton ab= voisin) → whenDeferred, contrairement au catalogue d'objets
+  // (S.items, chemin critique). L'état des facettes est reconstruit du jeton.
+  else if (abc != null) whenDeferred(() => openAbilityCatalogFiche(abc));
   else if (zone) whenDeferred(() => openRegionFiche(zone));
   else if (ch != null) { const i = chestIndexForToken(ch); if (i >= 0) openChestFiche(i); }
   else if (sc != null) openSearchableChestFiche(sc);

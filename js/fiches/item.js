@@ -23,7 +23,7 @@ import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, abilityDescHtml, abilityCooldownHtml, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    ( finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -615,27 +615,36 @@ function effectLinesSection(it) {
   return `<div class="fiche-section"><h3>${esc(tr('effectLinesTitle'))}</h3>${blocks}</div>`;
 }
 
-/* Fiche capacité (sorts de héros NOMMÉS uniquement) : nom, emplacement
-   (Q/W/E/R/MA), description, tags de nature (Stun/AoE/DoT…) en puces,
-   formule de dégâts reconstruite/localisée quand décodée (a.formula, 14/202
-   capacités du catalogue site -- voir formulaHtml ci-dessus) et mise à
+/* Fiche capacité (sorts de héros/monstres NOMMÉS) : icône, emplacement
+   (Q/W/E/R/MA quand présent), cooldown SI la règle le résout (voir core.js
+   abilityCooldownHtml — 3/240 résolus, « non spécifié » honnête quand déclaré
+   mais non décodé), description avec chaque {{mustache}} résolu par
+   formula.params ou remplacé par la pastille « ? » (core.js abilityDescHtml,
+   JAMAIS de {{brut}} affiché), tags verbatim, formule de dégâts reconstruite/
+   localisée quand décodée (a.formula, 20/240 — voir formulaHtml) et mise à
    l'échelle par rareté quand connue (a.rarity_scaling -- 0 aujourd'hui côté
    capacités, mais le champ est traité comme sur un item pour rester correct
-   si le pipeline en expose un jour). */
+   si le pipeline en expose un jour). Absence honnête typée pour les 14
+   capacités sans description NI formule (rien de chiffrable côté client). */
 function openAbilityFiche(key) {
   const a = S.abilities[key];
   if (!a) return;
   S.openFiche = { kind: 'ability', id: key };
+  const avatar = a.icon ? iconTag(`icons/${a.icon}`, 'fiche-avatar', '✨') : '';
   const tagsHtml = a.tags?.length
     ? `<div class="fiche-section reward-chips">${a.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
   const formulaHtmlBlock = a.formula ? formulaHtml(a.formula) : '';
   const scalingHtml = scalingSection(a);
+  const emptyNote = (!a.desc && !a.formula)
+    ? `<div class="fiche-section"><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('abilityNoDetail') })}</p></div>` : '';
   openFiche(`
-    ${ficheHeader({ name: a.name, hex: entityColor('ability', a.name), sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
-    ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${esc(a.desc)}</p></div>` : ''}
+    ${ficheHeader({ avatar, name: a.name, hex: entityColor('ability', a.name), sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
+    ${abilityCooldownHtml(a)}
+    ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${abilityDescHtml(a)}</p></div>` : ''}
     ${tagsHtml}
     ${formulaHtmlBlock}
-    ${scalingHtml}`);
+    ${scalingHtml}
+    ${emptyNote}`);
   setFicheHash(null);
 }
 
