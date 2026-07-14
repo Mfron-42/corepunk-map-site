@@ -65,7 +65,7 @@ import { map, toWorld } from './mapview.js';
    (node/code/key), aucun résolveur index→clé requis (même famille que q/i/
    camp/fam ci-dessus, contrairement à npc/ch/loc). */
 const FICHE_HASH_KEYS = ['q', 'camp', 'i', 'npc', 'mon', 'fam', 'wsp', 'zone',
-  'ch', 'sc', 'lt', 'node', 'loc', 'ab', 'rec', 'tal', 'spec', 'prof'];
+  'ch', 'sc', 'lt', 'node', 'loc', 'ab', 'rec', 'tal', 'spec', 'prof', 'cat'];
 
 const isLegacyIndex = tok => /^\d+$/.test(tok);
 function npcTokenForIndex(idx) {

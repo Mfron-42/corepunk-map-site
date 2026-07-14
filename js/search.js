@@ -1497,6 +1497,23 @@ function searchRefHtml(it) {
   return ref(desc);
 }
 
+/* Ligne d'ACTION « Parcourir le catalogue » (catalogue d'objets à facettes,
+   fiches/catalog.js) : la recherche floue par nom n'offrait AUCUNE surface de
+   navigation par facettes — cette ligne l'amorce. Rendue (a) en tête dès qu'un
+   résultat OBJET/RECETTE remonte (le joueur cherche un item → lui proposer de
+   parcourir), et (b) sur la requête « catalogue »/« catalog » (×5 locales, nom
+   replié) même sans résultat. AUCUN data-i → le délégué de #search-results
+   l'ignore (early-return) et le clic remonte au délégué global data-act de
+   main.js (cat-open) — un <button> pour le clavier. */
+const CATALOG_QUERY = new Set(['catalog', 'catalogue', 'catalogo', 'katalog', 'каталог']);
+function catalogBrowseLi() {
+  return `<li class="sr-browse-cat"><button type="button" class="sr-browse-btn" data-act="cat-open">
+    <span class="sr-browse-ico" aria-hidden="true">▤</span>
+    <span class="sr-browse-text"><span class="sr-browse-label">${esc(tr('catBrowse'))}</span>
+    <span class="sr-browse-hint">${esc(tr('catBrowseHint'))}</span></span>
+  </button></li>`;
+}
+
 /* Dernière liste rendue — le délégué de résultats retrouve l'entrée par index
    (data-i) plutôt qu'une closure par ligne (une seule écoute déléguée, posée une
    fois sur #search-results, survit à chaque reconstruction du dropdown). */
@@ -1507,13 +1524,16 @@ function renderSearch(raw) {
   searchResults = [];
   if (!v) return;
   const res = runSearch(v);
+  const showBrowse = CATALOG_QUERY.has(fold(v)) || res.some(r => r.cat === 'item' || r.cat === 'recipe');
+  const browseHtml = showBrowse ? catalogBrowseLi() : '';
   if (!res.length) {
-    resBox.innerHTML = `<li class="hint no-results">
+    resBox.innerHTML = browseHtml + `<li class="hint no-results">
       <span class="no-results-main">${esc(tr('noResults'))}</span>
       <span class="no-results-hint">${esc(tr('noResultsHint'))}</span>
     </li>`;
     return;
   }
+  if (browseHtml) resBox.insertAdjacentHTML('beforeend', browseHtml);
   searchResults = res;
   res.forEach((it, i) => {
     const li = document.createElement('li');

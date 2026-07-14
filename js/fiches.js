@@ -17,3 +17,4 @@ export { openItemFiche, openRecipeFiche, openLootTableFiche, openNodeFiche, open
 export { openChestFiche, openSearchableChestFiche, openLocationFiche } from './fiches/world.js';
 export { openRegionFiche } from './fiches/zone.js';
 export { openTalentFiche, openSpecFiche, openProfessionFiche } from './fiches/build.js';
+export { openCatalogFiche, toggleCatFacet, setCatSort, setCatPage, clearCatFacets } from './fiches/catalog.js';

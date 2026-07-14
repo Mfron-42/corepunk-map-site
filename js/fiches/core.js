@@ -214,6 +214,13 @@ const FICHE_TOKEN = {
   // Rien de spécifique à ajouter ici : leur sérialisation passe par FICHE_TOKEN
   // comme les 15 autres kinds.
   talent: 'tal', spec: 'spec', profession: 'prof',
+  // Catalogue d'objets à facettes (nouvelle surface, fiches/catalog.js) : le
+  // jeton `cat=` porte l'ÉTAT DES FACETTES encodé (pas une clé d'entité —
+  // ficheTokenValue le renvoie tel quel), mutuellement exclusif comme les
+  // autres jetons de fiche (il figure dans FICHE_HASH_KEYS). encodeState
+  // garantit une valeur non vide (au moins `so.<tri>`), donc le jeton est
+  // toujours écrit quand le catalogue est ouvert.
+  catalog: 'cat',
 };
 /* npc/chest/location portent un INDEX POSITIONNEL dans S.openFiche.id ; on
    SÉRIALISE une clé STABLE (un index glisse à la reconstruction → lien cassé,

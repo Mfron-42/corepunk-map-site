@@ -3172,3 +3172,94 @@ button.ref-dot-btn:hover { background: color-mix(in srgb, var(--ref-c) 15%, tran
 /* Dans une tag de légende, la pilule ne doit jamais pousser le nom hors de ses
    18ch : elle reste atomique (flex:none) à gauche du libellé tronqué. */
 .atag .ref-tree-tag { margin-right: -1px; }
+
+/* ── Catalogue d'objets à facettes (js/fiches/catalog.js) ─────────────────────
+   Surface de navigation par facettes rendue dans le tiroir de fiche. Se fond
+   dans l'existant : pastilles .rar-pill (facettes + tri), chips
+   .region-count-chip (filtres actifs), .fiche-scroll + .stock-filter (liste),
+   teintes de rareté (RARITY) sur les pastilles rareté et la méta de ligne. */
+.cat-body { padding: 2px 2px 4px; }
+.cat-facets { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 4px; }
+.cat-facet-group { display: flex; flex-direction: column; gap: 6px; }
+.cat-facet-group .rar-select-label {
+  font-family: var(--font-display); font-size: .6rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+/* Les pastilles de facette sont TOUJOURS des boutons (bascule 2 sens) : on
+   ré-autorise le curseur/hover que .rar-pill.is-active fige pour le sélecteur
+   de rareté (span inerte). */
+.cat-pill.is-active { cursor: pointer; }
+button.cat-pill.is-active:hover { background: color-mix(in srgb, var(--chip-c) 30%, transparent); }
+.cat-pill-n {
+  margin-left: 2px; font-size: .9em; opacity: .7;
+  font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.cat-facet-more { align-self: center; font-size: .68rem; color: var(--muted); padding: 0 4px; }
+
+/* Barre des filtres actifs (chips retirables + tout effacer). */
+.cat-active-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 8px 0 4px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.cat-active-bar .rar-select-label {
+  font-family: var(--font-display); font-size: .6rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); width: 100%;
+}
+.cat-active-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.cat-active-chip { --chip-c: var(--accent); cursor: pointer; border-width: 1px; }
+.cat-active-chip .cat-chip-x { font-size: .8em; color: var(--muted); padding: 0 2px; }
+.cat-active-chip:hover { border-color: var(--accent); }
+.cat-active-chip:hover .cat-chip-x { color: var(--ink); }
+.cat-clear-all {
+  margin-left: auto; font-size: .68rem; color: var(--muted);
+  background: none; border: none; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.cat-clear-all:hover { color: var(--ink); }
+
+/* Section résultats : tri + filtre local + liste fenêtrée + pagination. */
+.cat-results-section { margin-top: 10px; }
+.cat-sort { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.cat-sort .rar-select-label {
+  font-family: var(--font-display); font-size: .6rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted);
+}
+.cat-sort-pill.is-active { cursor: pointer; }
+.cat-row { align-items: center; gap: 8px; }
+.cat-row-meta { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.cat-meta-t {
+  font-size: .62rem; font-variant-numeric: tabular-nums; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; line-height: 1.5;
+}
+.cat-meta-r {
+  --chip-c: var(--muted); font-size: .62rem; letter-spacing: .04em;
+  color: color-mix(in srgb, var(--chip-c) 75%, var(--ink));
+}
+.cat-meta-multi { color: var(--muted); }
+.cat-hidden-note { margin-top: 8px; font-size: .72rem; }
+.cat-no-results { margin: 10px 2px; }
+
+.cat-pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.cat-page-btn {
+  font-family: var(--font-display); font-size: .6rem; letter-spacing: .1em;
+  text-transform: uppercase; padding: 5px 12px; border-radius: 999px;
+  color: var(--ink-dim); background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid var(--line); cursor: pointer;
+}
+.cat-page-btn:hover:not([disabled]) { color: var(--ink); border-color: var(--line-strong); }
+.cat-page-btn[disabled] { opacity: .4; cursor: default; }
+.cat-page-label { font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Ligne d'action « Parcourir le catalogue » en tête des résultats de recherche. */
+.sr-browse-cat { padding: 0; }
+.sr-browse-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 9px 12px; background: none; border: none; cursor: pointer;
+  color: var(--ink); border-bottom: 1px solid var(--line-soft);
+}
+.sr-browse-btn:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sr-browse-ico { font-size: 1.05rem; color: var(--accent); flex: none; }
+.sr-browse-text { display: flex; flex-direction: column; gap: 1px; }
+.sr-browse-label { font-family: var(--font-display); font-size: .8rem; letter-spacing: .02em; }
+.sr-browse-hint { font-size: .7rem; color: var(--muted); }

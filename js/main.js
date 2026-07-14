@@ -23,6 +23,7 @@ import {
   openMonsterFiche, openFamilyFiche, openWildlifeFiche, openLocationFiche, openLootTableFiche, openChestFiche,
   openSearchableChestFiche, openRecipeFiche, openNodeFiche, openAbilityFiche, openRegionFiche,
   openTalentFiche, openSpecFiche, openProfessionFiche,
+  openCatalogFiche, toggleCatFacet, setCatSort, setCatPage, clearCatFacets,
   viewGoalZone, flyToQuestZone, viewMonsterZone, drawNamedZone, setRollRarity,
 } from './fiches.js';
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
@@ -113,7 +114,7 @@ document.addEventListener('click', e => {
   // toute mutation (voir pushFocusState()'s doc : pousser après coup ferait
   // remonter un doublon de l'état déjà réécrit par le replaceState des
   // fonctions bas niveau ci-dessous, pas l'état d'avant-geste).
-  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-family', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'fiche-node', 'goto'].includes(b.dataset.act)) pushFocusState();
+  if (['fiche-quest', 'fiche-npc', 'fiche-camp', 'fiche-item', 'fiche-monster', 'fiche-family', 'fiche-location', 'fiche-loot', 'fiche-chest', 'fiche-searchable-chest', 'fiche-recipe', 'fiche-node', 'cat-open', 'goto'].includes(b.dataset.act)) pushFocusState();
   if (b.dataset.act === 'track') toggleTrack(id, b);
   else if (b.dataset.act === 'done') toggleDone(id, b);
   else if (b.dataset.act === 'fiche-quest') openQuestFiche(id);
@@ -143,6 +144,19 @@ document.addEventListener('click', e => {
   else if (b.dataset.act === 'fiche-searchable-chest') openSearchableChestFiche(id);
   else if (b.dataset.act === 'fiche-recipe') openRecipeFiche(id);
   else if (b.dataset.act === 'fiche-node') openNodeFiche(id);
+  // Catalogue d'objets à facettes (fiches/catalog.js) : `cat-open` ouvre le
+  // catalogue (pushFocusState déjà fait ci-dessus → Précédent y ramène) ; les
+  // gestes internes (facette/tri/page/effacer) NE poussent PAS d'historique —
+  // ils ré-écrivent l'état des facettes en place (renderCatalog → setFicheHash
+  // replaceState), donc Précédent depuis une fiche item ouverte DEPUIS le
+  // catalogue ramène au catalogue dans son DERNIER état filtré, jamais à chaque
+  // clic de facette. cat-facet/cat-unfacet = le même toggle (une chip active
+  // retirée = désélection de sa valeur).
+  else if (b.dataset.act === 'cat-open') { hideSearchResults(); openCatalogFiche(null); }
+  else if (b.dataset.act === 'cat-facet' || b.dataset.act === 'cat-unfacet') toggleCatFacet(b.dataset.facet, id);
+  else if (b.dataset.act === 'cat-sort') setCatSort(id);
+  else if (b.dataset.act === 'cat-page') setCatPage(id);
+  else if (b.dataset.act === 'cat-clear') clearCatFacets();
   // (Les ex-handlers de surlignage transitoire par camp / de la couche
   // coffres — RETIRÉS, kill-list §7.2 : la pastille des références
   // `[Camp(●)]`/`[Chest(●)]` (fiches.js campRef/containersSectionHtml) porte
@@ -325,21 +339,30 @@ initMapRefDelegation(document, {
         // PAS la réf d'objectif enter_zone (subrole absent, mode L) : elle reste
         // un pin locate au centroïde, traitée par la branche mode L plus bas.
         if (info.kind === 'zone' && info.subrole === 'region') { drawNamedZone(info.key != null ? info.key : info.label); break; }
+        // Ligne de CATÉGORIE mode C adossée à une VRAIE case du panneau
+        // (#filters li[data-fkey] input) : le dot bascule CETTE case dans les
+        // DEUX sens (input.click → l'écouteur `change` de filterRow : toggle +
+        // syncHash + refreshParentChecks), exactement comme le faisait déjà le
+        // cas coffre — GÉNÉRALISÉ ici à toutes les rest-rows (fix live
+        // 2026-07-14 : le dot de « Animaux paisibles » (camp:wildlife) et de
+        // « Spawns non identifiés » (camp:monsters/creeps) ALLUMAIT la couche
+        // sans jamais l'éteindre — le 1er tombait sur activateCategoryNode
+        // ensure-only, le 2e était détourné vers un campTrace, jamais un vrai
+        // off). Placé AVANT les branches camp/chest pour capter ces rest-rows.
+        // Ne PAS traiter ici une réf mode C SANS case rendue (chip/recherche) :
+        // input est null → on ne `break` pas, elle tombe sur activateCategoryNode
+        // (ensure-only) plus bas — le seul cas où celui-ci reste légitime.
+        if (info.mode === 'C' && info.fkey) {
+          const input = document.querySelector(`#filters li[data-fkey="${CSS.escape(info.fkey)}"] input`);
+          if (input) { input.click(); break; }
+        }
         // Camp individuel (mode E) — TRACÉ persistant self-toggle de 1re classe
         // (remplace l'ex-surlignage transitoire, kill-list §7.2) : un camp n'a
         // aucun nœud d'arbre. Un camp CROSS-carte (farmUnjoinedRow) est mode L →
-        // il tombe dans le traitement locate ci-dessous, jamais ici.
+        // il tombe dans le traitement locate ci-dessous, jamais ici. (Une
+        // rest-row « Spawns non identifiés » est kind:'camp' mode:'C' AVEC case
+        // → déjà captée juste au-dessus, elle n'arrive plus ici par erreur.)
         if (info.kind === 'camp' && info.mode !== 'L') { toggleCampTrace(info); break; }
-        // Catégorie « Coffres fouillables » (mode C, vague 2, remplace
-        // l'ex-surlignage de couche coffres) : VRAI toggle de la case (checkbox,
-        // .click() bascule dans les DEUX sens — contrairement à
-        // activateCategoryNode, ensure-only, du repli catégorie générique
-        // plus bas ; la couche est ON par défaut, il faut pouvoir l'éteindre).
-        if (info.kind === 'chest' && info.fkey) {
-          const input = document.querySelector(`#filters li[data-fkey="${CSS.escape(info.fkey)}"] input`);
-          if (input) input.click();
-          break;
-        }
         // Locate (mode L) — TOGGLE (Q7, spec §9, ratifié 2026-07-11 soir,
         // supersède le one-shot goTo de §2.4) : position / qao placé / PNJ
         // épinglé / centroïde de zone. Membre du jeu S.locates → RETRAIT du
@@ -714,10 +737,15 @@ async function restoreState() {
   const ch = p.get('ch'), sc = p.get('sc'), lt = p.get('lt');
   const node = p.get('node'), loc = p.get('loc'), ab = p.get('ab'), rec = p.get('rec');
   const tal = p.get('tal'), spec = p.get('spec'), prof = p.get('prof');
+  const cat = p.get('cat');
   await applyLocationState();
   // Jetons de fiche mutuellement exclusifs → au plus un présent ; on route le
   // seul capturé (chaîne else-if : rien d'autre ne peut coexister).
-  if (zone) whenDeferred(() => openRegionFiche(zone));
+  // Catalogue (cat=<facettes>) : s'appuie sur S.items (chemin CRITIQUE, déjà
+  // chargé ici) — ouverture immédiate, jamais whenDeferred ; l'état des
+  // facettes est reconstruit depuis le jeton (deep-link, aller-retour prouvé).
+  if (cat != null) openCatalogFiche(cat);
+  else if (zone) whenDeferred(() => openRegionFiche(zone));
   else if (ch != null) { const i = chestIndexForToken(ch); if (i >= 0) openChestFiche(i); }
   else if (sc != null) openSearchableChestFiche(sc);
   else if (lt != null) whenDeferred(() => openLootTableFiche(lt));

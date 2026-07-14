@@ -50,6 +50,12 @@ export function hashToPseudoPath(hash) {
   if (p.has('tal')) return '/talent/' + encodeURIComponent(p.get('tal'));
   if (p.has('spec')) return '/spec/' + encodeURIComponent(p.get('spec'));
   if (p.has('prof')) return '/profession/' + encodeURIComponent(p.get('prof'));
+  // Catalogue d'objets à facettes (fiches/catalog.js) : jeton `cat=<facettes>`.
+  // UNE seule pseudo-page « /catalog » (jamais une par état de facettes : les
+  // combinaisons explosent et n'ont aucune valeur analytique — on mesure les
+  // visites du catalogue, pas chaque filtre appliqué, même esprit que la
+  // dérivation sans x/z/zm ci-dessus).
+  if (p.has('cat')) return '/catalog';
   return '/map/' + encodeURIComponent(p.get('map') || 'Kwalat');
 }
 
