@@ -15,7 +15,7 @@ import {
 } from '../config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight, activeMap } from '../mapview.js';
+import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
 import { clearLocator, addCampTrace, removeCampTrace } from '../pins.js';
 import { unfocus } from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
@@ -27,28 +27,29 @@ import { ref, refDot } from '../mapref.js';
 import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
 
-/* ── Positions d'un but : LE modèle réutilisable à TROIS TIERS d'honnêteté ────
-   Refonte 2026-07-15 (« un bordel » → propre). Un but exprime son « où » comme
-   des SOURCES DE POINTS, chacune un nuage nommé porté par le registre campTrace
-   de 1re classe (pins.js S.campTraces / addCampTrace — le même qui dessine les
-   camps et les skins de coffre : togglable, listé au bandeau-légende, retirable,
-   teinte quête). Ces sources se répartissent en tiers PAR LES SIGNAUX DE LA
-   DONNÉE (jamais une quête codée en dur), rendus par UN seul renderer partagé :
-     1. 🟢 OFFICIEL (donnée) — les positions que le but DÉCLARE vraiment : les
-        placements EXACTS de conteneurs (search_zone.basis === "chest_placement",
-        target.placements) et le pool de spawn role==="quest" (loot lt_*_quest).
-        Réf bleue/donnée, dessinable.
-     2. 💡 POSITIONS-INDICE (dérivées) — les positions qu'on INFÈRE : les pools
-        role==="generic" (zones de corps déduites via la loot-table). Famille
-        visuelle 💡 (.player-hint, sœur de l'astuce joueur), marquée « aide, pas
-        des données officielles » — jamais confondue avec la donnée bleue.
-     3. 💡 ASTUCE JOUEUR — target.player_hint (provenance player_knowledge) :
-        connu EN JEU, jamais extrait de la data ; rendu en dernier, secondaire.
-   Réutilisable : tout but portant ces signaux obtient le tier correspondant —
-   officiel seul → tier 1 ; dérivé seul → tier 2 ; etc. Ce n'est PAS un patch
-   lost_crew, c'est le contrat général du guide de quête. */
+/* ── Positions d'un but : DEUX étiquettes combinées, sans tiroir ──────────────
+   Refonte 2026-07-16 (owner : « simple, clair, sans menu déroulant »). Un but
+   qui se remplit en fouillant des objets/corps exprime son « où » comme des
+   SOURCES DE POINTS, chacune un nuage nommé, réunies en AU PLUS DEUX étiquettes
+   dessinables (le même modèle que le but faune « Animaux paisibles » que l'owner
+   a validé) — jamais une liste par-zone, jamais un tiroir. Chaque étiquette
+   bascule d'un clic tout son nuage via le registre campTrace de 1re classe
+   (pins.js S.campTraces / addCampTrace — togglable, listé au bandeau-légende,
+   retirable, teinte quête). Réparties PAR LES SIGNAUX DE LA DONNÉE (jamais une
+   quête codée en dur) :
+     • 🟢 POSITIONS (donnée) — l'UNION des placements EXACTS de conteneurs
+       (search_zone.basis === "chest_placement", target.placements) et des pools
+       de spawn role==="quest". UNE réf bleue dessinable, dessine tout d'un coup.
+     • 💡 ZONES DE CORPS FOUILLABLES (dérivées) — l'UNION de TOUS les pools
+       role==="generic" (déduits via la loot-table). UNE réf 💡 (.player-hint,
+       sœur de l'astuce joueur), map-wide assumé : une seule étiquette, comme
+       « Animaux paisibles » (aussi pan-carte), jamais un nuage éclaté.
+   Puis, muettes : la ligne inline « Types acceptés : N types », le repère
+   d'orientation (landmark), et l'astuce joueur (target.player_hint, provenance
+   player_knowledge). Réutilisable : tout but portant ces signaux obtient
+   l'étiquette correspondante — officiel seul → 🟢 seule ; dérivé seul → 💡
+   seule ; aucun → la ligne objet/types seule. */
 const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN par jeu de points (garde-fou ; cas actuels ≤ 44)
-const ACCEPTED_TYPES_CAP = 8;     // plafond d'AFFICHAGE de la ventilation des types (« +N » au-delà)
 /* Instantané des jeux de points dessinables par clé de tracé (même idiome
    module-state que currentGoalZones) : le rendu le peuple, le routeur de dessin
    (main.js → toggleGoalPlacements) le relit au clic. Content-keyed → stable au
@@ -82,12 +83,6 @@ function resolveSpawnPoolCamp(pool) {
   if (!hit && pool.points) hit = groups.find(g => (g.pts || []).length === pool.points);
   return hit && hit.pts && hit.pts.length ? hit : null;
 }
-/* Le nom de groupe BRUT du pipeline « Corps1 » (jeton d'outil) → « Corpse
-   (type 1) » : humain, et DISTINCT des groupes « Corpse » / « Corpse astronaut »
-   — jamais réduit à un « Corpse » nu qui les doublerait. Le seul motif corps<N>
-   est transformé, cleanLabel fait ensuite son nettoyage normal. */
-const prettyAcceptedTypeName = name => String(name ?? '').replace(/^corps(\d+)$/i, 'Corpse (type $1)');
-
 /* ── Les sources de points d'un but, réparties par tier ─────────────────────
    Chaque source : { subrole, key, label, pts, count, placed? }. `count` = le
    compte de la DONNÉE (placements ou pool.points) porté par la méta du tier. */
@@ -158,143 +153,53 @@ function unionSourcePts(sources) {
   }
   return union;
 }
-/* ── Garde de DESSIN du tier 2 (dérivé) : ne dessiner que s'il RESTREINT ─────
-   Un pool role="generic" (💡 positions probables) n'aide QUE s'il est localisé.
-   Quand les positions déduites couvrent l'essentiel de la carte (ex.
-   lost_crew_search : « cherche des corps PARTOUT »), leur nuage de points est du
-   BRUIT — redondant avec l'astuce joueur qui dit déjà « partout ». On décide du
-   caractère WIDESPREAD par la FORME PROPRE du pool (jamais une quête codée en
-   dur), sur deux signaux robustes, l'un suffit :
-     • DENSITÉ — pool gros/éparpillé : ≥ WIDESPREAD_ZONES zones distinctes OU
-       ≥ WIDESPREAD_PTS points au total. C'est l'indicateur sûr (une bbox peut être
-       faussée par 2 grappes éloignées) et le moins cher — dérivé des COMPTES de
-       la donnée, disponible même si les camps ne sont pas encore chargés.
-     • ÉTENDUE — OU la bbox des points déduits couvre ≥ WIDESPREAD_BBOX_FRAC du
-       cadre carte actif sur LES DEUX axes (empreinte vraiment pan-carte, quel
-       que soit le compte).
-   lost_crew_search — 9 zones · 8 273 pts, bbox ≈ 53 %×51 % du cadre 9600×7680 —
-   déclenche la DENSITÉ (les deux comptes) ; une quête vraiment localisée à 1–3
-   zones ne déclenche aucun signal → tier 2 dessiné normalement (inchangé). */
-const WIDESPREAD_ZONES = 6;        // ≥ ce nb de zones dérivées distinctes ⇒ pan-carte
-const WIDESPREAD_PTS = 2000;       // ≥ ce nb de points dérivés ⇒ pan-carte
-const WIDESPREAD_BBOX_FRAC = 0.55; // ≥ cette part du cadre carte sur LES DEUX axes
-function hintSpread(sources) {
-  const zones = sources.length;
-  const pts = sources.reduce((s, x) => s + (x.count || 0), 0);
+/* UNE étiquette combinée dessinable pour un jeu de sources : dessine l'UNION de
+   tous leurs points d'un seul clic (registre campTrace de 1re classe, routé par
+   main.js sur data-subrole "goal-spawn-agg" → toggleGoalPlacements). Le compte
+   affiché est celui de la DONNÉE (somme des sources) — stable, indépendant du
+   chargement différé des camps ; l'union dessinée le rejoint une fois les camps
+   joints. Union vide (camps pas encore joints, aucun placement) → réf NON
+   dessinable = texte simple, jamais une pastille morte (règle owner). */
+function combinedDrawTag(sources, tier, label) {
   const union = unionSourcePts(sources);
-  let fx = 0, fz = 0;
-  if (union.length && activeMap && activeMap.w && activeMap.h) {
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-    for (const p of union) {
-      if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
-      if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
-    }
-    fx = (x1 - x0) / activeMap.w;
-    fz = (z1 - z0) / activeMap.h;
-  }
-  const widespread = zones >= WIDESPREAD_ZONES || pts >= WIDESPREAD_PTS
-    || (fx >= WIDESPREAD_BBOX_FRAC && fz >= WIDESPREAD_BBOX_FRAC);
-  return { zones, pts, fx, fz, widespread };
+  const dataPts = sources.reduce((s, x) => s + (x.count || 0), 0);
+  const key = `qpoolagg:${tier}:${cleanLabel(sources[0].label || '')}:${sources.length}`;
+  if (union.length) goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label });
+  return ref({
+    kind: 'qao', subrole: 'goal-spawn-agg', key: union.length ? key : undefined,
+    label, hex: CATS.quest.hex, hasFiche: false, mode: 'E',
+    drawable: union.length > 0, drawn: !!(union.length && S.campTraces?.has(key)),
+    count: dataPts,
+  });
 }
-/* Tier 2 WIDESPREAD : une SEULE ligne muette dans la famille 💡 (sœur de
-   l'astuce), AUCUNE réf-point agrégée dessinable (le gros nuage pan-carte
-   disparaît) ; défère à l'astuce joueur juste dessous. Le tiroir par-zone reste
-   offert REPLIÉ pour les power users (« voir les N zones » — chaque source y
-   demeure dessinable individuellement), mais ce n'est PLUS le tier dessiné par
-   défaut. */
-function hintTierWidespread(sources, hasTip) {
-  const tierLabel = tr('goalHintLocations');
-  const note = tr('goalHintWidespread') + (hasTip ? ` — ${tr('goalHintSeeTip')}` : '');
-  const detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalHintZonesDetail', sources.length))}</summary>${
-    sources.map(s => `<div class="goal-target-row goal-target-row-pos">${sourceChip(s)}</div>`).join('')
-  }</details>`;
-  return `<div class="goal-target-row player-hint" data-provenance="derived">
-      <span class="player-hint-icon" aria-hidden="true">💡</span>
-      <span class="player-hint-body"><span class="player-hint-label">${esc(tierLabel)}</span> <span class="pos-region">${esc(note)}</span></span>
-    </div>${detail}`;
-}
-/* Méta du tier (comptes de la DONNÉE) : officiel = « N placés + M en zones »
-   (placés + pts des pools quête) ; indice = « M pts · N zones ». */
-function tierMeta(sources, isHint) {
-  if (isHint) {
-    const pts = sources.reduce((s, x) => s + (x.count || 0), 0);
-    return tr('goalSpawnAggMeta', pts.toLocaleString(numberLocale()), sources.length);
-  }
-  const placed = sources.find(s => s.placed);
-  const spawnPts = sources.filter(s => !s.placed).reduce((s, x) => s + (x.count || 0), 0);
-  if (placed && spawnPts) return tr('goalAcceptedMeta', placed.count, spawnPts.toLocaleString(numberLocale()));
-  if (placed) return tr('goalCorpsePlacedN', placed.count);
-  return tr('goalSpawnAggMeta', spawnPts.toLocaleString(numberLocale()), sources.length);
-}
-/* UN tier d'honnêteté (officiel 🟢 ou indice 💡). RÉUTILISABLE par tout but :
-   liste de sources + type de tier. Source UNIQUE → sa propre puce mène (garde
-   son subrole, notamment goal-placements). Plusieurs → UNE réf agrégée
-   'goal-spawn-agg' dessine l'UNION, avec un tiroir replié gardant chaque source
-   dessinable individuellement. RÉUTILISE la machinerie campTrace : les subroles
-   goal-placements / goal-spawn-pool / goal-spawn-agg routent tous vers
-   toggleGoalPlacements (main.js). `note`/`extra` (muets) sont rendus dans le
-   tier. */
-function locationTier(sources, tier, { note = '', extra = '' } = {}) {
+/* 🟢 POSITIONS — UNE étiquette bleue : l'union des placements exacts + pools
+   role="quest". Réutilisable par tout but portant des sources officielles. */
+function officialPositionsTier(sources) {
   if (!sources.length) return '';
-  const isHint = tier === 'hint';
-  const tierLabel = isHint ? tr('goalHintLocations') : tr('goalOfficialPositions');
-  let lead, detail = '';
-  if (sources.length === 1) {
-    lead = sourceChip(sources[0]);
-  } else {
-    const union = unionSourcePts(sources);
-    const meta = tierMeta(sources, isHint);
-    const key = `qpoolagg:${tier}:${cleanLabel(sources[0].label || '')}:${sources.length}`;
-    if (union.length) {
-      goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label: tierLabel });
-      lead = ref({
-        kind: 'qao', subrole: 'goal-spawn-agg', key, label: '', hex: CATS.quest.hex,
-        hasFiche: false, drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta,
-      });
-    } else {
-      lead = ref({
-        kind: 'qao', subrole: 'goal-spawn-agg', label: '', hex: CATS.quest.hex,
-        hasFiche: false, drawable: false, meta,
-      });
-    }
-    detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalTierDetailN', sources.length))}</summary>${
-      sources.map(s => `<div class="goal-target-row goal-target-row-pos">${sourceChip(s)}</div>`).join('')
-    }</details>`;
-  }
-  if (isHint) {
-    // Tier DÉRIVÉ 💡 — la famille visuelle player-hint (ambre, sœur de l'astuce
-    // joueur), clairement PAS de la donnée bleue ; une note muette rappelle
-    // « aide, pas des données officielles ».
-    const noteHtml = note ? `<span class="pos-region"> — ${esc(note)}</span>` : '';
-    return `<div class="goal-target-row player-hint" data-provenance="derived">
-      <span class="player-hint-icon" aria-hidden="true">💡</span>
-      <span class="player-hint-body"><span class="player-hint-label">${esc(tierLabel)}</span> ${lead}${noteHtml}</span>
-    </div>${detail}`;
-  }
-  // Tier OFFICIEL 🟢 — ligne de donnée, réf bleue.
-  return `<div class="goal-target-row goal-target-row-pos">
-    <span class="goal-target-rel-verb">🟢 ${esc(tierLabel)}</span> ${lead}
-  </div>${detail}${extra}`;
+  return `<div class="goal-target-row goal-target-row-pos">`
+    + `<span class="goal-target-rel-verb" aria-hidden="true">🟢</span> ${combinedDrawTag(sources, 'official', tr('goalPositions'))}`
+    + `</div>`;
+}
+/* 💡 ZONES DE CORPS FOUILLABLES — UNE étiquette 💡 (famille player-hint, ambre,
+   clairement PAS de la donnée bleue) : l'union de TOUS les pools role="generic".
+   Map-wide assumé, une seule étiquette comme « Animaux paisibles » (elle-même
+   pan-carte) — jamais un nuage éclaté ni un tiroir par-zone. */
+function hintZonesTier(sources) {
+  if (!sources.length) return '';
+  return `<div class="goal-target-row player-hint" data-provenance="derived">`
+    + `<span class="player-hint-icon" aria-hidden="true">💡</span>`
+    + `<span class="player-hint-body">${combinedDrawTag(sources, 'hint', tr('goalHintZonesTag'))}</span>`
+    + `</div>`;
 }
 
-/* Types acceptés — la liste COMPLÈTE des types que le jeu bind (bound_units),
-   CONDENSÉE : un sommaire « Types acceptés : N types » qui déplie la ventilation
-   détaillée (nom + « (N placés) / (spawn serveur) » + ×N variante) dans un
-   tiroir replié — plus jamais la longue phrase inline. */
-function acceptedTypesBlock(t) {
+/* Types acceptés — ligne INLINE muette « Types acceptés : N types » (N = total
+   des variantes de bound_units) : plus jamais un tiroir ni la ventilation
+   par-type ; le décompte suffit, les positions vivent dans les deux étiquettes. */
+function acceptedTypesLine(t) {
   const types = Array.isArray(t.accepted_types) ? t.accepted_types.filter(a => a && a.name) : [];
   if (!types.length) return '';
   const nVariants = types.reduce((s, a) => s + (a.count || 1), 0);
-  const shown = types.slice(0, ACCEPTED_TYPES_CAP);
-  const list = shown.map(a => {
-    const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
-    const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
-    return `${esc(cleanLabel(prettyAcceptedTypeName(a.name)))}${mult} <span class="muted">(${esc(qual)})</span>`;
-  }).join(' · ');
-  const moreN = types.length - shown.length;
-  const more = moreN > 0 ? ` <span class="muted">${esc(tr('goalAcceptedTypesMore', moreN))}</span>` : '';
-  return `<details class="fiche-dialogs goal-accepted"><summary><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span> <span class="muted">${esc(tr('goalAcceptedSummary', nVariants))}</span></summary>
-    <div class="goal-target-row"><span class="goal-accepted-types">${list}${more}</span></div></details>`;
+  return `<div class="goal-target-row goal-target-row-types"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span> <span class="muted">${esc(tr('goalAcceptedSummary', nVariants))}</span></div>`;
 }
 /* Astuce joueur — 3e tier, VISUELLEMENT DISTINCT (connu EN JEU, pas extrait :
    badge .player-hint + data-provenance). Rendu en dernier, secondaire. */
@@ -321,36 +226,27 @@ function toggleGoalPlacements(info) {
 }
 
 /* Blocs supplémentaires d'un but à positions (corps / conteneur), empilés sous
-   la ligne d'identité — LA structure propre à 3 tiers (rien si la cible n'en
-   porte aucun). Réutilisable : chaque tier n'apparaît que si la donnée le porte.
-     1. Types acceptés (sommaire repliable)
-     2. 🟢 Positions officielles (placements + pool quête)  + indice landmark
-     3. 💡 Positions probables (pools génériques, dérivées) — DESSINÉ seulement
-        s'il restreint la recherche ; pan-carte → note concise, pas de dessin
-        (voir hintSpread/hintTierWidespread)
+   la ligne d'identité — DROPDOWN-FREE, au plus DEUX étiquettes dessinables (rien
+   si la cible n'en porte aucune). Réutilisable : chaque bloc n'apparaît que si la
+   donnée le porte.
+     1. Types acceptés — ligne inline « N types » (jamais un tiroir)
+     2. 🟢 Positions — UNE étiquette (placements + pools quête)  + repère landmark
+     3. 💡 Zones de corps fouillables — UNE étiquette (pools génériques, dérivés)
      4. 💡 Astuce joueur */
 function goalCorpseExtras(t) {
   if (!t) return '';
   const { official, hint } = goalLocationSources(t);
   const rows = [];
-  const acc = acceptedTypesBlock(t);
+  const acc = acceptedTypesLine(t);
   if (acc) rows.push(acc);
   if (official.length) {
+    rows.push(officialPositionsTier(official));
     // Repère d'orientation (target.landmark) : texte muet honnête (.pos-region)
     // rendu une fois près des positions officielles — jamais un pin.
-    const extra = t.landmark
-      ? `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span></div>`
-      : '';
-    rows.push(locationTier(official, 'official', { extra }));
+    if (t.landmark) rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span></div>`);
   }
   if (hint.length) {
-    // Tier 2 dessiné SEULEMENT s'il RESTREINT la recherche (hintSpread). Pool
-    // pan-carte (ex. lost_crew) → note muette concise, aucune réf-point
-    // agrégée ; localisé (1–3 zones) → tier 2 dessinable inchangé.
-    const hasTip = !!(t.player_hint && t.player_hint.text);
-    rows.push(hintSpread(hint).widespread
-      ? hintTierWidespread(hint, hasTip)
-      : locationTier(hint, 'hint', { note: tr('goalHintLocationsNote') }));
+    rows.push(hintZonesTier(hint));
   }
   const tip = playerTipRow(t);
   if (tip) rows.push(tip);
