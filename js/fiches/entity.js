@@ -540,9 +540,27 @@ function guessStatTier(m) {
   if (/\beasy\b/.test(hay)) return 'easy';
   return 'medium';
 }
+/* Stats de monstre affichées — LISTE BLANCHE ORDONNÉE explicite (F1,
+   2026-07-15), en remplacement de l'ancienne itération dynamique
+   `Object.entries(stats)` qui rendait EN AVEUGLE tout champ présent du relevé,
+   y compris du BRUIT non-joueur : `gold_reward` (=32, une CONSTANTE FUITÉE
+   partagée à l'identique par 10 mobs record_fixed_sibling — la montrer
+   per-monstre est malhonnête) et `xp_reward`. On ne rend désormais QUE les
+   stats de combat par-monstre légitimes, dans un ordre lisible ; une stat
+   absente du relevé est simplement OMISE (jamais un 0 ni une constante
+   inventée — absence honnête). Libellés via statLabel() (i18n ×5, table
+   `statLabel` présente dans les 5 locales). Effet de bord voulu : cette liste
+   de littéraux rend le lecteur VISIBLE au gate de dormance G2
+   (_verify_field_readers) — accuracy/vision/health_regen/mana/mana_regen/
+   movement_speed cessent d'être « lues en aveugle » et sortent du registre. */
+const MONSTER_STAT_ROWS = [
+  'health', 'attack_power', 'weapon_damage', 'armor', 'magic_resist',
+  'accuracy', 'attack_speed', 'movement_speed', 'vision',
+  'health_regen', 'mana', 'mana_regen',
+];
 function statsGridHtml(stats) {
-  const rows = Object.entries(stats).map(([k, v]) =>
-    `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(String(v))}</div>`).join('');
+  const rows = MONSTER_STAT_ROWS.filter(k => stats[k] != null).map(k =>
+    `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(String(stats[k]))}</div>`).join('');
   return `<div class="stat-grid">${rows}</div>`;
 }
 
