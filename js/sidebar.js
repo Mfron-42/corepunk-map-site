@@ -793,14 +793,28 @@ const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
    le parent en état partiel). */
 const catLeaf = key => ({ get: () => !!CATS[key]?.on, set: on => { if (CATS[key]) CATS[key].on = on; } });
 const decorLeaf = fam => ({ get: () => !!S.decor[fam]?.on, set: on => { if (S.decor[fam]) S.decor[fam].on = on; } });
-/* Familles (arbre) jointes à ≥1 camp d'un kind donné ici — lignes famille
-   MIROIR du groupe Creeps (rat/ratmutant : le moteur les spawne sous
-   monsters ET creeps, présence double assumée — même état S.monfam, même
-   teinte de rang que dans l'arbre, jamais une couche dupliquée). */
+/* Familles (arbre) MIROIR du groupe Creeps — lignes famille d'un monstre que
+   le moteur spawne sous CE kind ET sous un AUTRE (son foyer monsters) :
+   « présence double assumée » (rat/ratmutant s'ils spawnent dans les deux),
+   même état S.monfam, même teinte de rang que dans l'arbre, jamais une couche
+   dupliquée.
+   Garde ENFORCÉE (fix duplicata woodraptor, 2026-07-15) : le critère « spawne
+   sous monsters ET creeps » de l'en-tête était ASSUMÉ, jamais vérifié — d'où
+   la fuite d'une famille de monstre dont TOUS les camps sont du kind creeps
+   (woodraptor : 8 camps, 100 % creeps, 0 camp monsters). Une telle famille
+   n'est PAS un miroir : elle a son unique foyer dans l'arbre Monstres (où
+   buildGroupMonsters la liste, kind-agnostique) et ne doit pas se dédoubler
+   ici. On ne mirroir donc QUE les familles au FOYER DOUBLE : présentes sous
+   `kind` ET sous au moins un AUTRE kind. Critère CALCULÉ sur la donnée (les
+   kinds réels des camps résolus), jamais une liste en dur — une famille
+   creeps-only tombe, une vraie dual-kind (rat/ratmutant le cas échéant) reste. */
 function famsOfKind(kind) {
   return monsterFamilies()
     .map(f => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyLayerHex(f.family) }))
-    .filter(f => [...f.campKeys].some(k => campGroupByKey(k)?.kind === kind));
+    .filter(f => {
+      const kinds = [...f.campKeys].map(k => campGroupByKey(k)?.kind);
+      return kinds.includes(kind) && kinds.some(k => k && k !== kind);
+    });
 }
 /* (destroyableKinds/interactivesKinds/chestsLeaves/destroyableLeaves/
    interactivesLeaves/interOtherLeaves — la composition des 4 ex-seaux
