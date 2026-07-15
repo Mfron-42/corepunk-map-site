@@ -547,6 +547,7 @@ export default {
       // como interruptor, nunca un punto concreto presentado como el animal.
       wildlifeFicheKind: 'Fauna',
       wildlifeVariants: list => `Variantes: ${list}`,
+      wildlifeLootSharedNote: 'Botín compartido de familia: estos objetos están vinculados a toda la familia, no a esta especie concreta — cada miembro de la familia da la misma tabla.',
       wildlifeWhereTitle: 'Dónde encontrarlos',
       wildlifeCampedNote: (n, p) => `Aparece en ${n} campamento${n === 1 ? '' : 's'} (${p} puntos en este mapa) — usa el punto junto al título para mostrarlos.`,
       wildlifePeacefulNote: 'No se conoce ninguna posición por especie: esta especie aparece entre los animales pacíficos. Muestra esas zonas de aparición:',

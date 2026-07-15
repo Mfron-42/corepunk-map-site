@@ -570,6 +570,7 @@ export default {
       // jamais un point précis présenté comme l'animal.
       wildlifeFicheKind: 'Faune',
       wildlifeVariants: list => `Variantes : ${list}`,
+      wildlifeLootSharedNote: 'Butin partagé de famille : ces drops sont liés à la famille entière, pas à cette espèce précise — chaque membre de la famille donne la même table.',
       wildlifeWhereTitle: 'Où les trouver',
       wildlifeCampedNote: (n, p) => `Apparaît dans ${n} camp${n === 1 ? '' : 's'} (${p} points sur cette carte) — utilisez la pastille à côté du titre pour les afficher.`,
       wildlifePeacefulNote: "Aucune position par espèce n'est connue — cette espèce apparaît parmi les animaux paisibles. Afficher ces zones d'apparition :",

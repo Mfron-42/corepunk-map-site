@@ -471,7 +471,10 @@ function wildlifeWhereHtml(id, spRes) {
      0-camp (Request 2).
    - Butin de dépeçage (w.loot — `lootShared` = table partagée de la famille
      turtle) : même rendu lootRowsHtml que monstre/camp/coffre, la méthode
-     (harvestMethod) dans le titre.
+     (harvestMethod) dans le titre. Quand `lootShared`, une note honnête
+     (wildlifeLootSharedNote, même grammaire d'absence que lootGenericNote des
+     coffres) précise que la table est liée à la FAMILLE, pas à cette espèce
+     nommée précise — le champ a désormais un lecteur (sorti de dormance).
    Lien profond `wsp=<id>` (setFicheHash 'wildlife') : partageable + Précédent/
    Suivant (restauré par router.js, différé comme monstre/camp). */
 function openWildlifeFiche(id) {
@@ -494,7 +497,14 @@ function openWildlifeFiche(id) {
   const variants = (w.namesAll || []).filter(nm => fold(nm) !== fold(w.name));
   const variantsHtml = variants.length
     ? `<p class="hint">${esc(tr('wildlifeVariants', variants.join(' · ')))}</p>` : '';
-  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}${w.harvestMethod ? ' · ' + esc(harvestMethodLabel(w.harvestMethod)) : ''}</h3>${lootRowsHtml(w.loot, 'noLootCatalogued')}</div>`;
+  // Note honnête (w.lootShared) : la table de butin est liée à la FAMILLE
+  // entière (turtle), jamais à cette espèce nommée précise — les couleurs des
+  // tables du jeu ne suivent pas les couleurs de skin. Même grammaire d'absence
+  // honnête que lootGenericNote (coffres) : jamais présenté comme une table
+  // curée par espèce.
+  const sharedLootNote = w.lootShared
+    ? `<p class="hint">${esc(tr('wildlifeLootSharedNote'))}</p>` : '';
+  const lootHtml = `<div class="fiche-section"><h3>${esc(tr('lootBestRates'))}${w.harvestMethod ? ' · ' + esc(harvestMethodLabel(w.harvestMethod)) : ''}</h3>${sharedLootNote}${lootRowsHtml(w.loot, 'noLootCatalogued')}</div>`;
   openFiche(`
     ${ficheHeader({ name: w.name, hex, dot: speciesDot, sub: esc(kindLine), below: dispHtml })}
     ${variantsHtml}

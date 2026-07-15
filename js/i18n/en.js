@@ -596,6 +596,7 @@ export default {
       // specific point IS that animal.
       wildlifeFicheKind: 'Wildlife',
       wildlifeVariants: list => `Variants: ${list}`,
+      wildlifeLootSharedNote: 'Shared family loot: these drops are bound to the whole species family, not this exact species — every member of the family yields the same table.',
       wildlifeWhereTitle: 'Where to find',
       wildlifeCampedNote: (n, p) => `Spawns in ${n} camp${n === 1 ? '' : 's'} (${p} points on this map) — use the dot next to the title to show them.`,
       wildlifePeacefulNote: 'No per-species position is known — this species spawns among the peaceful animals. Show those spawn zones:',
