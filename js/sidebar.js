@@ -3,7 +3,7 @@
 import { S, LS, save } from './state.js';
 import {
   CATS, CAMP_COLORS, ZONE_HEX, MONSTER_HEX, catLabel, campKindLabel, familyKey, familyLayerHex,
-  chestDisplayName, chestHex, DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
+  chestDisplayName, chestHex, DECOR_HEX, decorFamilyLabel, prettyRegion, ecAttr,
   speciesLayerHex, POI_TYPES, poiTypeLabel, kindBaseHex,
 } from './config.js';
 import { $, $$, esc, fmtCoord, pretty, fold } from './utils.js';
@@ -286,23 +286,17 @@ function catStats(key) {
 }
 
 /* ── Le groupe « Décor » est DISSOUS (IA finale, décision utilisateur
-   2026-07-11 : « c'est soit interactives soit destroyable, et tu as
-   chest ») : ses 7 familles (S.decor, données INCHANGÉES — data.js
-   buildDecorGroups, couches decor:<fam>, hash decor.*) se rangent dans les
-   sous-groupes du groupe Interactables selon leur `category` CUITE
-   (ontology chunk 2 —  « Chest/decor placements » :
-   legacy→interactable.chests, barrel/boxes→interactable.destroyable,
-   furniture/corpse/books→interactable.reactive, misc→interactable.other).
-   L'ancienne table d'affichage DECOR_BUCKET (le même rangement, jugé côté
-   front) est SUPPRIMÉE : le front LIT la classification, il ne re-juge
-   plus. Toujours toutes décochées par défaut ( §1/§3.1) et
-   pleinement recherchables (search.js buildChestSearchIndex ne filtre
-   jamais sur l'état on/off). Ordre d'affichage intra-bucket =
-   DECOR_FAMILIES (présentation, config.js). */
-const decorFamsOfCategory = cat =>
-  DECOR_FAMILIES.filter(f => S.decor[f] && (S.decor[f].category || 'interactable.other') === cat);
-/* Ligne de filtre d'UNE famille décor (ex-sous-ligne du groupe Décor —
-   mêmes couche/hash/état, seule la position dans l'arbre change). */
+   2026-07-11, puis arbre PLAT 2026-07-14) : ses familles (S.decor, données
+   INCHANGÉES — data.js buildDecorGroups, couches decor:<fam>, hash decor.*)
+   sont désormais des LIGNES DE PREMIER NIVEAU des « Objets interactifs »,
+   une par famille, dans un ordre de présentation FIXE (voir
+   buildGroupContainers). L'ancien rangement par `category` cuite en 4 seaux
+   (decorFamsOfCategory) est RETIRÉ avec les seaux eux-mêmes : plus de
+   parent, chaque famille se lit d'un coup d'œil. Toujours toutes décochées
+   par défaut ( §1/§3.1) et pleinement recherchables
+   (search.js buildChestSearchIndex ne filtre jamais sur l'état on/off). */
+/* Ligne de filtre d'UNE famille décor — ligne de PREMIER NIVEAU de l'arbre
+   plat (extraClass '' fourni par l'appelant ; mêmes couche/hash/état). */
 function decorRow(fam, extraClass = 'filter-row-sub') {
   const st = S.decor[fam];
   if (!st) return null;
@@ -606,9 +600,11 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
                         squirrel/porcupine via camp_details) + « Spawns non
                         identifiés » en dernier
      4. Harvesting    — Herbalism · Logging · Mining (inchangé)
-     5. Interactables — Chests · Destroyable · Interactives · Other
-                        (le groupe Décor y est dissous par sa `category`
-                        cuite, voir decorFamsOfCategory)
+     5. Interactables — arbre PLAT (2026-07-14) : une ligne par kind, à plat
+                        (Coffres de camp · Coffres fouillables · Corps · props
+                        placés · QAO · camps dynamiques « (camps) » · legacy ·
+                        Zones de fouille (spawn) tout en bas) — voir
+                        buildGroupContainers ; plus aucun sous-groupe/seau
    (Ex-groupe 4 « Wildlife » RETIRÉ 2026-07-12, décision propriétaire — sa
    seule couche dessinable « Animaux paisibles » (camp:wildlife) est passée
    dans World ci-dessus ; ses espèces fauniques 0-camp quittent l'arbre mais
@@ -651,7 +647,13 @@ const CAMP_ROW_LABEL_KEY = {
   guards: 'guardsRowLabel',
   destroyable: 'destroyableCampsRow',
   reactive: 'reactiveCampsRow',
-  searchable: 'searchSpotsRow',
+  // Split par contenu PROUVÉ (2026-07-15, config.js campStateKey) : les zones
+  // de fouille dominées par des corps et les camps réactifs de squelettes sont
+  // des couches distinctes, libellées par leur TYPE. Le seau `searchable`
+  // résiduel (zones sans corps prouvés) devient « — Autres ».
+  searchable: 'searchSpotsOtherRow',
+  searchable_corpses: 'searchSpotsCorpsesRow',
+  reactive_skeleton: 'skeletonCampsRow',
 };
 const campRowLabel = kind => CAMP_ROW_LABEL_KEY[kind] ? tr(CAMP_ROW_LABEL_KEY[kind]) : null;
 
@@ -723,6 +725,10 @@ const CAMP_REF_KIND = {
   shrines: 'shrine', soulkeeper: 'soulkeeper', guards: 'guard',
   mining: 'harvest', logging: 'harvest', herbalism: 'harvest',
   destroyable: 'destructible', reactive: 'reactive', wildlife: 'wildlife',
+  // Split de présentation (config.js) : le seau squelette reste un `reactive`
+  // (identité + teinte du contrat) ; le seau corps searchable retombe sur le
+  // kind générique « camp » comme le seau searchable d'origine.
+  reactive_skeleton: 'reactive',
 };
 function campRefOpt(kind) {
   const rk = CAMP_REF_KIND[kind] || 'camp';
@@ -747,7 +753,7 @@ function loadingHintLi() {
    2026-07-11) ────────────────────────────────────────────────────────────
    SEULS les parents intermédiaires qui représentent une vraie UNITÉ DE
    FILTRE portent une pastille de cascade : les sous-groupes (buildSubGroup
-   — POI/Others/buckets Interactables) et les lignes FAMILLE. Les en-têtes
+   — POI, World › Autres) et les lignes FAMILLE. Les en-têtes
    de GROUPE racine (World/Monsters/…, index.html) n'ont PLUS AUCUNE case :
    purs conteneurs plier/déplier (l'ancien câblage .grp-check/GROUP_LEAVES
    est retiré). Cocher un parent = TOUTES les feuilles de son sous-arbre
@@ -760,11 +766,13 @@ function loadingHintLi() {
    S.decor[f].on / S.poiTypes[t].on / S.monfam[f].on / S.monsp[id].on) ; les
    feuilles absentes de la carte active ne sont simplement pas listées
    (jamais un parent bloqué « ni tout ni rien » par une couche impossible). */
-const catLeaf = key => ({ get: () => !!CATS[key].on, set: on => { CATS[key].on = on; } });
 const campLeaf = kind => ({ get: () => !!S.camps[kind]?.on, set: on => { if (S.camps[kind]) S.camps[kind].on = on; } });
-const decorLeaf = fam => ({ get: () => !!S.decor[fam]?.on, set: on => { if (S.decor[fam]) S.decor[fam].on = on; } });
 const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
-const decorLeavesOfCategory = cat => decorFamsOfCategory(cat).map(decorLeaf);
+/* (catLeaf/decorLeaf/decorLeavesOfCategory — feuilles des ex-seaux
+   Interactables — RETIRÉS avec l'arbre plat 2026-07-14 : plus aucun
+   sous-groupe ne recouvre les couches CATS/décor, elles sont des lignes
+   plates directes. campLeaf/campLeavesOf restent — World › Autres cascade
+   encore.) */
 /* Familles (arbre) jointes à ≥1 camp d'un kind donné ici — lignes famille
    MIROIR du groupe Creeps (rat/ratmutant : le moteur les spawne sous
    monsters ET creeps, présence double assumée — même état S.monfam, même
@@ -774,14 +782,11 @@ function famsOfKind(kind) {
     .map(f => ({ family: f.family, nCamps: f.nCamps, nPts: f.nPts, campKeys: f.campKeys, hex: familyLayerHex(f.family) }))
     .filter(f => [...f.campKeys].some(k => campGroupByKey(k)?.kind === kind));
 }
-/* Kinds de camp de chaque bucket Interactables — DÉRIVÉS de la catégorie
-   cuite (voir kindsOfCategory ci-dessus), plus jamais une liste front. */
-const destroyableKinds = () => kindsOfCategory(c => c === 'interactable.destroyable');
-const interactivesKinds = () => kindsOfCategory(c => c === 'interactable.reactive' || c === 'interactable.searchable');
-const chestsLeaves = () => [catLeaf('searchable_chest'), catLeaf('camp_chest'), ...decorLeavesOfCategory('interactable.chests')];
-const destroyableLeaves = () => [...campLeavesOf(destroyableKinds()), ...decorLeavesOfCategory('interactable.destroyable')];
-const interactivesLeaves = () => [...campLeavesOf(interactivesKinds()), ...decorLeavesOfCategory('interactable.reactive')];
-const interOtherLeaves = () => [catLeaf('qao'), ...decorLeavesOfCategory('interactable.other')];
+/* (destroyableKinds/interactivesKinds/chestsLeaves/destroyableLeaves/
+   interactivesLeaves/interOtherLeaves — la composition des 4 ex-seaux
+   Interactables — RETIRÉS avec l'arbre plat 2026-07-14. buildGroupContainers
+   liste maintenant chaque kind/famille/couche DIRECTEMENT via
+   kindsOfCategory (camps dynamiques) + decorRow/catRow, sans seau parent.) */
 
 /* Registre des pastilles parent de sous-groupe (reconstruites à chaque
    rebuild de l'arbre). (L'ancien registre STATIQUE des groupes racine —
@@ -1417,72 +1422,64 @@ function buildGroupHarvest() {
     if (li) ul.appendChild(li);
   }
 }
-/* Somme HONNÊTE d'un bucket Interactables (sources DISJOINTES prouvées :
-   couches CATS ≠ familles décor ≠ camps dynamiques, voir 
-    §3 « point-level overlap: zero ») :
-   compte principal = ce que la carte dessinerait, badge +N = enregistrements
-   réels sans position (même discipline que catStats/hiddenBadge). */
-function bucketStats(cats, decorFams, kinds) {
-  let count = 0, hidden = 0;
-  for (const c of cats) { const s = catStats(c); count += s.shown; hidden += s.hidden || 0; }
-  for (const f of decorFams) { const st = S.decor[f]; if (st) { count += st.count; hidden += st.hidden || 0; } }
-  for (const k of kinds) { const st = S.camps[k]; if (st) count += st.points.length; }
-  return { count, hidden };
-}
-/* ── Groupe « Interactables » : 4 sous-groupes (Chests · Destroyable ·
-   Interactives · Other) — la composition de chaque bucket est DÉRIVÉE de la
-   `category` cuite des records (kinds de camp : interactable.destroyable/
-   reactive/searchable ; familles décor dissoutes : interactable.chests/
-   destroyable/reactive/other — voir decorFamsOfCategory/kindsOfCategory,
-   ontology chunk 2). Libellés désambiguïsés — plus jamais quatre choses
-   nommées « fouillable » : « Coffres fouillables » (searchable_chest, la
-   vraie couche coffre à recette) garde son terme ; le kind camp
-   `searchable` devient « Points de fouille (camps) » (searchSpotsRow,
-   GLOSSARY-PENDING) ; les kinds destroyable/reactive prennent un suffixe
-   « (camps) » (spawns dynamiques serveur, campRowLabel) pour ne pas se
-   confondre avec les props PLACÉS (décor) rangés dans le même bucket.
-   Défauts inchangés : les 2 couches coffres ON ; destroyable/reactive/
-   searchable/décor/qao OFF (palier bruit — verdict investigation §6.2,
-   0 table de butin canonique). */
+/* ── Groupe « Objets interactifs » : arbre PLAT (décision propriétaire
+   2026-07-14 — supersède les 4 seaux repliables Chests/Destroyable/
+   Interactives/Other). UNE ligne par kind, mutuellement exclusives, toutes
+   de PREMIER NIVEAU (plus aucun parent-seau, plus aucune cascade ici).
+   ORDRE FIXE (présentation, pas une classification) :
+     1. Coffres de camp      (camp_chest — ON par défaut)
+     2. Coffres fouillables  (searchable_chest — ON par défaut)
+     3. Corps                (decor:corpse — UNE ligne ; le rôle quête/loot/
+                              décor ne se lit plus QUE sur la fiche, voir
+                              data.js buildDecorGroups / config.js corpseRoleKey)
+     4-8. Tonneaux · Caisses · Meubles · Livres · Divers (props PLACÉS, décor)
+     9.  QAO                 (objets de quête activables)
+     10. Camps DYNAMIQUES serveur destroyable/reactive — suffixe « (camps) »
+         (campRowLabel) pour ne pas se confondre avec les props placés ci-dessus
+     11. Coffre hérité       (legacy — rangé en fin de props, si présent)
+     12. SÉPARÉ, tout en bas : « Zones de fouille (spawn) » — le kind camp
+         `searchable` (pool de spawn dynamique, searchSpotsRow), jamais mêlé
+         aux lignes coffres/corps ci-dessus.
+   Défauts inchangés (lus sur S.* — jamais réécrits ici) : les 2 couches
+   coffres ON ; corps/props/qao/camps dynamiques/searchable OFF (palier bruit,
+    §1/§3.1). Tokens de hash inchangés (cat.* / camp.<kind> /
+   decor.<famille>) SAUF la fusion corps (decor.corpse_quest|loot|decor →
+   decor.corpse, attendu — un deep-link legacy vers un token de rôle devient
+   inerte, accepté). Les camps dynamiques n'apparaissent qu'une fois camps.bin
+   arrivé (deferredReady) — sinon un indice de chargement en fin de liste. */
 function buildGroupContainers() {
   const ul = $('#group-containers-list');
   ul.innerHTML = '';
-  const fillKindsAndDecor = (kindsFn, decorCat) => u => {
-    for (const kind of (deferredReady ? kindsFn() : [])) {
-      const c = campRow(kind, campRowLabel(kind), 'filter-row-sub');
-      if (c) u.appendChild(c);
+  const add = li => { if (li) ul.appendChild(li); };
+  // 1-2. Les 2 vraies couches coffres (seules ON par défaut).
+  add(catRow('camp_chest'));
+  add(catRow('searchable_chest'));
+  // 3-8. Props PLACÉS (décor), ordre de présentation FIXE — corps en UNE ligne,
+  // puis tonneaux/caisses/meubles/livres/divers. decorRow() rend null si la
+  // famille est absente de la carte active (add() l'ignore).
+  for (const fam of ['corpse', 'barrel', 'boxes', 'furniture', 'books', 'misc']) add(decorRow(fam, ''));
+  // 9. QAO (objets de quête activables).
+  add(catRow('qao'));
+  // 10. Camps DYNAMIQUES serveur (destroyable/reactive) — suffixe « (camps) »
+  // (campRowLabel) : spawns serveur, distincts des props placés ci-dessus. Le
+  // seau réactif SQUELETTE (subtype `skeleton`, config.js campStateKey) sort en
+  // sa propre ligne « Squelettes (camps) », typée par contenu prouvé.
+  if (deferredReady) {
+    for (const kind of kindsOfCategory(c => c === 'interactable.destroyable' || c === 'interactable.reactive')) {
+      add(campRow(kind, campRowLabel(kind)));
     }
-    for (const f of decorFamsOfCategory(decorCat)) { const li = decorRow(f); if (li) u.appendChild(li); }
-  };
-  const BUCKETS = [
-    ['inter-chests', 'subChests', CATS.searchable_chest.hex, chestsLeaves,
-      ['searchable_chest', 'camp_chest'], 'interactable.chests', () => [],
-      u => {
-        u.appendChild(catRow('searchable_chest', 'filter-row-sub'));
-        u.appendChild(catRow('camp_chest', 'filter-row-sub'));
-        for (const f of decorFamsOfCategory('interactable.chests')) { const li = decorRow(f); if (li) u.appendChild(li); }
-      }],
-    ['inter-destroyable', 'subDestroyable', CAMP_COLORS.destroyable, destroyableLeaves,
-      [], 'interactable.destroyable', destroyableKinds,
-      fillKindsAndDecor(destroyableKinds, 'interactable.destroyable')],
-    ['inter-interactives', 'subInteractives', CAMP_COLORS.reactive, interactivesLeaves,
-      [], 'interactable.reactive', interactivesKinds,
-      fillKindsAndDecor(interactivesKinds, 'interactable.reactive')],
-    ['inter-other', 'subOther', CAMP_COLORS.other, interOtherLeaves,
-      ['qao'], 'interactable.other', () => [],
-      u => {
-        u.appendChild(catRow('qao', 'filter-row-sub'));
-        for (const f of decorFamsOfCategory('interactable.other')) { const li = decorRow(f); if (li) u.appendChild(li); }
-      }],
-  ];
-  // Bucket → kind EntityRef (identité + teinte du sous-groupe ; pas de pilule —
-  // catégorie). Table d'affichage, pas une re-classification.
-  const BUCKET_REF_KIND = { 'inter-chests': 'chest', 'inter-destroyable': 'destructible', 'inter-interactives': 'reactive', 'inter-other': 'qao' };
-  for (const [key, labelKey, hex, leavesFn, cats, decorCat, kindsFn, fill] of BUCKETS) {
-    const { count, hidden } = bucketStats(cats, decorFamsOfCategory(decorCat), deferredReady ? kindsFn() : []);
-    const grp = buildSubGroup(key, tr(labelKey), hex, leavesFn, count, hidden, BUCKET_REF_KIND[key] || null);
-    fill(grp.ul);
-    if (grp.ul.children.length) ul.appendChild(grp.li);
+  }
+  // 11. Coffre hérité (group legacy_chest) — rangé en fin de props.
+  add(decorRow('legacy', ''));
+  // 12. SÉPARÉ, tout en bas : les pools de fouille dynamiques (kind camp
+  // `searchable`), TYPÉS par contenu prouvé (config.js campStateKey) — « Zones
+  // de fouille — Corps » (couche dominante, subtype `corpses`) puis « — Autres »,
+  // ordonnées par nombre de points décroissant (les corps dominent). Jamais
+  // mêlées aux coffres/corps placés au-dessus.
+  if (deferredReady) {
+    for (const kind of kindsOfCategory(c => c === 'interactable.searchable', true)) {
+      add(campRow(kind, campRowLabel(kind)));
+    }
   }
   if (!deferredReady) ul.appendChild(loadingHintLi());
 }

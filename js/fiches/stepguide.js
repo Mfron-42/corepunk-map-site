@@ -133,11 +133,18 @@ function toggleGoalPlacements(info) {
    groupe de camp (pts) ou null si les camps ne sont pas encore chargés / le pool
    n'est pas joignable (rendu honnête non dessinable dans ce cas). */
 function resolveSpawnPoolCamp(pool) {
-  const st = S.camps && S.camps.searchable;
-  if (!st || !st.groups) return null;
+  // Depuis le split par contenu (2026-07-15, config.js campStateKey), les camps
+  // searchable de CORPS vivent sous la clé `searchable_corpses`, les autres sous
+  // `searchable` — on balaie donc TOUS les groupes de catégorie
+  // `interactable.searchable`, quelle que soit leur clé de couche.
+  const groups = [];
+  for (const st of Object.values(S.camps || {}))
+    for (const g of (st.groups || []))
+      if (g.category === 'interactable.searchable') groups.push(g);
+  if (!groups.length) return null;
   const want = fold(cleanLabel(pool.label || ''));
-  let hit = st.groups.find(g => fold(cleanLabel(g.name || '')) === want);
-  if (!hit && pool.points) hit = st.groups.find(g => (g.pts || []).length === pool.points);
+  let hit = groups.find(g => fold(cleanLabel(g.name || '')) === want);
+  if (!hit && pool.points) hit = groups.find(g => (g.pts || []).length === pool.points);
   return hit && hit.pts && hit.pts.length ? hit : null;
 }
 /* Affordance DESSINABLE d'un pool de spawn — RÉUTILISE le registre campTrace
@@ -164,6 +171,15 @@ function goalSpawnPoolChip(pool) {
     drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta: capMeta,
   });
 }
+/* Le nom de groupe BRUT du pipeline « Corps1 » (préfixe de clé tc_chest_corps1_*,
+   6 clés serveur-spawn) est un jeton d'outil illisible. Prettifié en « Corpse
+   (type 1) » : humain, et surtout DISTINCT des groupes « Corpse » (1 clé,
+   11 corps placés) et « Corpse astronaut » (2 clés) — jamais réduit à un
+   « Corpse » nu qui doublerait le groupe existant. Local à cette vue :
+   cleanLabel (utils.js) est partagé par ~25 sites d'appel, jamais élargi ici ;
+   ce helper transforme le seul motif corps<N> puis laisse cleanLabel faire son
+   nettoyage normal (no-op sur « Corpse (type 1) », sans underscore). */
+const prettyAcceptedTypeName = name => String(name ?? '').replace(/^corps(\d+)$/i, 'Corpse (type $1)');
 /* Les 3 blocs corps, empilés sous la vignette de cible (rien si la cible n'en
    porte aucun — sûr pour tout target non-corps). */
 function goalCorpseExtras(t) {
@@ -181,7 +197,7 @@ function goalCorpseExtras(t) {
       // ×2) ; « (N placés) » sinon « (spawn serveur) » quand 0 placement statique.
       const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
       const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
-      return `${esc(cleanLabel(a.name))}${mult} <span class="muted">(${esc(qual)})</span>`;
+      return `${esc(cleanLabel(prettyAcceptedTypeName(a.name)))}${mult} <span class="muted">(${esc(qual)})</span>`;
     }).join(' · ');
     const moreN = types.length - shown.length;
     const more = moreN > 0 ? ` <span class="muted">${esc(tr('goalAcceptedTypesMore', moreN))}</span>` : '';

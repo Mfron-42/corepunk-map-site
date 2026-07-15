@@ -112,14 +112,24 @@ const CAMP_COLORS = {
   // concepts distincts, une seule couleur. Décalé vers un or-bronze foncé
   // distinct (le conteneur garde son or clair #ffd166) : harmonieux avec l'ADN
   // ambre, et la couche camp étant DÉCOCHÉE par défaut, zéro changement au boot.
-  // (Le renommage du LIBELLÉ « searchable » est TRANCHÉ — décision ratifiée #4,
-  // 2026-07-14 : la ligne d'arbre/légende dit le CONTENU joueur « Coffres &
-  // corps fouillables » (i18n searchSpotsRow ×5 — vérifié sur camps.bin :
-  // 9 pools de coffres fouillables + 3 pools de corps), jamais la piste
+  // (Libellé du kind camp `searchable` — arbre PLAT, décision propriétaire
+  // 2026-07-14 : rangé SÉPARÉMENT tout en bas des « Objets interactifs »,
+  // dit son mécanisme « Zones de fouille (spawn) » (i18n searchSpotsRow ×5 —
+  // pool de spawn dynamique serveur, jamais un conteneur placé), distinct de
+  // la vraie couche coffre `searchable_chest` ci-dessus ; jamais la piste
   // « Loot camp »/« Camp de butin » du blueprint R2, abandonnée.)
   searchable: '#c9982e', destroyable: '#e07a5f',
   reactive: '#06d6a0', shrines: '#bdb2ff', soulkeeper: '#7b2cbf',
   quest: '#c77dff', guards: '#778da9', event: '#f4a259', other: '#6c757d',
+  // Split de PRÉSENTATION par contenu PROUVÉ (2026-07-15, décision
+  // propriétaire — voir CAMP_SUBTYPE_SPLIT plus bas) : le kind `searchable`
+  // dominé par des corps (subtype `corpses`) et le kind `reactive` fait de
+  // squelettes (subtype `skeleton`) deviennent chacun leur propre couche.
+  // Teintes RELIÉES à leur concept — corpse-spawn → mauve de la famille Corps
+  // (parent de DECOR_HEX.corpse) ; skeleton → os/cendre — et distinctes à la
+  // fois de leur teinte de kind d'origine (or `searchable`, turquoise
+  // `reactive`) et de toute autre teinte de couche.
+  searchable_corpses: '#9d6f88', reactive_skeleton: '#c9bda3',
 };
 const campKindLabel = key => tbl('campKind', key) || pretty(key);
 const actorKindLabel = key => tbl('kind', key) || key;
@@ -372,6 +382,59 @@ function campLabel(key, kind, shippedName, subtype) {
   }
   return shippedName || campDisplayName(key);
 }
+/* ── Split de PRÉSENTATION par contenu PROUVÉ (2026-07-15) ────────────────────
+   Décision propriétaire : « maintenant que les zones sont typées par contenu
+   PROUVÉ (camps.bin `subtype`/`subtypeSource`), MONTRER le type ». Certains
+   kinds de camp sont présentés en PLUSIEURS couches selon leur sous-type
+   dominant, mutuellement exclusives :
+     - `searchable` → Corps (subtype `corpses`, dominant) vs le reste ;
+     - `reactive`   → Squelettes (subtype `skeleton`) vs le reste.
+   Le groupe garde son `kind`/`subtype` RÉELS (popup/fiche/recherche les lisent) ;
+   seule la CLÉ D'ÉTAT de couche (S.camps) dérive via campStateKey — chaque seau
+   devient une couche indépendante qui réutilise TOUTE la machinerie kind (ligne
+   d'arbre, tracé composite, jeton de hash, popup). Les kinds/sous-types non
+   listés retombent sur leur kind d'origine (aucune couche fantôme : une carte
+   sans corps searchable / sans squelette reactive ne crée simplement pas la
+   clé, donc pas de ligne vide). */
+const CAMP_SUBTYPE_SPLIT = {
+  searchable: { corpses: 'searchable_corpses' },
+  reactive: { skeleton: 'reactive_skeleton' },
+};
+function campStateKey(g) {
+  const m = g && CAMP_SUBTYPE_SPLIT[g.kind];
+  return (m && m[g.subtype]) || (g ? g.kind : undefined);
+}
+/* Teinte de COUCHE d'un camp — la couleur de sa couche de présentation (split
+   inclus), SOURCE UNIQUE partagée par le tracé carte (compositeCampPoints), la
+   popup, la fiche, la réf `[Camp(●)]` et la recherche : un camp de spawn de
+   corps se lit mauve PARTOUT, jamais mauve sur la carte et or dans la popup. */
+function campLayerHex(g) {
+  return (g && (CAMP_COLORS[campStateKey(g)] || CAMP_COLORS[g.kind])) || '#999';
+}
+/* Descripteur de CONTENU honnête d'un camp (camps.bin `subtype`/`corpseFraction`/
+   `subtypeSource`) : composition PROUVÉE par preset de spawn serveur
+   (`subtypeSource:'presets'`) ou par le nom de la zone (`'name'`) — jamais
+   inférée. Renvoie { label (campType localisé), corpsePct (fraction de corps
+   dans le pool, seulement quand > 0), source } ; `null` quand le camp n'est pas
+   typé (absence honnête). Aucune interne de preset n'est exposée. */
+function campContentInfo(g) {
+  if (!g || !g.subtype || !g.subtypeSource) return null;
+  // Seulement les sous-types à libellé de CONTENU connu (campType — corps,
+  // squelettes, champignons, caisses…) : jamais les sous-types de FAUNE
+  // (« rat », « small », « raptor »…) qui ne décrivent pas un contenu de pool.
+  // Même porte que la branche subtype de campLabel — cohérence nom/contenu.
+  const label = tbl('campType', g.subtype);
+  if (!label) return null;
+  const cf = typeof g.corpseFraction === 'number' ? g.corpseFraction : 0;
+  return { label, corpsePct: cf > 0 ? Math.round(cf * 100) : null, source: g.subtypeSource };
+}
+/* Valeur d'affichage du contenu (popup/fiche) : la fraction de corps quand elle
+   est prouvée (« ~86 % de corps »), sinon le libellé de sous-type (« Squelettes »). */
+function campContentValue(g) {
+  const info = campContentInfo(g);
+  if (!info) return null;
+  return info.corpsePct != null ? tr('campCorpsePct', info.corpsePct) : info.label;
+}
 /* Qualificatif de camp (patrol|buffed -- jeton NEUTRE côté moteur, poids par
    mode PvP/PvE byte-prouvé, voir  §3) :
    « — Patrouille » / « — Renforcé (PvP) », formulation SOFT (c'est un poids
@@ -439,25 +502,28 @@ function chestDisplayName(r) {
    des 2 vraies couches de coffres ci-dessus). */
 /* Corps : le CHAMP CUIT `contentRole` (chests.bin, byte-dérivé du client —
    loot_tables lt_searchable_corpse_quest / lt_searchable_corpse / aucune,
-   voir  LOT C) scinde l'ancien seau unique « Corps »
-   (51) en trois couches HONNÊTES : corps CÂBLÉ-QUÊTE (contentRole=quest, 11),
-   corps FOUILLABLE (contentRole=loot, 34), corps DÉCOR (aucun rôle prouvé —
-   contentRole 'unknown'/'decor', non fouillable, 6). Un corps reste un corps
-   (kind=corpse pour les trois) — c'est le RÔLE qui les distingue, pas leur
-   nature. Résolveur unique, réutilisé par buildDecorGroups (data.js),
-   chestHex/chestKindLabel ci-dessous et le sélecteur de couche (main.js). */
+   voir  LOT C) distingue trois RÔLES honnêtes : corps
+   CÂBLÉ-QUÊTE (contentRole=quest, 11), corps FOUILLABLE (contentRole=loot, 34),
+   corps DÉCOR (aucun rôle prouvé — 'unknown'/'decor', 6). Un corps reste un
+   corps (kind=corpse, family='corpse' pour les 51). Depuis l'arbre PLAT
+   (décision propriétaire 2026-07-14), le rôle N'EST PLUS une couche d'arbre :
+   les corps forment UNE seule famille 'corpse' (data.js buildDecorGroups,
+   couche decor:corpse, main.js). corpseRoleKey ne sert donc plus qu'à la
+   FICHE/au popup — teinte + libellé PAR RECORD via chestHex/chestKindLabel
+   ci-dessous (le rôle se lit sur l'objet ouvert, jamais comme 3 lignes). */
 function corpseRoleKey(r) {
   const role = r && r.contentRole;
   if (role === 'quest') return 'corpse_quest';
   if (role === 'loot') return 'corpse_loot';
   return 'corpse_decor';   // unknown / decor / rôle non prouvé : corps décoratif
 }
-const DECOR_FAMILIES = ['barrel', 'boxes', 'furniture', 'misc',
-  'corpse_quest', 'corpse_loot', 'corpse_decor', 'books', 'legacy'];
+const DECOR_FAMILIES = ['barrel', 'boxes', 'furniture', 'misc', 'corpse', 'books', 'legacy'];
 const DECOR_HEX = {
   barrel: '#a9744c', boxes: '#c2a25c', furniture: '#8f97a8',
-  // Trois teintes de corps : sourdes/terreuses (décor masqué par défaut),
-  // distinguables entre elles pour lire les trois couches d'un coup d'œil.
+  // `corpse` = teinte de la couche/ligne UNIQUE des corps (arbre plat). Les
+  // trois teintes de RÔLE (corpse_quest/loot/decor) restent : chestHex les lit
+  // PAR RECORD pour la pastille de la fiche/du popup (corpseRoleKey), jamais
+  // pour une couche d'arbre — sourdes/terreuses (décor masqué par défaut).
   corpse: '#8a7080', corpse_quest: '#a06a86', corpse_loot: '#8a7080', corpse_decor: '#6f6470',
   books: '#8d7ab0', misc: '#6c757d', legacy: '#c9a66b',
 };
@@ -748,6 +814,7 @@ export {
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
   prettyMapId, mapName, ecAttr,
   campDisplayName, campLabel, campTypeLabel, campQualifierLabel, campQualifierChip, campModeLabel,
+  campStateKey, campLayerHex, campContentInfo, campContentValue,
   chestTypeLabel, activableTypeLabel, chestDisplayName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, corpseRoleKey, chestHex, chestKindLabel,
   prettyRegion, LOOT_TABLE_HEX,

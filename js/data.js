@@ -5,7 +5,7 @@
 import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
-import { DECOR_FAMILIES, corpseRoleKey } from './config.js';
+import { DECOR_FAMILIES, campStateKey } from './config.js';
 import { setClassLabels } from './classlabels.js';
 import { positionCounts, isHiddenTest } from './devcontent.js';
 
@@ -92,11 +92,13 @@ function buildDecorGroups(chests, prevOn = {}) {
   const byFam = {};
   for (const c of chests) {
     let fam = null;
-    // Corps : scindés par RÔLE cuit (contentRole → corpseRoleKey : corpse_quest/
-    // corpse_loot/corpse_decor) plutôt qu'un seul seau « corpse » — un corps
-    // reste un corps (kind=corpse), c'est son rôle qui le range (voir
-    //  LOT C ; config.js corpseRoleKey).
-    if (c.group === 'decor') fam = c.kind === 'corpse' ? corpseRoleKey(c) : (c.family || 'misc');
+    // Corps : UNE seule famille d'arbre 'corpse' (kind=corpse, family='corpse'
+    // côté données) — décision propriétaire 2026-07-14 (arbre PLAT, une ligne
+    // par kind, corps = UNE ligne). Le RÔLE cuit (contentRole loot/quest/
+    // unknown) n'est PLUS une couche d'arbre à part : il ne teinte/n'étiquette
+    // QUE la fiche et le popup, par-record, via config.js chestKindLabel/
+    // chestHex (corpseRoleKey y reste, ici non).
+    if (c.group === 'decor') fam = c.kind === 'corpse' ? 'corpse' : (c.family || 'misc');
     else if (c.group === 'legacy_chest') fam = 'legacy';
     else continue;
     (byFam[fam] || (byFam[fam] = [])).push(c);
@@ -286,7 +288,9 @@ async function loadDeferred() {
   for (const [k, st] of Object.entries(prevSrc)) prevOn[k] = st.on;
   const kwCamps = {};
   camps.forEach(g => {
-    const k = g.kind;
+    // Clé de couche = kind de PRÉSENTATION (split par contenu prouvé, voir
+    // config.js campStateKey) — le groupe garde son kind/subtype RÉELS.
+    const k = campStateKey(g);
     if (!kwCamps[k]) kwCamps[k] = { on: prevOn[k] || false, points: [], groups: [] };
     kwCamps[k].groups.push(g);
     g.pts.forEach(pt => kwCamps[k].points.push({ x: pt[0], z: pt[1], g }));

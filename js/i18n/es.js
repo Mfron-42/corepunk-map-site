@@ -82,6 +82,10 @@ export default {
       // Títulos de subgrupos (IA final). Los del grupo Monstruos
       // (Monsters/Creeps/Wildlife) reutilizan la tabla campKind — espejo
       // literal de los kinds del motor. GLOSSARY-PENDING.
+      // subChests/subDestroyable/subInteractives/subOther YA NO los usa el
+      // árbol (árbol plano «Objetos interactivos», 2026-07-14 — los 4 buckets
+      // se retiraron), pero se CONSERVAN por paridad i18n; subWorldOthers aún
+      // etiqueta el subgrupo World › Otros.
       subWorldOthers: 'Otros',
       subChests: 'Cofres',
       subDestroyable: 'Destructibles',
@@ -102,12 +106,32 @@ export default {
       // pero las ZONAS de aparición son reales — capa propia « Animales
       // pacíficos », no un recuento de « datos faltantes ».
       wildlifeRestRow: 'Animales pacíficos',
-      // Decisión ratificada #4 (2026-07-14): la etiqueta dice el CONTENIDO
-      // para el jugador que la capa dibuja realmente (9 pools de cofres
-      // registrables + 3 de cuerpos), nunca la taxonomía interna.
-      searchSpotsRow: 'Cofres y cuerpos registrables',
+      // Árbol plano (2026-07-14): el kind de campamento `searchable` es un
+      // POOL DE APARICIÓN dinámico del servidor (camps.bin) — listado aparte,
+      // al final del árbol plano, nunca mezclado con las filas de cofres/
+      // cuerpos colocados de arriba. Su etiqueta nombra ese mecanismo —
+      // «Zonas de registro (spawn)» — distinta de la capa contenedora real
+      // `searchable_chest` («Cofres registrables»).
+      searchSpotsRow: 'Zonas de registro (spawn)',
       destroyableCampsRow: 'Destructibles (campamentos)',
       reactiveCampsRow: 'Interactivos (campamentos)',
+      searchSpotsCorpsesRow: 'Zonas de registro — Cadáveres',
+      searchSpotsOtherRow: 'Zonas de registro — Otros',
+      skeletonCampsRow: 'Esqueletos (campamentos)',
+      campContentLabel: 'Contenido',
+      campCorpsePct: p => `~${p}% cadáveres`,
+      campContentPresetNote: 'Composición probada por el preajuste de aparición del servidor.',
+      campContentNameNote: 'Tipo probado por el nombre de la zona.',
+      qaoQuestLabel: 'Misión',
+      barterCostLabel: 'Trueque:',
+      barterCostTitle: 'Coste en objetos (el oro se omite para esta existencia).',
+      itemValueLabel: 'Valor',
+      itemValueTitle: 'Valor de venta base.',
+      professionEfficiencyTitle: 'Eficiencia',
+      professionEfficiencyTier: n => `Nivel ${n}`,
+      recipeProfLevel: (prof, lv) => `Requiere ${prof} Nv ${lv}`,
+      recipeProfLevelNoProf: lv => `Requiere nivel ${lv}`,
+      recipeRequiresRecipe: names => `Aprende primero: ${names}`,
       // (pinFiltersTitle retirado con el concepto abandonado de filtros anclados.)
       trackedTitle: 'Seguimiento',
       trackedEmptyHint: 'Fija un marcador con «Seguir» para encontrarlo aquí.',
@@ -886,8 +910,10 @@ export default {
     // "Decoración" (js/sidebar.js buildDecorGroup), ver  §3.1.
     decorFamily: {
       barrel: 'Barriles', boxes: 'Cajas', furniture: 'Muebles',
-      // Cadáveres divididos por contentRole (un cadáver es un cadáver —
-      // kind=corpse en los tres; el rol los distingue; config.js corpseRoleKey).
+      // `corpse` = la fila ÚNICA de cadáveres del árbol plano (2026-07-14). Las
+      // etiquetas de ROL (corpse_quest/loot/decor) permanecen: config.js
+      // chestKindLabel las muestra POR REGISTRO en la ficha/popup, nunca como
+      // filas del árbol (config.js corpseRoleKey).
       corpse: 'Cadáveres',
       corpse_quest: 'Cadáveres de misión', corpse_loot: 'Cadáveres saqueables', corpse_decor: 'Cadáveres (decorativos)',
       books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
@@ -917,7 +943,7 @@ export default {
     },
     campType: {
       barrels: 'Barriles explosivos', tombstones: 'Lápidas', coffins: 'Ataúdes',
-      chests: 'Cofres registrables', corpses: 'Cadáveres registrables', sacks: 'Sacos',
+      chests: 'Cofres registrables', corpses: 'Cadáveres registrables', skeleton: 'Esqueletos', sacks: 'Sacos',
       crateCorn: 'Cajón de maíz', crateCabbage: 'Cajón de repollo', crateCarrot: 'Cajón de zanahorias',
       crateOnion: 'Cajón de cebollas', crateEggplant: 'Cajón de berenjenas', crateBerries: 'Cajón de bayas',
       sackCorn: 'Saco de maíz', sackWheat: 'Saco de trigo',

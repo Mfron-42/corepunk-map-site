@@ -93,7 +93,10 @@ export default {
       // zones: dot/label = toggle, chevron = fold only).
       subgroupFoldAria: 'Expand or collapse',
       // Sub-group titles (final IA). GLOSSARY-PENDING (bespoke structural
-      // labels).
+      // labels). subChests/subDestroyable/subInteractives/subOther are now
+      // UNUSED by the tree (flat Interactables, 2026-07-14 — the 4 buckets
+      // were removed) but KEPT for i18n parity; subWorldOthers still labels
+      // the World › Others sub-group.
       subWorldOthers: 'Others',
       subChests: 'Chests',
       subDestroyable: 'Destroyable',
@@ -107,10 +110,10 @@ export default {
       // kindRestPoints (règle rest-only universelle, data-dérivée); now serves ALL THREE Monsters/Creeps/Wildlife root
       // groups symmetrically — the old monsterCampsRow "Monster camps"
       // coarse toggle is retired); and the "(camps)" disambiguation of the
-      // dynamic-spawn kinds sitting next to PLACED decor props inside the
-      // Interactables buckets. The `searchable` kind gets a genuinely
-      // distinct name ("Search spots"). GLOSSARY-PENDING (internal
-      // level-design tokens).
+      // dynamic-spawn kinds (destroyable/reactive) sitting next to PLACED
+      // decor props in the flat Interactables tree. The `searchable` kind is
+      // listed separately at the bottom as "Search spawn zones" (searchSpotsRow).
+      // GLOSSARY-PENDING (internal level-design tokens).
       guardsRowLabel: 'Guards (unidentified unit)',
       kindRestRow: 'Unidentified spawns',
       // Wildlife group only: the generic peaceful/wild fauna pools bind no
@@ -118,14 +121,41 @@ export default {
       // are real, so this is a first-class « Peaceful animals » layer, not a
       // « missing data » count.
       wildlifeRestRow: 'Peaceful animals',
-      // Ratified decision #4 (2026-07-14): the row/legend label says the
-      // PLAYER CONTENT the layer actually draws — verified on camps.bin:
-      // 12 `searchable` pools = 9 searchable-chest spawn pools (7 845 pts)
-      // + 3 searchable-corpse pools (814 pts) — never internal taxonomy
-      // ("search spots"/"loot camp" wordings retired).
-      searchSpotsRow: 'Searchable chests & corpses',
+      // Flat-tree decision (2026-07-14): the `searchable` camp kind is a
+      // dynamic SERVER SPAWN POOL (camps.bin) — listed on its own, separated
+      // at the very bottom of the flat Interactables tree, never mixed with
+      // the placed chest/corpse rows above. Its label names that mechanism —
+      // "Search spawn zones" — distinct from the real `searchable_chest`
+      // container layer ("Searchable chests"). ("search spots"/"loot camp"
+      // wordings retired.)
+      searchSpotsRow: 'Search spawn zones',
       destroyableCampsRow: 'Destroyables (camps)',
       reactiveCampsRow: 'Interactives (camps)',
+      // Search zones TYPED by proven content (2026-07-15, camps.bin
+      // `subtype`/`corpseFraction`): the dominant corpse-spawn layer, the
+      // rest, and reactive skeleton camps — split into distinct rows, tinted
+      // toward their concept (Corpses mauve / Bone).
+      searchSpotsCorpsesRow: 'Search zones — Corpses',
+      searchSpotsOtherRow: 'Search zones — Other',
+      skeletonCampsRow: 'Skeletons (camps)',
+      // Proven pool content (camp popup/fiche).
+      campContentLabel: 'Content',
+      campCorpsePct: p => `~${p}% corpses`,
+      campContentPresetNote: 'Composition proven by the server spawn preset.',
+      campContentNameNote: 'Type proven by the zone name.',
+      // Quest object → quest(s) it serves (qao popup).
+      qaoQuestLabel: 'Quest',
+      // Barter cost + item sell value.
+      barterCostLabel: 'Barter:',
+      barterCostTitle: 'Cost in items (gold suppressed for this stock).',
+      itemValueLabel: 'Value',
+      itemValueTitle: 'Base sell value.',
+      // Efficiency ladder (profession fiche) + recipe gates.
+      professionEfficiencyTitle: 'Efficiency',
+      professionEfficiencyTier: n => `Tier ${n}`,
+      recipeProfLevel: (prof, lv) => `Requires ${prof} Lv ${lv}`,
+      recipeProfLevelNoProf: lv => `Requires level ${lv}`,
+      recipeRequiresRecipe: names => `Learn first: ${names}`,
       // (pinFiltersTitle removed with the abandoned separate pinned-filters
       // concept -- user decision 2026-07-11, the tree IS the bestiary.)
       trackedTitle: 'Tracked',
@@ -967,8 +997,10 @@ export default {
     // (js/sidebar.js buildDecorGroup), see  §3.1.
     decorFamily: {
       barrel: 'Barrels', boxes: 'Boxes', furniture: 'Furniture',
-      // Corpses split by cooked contentRole (a corpse is a corpse — kind=corpse
-      // for all three — the role distinguishes them; see config.js corpseRoleKey).
+      // `corpse` = the SINGLE corpse row of the flat tree (2026-07-14). The
+      // ROLE labels (corpse_quest/loot/decor) stay: config.js chestKindLabel
+      // shows them PER RECORD on the fiche/popup, never as tree rows
+      // (config.js corpseRoleKey).
       corpse: 'Corpses',
       corpse_quest: 'Quest corpses', corpse_loot: 'Searchable corpses', corpse_decor: 'Corpses (decor)',
       books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
@@ -997,7 +1029,7 @@ export default {
     },
     campType: {
       barrels: 'Explosive barrels', tombstones: 'Tombstones', coffins: 'Coffins',
-      chests: 'Searchable chests', corpses: 'Searchable corpses', sacks: 'Sacks',
+      chests: 'Searchable chests', corpses: 'Searchable corpses', skeleton: 'Skeletons', sacks: 'Sacks',
       crateCorn: 'Corn crate', crateCabbage: 'Cabbage crate', crateCarrot: 'Carrot crate',
       crateOnion: 'Onion crate', crateEggplant: 'Eggplant crate', crateBerries: 'Berry crate',
       sackCorn: 'Corn sack', sackWheat: 'Wheat sack',

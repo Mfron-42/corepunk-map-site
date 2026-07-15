@@ -7,6 +7,7 @@ import {
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
   campLabel, campQualifierChip, campModeLabel, chestDisplayName,
+  campLayerHex, campContentInfo, campContentValue,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
   speciesLayerHex, familyLayerHex, entityColor,
@@ -290,6 +291,27 @@ function campContextSection(det) {
   if (!region && !tier) return '';
   return `<div class="fiche-section camp-context">${region}${tier}</div>`;
 }
+/* Section CONTENU PROUVÉ (camps.bin `subtype`/`corpseFraction`/`subtypeSource`)
+   — la composition du pool de spawn, PROUVÉE par preset de spawn serveur ou par
+   le nom de la zone (jamais inférée) : « ~86 % de corps » quand la fraction de
+   corps est connue, sinon le libellé de sous-type (« Squelettes »). Badge de
+   provenance AFFIRMATIF (c'est un fait byte-prouvé, même registre que la ligne
+   d'activité). Vide (aucun octet) quand le camp n'est pas typé — fiche
+   inchangée. */
+function campContentSection(g) {
+  const info = campContentInfo(g);
+  if (!info) return '';
+  const note = info.source === 'presets' ? tr('campContentPresetNote') : tr('campContentNameNote');
+  // Réutilise le gabarit de la ligne « Région » (mêmes classes .camp-region-row/
+  // .camp-region-label) — même traitement visuel qu'un fait de contexte de camp.
+  return `<div class="fiche-section camp-context">
+    <div class="camp-region-row">
+      <span class="camp-region-label">${esc(tr('campContentLabel'))}</span>
+      <span>${esc(campContentValue(g))}</span>
+      ${badge({ axis: 'provenance', value: 'official', extra: note })}
+    </div>
+  </div>`;
+}
 
 function openCampFiche(key) {
   const det = S.campDetails[key] || null;
@@ -350,15 +372,16 @@ function openCampFiche(key) {
   // pastille de l'en-tête EST le locate, jamais l'en-tête + un bouton position
   // redondant sur le même point (forme verbeuse abandonnée, intention owner).
   const campDot = g.pts.length
-    ? { kind: 'camp', mode: 'L', key, label: name, hex: CAMP_COLORS[g.kind] || '#999',
+    ? { kind: 'camp', mode: 'L', key, label: name, hex: campLayerHex(g),
         drawable: true, pos: { x: g.pts[0][0], z: g.pts[0][1] } }
     : null;
   openFiche(`
     ${ficheHeader({
-      name, hex: CAMP_COLORS[g.kind] || '#999', dot: campDot, nameSuffix: qualChip,
+      name, hex: campLayerHex(g), dot: campDot, nameSuffix: qualChip,
       sub: `${esc(tr('campLabel'))} · ${esc(campKindLabel(g.kind))}`,
       below: `<span class="pop-coords">${esc(tr('spawnPointsCount', g.pts.length))}</span>`,
     })}
+    ${campContentSection(g)}
     ${campContextSection(det)}${presenceHtml}
     ${rosterSection}
     ${cospawnHtml}

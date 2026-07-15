@@ -3,7 +3,7 @@
    sélecteur du panneau. Ne connaît aucune vue : à chaque bascule, il
    rejoue les hooks posés par main.js (fiches/recherche/filtres/couches). */
 import { S } from './state.js';
-import { KWALAT_DEFAULTS, mapName } from './config.js';
+import { KWALAT_DEFAULTS, mapName, campStateKey } from './config.js';
 import { fetchJson, dataPath, buildDecorGroups } from './data.js';
 import {
   map, worldBounds, setActiveMap, applyMapGeometry, denseRenderers,
@@ -65,7 +65,9 @@ async function loadMapData(mid) {
   quests.forEach(q => qmap.set(q.slug, q));
   const campsState = {};
   camps.forEach(g => {
-    const k = g.kind;
+    // Clé de couche = kind de PRÉSENTATION (split par contenu prouvé, voir
+    // config.js campStateKey) — même règle que le chemin Kwalat (data.js).
+    const k = campStateKey(g);
     if (!campsState[k]) campsState[k] = { on: false, points: [], groups: [] };
     campsState[k].groups.push(g);
     g.pts.forEach(pt => campsState[k].points.push({ x: pt[0], z: pt[1], g }));

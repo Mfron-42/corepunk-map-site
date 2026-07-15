@@ -925,6 +925,25 @@ function containersSectionHtml(it) {
    pseudo-item recette lui-même pour openRecipeFiche) : le chip "produit →"
    ne s'affiche que quand r.output diffère de CETTE clé (jamais un lien qui
    pointerait vers la fiche déjà ouverte). */
+/* Verrous d'accès d'une recette (recipes.bin) — RENDUS quand la donnée les
+   porte, jamais fabriqués : `profLevel` (« Requiert <métier> niv. N ») et
+   `requiresRecipe` (« Apprenez d'abord : <recette> », nom résolu via S.recipes,
+   repli prettifié — jamais un lien mort). Partagé par la section « Recette »
+   d'une fiche objet ET la fiche recette (recipeIngredientBlocks ci-dessous). */
+function recipeGateHtml(r) {
+  const parts = [];
+  if (r.profLevel != null) {
+    parts.push(r.prof
+      ? tr('recipeProfLevel', professionLabel(r.prof), r.profLevel)
+      : tr('recipeProfLevelNoProf', r.profLevel));
+  }
+  if (r.requiresRecipe?.length) {
+    const names = r.requiresRecipe.map(k => S.recipes[k]?.name || pretty(k));
+    parts.push(tr('recipeRequiresRecipe', names.join(', ')));
+  }
+  if (!parts.length) return '';
+  return parts.map(p => `<p class="hint recipe-gate">${esc(p)}</p>`).join('');
+}
 function recipeIngredientBlocks(recipeRefs, ownKey) {
   return (recipeRefs || []).map(ref => {
     const rk = typeof ref === 'string' ? ref : ref.key;
@@ -934,6 +953,7 @@ function recipeIngredientBlocks(recipeRefs, ownKey) {
     const metaLine = [r.prof ? professionLabel(r.prof) : null, rarity ? rarityLabel(rarity) : null]
       .filter(Boolean).join(' · ');
     const meta = metaLine ? `<div class="pop-coords recipe-meta">${esc(metaLine)}</div>` : '';
+    const gate = recipeGateHtml(r);
     // BUG FIX (regression, was chipList(r.ingredients)): r.ingredients is
     // [{key,count}] (see  not
     // an array of string keys -- chipList's itemChip(key) did S.items[key]
@@ -946,7 +966,7 @@ function recipeIngredientBlocks(recipeRefs, ownKey) {
     const ing = qtyChipList(r.ingredients);
     const out = (r.output && r.output !== ownKey)
       ? `<div class="recipe-out">${esc(tr('producesArrow'))}${itemChip(r.output)}</div>` : '';
-    return `<div class="recipe-block">${meta}<div class="reward-chips">${ing}</div>${out}</div>`;
+    return `<div class="recipe-block">${meta}${gate}<div class="reward-chips">${ing}</div>${out}</div>`;
   }).join('');
 }
 
@@ -1069,12 +1089,24 @@ function itemStockFlags(s) {
    que la table de stock de la fiche PNJ, pour une seule grammaire de prix. */
 function itemPriceBandRow(s) {
   if (!s || typeof s === 'string') return '';
-  const bpm = s.buy_price_multiplier, gold = s.gold;
-  const lo = s.priceMin != null ? s.priceMin : (bpm && gold ? bpm.min * gold.min : (s.price ?? null));
-  const hi = s.priceMax != null ? s.priceMax : (bpm && gold ? bpm.max * gold.max : lo);
   const qual = s.quality
     ? `<span class="fr-quality" style="color:${RARITY[s.quality]?.hex || 'var(--muted)'}">${esc(rarityLabel(s.quality) || s.quality)}</span>` : '';
   const flags = itemStockFlags(s);
+  // Échange (barter) : le coût est en OBJETS, l'or est supprimé côté données
+  // (ex. monture Hyène cuirassée = 1× Sceau de hyène cuirassée). Rendu « N×
+  // <objet> » — chip cliquable vers la fiche de l'objet d'échange, quantité
+  // TOUJOURS explicite — au lieu d'AUCUN prix (l'ancien rendu laissait ces
+  // stocks sans aucune indication de coût).
+  if (s.barter?.length) {
+    const barterHtml = s.barter
+      .map(b => `${esc(String(b.count || 1))}× ${itemChip(b.key)}`)
+      .join(' + ');
+    const price = `<span class="muted" title="${esc(tr('barterCostTitle'))}">${esc(tr('barterCostLabel'))} ${barterHtml}</span>`;
+    return `<div class="vendor-price">${qual}${flags}${price}</div>`;
+  }
+  const bpm = s.buy_price_multiplier, gold = s.gold;
+  const lo = s.priceMin != null ? s.priceMin : (bpm && gold ? bpm.min * gold.min : (s.price ?? null));
+  const hi = s.priceMax != null ? s.priceMax : (bpm && gold ? bpm.max * gold.max : lo);
   let price = '';
   if (lo != null && hi != null && Math.round(lo) !== Math.round(hi)) {
     price = `<span class="muted fr-price" title="${esc(tr('priceBandTitle'))}">${esc(Math.round(lo).toLocaleString(numberLocale()))}&nbsp;–&nbsp;${esc(Math.round(hi).toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`;
@@ -1115,6 +1147,12 @@ function openItemFiche(key) {
 
   const descHtml = it.desc
     ? `<div class="fiche-section"><p class="fiche-journal">${esc(it.desc)}</p></div>` : '';
+
+  // Valeur de revente de base (items.bin `value`) — repère de « prix » honnête,
+  // surtout utile quand l'objet n'a pas de prix d'achat en or (stock d'échange).
+  const valueLine = (it.value != null && it.value > 0)
+    ? `<span class="pop-coords item-value" title="${esc(tr('itemValueTitle'))}">${esc(tr('itemValueLabel'))} ${esc(Math.round(it.value).toLocaleString(numberLocale()))} <span class="coin" aria-hidden="true"></span></span>`
+    : '';
 
   // Effet(s) de la/des capacité(s) liée(s) ( Phase B) --
   // jointure déjà faite au build (it.useEffect), rendue ici seulement.
@@ -1469,6 +1507,7 @@ function openItemFiche(key) {
       sub: `${esc(itemKindText)}${rarity ? ' · ' + esc(rarityLabel(it.rarity)) : ''}${raritiesLine ? ' · ' + esc(raritiesLine) : ''}${it.tier ? ' · ' + esc(it.tier) : ''}${devMark}`,
       below: `${weaponLine ? `<span class="pop-coords">${esc(weaponLine)}</span>` : ''}
       ${it.prof ? `<span class="pop-coords">${esc(professionLabel(it.prof))}</span>` : ''}
+      ${valueLine}
       ${recipeChipHtml}`,
     })}
     ${raritySelectHtml}

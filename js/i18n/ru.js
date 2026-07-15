@@ -84,6 +84,10 @@ export default {
       // Заголовки подгрупп. Подгруппы группы «Монстры» (Monsters/Creeps/
       // Wildlife) переиспользуют таблицу campKind — дословное зеркало
       // kinds движка. GLOSSARY-PENDING.
+      // subChests/subDestroyable/subInteractives/subOther БОЛЬШЕ не
+      // используются деревом (плоское дерево «Интерактивные объекты»,
+      // 2026-07-14 — 4 бакета удалены), но СОХРАНЕНЫ для паритета i18n;
+      // subWorldOthers всё ещё подписывает подгруппу World › Прочее.
       subWorldOthers: 'Прочее',
       subChests: 'Сундуки',
       subDestroyable: 'Разрушаемые',
@@ -104,12 +108,31 @@ export default {
       // спавна реальны — это полноценный слой « Мирные животные », а не счётчик
       // « недостающих данных ».
       wildlifeRestRow: 'Мирные животные',
-      // Ратифицированное решение #4 (2026-07-14): подпись говорит о СОДЕРЖИМОМ
-      // для игрока, которое слой реально рисует (9 пулов обыскиваемых сундуков
-      // + 3 пула тел), а не о внутренней таксономии.
-      searchSpotsRow: 'Обыскиваемые сундуки и тела',
+      // Плоское дерево (2026-07-14): kind лагеря `searchable` — это
+      // динамический СЕРВЕРНЫЙ ПУЛ СПАВНА (camps.bin), стоит отдельно, внизу
+      // плоского дерева, отдельно от размещённых строк сундуков/тел выше.
+      // Подпись называет этот механизм — «Зоны обыска (спавн)» — отличается
+      // от настоящего слоя-контейнера `searchable_chest` («Обыскиваемые сундуки»).
+      searchSpotsRow: 'Зоны обыска (спавн)',
       destroyableCampsRow: 'Разрушаемые (лагеря)',
       reactiveCampsRow: 'Интерактивные (лагеря)',
+      searchSpotsCorpsesRow: 'Зоны обыска — Трупы',
+      searchSpotsOtherRow: 'Зоны обыска — Прочее',
+      skeletonCampsRow: 'Скелеты (лагеря)',
+      campContentLabel: 'Содержимое',
+      campCorpsePct: p => `~${p}% трупов`,
+      campContentPresetNote: 'Состав подтверждён серверным пресетом спавна.',
+      campContentNameNote: 'Тип подтверждён названием зоны.',
+      qaoQuestLabel: 'Квест',
+      barterCostLabel: 'Обмен:',
+      barterCostTitle: 'Стоимость в предметах (золото не используется для этого товара).',
+      itemValueLabel: 'Ценность',
+      itemValueTitle: 'Базовая цена продажи.',
+      professionEfficiencyTitle: 'Эффективность',
+      professionEfficiencyTier: n => `Ступень ${n}`,
+      recipeProfLevel: (prof, lv) => `Требуется ${prof} ур. ${lv}`,
+      recipeProfLevelNoProf: lv => `Требуется уровень ${lv}`,
+      recipeRequiresRecipe: names => `Сначала изучите: ${names}`,
       // (pinFiltersTitle удалён вместе с отказом от отдельных закреплённых фильтров.)
       trackedTitle: 'Отслеживаемое',
       trackedEmptyHint: 'Закрепите маркер кнопкой «Отслеживать», чтобы найти его здесь.',
@@ -868,8 +891,10 @@ export default {
     // (js/sidebar.js buildDecorGroup), см.  §3.1.
     decorFamily: {
       barrel: 'Бочки', boxes: 'Ящики', furniture: 'Мебель',
-      // Трупы разделены по contentRole (труп остаётся трупом — kind=corpse для
-      // всех трёх; различает их роль; config.js corpseRoleKey).
+      // `corpse` = ЕДИНАЯ строка тел плоского дерева (2026-07-14). Подписи
+      // РОЛИ (corpse_quest/loot/decor) остаются: config.js chestKindLabel
+      // показывает их ПО ЗАПИСИ в карточке/попапе, а не как строки дерева
+      // (config.js corpseRoleKey).
       corpse: 'Трупы',
       corpse_quest: 'Трупы заданий', corpse_loot: 'Обыскиваемые трупы', corpse_decor: 'Трупы (декор)',
       books: 'Книги', misc: 'Разное', legacy: 'Устаревший сундук',
@@ -898,7 +923,7 @@ export default {
     },
     campType: {
       barrels: 'Взрывающиеся бочки', tombstones: 'Надгробия', coffins: 'Гробы',
-      chests: 'Обыскиваемые сундуки', corpses: 'Обыскиваемые трупы', sacks: 'Мешки',
+      chests: 'Обыскиваемые сундуки', corpses: 'Обыскиваемые трупы', skeleton: 'Скелеты', sacks: 'Мешки',
       crateCorn: 'Ящик кукурузы', crateCabbage: 'Ящик капусты', crateCarrot: 'Ящик моркови',
       crateOnion: 'Ящик лука', crateEggplant: 'Ящик баклажанов', crateBerries: 'Ящик ягод',
       sackCorn: 'Мешок кукурузы', sackWheat: 'Мешок пшеницы',

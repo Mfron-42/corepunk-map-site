@@ -96,7 +96,10 @@ export default {
       // zones de clic : pastille/libellé = bascule, chevron = pli seul).
       subgroupFoldAria: 'Déplier ou replier',
       // Titres de sous-groupes (IA finale). GLOSSARY-PENDING (libellés
-      // structurels).
+      // structurels). subChests/subDestroyable/subInteractives/subOther ne
+      // sont PLUS utilisés par l'arbre (Objets interactifs à plat, 2026-07-14 —
+      // les 4 seaux sont retirés) mais CONSERVÉS pour la parité i18n ;
+      // subWorldOthers étiquette encore le sous-groupe World › Autres.
       subWorldOthers: 'Autres',
       subChests: 'Coffres',
       subDestroyable: 'Destructibles',
@@ -111,10 +114,10 @@ export default {
       // kindRestPoints (règle rest-only universelle, data-dérivée) ; sert désormais les TROIS groupes
       // Monsters/Creeps/Wildlife, symétrie — l'ancienne monsterCampsRow
       // « Camps de monstres » est retirée avec la bascule grossière) ; et la
-      // désambiguïsation « (camps) » des kinds dynamiques rangés à côté de
-      // props PLACÉS dans les buckets Interactables. Le kind `searchable`
-      // reçoit un nom VRAIMENT distinct (« Points de fouille ») — plus
-      // jamais quatre choses nommées « fouillable ». GLOSSARY-PENDING
+      // désambiguïsation « (camps) » des kinds dynamiques (destroyable/
+      // reactive) rangés à côté des props PLACÉS dans l'arbre plat Objets
+      // interactifs. Le kind `searchable` est listé À PART, tout en bas :
+      // « Zones de fouille (spawn) » (searchSpotsRow). GLOSSARY-PENDING
       // (tokens internes d'outil de level-design, pas des termes du jeu).
       guardsRowLabel: 'Gardes (unité non identifiée)',
       kindRestRow: 'Spawns non identifiés',
@@ -123,14 +126,40 @@ export default {
       // mais les ZONES de spawn sont réelles, donc une couche à part entière
       // « Animaux paisibles », pas un compte « donnée manquante ».
       wildlifeRestRow: 'Animaux paisibles',
-      // Décision ratifiée #4 (2026-07-14) : le libellé de la ligne/légende dit
-      // le CONTENU joueur que la couche dessine réellement — vérifié sur
-      // camps.bin : 12 pools `searchable` = 9 pools de coffres fouillables
-      // (7 845 pts) + 3 pools de corps fouillables (814 pts) — jamais la
-      // taxonomie interne (« points de fouille »/« camp de butin » retirés).
-      searchSpotsRow: 'Coffres & corps fouillables',
+      // Arbre plat (2026-07-14) : le kind camp `searchable` est un POOL DE
+      // SPAWN dynamique serveur (camps.bin) — listé seul, séparé tout en bas
+      // de l'arbre plat Objets interactifs, jamais mêlé aux lignes coffres/
+      // corps placés au-dessus. Son libellé nomme ce mécanisme — « Zones de
+      // fouille (spawn) » — distinct de la vraie couche conteneur
+      // `searchable_chest` (« Coffres fouillables »).
+      searchSpotsRow: 'Zones de fouille (spawn)',
       destroyableCampsRow: 'Destructibles (camps)',
       reactiveCampsRow: 'Interactifs (camps)',
+      // Zones de fouille TYPÉES par contenu prouvé (2026-07-15, camps.bin
+      // `subtype`/`corpseFraction`) : la couche dominante de spawn de corps,
+      // le reste, et les camps réactifs de squelettes — sortis en lignes
+      // distinctes, teintées vers leur concept (Corps mauve / Os).
+      searchSpotsCorpsesRow: 'Zones de fouille — Corps',
+      searchSpotsOtherRow: 'Zones de fouille — Autres',
+      skeletonCampsRow: 'Squelettes (camps)',
+      // Contenu prouvé d'un pool (popup/fiche camp).
+      campContentLabel: 'Contenu',
+      campCorpsePct: p => `~${p} % de corps`,
+      campContentPresetNote: 'Composition prouvée par le preset de spawn serveur.',
+      campContentNameNote: 'Type prouvé par le nom de la zone.',
+      // Objet de quête → quête(s) servie(s) (popup qao).
+      qaoQuestLabel: 'Quête',
+      // Coût d'échange (barter) + valeur de revente d'un objet.
+      barterCostLabel: 'Échange :',
+      barterCostTitle: "Coût en objets (l'or est supprimé pour ce stock).",
+      itemValueLabel: 'Valeur',
+      itemValueTitle: 'Valeur de revente de base.',
+      // Échelle d'efficacité (fiche métier) + verrous de recette.
+      professionEfficiencyTitle: 'Efficacité',
+      professionEfficiencyTier: n => `Palier ${n}`,
+      recipeProfLevel: (prof, lv) => `Requiert ${prof} niv. ${lv}`,
+      recipeProfLevelNoProf: lv => `Requiert niveau ${lv}`,
+      recipeRequiresRecipe: names => `Apprenez d'abord : ${names}`,
       // (pinFiltersTitle retiré avec le concept abandonné de filtres épinglés
       // séparés — décision utilisateur 2026-07-11, l'arbre EST le bestiaire.)
       trackedTitle: 'Suivis',
@@ -931,9 +960,11 @@ export default {
     // (js/sidebar.js buildDecorGroup) — voir  §3.1.
     decorFamily: {
       barrel: 'Tonneaux', boxes: 'Caisses', furniture: 'Meubles',
-      // Corps scindés par contentRole cuit (un corps reste un corps — kind=corpse
-      // pour les trois — c'est le rôle qui les range ; config.js corpseRoleKey).
-      corpse: 'Cadavres',
+      // `corpse` = la ligne UNIQUE des corps de l'arbre plat (2026-07-14). Les
+      // libellés de RÔLE (corpse_quest/loot/decor) restent : config.js
+      // chestKindLabel les affiche PAR RECORD sur la fiche/le popup, jamais
+      // comme lignes d'arbre (config.js corpseRoleKey).
+      corpse: 'Corps',
       corpse_quest: 'Corps de quête', corpse_loot: 'Corps fouillables', corpse_decor: 'Corps (décor)',
       books: 'Livres', misc: 'Divers', legacy: 'Coffre hérité',
     },
@@ -968,7 +999,7 @@ export default {
     // campKind.destroyable/searchable ci-dessus (déjà générique et traduit).
     campType: {
       barrels: 'Tonneaux explosifs', tombstones: 'Pierres tombales', coffins: 'Cercueils',
-      chests: 'Coffres fouillables', corpses: 'Corps fouillables', sacks: 'Sacs',
+      chests: 'Coffres fouillables', corpses: 'Corps fouillables', skeleton: 'Squelettes', sacks: 'Sacs',
       crateCorn: 'Caisse de maïs', crateCabbage: 'Caisse de choux', crateCarrot: 'Caisse de carottes',
       crateOnion: "Caisse d'oignons", crateEggplant: "Caisse d'aubergines", crateBerries: 'Caisse de baies',
       sackCorn: 'Sac de maïs', sackWheat: 'Sac de blé',

@@ -4,11 +4,11 @@
    npcRef/campRef), lignes de camp, et la machinerie de zone d'objectif/monstre. */
 import { S } from '../state.js';
 import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
+  CATS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
   actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
   rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
+  campLabel, campQualifierChip, campModeLabel, chestDisplayName, campLayerHex,
   statLabel, statTierLabel, formulaTermLabel,
   chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
   speciesLayerHex, familyLayerHex, entityColor,
@@ -772,7 +772,7 @@ function campRef(key, g, { self = false } = {}) {
   return ref({
     kind: 'camp', key,
     label: campLabel(key, g.kind, g.name, g.subtype),
-    hex: CAMP_COLORS[g.kind] || '#999',
+    hex: campLayerHex(g),
     hasFiche: !self, drawable: n > 0, drawn: false, count: n,
   });
 }
@@ -948,7 +948,7 @@ function farmUnjoinedRow(c) {
   const canPing = c.x != null;
   const openable = Object.values(S.camps || {}).some(st => (st.groups || []).some(gr => gr.k === c.camp));
   const campRefHtml = ref({
-    kind: 'camp', key: c.camp, label, hex: CAMP_COLORS[c.kind] || '#999',
+    kind: 'camp', key: c.camp, label, hex: campLayerHex(c),
     hasFiche: openable,
     mode: canPing ? 'L' : undefined, drawable: canPing,
     pos: canPing ? { x: c.x, z: c.z, map: mid || undefined } : undefined,

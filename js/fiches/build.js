@@ -262,6 +262,35 @@ function professionTiersHtml(p) {
   return `<div class="fiche-section"><h3>${esc(tr('professionTiersTitle'))}</h3>
     ${p.tier_unlocks.map(u => `<p class="hint">• ${esc(u)}</p>`).join('')}</div>`;
 }
+/* Rendu HONNÊTE d'un texte de bonus du client : les balises Unity
+   `<color=#RRGGBB>…</color>` (ex. « Rare » bleu, « Epic » violet) deviennent des
+   `<span>` teintés et les sauts de ligne des `<br>`. Chaque segment est échappé ;
+   la couleur n'est acceptée que si elle matche un hex court (sinon la balise est
+   ignorée, texte rendu nu) — aucune injection possible depuis la donnée. */
+function bonusRich(s) {
+  const str = String(s ?? '');
+  const re = /<color=(#[0-9a-fA-F]{3,8})>([\s\S]*?)<\/color>/g;
+  let out = '', last = 0, m;
+  while ((m = re.exec(str)) !== null) {
+    out += esc(str.slice(last, m.index));
+    out += `<span style="color:${m[1]}">${esc(m[2])}</span>`;
+    last = re.lastIndex;
+  }
+  out += esc(str.slice(last));
+  return out.replace(/\n/g, '<br>');
+}
+/* Échelle d'EFFICACITÉ (professions.bin `efficiency_bonuses` — 5 paliers de
+   proc : tentatives/nœud, déblocage Rare/Epic/Restes de boss, temps de récolte)
+   + `efficiency_description`. Rendus quand la donnée les porte, jamais fabriqués
+   (8 métiers sur 18 en ont ; les autres n'affichent simplement pas la section). */
+function professionEfficiencyHtml(p) {
+  const bonuses = p.efficiency_bonuses;
+  if (!Array.isArray(bonuses) || !bonuses.length) return '';
+  const desc = p.efficiency_description ? `<p class="hint">${esc(p.efficiency_description)}</p>` : '';
+  const rows = bonuses.map((b, i) => `<p class="hint prof-eff-row">
+    <strong>${esc(tr('professionEfficiencyTier', i + 1))}</strong> ${bonusRich(b)}</p>`).join('');
+  return `<div class="fiche-section"><h3>${esc(tr('professionEfficiencyTitle'))}</h3>${desc}${rows}</div>`;
+}
 
 /* ── openProfessionFiche(key) ─────────────────────────────────────────── */
 function openProfessionFiche(key) {
@@ -281,6 +310,7 @@ function openProfessionFiche(key) {
     ${ficheHeader({ name: label, hex: PROFESSION_HEX, sub: esc(tr('professionFicheKind')) })}
     ${descHtml}
     ${professionTiersHtml(p)}
+    ${professionEfficiencyHtml(p)}
     ${professionItemsHtml(p)}`);
   setFicheHash(null);
 }

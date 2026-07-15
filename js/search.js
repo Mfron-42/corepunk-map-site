@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, chestKindLabel, prettyRegion,
+  campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, chestKindLabel, prettyRegion, campLayerHex,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
   locationKindLabel, mapName, entityColor, nodeTierBadge, interactableBucketLabel,
 } from './config.js';
@@ -658,10 +658,10 @@ function buildCampSearchIndex() {
     // retire depuis la recherche et réciproquement, un seul état. `ref: g.k`
     // porte la clé jusqu'à la pastille de la ligne (état lu au rendu,
     // searchRefHtml, + resync live mode E par sidebar.syncEntityRefDots).
-    pushSearchEntry(label, 'camp', CAMP_COLORS[g.kind] || '#888', g.pts[0][0], g.pts[0][1],
+    pushSearchEntry(label, 'camp', campLayerHex(g), g.pts[0][0], g.pts[0][1],
       () => toggleLotTrace(g.k, () => ({
         pts: g.pts.map(([x, z]) => ({ x, z })),
-        hex: CAMP_COLORS[g.kind] || '#888', label, kind: g.kind, map: S.map,
+        hex: campLayerHex(g), label, kind: g.kind, map: S.map,
       })),
       null, null, null, 0, null, { ref: g.k });
   }));

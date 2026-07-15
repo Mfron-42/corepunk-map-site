@@ -84,6 +84,10 @@ export default {
       // Заголовки підгруп. Підгрупи групи «Монстри» (Monsters/Creeps/
       // Wildlife) переиспользують таблицю campKind — дослівне дзеркало
       // kinds рушія. GLOSSARY-PENDING.
+      // subChests/subDestroyable/subInteractives/subOther БІЛЬШЕ не
+      // використовуються деревом (пласке дерево «Інтерактивні об'єкти»,
+      // 2026-07-14 — 4 бакети вилучено), але ЗБЕРЕЖЕНІ для паритету i18n;
+      // subWorldOthers досі підписує підгрупу World › Інше.
       subWorldOthers: 'Інше',
       subChests: 'Скрині',
       subDestroyable: 'Руйнівні',
@@ -104,12 +108,31 @@ export default {
       // реальні — це повноцінний шар « Мирні тварини », а не лічильник
       // « відсутніх даних ».
       wildlifeRestRow: 'Мирні тварини',
-      // Ратифіковане рішення #4 (2026-07-14): підпис каже про ВМІСТ для
-      // гравця, який шар реально малює (9 пулів обшукуваних скринь + 3 пули
-      // тіл), а не про внутрішню таксономію.
-      searchSpotsRow: 'Обшукувані скрині й тіла',
+      // Пласке дерево (2026-07-14): kind табору `searchable` — це динамічний
+      // СЕРВЕРНИЙ ПУЛ СПАВНУ (camps.bin), стоїть окремо, внизу плаского дерева,
+      // не змішаний із розміщеними рядками скринь/тіл вище. Підпис називає цей
+      // механізм — «Зони обшуку (спавн)» — відмінний від справжнього шару-
+      // контейнера `searchable_chest` («Обшукувані скрині»).
+      searchSpotsRow: 'Зони обшуку (спавн)',
       destroyableCampsRow: 'Руйнівні (табори)',
       reactiveCampsRow: 'Інтерактивні (табори)',
+      searchSpotsCorpsesRow: 'Зони обшуку — Трупи',
+      searchSpotsOtherRow: 'Зони обшуку — Інше',
+      skeletonCampsRow: 'Скелети (табори)',
+      campContentLabel: 'Вміст',
+      campCorpsePct: p => `~${p}% трупів`,
+      campContentPresetNote: 'Склад підтверджено серверним пресетом спавну.',
+      campContentNameNote: 'Тип підтверджено назвою зони.',
+      qaoQuestLabel: 'Квест',
+      barterCostLabel: 'Обмін:',
+      barterCostTitle: 'Вартість у предметах (золото не застосовується до цього товару).',
+      itemValueLabel: 'Цінність',
+      itemValueTitle: 'Базова ціна продажу.',
+      professionEfficiencyTitle: 'Ефективність',
+      professionEfficiencyTier: n => `Щабель ${n}`,
+      recipeProfLevel: (prof, lv) => `Потрібно ${prof} рів. ${lv}`,
+      recipeProfLevelNoProf: lv => `Потрібен рівень ${lv}`,
+      recipeRequiresRecipe: names => `Спершу вивчіть: ${names}`,
       // (pinFiltersTitle вилучено разом із відмовою від окремих закріплених фільтрів.)
       trackedTitle: 'Відстежуване',
       trackedEmptyHint: 'Закріпіть маркер кнопкою «Відстежувати», щоб знайти його тут.',
@@ -869,8 +892,10 @@ export default {
     // (js/sidebar.js buildDecorGroup), див.  §3.1.
     decorFamily: {
       barrel: 'Бочки', boxes: 'Ящики', furniture: 'Меблі',
-      // Трупи поділені за contentRole (труп лишається трупом — kind=corpse для
-      // всіх трьох; розрізняє їх роль; config.js corpseRoleKey).
+      // `corpse` = ЄДИНИЙ рядок тіл плаского дерева (2026-07-14). Підписи РОЛІ
+      // (corpse_quest/loot/decor) лишаються: config.js chestKindLabel показує
+      // їх ЗА ЗАПИСОМ у картці/попапі, а не як рядки дерева
+      // (config.js corpseRoleKey).
       corpse: 'Трупи',
       corpse_quest: 'Трупи завдань', corpse_loot: 'Оглядувані трупи', corpse_decor: 'Трупи (декор)',
       books: 'Книги', misc: 'Різне', legacy: 'Застаріла скриня',
@@ -899,7 +924,7 @@ export default {
     },
     campType: {
       barrels: 'Вибухові бочки', tombstones: 'Надгробки', coffins: 'Труни',
-      chests: 'Обшукувані скрині', corpses: 'Обшукувані трупи', sacks: 'Мішки',
+      chests: 'Обшукувані скрині', corpses: 'Обшукувані трупи', skeleton: 'Скелети', sacks: 'Мішки',
       crateCorn: 'Ящик кукурудзи', crateCabbage: 'Ящик капусти', crateCarrot: 'Ящик моркви',
       crateOnion: 'Ящик цибулі', crateEggplant: 'Ящик баклажанів', crateBerries: 'Ящик ягід',
       sackCorn: 'Мішок кукурудзи', sackWheat: 'Мішок пшениці',
