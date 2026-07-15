@@ -114,7 +114,7 @@ export default {
       // (etiqueta plana antigua) conservada por compatibilidad, ya sin uso.
       searchSpotsRow: 'Zonas de registro (spawn)',
       destroyableCampsRow: 'Destructibles',
-      reactiveCampsRow: 'Interactivos',
+      reactiveCampsRow: 'Reactivos',
       // Bucket genérico `other` cuando cae en una categoría interactable —
       // distinto del «Otros» de las zonas de registro residuales.
       otherCampsRow: 'Otros (sin tipo)',
@@ -124,6 +124,17 @@ export default {
       searchSpotsCorpsesRow: 'Cadáveres',
       searchSpotsOtherRow: 'Otros',
       skeletonCampsRow: 'Esqueletos',
+      // Interactivos organizados POR TIPO (2026-07-15): cada tipo = una entrada,
+      // sus formas colocada+aparición unificadas. CADÁVERES ▸ y COFRES ▸ son
+      // padres plegables; las etiquetas hijas son CORTAS (el padre da el contexto).
+      groupCorps: 'Cadáveres',
+      subCorpsPlaces: 'Colocados',
+      subCorpsSpawn: 'Zonas de aparición',
+      groupCoffres: 'Cofres',
+      subCoffresCamp: 'De campamento',
+      subCoffresFouillables: 'Registrables',
+      subCoffresHerite: 'Heredado',
+      spawnAutresGroup: 'Zonas de aparición — otras (campamentos)',
       campContentLabel: 'Contenido',
       campCorpsePct: p => `~${p}% cadáveres`,
       campContentPresetNote: 'Composición probada por el preajuste de aparición del servidor.',
@@ -393,6 +404,12 @@ export default {
           : q ? `${q} zona${q > 1 ? 's' : ''} de misión`
             : `${g} zona${g > 1 ? 's' : ''} genérica${g > 1 ? 's' : ''} probada${g > 1 ? 's' : ''}`,
       goalSpawnDetailN: n => `detalle (${n} zonas)`,
+      // Referencia UNIFICADA «Objetos aceptados» (2026-07-15): un solo botón dibuja
+      // la unión (colocados + todas las zonas), el cajón «detalle» mantiene cada
+      // forma dibujable por separado.
+      goalAcceptedRef: 'Objetos aceptados',
+      goalAcceptedMeta: (placed, pts) => `${placed} colocados + ${pts} en zonas`,
+      goalAcceptedDetail: (placed, zones) => `detalle: ${placed} colocados · ${zones} zonas`,
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).

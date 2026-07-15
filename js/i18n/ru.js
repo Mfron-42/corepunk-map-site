@@ -116,7 +116,7 @@ export default {
       // сохранён для совместимости, больше не используется.
       searchSpotsRow: 'Зоны обыска (спавн)',
       destroyableCampsRow: 'Разрушаемые',
-      reactiveCampsRow: 'Интерактивные',
+      reactiveCampsRow: 'Реактивные',
       // Общий бакет `other`, когда он попадает в категорию interactable —
       // отличается от «Прочее» остаточных зон обыска.
       otherCampsRow: 'Прочие (без типа)',
@@ -126,6 +126,18 @@ export default {
       searchSpotsCorpsesRow: 'Трупы',
       searchSpotsOtherRow: 'Прочее',
       skeletonCampsRow: 'Скелеты',
+      // Интерактивные объекты сгруппированы ПО ТИПУ (2026-07-15): каждый тип —
+      // одна запись, его размещённая форма и форма спавна объединены. ТРУПЫ ▸ и
+      // СУНДУКИ ▸ — сворачиваемые родители; подписи детей КОРОТКИЕ (контекст
+      // задаёт родитель).
+      groupCorps: 'Трупы',
+      subCorpsPlaces: 'Размещённые',
+      subCorpsSpawn: 'Зоны спавна',
+      groupCoffres: 'Сундуки',
+      subCoffresCamp: 'Лагерные',
+      subCoffresFouillables: 'Обыскиваемые',
+      subCoffresHerite: 'Устаревший',
+      spawnAutresGroup: 'Зоны спавна — прочие (лагеря)',
       campContentLabel: 'Содержимое',
       campCorpsePct: p => `~${p}% трупов`,
       campContentPresetNote: 'Состав подтверждён серверным пресетом спавна.',
@@ -400,6 +412,12 @@ export default {
           : q ? `${q} зон задания`
             : `${g} доказанных общих зон`,
       goalSpawnDetailN: n => `подробно (${n} зон)`,
+      // ОБЪЕДИНЁННАЯ ссылка «Принимаемые объекты» (2026-07-15): один переключатель
+      // рисует объединение (размещённые + все зоны), ящик «подробно» сохраняет
+      // каждую форму рисуемой по отдельности.
+      goalAcceptedRef: 'Принимаемые объекты',
+      goalAcceptedMeta: (placed, pts) => `${placed} размещённых + ${pts} в зонах`,
+      goalAcceptedDetail: (placed, zones) => `подробно: ${placed} размещённых · ${zones} зон`,
       // Механизм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точное значение) — отличается от общего dropChanceApprox (расчётная
       // доля, здесь никогда нет "≈" — это заданный игрой процент).

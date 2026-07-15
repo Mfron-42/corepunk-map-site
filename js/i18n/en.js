@@ -129,7 +129,7 @@ export default {
       // kept for compat, no longer referenced.
       searchSpotsRow: 'Search spawn zones',
       destroyableCampsRow: 'Destroyables',
-      reactiveCampsRow: 'Interactives',
+      reactiveCampsRow: 'Reactives',
       // Generic `other` bucket when it falls under an interactable category —
       // distinct from the residual search-zones "Other".
       otherCampsRow: 'Other (untyped)',
@@ -141,6 +141,20 @@ export default {
       searchSpotsCorpsesRow: 'Corpses',
       searchSpotsOtherRow: 'Other',
       skeletonCampsRow: 'Skeletons',
+      // Interactables arranged BY OBJECT TYPE (2026-07-15): each type = one
+      // entry, its placed+spawn forms unified. CORPSES ▸ (Placed · Spawn zones)
+      // and CHESTS ▸ (From camp · Searchable · Legacy) are collapsible parents;
+      // child labels are SHORT (the parent carries the context). "Spawn zones —
+      // other (camps)" groups the camp spawns not content-split
+      // (Other · Destroyables · Reactives). GLOSSARY-PENDING (structural labels).
+      groupCorps: 'Corpses',
+      subCorpsPlaces: 'Placed',
+      subCorpsSpawn: 'Spawn zones',
+      groupCoffres: 'Chests',
+      subCoffresCamp: 'From camp',
+      subCoffresFouillables: 'Searchable',
+      subCoffresHerite: 'Legacy',
+      spawnAutresGroup: 'Spawn zones — other (camps)',
       // Proven pool content (camp popup/fiche).
       campContentLabel: 'Content',
       campCorpsePct: p => `~${p}% corpses`,
@@ -458,6 +472,14 @@ export default {
           : q ? `${q} quest zone${q > 1 ? 's' : ''}`
             : `${g} proven generic zone${g > 1 ? 's' : ''}`,
       goalSpawnDetailN: n => `detail (${n} zones)`,
+      // UNIFIED "Accepted objects" ref (2026-07-15) when a goal accepts BOTH
+      // placed objects AND spawn zones: one toggle draws the union (placed + all
+      // pools), the "detail" drawer keeps each form individually drawable.
+      // goalAcceptedMeta: "N placed + M in zones" (both DATA counts);
+      // goalAcceptedDetail: the collapsed drawer summary.
+      goalAcceptedRef: 'Accepted objects',
+      goalAcceptedMeta: (placed, pts) => `${placed} placed + ${pts} in zones`,
+      goalAcceptedDetail: (placed, zones) => `detail: ${placed} placed · ${zones} zones`,
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,

@@ -116,7 +116,7 @@ export default {
       // збережено для сумісності, більше не використовується.
       searchSpotsRow: 'Зони обшуку (спавн)',
       destroyableCampsRow: 'Руйнівні',
-      reactiveCampsRow: 'Інтерактивні',
+      reactiveCampsRow: 'Реактивні',
       // Загальний бакет `other`, коли він потрапляє в категорію interactable —
       // відмінний від «Інше» залишкових зон обшуку.
       otherCampsRow: 'Інші (без типу)',
@@ -126,6 +126,17 @@ export default {
       searchSpotsCorpsesRow: 'Трупи',
       searchSpotsOtherRow: 'Інше',
       skeletonCampsRow: 'Скелети',
+      // Інтерактивні об’єкти згруповані ЗА ТИПОМ (2026-07-15): кожен тип — один
+      // запис, його розміщена форма та форма спавну об’єднані. ТРУПИ ▸ та СКРИНІ ▸
+      // — згортувані батьки; підписи дочірніх — КОРОТКІ (контекст задає батько).
+      groupCorps: 'Трупи',
+      subCorpsPlaces: 'Розміщені',
+      subCorpsSpawn: 'Зони спавну',
+      groupCoffres: 'Скрині',
+      subCoffresCamp: 'Табірні',
+      subCoffresFouillables: 'Обшукувані',
+      subCoffresHerite: 'Застарілий',
+      spawnAutresGroup: 'Зони спавну — інші (табори)',
       campContentLabel: 'Вміст',
       campCorpsePct: p => `~${p}% трупів`,
       campContentPresetNote: 'Склад підтверджено серверним пресетом спавну.',
@@ -401,6 +412,12 @@ export default {
           : q ? `${q} зон завдання`
             : `${g} доведених загальних зон`,
       goalSpawnDetailN: n => `детально (${n} зон)`,
+      // ОБ’ЄДНАНЕ посилання «Прийнятні об’єкти» (2026-07-15): один перемикач малює
+      // об’єднання (розміщені + усі зони), шухляда «детально» зберігає кожну форму
+      // придатною до малювання окремо.
+      goalAcceptedRef: 'Прийнятні об’єкти',
+      goalAcceptedMeta: (placed, pts) => `${placed} розміщених + ${pts} у зонах`,
+      goalAcceptedDetail: (placed, zones) => `детально: ${placed} розміщених · ${zones} зон`,
       // Механізм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точне значення) — відрізняється від загального dropChanceApprox
       // (розрахункова частка, тут ніколи немає "≈" — це заданий грою відсоток).

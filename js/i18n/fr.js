@@ -133,7 +133,7 @@ export default {
       // plat) conservé pour compat, plus référencé.
       searchSpotsRow: 'Zones de fouille (spawn)',
       destroyableCampsRow: 'Destructibles',
-      reactiveCampsRow: 'Interactifs',
+      reactiveCampsRow: 'Réactifs',
       // Seau générique `other` quand il tombe en catégorie interactable —
       // distinct du « Autres » des zones de fouille résiduelles.
       otherCampsRow: 'Autres (non typés)',
@@ -145,6 +145,21 @@ export default {
       searchSpotsCorpsesRow: 'Corps',
       searchSpotsOtherRow: 'Autres',
       skeletonCampsRow: 'Squelettes',
+      // Objets interactifs rangés PAR TYPE (2026-07-15) : chaque type = une
+      // entrée, ses formes placée+spawn unifiées. CORPS ▸ (Placés · Zones de
+      // spawn) et COFFRES ▸ (De camp · Fouillables · Hérité) sont des parents
+      // repliables ; les libellés d'enfant sont COURTS (le parent porte le
+      // contexte). « Zones de spawn — autres (camps) » regroupe les camps de
+      // spawn non scindés par contenu (Autres · Destructibles · Réactifs).
+      // GLOSSARY-PENDING (libellés structurels).
+      groupCorps: 'Corps',
+      subCorpsPlaces: 'Placés',
+      subCorpsSpawn: 'Zones de spawn',
+      groupCoffres: 'Coffres',
+      subCoffresCamp: 'De camp',
+      subCoffresFouillables: 'Fouillables',
+      subCoffresHerite: 'Hérité',
+      spawnAutresGroup: 'Zones de spawn — autres (camps)',
       // Contenu prouvé d'un pool (popup/fiche camp).
       campContentLabel: 'Contenu',
       campCorpsePct: p => `~${p} % de corps`,
@@ -440,6 +455,14 @@ export default {
           : q ? `${q} zone${q > 1 ? 's' : ''} de quête`
             : `${g} zone${g > 1 ? 's' : ''} générique${g > 1 ? 's' : ''} prouvée${g > 1 ? 's' : ''}`,
       goalSpawnDetailN: n => `détail (${n} zones)`,
+      // Référence UNIFIÉE « Objets acceptés » (2026-07-15) quand un but accepte À
+      // LA FOIS des objets placés ET des zones de spawn : une seule bascule dessine
+      // l'union (placés + tous les pools), le tiroir « détail » garde chaque forme
+      // dessinable. goalAcceptedMeta : « N placés + M en zones » (les deux comptes
+      // de la DONNÉE) ; goalAcceptedDetail : le sommaire du tiroir replié.
+      goalAcceptedRef: 'Objets acceptés',
+      goalAcceptedMeta: (placed, pts) => `${placed} placés + ${pts} en zones`,
+      goalAcceptedDetail: (placed, zones) => `détail : ${placed} placés · ${zones} zones`,
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).
