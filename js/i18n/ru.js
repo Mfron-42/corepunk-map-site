@@ -355,6 +355,7 @@ export default {
       goalAcceptedTypesLabel: 'Принятые типы:',
       goalAcceptedTypePlaced: n => `размещено: ${n}`,
       goalAcceptedTypeServer: 'спавн на сервере',
+      goalAcceptedTypesMore: n => `+${n} тип.`,
       goalSpawnPoolLabel: (name, n) => `Зона спавна — ${name} (${n} т.)`,
       goalSpawnPoolNote: 'Зона спавна трупов задания — не один труп на точку.',
       playerHintLabel: 'Совет игрока',

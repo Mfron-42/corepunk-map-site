@@ -389,6 +389,7 @@ export default {
       goalAcceptedTypesLabel: 'Types acceptés :',
       goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'placé' : 'placés'}`,
       goalAcceptedTypeServer: 'spawn serveur',
+      goalAcceptedTypesMore: n => `+${n} type${n > 1 ? 's' : ''} de plus`,
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Zone de spawn des corps de quête — pas un point = un corps.',
       playerHintLabel: 'Astuce joueur',

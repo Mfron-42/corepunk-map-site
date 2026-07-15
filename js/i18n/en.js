@@ -406,6 +406,7 @@ export default {
       goalAcceptedTypesLabel: 'Accepted types:',
       goalAcceptedTypePlaced: n => `${n} placed`,
       goalAcceptedTypeServer: 'server-spawn',
+      goalAcceptedTypesMore: n => `+${n} more type${n > 1 ? 's' : ''}`,
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Spawn zone for quest corpses — not one point per corpse.',
       playerHintLabel: 'Player tip',

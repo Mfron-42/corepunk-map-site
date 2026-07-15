@@ -50,6 +50,7 @@ import { regionFicheExists } from './zone.js';
    cible de CE joueur » — le libellé le dit (« N locations »), et le serveur
    choisit dynamiquement lequel spawn. */
 const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN (les cas actuels ≤ 44 ; garde-fou)
+const ACCEPTED_TYPES_CAP = 8;     // plafond d'AFFICHAGE des types acceptés (données complètes dans le bin ; « +N types » au-delà)
 /* Instantané des points par clé de tracé (même idiome module-state que
    currentGoalZones) : le rendu le peuple, le routeur de dessin (main.js →
    toggleGoalPlacements) le relit au clic. Content-keyed → stable au re-rendu. */
@@ -168,24 +169,34 @@ function goalSpawnPoolChip(pool) {
 function goalCorpseExtras(t) {
   if (!t) return '';
   const rows = [];
-  // (1) Types acceptés — nom + « (N placés) » ou « (spawn serveur) » si placed=0.
+  // (1) Types acceptés — la liste COMPLÈTE des types que le jeu accepte
+  // (bound_units), nom + « (N placés) » ou « (spawn serveur) » si placed=0. Un
+  // but peut binder BEAUCOUP de types (barils/décor, 40+) : cap d'affichage
+  // lisible « +N types » (la donnée reste complète dans le bin).
   const types = Array.isArray(t.accepted_types) ? t.accepted_types.filter(a => a && a.name) : [];
   if (types.length) {
-    const list = types.map(a => {
+    const shown = types.slice(0, ACCEPTED_TYPES_CAP);
+    const list = shown.map(a => {
       // ×N quand le type couvre plusieurs clés-variantes (ex. Corpse astronaut
       // ×2) ; « (N placés) » sinon « (spawn serveur) » quand 0 placement statique.
       const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
       const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
       return `${esc(cleanLabel(a.name))}${mult} <span class="muted">(${esc(qual)})</span>`;
     }).join(' · ');
+    const moreN = types.length - shown.length;
+    const more = moreN > 0 ? ` <span class="muted">${esc(tr('goalAcceptedTypesMore', moreN))}</span>` : '';
     rows.push(`<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span></div>
-      <div class="goal-target-row"><span class="goal-accepted-types">${list}</span></div>`);
+      <div class="goal-target-row"><span class="goal-accepted-types">${list}${more}</span></div>`);
   }
-  // (2) Pools de spawn — affordance dessinable + caveat honnête « pas un point = un corps ».
-  for (const pool of Array.isArray(t.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : []) {
-    const chip = goalSpawnPoolChip(pool);
-    rows.push(`<div class="goal-target-row goal-target-row-pos">${chip}</div>
-      <div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`);
+  // (2) Pools de spawn — une affordance dessinable PAR pool (le jeu en lie
+  // plusieurs : la pool quête + les pools génériques dont un type bindé porte la
+  // loot-table). Caveat honnête « pas un point = un corps » rendu UNE fois.
+  const pools = Array.isArray(t.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
+  if (pools.length) {
+    for (const pool of pools) {
+      rows.push(`<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(pool)}</div>`);
+    }
+    rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`);
   }
   // (3) Astuce joueur — 3e tier visuellement distinct (connu en jeu, pas data).
   const hint = t.player_hint;

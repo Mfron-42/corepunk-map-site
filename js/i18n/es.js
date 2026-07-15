@@ -347,6 +347,7 @@ export default {
       goalAcceptedTypesLabel: 'Tipos aceptados:',
       goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'colocado' : 'colocados'}`,
       goalAcceptedTypeServer: 'aparece en el servidor',
+      goalAcceptedTypesMore: n => `+${n} tipo${n > 1 ? 's' : ''} más`,
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Zona de aparición de cadáveres de misión — no un punto por cadáver.',
       playerHintLabel: 'Consejo de jugador',
