@@ -110,34 +110,37 @@ export default {
       // kindRestPoints (règle rest-only universelle, data-dérivée); now serves ALL THREE Monsters/Creeps/Wildlife root
       // groups symmetrically — the old monsterCampsRow "Monster camps"
       // coarse toggle is retired); and the "(camps)" disambiguation of the
-      // dynamic-spawn kinds (destroyable/reactive) sitting next to PLACED
-      // decor props in the flat Interactables tree. The `searchable` kind is
-      // listed separately at the bottom as "Search spawn zones" (searchSpotsRow).
-      // GLOSSARY-PENDING (internal level-design tokens).
+      // the SHORT labels of the spawn rows gathered under the "Spawn zones
+      // (camps)" parent (spawnCampsGroup) of the Interactables tree: the parent
+      // carries the context, each row just names its type
+      // (Corpses/Skeletons/Other/Destroyables/Interactives). GLOSSARY-PENDING.
       guardsRowLabel: 'Guards (unidentified unit)',
       kindRestRow: 'Unidentified spawns',
+      // Collapsible parent gathering every dynamic / server-spawn row of the
+      // Interactables tree (Option 1 consolidation, 2026-07-15).
+      spawnCampsGroup: 'Spawn zones (camps)',
       // Wildlife group only: the generic peaceful/wild fauna pools bind no
       // client-side species (roster resolved server-side) — but the spawn ZONES
       // are real, so this is a first-class « Peaceful animals » layer, not a
       // « missing data » count.
       wildlifeRestRow: 'Peaceful animals',
-      // Flat-tree decision (2026-07-14): the `searchable` camp kind is a
-      // dynamic SERVER SPAWN POOL (camps.bin) — listed on its own, separated
-      // at the very bottom of the flat Interactables tree, never mixed with
-      // the placed chest/corpse rows above. Its label names that mechanism —
-      // "Search spawn zones" — distinct from the real `searchable_chest`
-      // container layer ("Searchable chests"). ("search spots"/"loot camp"
-      // wordings retired.)
+      // Rows INSIDE the "Spawn zones (camps)" group (the parent carries the
+      // context, each row just names its type). searchSpotsRow (old flat label)
+      // kept for compat, no longer referenced.
       searchSpotsRow: 'Search spawn zones',
-      destroyableCampsRow: 'Destroyables (camps)',
-      reactiveCampsRow: 'Interactives (camps)',
-      // Search zones TYPED by proven content (2026-07-15, camps.bin
+      destroyableCampsRow: 'Destroyables',
+      reactiveCampsRow: 'Interactives',
+      // Generic `other` bucket when it falls under an interactable category —
+      // distinct from the residual search-zones "Other".
+      otherCampsRow: 'Other (untyped)',
+      // Spawn rows TYPED by proven content (2026-07-15, camps.bin
       // `subtype`/`corpseFraction`): the dominant corpse-spawn layer, the
-      // rest, and reactive skeleton camps — split into distinct rows, tinted
-      // toward their concept (Corpses mauve / Bone).
-      searchSpotsCorpsesRow: 'Search zones — Corpses',
-      searchSpotsOtherRow: 'Search zones — Other',
-      skeletonCampsRow: 'Skeletons (camps)',
+      // rest, and reactive skeleton camps — tinted toward their concept
+      // (Corpses mauve / Bone). The spawn "Corpses" here and the "Placed
+      // corpses" of decorFamily are the same concept in two honest forms.
+      searchSpotsCorpsesRow: 'Corpses',
+      searchSpotsOtherRow: 'Other',
+      skeletonCampsRow: 'Skeletons',
       // Proven pool content (camp popup/fiche).
       campContentLabel: 'Content',
       campCorpsePct: p => `~${p}% corpses`,
@@ -440,6 +443,21 @@ export default {
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Spawn zone for quest corpses — not one point per corpse.',
       playerHintLabel: 'Player tip',
+      // Placed (fixed) corpses line on a corpse target (goalPlacementsChip when
+      // accepted_types are present) — distinct from the dynamic search zones
+      // ("spawn") below.
+      goalCorpsePlacedN: n => `${n} placed corpses`,
+      // Search-zone aggregate (corpse UX rework 2026-07-15,
+      // goalSpawnPoolAggregate): ONE drawable line for all spawn pools whose
+      // toggle draws their union; a collapsed "detail" drawer lists each zone.
+      // The total is the data total (sum of the pools).
+      goalSpawnAggLabel: 'Search zones — corpses (spawn)',
+      goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zones`,
+      goalSpawnAggRoles: (q, g) =>
+        q && g ? `incl. ${q} quest zone${q > 1 ? 's' : ''} + ${g} proven generic zone${g > 1 ? 's' : ''}`
+          : q ? `${q} quest zone${q > 1 ? 's' : ''}`
+            : `${g} proven generic zone${g > 1 ? 's' : ''}`,
+      goalSpawnDetailN: n => `detail (${n} zones)`,
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,
@@ -997,11 +1015,13 @@ export default {
     // (js/sidebar.js buildDecorGroup), see  §3.1.
     decorFamily: {
       barrel: 'Barrels', boxes: 'Boxes', furniture: 'Furniture',
-      // `corpse` = the SINGLE corpse row of the flat tree (2026-07-14). The
-      // ROLE labels (corpse_quest/loot/decor) stay: config.js chestKindLabel
-      // shows them PER RECORD on the fiche/popup, never as tree rows
-      // (config.js corpseRoleKey).
-      corpse: 'Corpses',
+      // `corpse` = the PLACED corpses row (fixed/placed concept) — "Placed
+      // corpses", distinct from the SPAWN "Corpses" of the "Spawn zones
+      // (camps)" group: the same concept in two honest forms, now clearly
+      // sectioned. The ROLE labels (corpse_quest/loot/decor) stay: config.js
+      // chestKindLabel shows them PER RECORD on the fiche/popup, never as tree
+      // rows (config.js corpseRoleKey).
+      corpse: 'Placed corpses',
       corpse_quest: 'Quest corpses', corpse_loot: 'Searchable corpses', corpse_decor: 'Corpses (decor)',
       books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
     },

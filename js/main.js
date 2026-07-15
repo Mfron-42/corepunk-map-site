@@ -340,7 +340,10 @@ initMapRefDelegation(document, {
         // 'goal-spawn-pool' (nuage de spawn de corps de quête, LOT corps) partage
         // EXACTEMENT le même mécanisme de tracé (campTrace via goalPlacementSets),
         // seul son subrole diffère (jamais confondu avec les placements exacts).
-        if (info.subrole === 'goal-placements' || info.subrole === 'goal-spawn-pool') { toggleGoalPlacements(info); break; }
+        // 'goal-spawn-agg' (refonte UX corps 2026-07-15) : l'agrégat « Zones de
+        // fouille (spawn) » qui dessine l'UNION de tous les pools — MÊME
+        // machinerie (goalPlacementSets sous une clé 'qpoolagg:'), routé ici.
+        if (info.subrole === 'goal-placements' || info.subrole === 'goal-spawn-pool' || info.subrole === 'goal-spawn-agg') { toggleGoalPlacements(info); break; }
         // Zone de recherche d'un OBJECTIF ([Région ●] de dynamicPosBadge,
         // vague 1) : dessine le cercle/les vrais points de cette search_zone
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la

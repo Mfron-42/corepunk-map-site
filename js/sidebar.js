@@ -600,11 +600,12 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
                         squirrel/porcupine via camp_details) + « Spawns non
                         identifiés » en dernier
      4. Harvesting    — Herbalism · Logging · Mining (inchangé)
-     5. Interactables — arbre PLAT (2026-07-14) : une ligne par kind, à plat
-                        (Coffres de camp · Coffres fouillables · Corps · props
-                        placés · QAO · camps dynamiques « (camps) » · legacy ·
-                        Zones de fouille (spawn) tout en bas) — voir
-                        buildGroupContainers ; plus aucun sous-groupe/seau
+     5. Interactables — objets PLACÉS à PLAT en haut (Coffres de camp ·
+                        Coffres fouillables · Corps placés · props placés ·
+                        Objets de quête · Coffre hérité) PUIS un seul parent
+                        repliable « Zones de spawn (camps) » (Corps · Squelettes
+                        · Autres · Destructibles · Interactifs) — consolidation
+                        Option 1, 2026-07-15, voir buildGroupContainers
    (Ex-groupe 4 « Wildlife » RETIRÉ 2026-07-12, décision propriétaire — sa
    seule couche dessinable « Animaux paisibles » (camp:wildlife) est passée
    dans World ci-dessus ; ses espèces fauniques 0-camp quittent l'arbre mais
@@ -641,16 +642,24 @@ function kindsOfCategory(pred, byPtsDesc = false) {
   return hit.map(e => e.kind);
 }
 /* Surcharges d'AFFICHAGE par kind (libellés i18n, jamais une
-   classification) : gardes honnêtes, désambiguïsation « (camps) » des kinds
-   dynamiques rangés à côté de props placés — voir buildGroupContainers. */
+   classification) : gardes honnêtes ; libellés COURTS des lignes de spawn
+   rangées sous le parent « Zones de spawn (camps) » — le parent porte déjà le
+   contexte, la ligne dit juste son TYPE (voir buildGroupContainers). */
 const CAMP_ROW_LABEL_KEY = {
   guards: 'guardsRowLabel',
   destroyable: 'destroyableCampsRow',
   reactive: 'reactiveCampsRow',
+  // Le seau générique `other` peut, selon la carte, tomber en catégorie
+  // interactable.* (il rejoint alors le groupe « Zones de spawn (camps) ») :
+  // libellé DISTINCT « Autres (non typés) » pour ne pas se confondre avec le
+  // « Autres » du seau `searchable` résiduel ci-dessous. (Quand `other` est
+  // `unclassified`, il vit dans World › Autres via campKindLabel, pas ici —
+  // campRowLabel n'y est pas consulté.)
+  other: 'otherCampsRow',
   // Split par contenu PROUVÉ (2026-07-15, config.js campStateKey) : les zones
   // de fouille dominées par des corps et les camps réactifs de squelettes sont
-  // des couches distinctes, libellées par leur TYPE. Le seau `searchable`
-  // résiduel (zones sans corps prouvés) devient « — Autres ».
+  // des couches distinctes, libellées par leur TYPE (« Corps », « Squelettes »).
+  // Le seau `searchable` résiduel (zones sans corps prouvés) devient « Autres ».
   searchable: 'searchSpotsOtherRow',
   searchable_corpses: 'searchSpotsCorpsesRow',
   reactive_skeleton: 'skeletonCampsRow',
@@ -1422,31 +1431,46 @@ function buildGroupHarvest() {
     if (li) ul.appendChild(li);
   }
 }
-/* ── Groupe « Objets interactifs » : arbre PLAT (décision propriétaire
-   2026-07-14 — supersède les 4 seaux repliables Chests/Destroyable/
-   Interactives/Other). UNE ligne par kind, mutuellement exclusives, toutes
-   de PREMIER NIVEAU (plus aucun parent-seau, plus aucune cascade ici).
-   ORDRE FIXE (présentation, pas une classification) :
+/* Ordre FIXE des lignes du groupe « Zones de spawn (camps) » (présentation,
+   pas une classification) : d'abord par CONTENU prouvé (Corps, Squelettes,
+   Autres), puis par kind (Destructibles, Interactifs). Un kind absent de la
+   carte active ne crée simplement pas de ligne (campRow rend null). */
+const SPAWN_ROW_ORDER = ['searchable_corpses', 'reactive_skeleton', 'searchable', 'destroyable', 'reactive', 'other'];
+const spawnRowRank = k => { const i = SPAWN_ROW_ORDER.indexOf(k); return i < 0 ? SPAWN_ROW_ORDER.length : i; };
+
+/* ── Groupe « Objets interactifs » (consolidation Option 1, décision
+   propriétaire 2026-07-15 — supersède l'arbre 100 % plat du 2026-07-14) : les
+   OBJETS PLACÉS restent à PLAT en haut ; toutes les lignes DYNAMIQUES / de
+   spawn serveur sont regroupées sous UN seul parent repliable « Zones de spawn
+   (camps) », pour que corps/squelette/zone/fouille ne se répètent plus à plat.
+   ORDRE (présentation, pas une classification) :
      1. Coffres de camp      (camp_chest — ON par défaut)
      2. Coffres fouillables  (searchable_chest — ON par défaut)
-     3. Corps                (decor:corpse — UNE ligne ; le rôle quête/loot/
-                              décor ne se lit plus QUE sur la fiche, voir
-                              data.js buildDecorGroups / config.js corpseRoleKey)
+     3. Corps placés         (decor:corpse — le concept PLACÉ/fixe ; UNE ligne,
+                              le rôle quête/loot/décor ne se lit plus QUE sur la
+                              fiche, voir data.js buildDecorGroups / config.js
+                              corpseRoleKey)
      4-8. Tonneaux · Caisses · Meubles · Livres · Divers (props PLACÉS, décor)
-     9.  QAO                 (objets de quête activables)
-     10. Camps DYNAMIQUES serveur destroyable/reactive — suffixe « (camps) »
-         (campRowLabel) pour ne pas se confondre avec les props placés ci-dessus
-     11. Coffre hérité       (legacy — rangé en fin de props, si présent)
-     12. SÉPARÉ, tout en bas : « Zones de fouille (spawn) » — le kind camp
-         `searchable` (pool de spawn dynamique, searchSpotsRow), jamais mêlé
-         aux lignes coffres/corps ci-dessus.
+     9.  Objets de quête     (qao)
+     10. Coffre hérité       (legacy — fin des objets placés, si présent)
+     11. ▸ Zones de spawn (camps) — UN seul parent repliable (buildSubGroup,
+         même machinerie que POI/World › Autres : cascade + somme honnête)
+         portant les lignes de spawn, contenu d'abord :
+           Corps         (searchable_corpses, subtype `corpses`)
+           Squelettes    (reactive_skeleton, subtype `skeleton`)
+           Autres        (searchable résiduel)
+           Destructibles (destroyable)
+           Interactifs   (reactive)
+   Les libellés INTERNES au groupe laissent tomber les préfixes « Zones de
+   fouille — »/« (camps) » (le parent le dit déjà). Le « Corps placés » à plat
+   et le « Corps » de spawn sont le MÊME concept en deux formes honnêtes
+   (placé vs spawn), désormais clairement sectionnées.
    Défauts inchangés (lus sur S.* — jamais réécrits ici) : les 2 couches
-   coffres ON ; corps/props/qao/camps dynamiques/searchable OFF (palier bruit,
+   coffres ON ; corps/props/qao/lignes de spawn OFF (palier bruit,
     §1/§3.1). Tokens de hash inchangés (cat.* / camp.<kind> /
-   decor.<famille>) SAUF la fusion corps (decor.corpse_quest|loot|decor →
-   decor.corpse, attendu — un deep-link legacy vers un token de rôle devient
-   inerte, accepté). Les camps dynamiques n'apparaissent qu'une fois camps.bin
-   arrivé (deferredReady) — sinon un indice de chargement en fin de liste. */
+   decor.<famille>) — une ligne qui passe DANS le groupe garde son jeton, les
+   deep-links résolvent toujours. Les lignes de spawn n'apparaissent qu'une fois
+   camps.bin arrivé (deferredReady) — sinon un indice de chargement. */
 function buildGroupContainers() {
   const ul = $('#group-containers-list');
   ul.innerHTML = '';
@@ -1454,34 +1478,37 @@ function buildGroupContainers() {
   // 1-2. Les 2 vraies couches coffres (seules ON par défaut).
   add(catRow('camp_chest'));
   add(catRow('searchable_chest'));
-  // 3-8. Props PLACÉS (décor), ordre de présentation FIXE — corps en UNE ligne,
-  // puis tonneaux/caisses/meubles/livres/divers. decorRow() rend null si la
-  // famille est absente de la carte active (add() l'ignore).
+  // 3-8. Objets PLACÉS (décor), ordre FIXE — « Corps placés » (concept
+  // placé/fixe, decor:corpse) puis tonneaux/caisses/meubles/livres/divers.
+  // decorRow() rend null si la famille est absente de la carte active.
   for (const fam of ['corpse', 'barrel', 'boxes', 'furniture', 'books', 'misc']) add(decorRow(fam, ''));
-  // 9. QAO (objets de quête activables).
+  // 9. Objets de quête activables.
   add(catRow('qao'));
-  // 10. Camps DYNAMIQUES serveur (destroyable/reactive) — suffixe « (camps) »
-  // (campRowLabel) : spawns serveur, distincts des props placés ci-dessus. Le
-  // seau réactif SQUELETTE (subtype `skeleton`, config.js campStateKey) sort en
-  // sa propre ligne « Squelettes (camps) », typée par contenu prouvé.
-  if (deferredReady) {
-    for (const kind of kindsOfCategory(c => c === 'interactable.destroyable' || c === 'interactable.reactive')) {
-      add(campRow(kind, campRowLabel(kind)));
-    }
-  }
-  // 11. Coffre hérité (group legacy_chest) — rangé en fin de props.
+  // 10. Coffre hérité (group legacy_chest) — fin des objets placés.
   add(decorRow('legacy', ''));
-  // 12. SÉPARÉ, tout en bas : les pools de fouille dynamiques (kind camp
-  // `searchable`), TYPÉS par contenu prouvé (config.js campStateKey) — « Zones
-  // de fouille — Corps » (couche dominante, subtype `corpses`) puis « — Autres »,
-  // ordonnées par nombre de points décroissant (les corps dominent). Jamais
-  // mêlées aux coffres/corps placés au-dessus.
+  // 11. UN seul groupe repliable « Zones de spawn (camps) » : toutes les lignes
+  // dynamiques / de spawn serveur (pools de fouille typés par contenu +
+  // camps destructibles/interactifs), contenu d'abord (voir SPAWN_ROW_ORDER).
+  // Même machinerie que POI/World › Autres (buildSubGroup : cascade + somme
+  // honnête des couches DISJOINTES qu'il porte). N'apparaît qu'une fois
+  // camps.bin arrivé.
   if (deferredReady) {
-    for (const kind of kindsOfCategory(c => c === 'interactable.searchable', true)) {
-      add(campRow(kind, campRowLabel(kind)));
+    const spawnKinds = kindsOfCategory(c => c === 'interactable.searchable'
+      || c === 'interactable.destroyable' || c === 'interactable.reactive')
+      .sort((a, b) => spawnRowRank(a) - spawnRowRank(b));
+    if (spawnKinds.length) {
+      const total = spawnKinds.reduce((s, k) => s + (S.camps[k]?.points.length || 0), 0);
+      const grp = buildSubGroup('containers-spawn', tr('spawnCampsGroup'), CAMP_COLORS.searchable,
+        () => campLeavesOf(spawnKinds), total, 0, 'camp');
+      for (const kind of spawnKinds) {
+        const row = campRow(kind, campRowLabel(kind), 'filter-row-sub');
+        if (row) grp.ul.appendChild(row);
+      }
+      add(grp.li);
     }
+  } else {
+    ul.appendChild(loadingHintLi());
   }
-  if (!deferredReady) ul.appendChild(loadingHintLi());
 }
 
 /* Point d'entrée unique -- nom CONSERVÉ pour ne pas toucher main.js/

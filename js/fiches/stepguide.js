@@ -75,7 +75,15 @@ function goalPlacementsChip(t) {
     .filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]))
     .map(([x, z]) => ({ x, z }));
   if (!pts.length) return '';
-  const label = tr('goalLocationsN', total);
+  // Corps placés vs conteneurs génériques (refonte UX corps 2026-07-15) : une
+  // cible CORPS (accepted_types présents) nomme sa ligne « N corps placés » —
+  // le concept POSÉ/FIXE, nettement distinct des zones de fouille dynamiques
+  // (l'agrégat plus bas, libellé « (spawn) »). Un conteneur ordinaire
+  // (chest_placement sans accepted_types — vrais coffres d'autres quêtes)
+  // garde « N emplacements ». Le libellé porte toujours le compte : la garde
+  // d'honnêteté (_verify_goal_placements) et le tag de légende le relisent.
+  const label = (Array.isArray(t.accepted_types) && t.accepted_types.length)
+    ? tr('goalCorpsePlacedN', total) : tr('goalLocationsN', total);
   const key = goalPlacementKey(t, pl);
   // Snapshot pour le routeur de dessin (campTrace fige ses points à l'ajout).
   goalPlacementSets.set(key, { pts, hex: CATS.quest.hex, label });
@@ -171,6 +179,80 @@ function goalSpawnPoolChip(pool) {
     drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta: capMeta,
   });
 }
+/* Agrégat de zones de fouille (refonte UX corps 2026-07-15) : le jeu lie
+   PLUSIEURS pools de spawn à un but corps (la pool de quête + les pools
+   génériques PROUVÉS dont un type bindé porte la loot-table) — lost_crew en a
+   10. Rendus un par un, ils formaient un MUR de puces « Zone de spawn — X »
+   toutes identiques (même tag [Objets de quête], seul le nom change). On les
+   ramène à UNE seule ligne dessinable honnête — « Zones de fouille — corps
+   (spawn) · <total> pts · <N> zones » — dont la bascule dessine l'UNION des
+   points de tous les pools joignables. RÉUTILISE la MÊME machinerie que les
+   puces (goalPlacementSets + campTrace, routé par main.js ref-draw →
+   toggleGoalPlacements) avec un subrole DISTINCT 'goal-spawn-agg' (clé
+   namespace 'qpoolagg:', disjointe de 'qpool:'/'qplace:'). Le détail par zone
+   — chaque pool encore dessinable individuellement, le rendu par-pool
+   d'origine — vit dans un tiroir replié « détail (N zones) » pour les joueurs
+   avancés. HONNÊTETÉ : le total affiché est celui de la DONNÉE (somme des
+   pools) ; une note muette distingue la zone de quête des zones génériques
+   PROUVÉES (subtype corpses via presets — une DONNÉE, jamais une astuce) ; le
+   caveat « pas un point = un corps » reste rendu une fois. */
+function goalSpawnPoolAggregate(pools) {
+  const nZones = pools.length;
+  const totalPts = pools.reduce((s, p) => s + (Number(p.points) || 0), 0);
+  // UNION des points de tous les pools joignables (chacun plafonné comme sa
+  // propre puce via GOAL_PLACEMENT_CAP), dédupliqués par coordonnée arrondie :
+  // « dessine toutes les zones à la fois ». Un pool non joint (camp pas chargé
+  // sur la carte active) est simplement absent — jamais un point fabriqué.
+  const seen = new Set();
+  const union = [];
+  const drawCap = nZones * GOAL_PLACEMENT_CAP;      // même densité par zone que les puces
+  for (const pool of pools) {
+    const camp = resolveSpawnPoolCamp(pool);
+    if (!camp) continue;
+    let taken = 0;
+    for (const p of camp.pts) {
+      if (taken >= GOAL_PLACEMENT_CAP || union.length >= drawCap) break;
+      if (!Array.isArray(p) || !Number.isFinite(+p[0]) || !Number.isFinite(+p[1])) continue;
+      const k = `${Math.round(p[0])},${Math.round(p[1])}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      union.push({ x: p[0], z: p[1] });
+      taken++;
+    }
+  }
+  const label = tr('goalSpawnAggLabel');
+  const meta = tr('goalSpawnAggMeta', totalPts.toLocaleString(numberLocale()), nZones);
+  // Ligne dessinable agrégée. Repli honnête NON dessinable quand aucun pool ne
+  // joint sur la carte active (jamais un toggle mort) — mêmes états que les
+  // puces individuelles (goalSpawnPoolChip rend alors une ligne muette aussi).
+  let aggChip;
+  if (union.length) {
+    const key = `qpoolagg:${cleanLabel(pools[0].label || '')}:${nZones}:${totalPts}`;
+    goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label });
+    aggChip = ref({
+      kind: 'qao', subrole: 'goal-spawn-agg', key,
+      label, hex: CATS.quest.hex, hasFiche: false,
+      drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta,
+    });
+  } else {
+    aggChip = ref({
+      kind: 'qao', subrole: 'goal-spawn-agg', label,
+      hex: CATS.quest.hex, hasFiche: false, drawable: false, meta,
+    });
+  }
+  // Répartition honnête quête vs génériques PROUVÉES — muette, simple (owner :
+  // « pas embrouillant »). Les zones génériques restent une DONNÉE prouvée.
+  const questZones = pools.filter(p => p.role === 'quest').length;
+  const rolesNote = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnAggRoles', questZones, nZones - questZones))}</span></div>`;
+  // Tiroir replié par DÉFAUT (fiche-dialogs, l'idiome des tiroirs secondaires
+  // de la fiche) : chaque pool y garde SA puce dessinable — quête en premier,
+  // exactement le rendu par-pool d'origine (goalSpawnPoolChip inchangé).
+  const detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalSpawnDetailN', nZones))}</summary>${
+    pools.map(p => `<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(p)}</div>`).join('')
+  }</details>`;
+  const note = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`;
+  return `<div class="goal-target-row goal-target-row-pos">${aggChip}</div>${rolesNote}${detail}${note}`;
+}
 /* Le nom de groupe BRUT du pipeline « Corps1 » (préfixe de clé tc_chest_corps1_*,
    6 clés serveur-spawn) est un jeton d'outil illisible. Prettifié en « Corpse
    (type 1) » : humain, et surtout DISTINCT des groupes « Corpse » (1 clé,
@@ -204,20 +286,30 @@ function goalCorpseExtras(t) {
     rows.push(`<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span></div>
       <div class="goal-target-row"><span class="goal-accepted-types">${list}${more}</span></div>`);
   }
-  // (2) Pools de spawn — une affordance dessinable PAR pool (le jeu en lie
-  // plusieurs : la pool quête + les pools génériques dont un type bindé porte la
-  // loot-table). Caveat honnête « pas un point = un corps » rendu UNE fois.
+  // (2) Zones de fouille (pools de spawn) — le jeu en lie souvent PLUSIEURS (la
+  // pool de quête + les pools génériques dont un type bindé porte la
+  // loot-table). UN seul pool → ligne dessinable unique inchangée (règle de
+  // réutilisabilité : pas d'agrégat ni de tiroir redondant). PLUSIEURS → UNE
+  // ligne agrégée dessinable + tiroir « détail (N zones) » replié
+  // (goalSpawnPoolAggregate) au lieu du mur de N puces. Caveat « pas un point =
+  // un corps » rendu une fois dans chaque branche.
   const pools = Array.isArray(t.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
-  if (pools.length) {
-    for (const pool of pools) {
-      rows.push(`<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(pool)}</div>`);
-    }
+  if (pools.length === 1) {
+    rows.push(`<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(pools[0])}</div>`);
     rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`);
+  } else if (pools.length > 1) {
+    rows.push(goalSpawnPoolAggregate(pools));
   }
-  // (3) Astuce joueur — 3e tier visuellement distinct (connu en jeu, pas data).
+  // (3) Astuce joueur — 3e tier visuellement distinct (connu EN JEU, pas
+  // extrait de la data : d'où le badge .player-hint + data-provenance). Depuis
+  // que les zones de fouille sont montrées comme DONNÉE juste au-dessus, cette
+  // astuce est un COMPLÉMENT (« au-delà de ces zones, ces corps apparaissent
+  // aussi ailleurs ») — le texte livré le dit déjà (« … PARTOUT sur la carte,
+  // pas seulement ici … ») — et non plus l'info principale. Rendue en dernier,
+  // secondaire ; styling 💡 et provenance:player_knowledge conservés.
   const hint = t.player_hint;
   if (hint && hint.text) {
-    rows.push(`<div class="goal-target-row player-hint">
+    rows.push(`<div class="goal-target-row player-hint" data-provenance="${esc(hint.provenance || 'player_knowledge')}">
       <span class="player-hint-icon" aria-hidden="true">💡</span>
       <span class="player-hint-body"><span class="player-hint-label">${esc(tr('playerHintLabel'))}</span> ${esc(hint.text)}</span>
     </div>`);

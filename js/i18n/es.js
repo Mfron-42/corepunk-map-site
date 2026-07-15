@@ -101,23 +101,29 @@ export default {
       // Interactuables. GLOSSARY-PENDING.
       guardsRowLabel: 'Guardias (unidad sin identificar)',
       kindRestRow: 'Apariciones sin identificar',
+      // Padre plegable que agrupa todas las filas dinámicas / de aparición del
+      // servidor del árbol de Interactuables (consolidación, 2026-07-15).
+      spawnCampsGroup: 'Zonas de aparición (campamentos)',
       // Solo grupo Wildlife: los pools genéricos de fauna pacífica/salvaje no
       // vinculan ninguna especie del lado cliente (roster del lado servidor),
       // pero las ZONAS de aparición son reales — capa propia « Animales
       // pacíficos », no un recuento de « datos faltantes ».
       wildlifeRestRow: 'Animales pacíficos',
-      // Árbol plano (2026-07-14): el kind de campamento `searchable` es un
-      // POOL DE APARICIÓN dinámico del servidor (camps.bin) — listado aparte,
-      // al final del árbol plano, nunca mezclado con las filas de cofres/
-      // cuerpos colocados de arriba. Su etiqueta nombra ese mecanismo —
-      // «Zonas de registro (spawn)» — distinta de la capa contenedora real
-      // `searchable_chest` («Cofres registrables»).
+      // Filas DENTRO del grupo «Zonas de aparición (campamentos)»: el padre
+      // lleva el contexto, cada fila solo nombra su tipo. searchSpotsRow
+      // (etiqueta plana antigua) conservada por compatibilidad, ya sin uso.
       searchSpotsRow: 'Zonas de registro (spawn)',
-      destroyableCampsRow: 'Destructibles (campamentos)',
-      reactiveCampsRow: 'Interactivos (campamentos)',
-      searchSpotsCorpsesRow: 'Zonas de registro — Cadáveres',
-      searchSpotsOtherRow: 'Zonas de registro — Otros',
-      skeletonCampsRow: 'Esqueletos (campamentos)',
+      destroyableCampsRow: 'Destructibles',
+      reactiveCampsRow: 'Interactivos',
+      // Bucket genérico `other` cuando cae en una categoría interactable —
+      // distinto del «Otros» de las zonas de registro residuales.
+      otherCampsRow: 'Otros (sin tipo)',
+      // Filas de aparición TIPIFICADAS por contenido probado (2026-07-15):
+      // «Cadáveres» de aparición aquí y «Cadáveres colocados» en decorFamily
+      // son el mismo concepto en dos formas honestas.
+      searchSpotsCorpsesRow: 'Cadáveres',
+      searchSpotsOtherRow: 'Otros',
+      skeletonCampsRow: 'Esqueletos',
       campContentLabel: 'Contenido',
       campCorpsePct: p => `~${p}% cadáveres`,
       campContentPresetNote: 'Composición probada por el preajuste de aparición del servidor.',
@@ -375,6 +381,18 @@ export default {
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Zona de aparición de cadáveres de misión — no un punto por cadáver.',
       playerHintLabel: 'Consejo de jugador',
+      // Cadáveres colocados (fijos) + agregado de zonas de búsqueda
+      // (goalSpawnPoolAggregate): UNA línea dibujable para todos los grupos de
+      // aparición cuya activación dibuja su unión; un cajón "detalle" plegado
+      // lista cada zona. El total es el de los datos (suma de los grupos).
+      goalCorpsePlacedN: n => `${n} cadáveres colocados`,
+      goalSpawnAggLabel: 'Zonas de búsqueda — cadáveres (aparición)',
+      goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zonas`,
+      goalSpawnAggRoles: (q, g) =>
+        q && g ? `incl. ${q} zona${q > 1 ? 's' : ''} de misión + ${g} zona${g > 1 ? 's' : ''} genérica${g > 1 ? 's' : ''} probada${g > 1 ? 's' : ''}`
+          : q ? `${q} zona${q > 1 ? 's' : ''} de misión`
+            : `${g} zona${g > 1 ? 's' : ''} genérica${g > 1 ? 's' : ''} probada${g > 1 ? 's' : ''}`,
+      goalSpawnDetailN: n => `detalle (${n} zonas)`,
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).
@@ -910,11 +928,13 @@ export default {
     // "Decoración" (js/sidebar.js buildDecorGroup), ver  §3.1.
     decorFamily: {
       barrel: 'Barriles', boxes: 'Cajas', furniture: 'Muebles',
-      // `corpse` = la fila ÚNICA de cadáveres del árbol plano (2026-07-14). Las
-      // etiquetas de ROL (corpse_quest/loot/decor) permanecen: config.js
-      // chestKindLabel las muestra POR REGISTRO en la ficha/popup, nunca como
-      // filas del árbol (config.js corpseRoleKey).
-      corpse: 'Cadáveres',
+      // `corpse` = la fila de cadáveres COLOCADOS (concepto fijo/colocado) —
+      // «Cadáveres colocados», distinta de los «Cadáveres» de APARICIÓN del
+      // grupo «Zonas de aparición (campamentos)»: el mismo concepto en dos
+      // formas honestas. Las etiquetas de ROL (corpse_quest/loot/decor)
+      // permanecen: config.js chestKindLabel las muestra POR REGISTRO en la
+      // ficha/popup, nunca como filas del árbol (config.js corpseRoleKey).
+      corpse: 'Cadáveres colocados',
       corpse_quest: 'Cadáveres de misión', corpse_loot: 'Cadáveres saqueables', corpse_decor: 'Cadáveres (decorativos)',
       books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
     },

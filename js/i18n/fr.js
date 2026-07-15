@@ -114,34 +114,37 @@ export default {
       // kindRestPoints (règle rest-only universelle, data-dérivée) ; sert désormais les TROIS groupes
       // Monsters/Creeps/Wildlife, symétrie — l'ancienne monsterCampsRow
       // « Camps de monstres » est retirée avec la bascule grossière) ; et la
-      // désambiguïsation « (camps) » des kinds dynamiques (destroyable/
-      // reactive) rangés à côté des props PLACÉS dans l'arbre plat Objets
-      // interactifs. Le kind `searchable` est listé À PART, tout en bas :
-      // « Zones de fouille (spawn) » (searchSpotsRow). GLOSSARY-PENDING
-      // (tokens internes d'outil de level-design, pas des termes du jeu).
+      // libellés COURTS des lignes de spawn regroupées sous le parent
+      // « Zones de spawn (camps) » (spawnCampsGroup) des Objets interactifs :
+      // le parent porte le contexte, la ligne dit juste son type
+      // (Corps/Squelettes/Autres/Destructibles/Interactifs). GLOSSARY-PENDING.
       guardsRowLabel: 'Gardes (unité non identifiée)',
       kindRestRow: 'Spawns non identifiés',
+      // Parent repliable qui regroupe toutes les lignes dynamiques / de spawn
+      // serveur des Objets interactifs (consolidation Option 1, 2026-07-15).
+      spawnCampsGroup: 'Zones de spawn (camps)',
       // Groupe Wildlife seulement : les pools de faune paisible/sauvage
       // génériques ne lient AUCUNE espèce côté client (roster côté serveur) —
       // mais les ZONES de spawn sont réelles, donc une couche à part entière
       // « Animaux paisibles », pas un compte « donnée manquante ».
       wildlifeRestRow: 'Animaux paisibles',
-      // Arbre plat (2026-07-14) : le kind camp `searchable` est un POOL DE
-      // SPAWN dynamique serveur (camps.bin) — listé seul, séparé tout en bas
-      // de l'arbre plat Objets interactifs, jamais mêlé aux lignes coffres/
-      // corps placés au-dessus. Son libellé nomme ce mécanisme — « Zones de
-      // fouille (spawn) » — distinct de la vraie couche conteneur
-      // `searchable_chest` (« Coffres fouillables »).
+      // Lignes DANS le groupe « Zones de spawn (camps) » (le parent porte le
+      // contexte, la ligne dit juste son type). searchSpotsRow (ancien libellé
+      // plat) conservé pour compat, plus référencé.
       searchSpotsRow: 'Zones de fouille (spawn)',
-      destroyableCampsRow: 'Destructibles (camps)',
-      reactiveCampsRow: 'Interactifs (camps)',
-      // Zones de fouille TYPÉES par contenu prouvé (2026-07-15, camps.bin
+      destroyableCampsRow: 'Destructibles',
+      reactiveCampsRow: 'Interactifs',
+      // Seau générique `other` quand il tombe en catégorie interactable —
+      // distinct du « Autres » des zones de fouille résiduelles.
+      otherCampsRow: 'Autres (non typés)',
+      // Lignes de spawn TYPÉES par contenu prouvé (2026-07-15, camps.bin
       // `subtype`/`corpseFraction`) : la couche dominante de spawn de corps,
-      // le reste, et les camps réactifs de squelettes — sortis en lignes
-      // distinctes, teintées vers leur concept (Corps mauve / Os).
-      searchSpotsCorpsesRow: 'Zones de fouille — Corps',
-      searchSpotsOtherRow: 'Zones de fouille — Autres',
-      skeletonCampsRow: 'Squelettes (camps)',
+      // le reste, et les camps réactifs de squelettes — teintées vers leur
+      // concept (Corps mauve / Os). Le « Corps » de spawn ici et le « Corps
+      // placés » de decorFamily sont le même concept en deux formes honnêtes.
+      searchSpotsCorpsesRow: 'Corps',
+      searchSpotsOtherRow: 'Autres',
+      skeletonCampsRow: 'Squelettes',
       // Contenu prouvé d'un pool (popup/fiche camp).
       campContentLabel: 'Contenu',
       campCorpsePct: p => `~${p} % de corps`,
@@ -422,6 +425,21 @@ export default {
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
       goalSpawnPoolNote: 'Zone de spawn des corps de quête — pas un point = un corps.',
       playerHintLabel: 'Astuce joueur',
+      // Ligne de CORPS PLACÉS (fixes) d'une cible corps (goalPlacementsChip
+      // quand accepted_types présents) — distincte des zones de fouille
+      // dynamiques (« spawn ») ci-dessous.
+      goalCorpsePlacedN: n => `${n} corps placés`,
+      // Agrégat des zones de fouille (refonte UX corps 2026-07-15,
+      // goalSpawnPoolAggregate) : UNE ligne dessinable pour tous les pools de
+      // spawn, dont la bascule dessine l'union ; un tiroir « détail » replié
+      // liste chaque zone. Le total est celui de la donnée (somme des pools).
+      goalSpawnAggLabel: 'Zones de fouille — corps (spawn)',
+      goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zones`,
+      goalSpawnAggRoles: (q, g) =>
+        q && g ? `dont ${q} zone${q > 1 ? 's' : ''} de quête + ${g} zone${g > 1 ? 's' : ''} générique${g > 1 ? 's' : ''} prouvée${g > 1 ? 's' : ''}`
+          : q ? `${q} zone${q > 1 ? 's' : ''} de quête`
+            : `${g} zone${g > 1 ? 's' : ''} générique${g > 1 ? 's' : ''} prouvée${g > 1 ? 's' : ''}`,
+      goalSpawnDetailN: n => `détail (${n} zones)`,
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).
@@ -960,11 +978,13 @@ export default {
     // (js/sidebar.js buildDecorGroup) — voir  §3.1.
     decorFamily: {
       barrel: 'Tonneaux', boxes: 'Caisses', furniture: 'Meubles',
-      // `corpse` = la ligne UNIQUE des corps de l'arbre plat (2026-07-14). Les
-      // libellés de RÔLE (corpse_quest/loot/decor) restent : config.js
-      // chestKindLabel les affiche PAR RECORD sur la fiche/le popup, jamais
-      // comme lignes d'arbre (config.js corpseRoleKey).
-      corpse: 'Corps',
+      // `corpse` = la ligne des corps PLACÉS (concept fixe/placé) — « Corps
+      // placés », distincte du « Corps » de SPAWN du groupe « Zones de spawn
+      // (camps) » : le même concept en deux formes honnêtes, désormais
+      // clairement sectionnées. Les libellés de RÔLE (corpse_quest/loot/decor)
+      // restent : config.js chestKindLabel les affiche PAR RECORD sur la
+      // fiche/le popup, jamais comme lignes d'arbre (config.js corpseRoleKey).
+      corpse: 'Corps placés',
       corpse_quest: 'Corps de quête', corpse_loot: 'Corps fouillables', corpse_decor: 'Corps (décor)',
       books: 'Livres', misc: 'Divers', legacy: 'Coffre hérité',
     },
