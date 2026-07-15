@@ -340,6 +340,16 @@ export default {
       // una hilera de chips de nodo bajo el objetivo, nunca una capa del
       // mapa (no existe un vínculo tipo-de-nodo -> punto en el cliente).
       goalAcceptedNodesLabel: 'Nodos aceptados:',
+      // Bloques de objetivo cadáver de misión (LOT cadáveres 2026-07-15,
+      // stepguide.js goalCorpseExtras). Tres niveles de honestidad: TIPOS
+      // aceptados (dato probado), zona de SPAWN (nube honesta, no un punto por
+      // cadáver) y CONSEJO de jugador (3.er nivel: conocido en el juego, no data).
+      goalAcceptedTypesLabel: 'Tipos aceptados:',
+      goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'colocado' : 'colocados'}`,
+      goalAcceptedTypeServer: 'aparece en el servidor',
+      goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
+      goalSpawnPoolNote: 'Zona de aparición de cadáveres de misión — no un punto por cadáver.',
+      playerHintLabel: 'Consejo de jugador',
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).
@@ -874,7 +884,11 @@ export default {
     // "Decoración" (js/sidebar.js buildDecorGroup), ver  §3.1.
     decorFamily: {
       barrel: 'Barriles', boxes: 'Cajas', furniture: 'Muebles',
-      corpse: 'Cadáveres', books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
+      // Cadáveres divididos por contentRole (un cadáver es un cadáver —
+      // kind=corpse en los tres; el rol los distingue; config.js corpseRoleKey).
+      corpse: 'Cadáveres',
+      corpse_quest: 'Cadáveres de misión', corpse_loot: 'Cadáveres saqueables', corpse_decor: 'Cadáveres (decorativos)',
+      books: 'Libros', misc: 'Varios', legacy: 'Cofre heredado',
     },
     // "searchable" y "quest" reformulados para que no se lean como las capas
     // estáticas de nivel superior (cat.chest "Cofres" / cat.quest

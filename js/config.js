@@ -437,10 +437,29 @@ function chestDisplayName(r) {
    panneau à la demande du propriétaire). Couleurs volontairement sourdes/
    terreuses (décor = masqué par défaut, jamais le point d'attention visuel
    des 2 vraies couches de coffres ci-dessus). */
-const DECOR_FAMILIES = ['barrel', 'boxes', 'furniture', 'misc', 'corpse', 'books', 'legacy'];
+/* Corps : le CHAMP CUIT `contentRole` (chests.bin, byte-dérivé du client —
+   loot_tables lt_searchable_corpse_quest / lt_searchable_corpse / aucune,
+   voir  LOT C) scinde l'ancien seau unique « Corps »
+   (51) en trois couches HONNÊTES : corps CÂBLÉ-QUÊTE (contentRole=quest, 11),
+   corps FOUILLABLE (contentRole=loot, 34), corps DÉCOR (aucun rôle prouvé —
+   contentRole 'unknown'/'decor', non fouillable, 6). Un corps reste un corps
+   (kind=corpse pour les trois) — c'est le RÔLE qui les distingue, pas leur
+   nature. Résolveur unique, réutilisé par buildDecorGroups (data.js),
+   chestHex/chestKindLabel ci-dessous et le sélecteur de couche (main.js). */
+function corpseRoleKey(r) {
+  const role = r && r.contentRole;
+  if (role === 'quest') return 'corpse_quest';
+  if (role === 'loot') return 'corpse_loot';
+  return 'corpse_decor';   // unknown / decor / rôle non prouvé : corps décoratif
+}
+const DECOR_FAMILIES = ['barrel', 'boxes', 'furniture', 'misc',
+  'corpse_quest', 'corpse_loot', 'corpse_decor', 'books', 'legacy'];
 const DECOR_HEX = {
   barrel: '#a9744c', boxes: '#c2a25c', furniture: '#8f97a8',
-  corpse: '#8a7080', books: '#8d7ab0', misc: '#6c757d', legacy: '#c9a66b',
+  // Trois teintes de corps : sourdes/terreuses (décor masqué par défaut),
+  // distinguables entre elles pour lire les trois couches d'un coup d'œil.
+  corpse: '#8a7080', corpse_quest: '#a06a86', corpse_loot: '#8a7080', corpse_decor: '#6f6470',
+  books: '#8d7ab0', misc: '#6c757d', legacy: '#c9a66b',
 };
 const decorFamilyLabel = key => tbl('decorFamily', key) || pretty(key);
 
@@ -452,6 +471,9 @@ function chestHex(r) {
   if (!r) return DECOR_HEX.misc;
   if (r.group === 'camp_chest') return CATS.camp_chest.hex;
   if (r.group === 'legacy_chest') return DECOR_HEX.legacy;
+  // Corps : teinte par RÔLE (contentRole), jamais un unique gris « corps » —
+  // même vocabulaire de seau que la couche/la recherche (corpseRoleKey).
+  if (r.kind === 'corpse') return DECOR_HEX[corpseRoleKey(r)] || DECOR_HEX.corpse;
   return DECOR_HEX[r.family] || DECOR_HEX.misc;
 }
 /* Libellé de catégorie RÉELLE d'un coffre placé (pop-cat/fiche-kind) —
@@ -461,6 +483,10 @@ function chestKindLabel(r) {
   if (!r) return '';
   if (r.group === 'camp_chest') return tr('campChestLabel');
   if (r.group === 'legacy_chest') return tr('legacyChestLabel');
+  // Corps : le libellé du SEAU par rôle (« Corps de quête » / « Corps
+  // fouillables » / « Corps (décor) ») — vocabulaire partagé arbre/recherche/
+  // fiche (corpseRoleKey → decorFamily), plus jamais un « Décor — Corpse » plat.
+  if (r.kind === 'corpse') return decorFamilyLabel(corpseRoleKey(r));
   return `${tr('decorGroupLabel')} — ${decorFamilyLabel(r.family)}`;
 }
 
@@ -723,6 +749,6 @@ export {
   prettyMapId, mapName, ecAttr,
   campDisplayName, campLabel, campTypeLabel, campQualifierLabel, campQualifierChip, campModeLabel,
   chestTypeLabel, activableTypeLabel, chestDisplayName,
-  DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, chestHex, chestKindLabel,
+  DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, corpseRoleKey, chestHex, chestKindLabel,
   prettyRegion, LOOT_TABLE_HEX,
 };

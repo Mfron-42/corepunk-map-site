@@ -348,6 +348,16 @@ export default {
       // target.node_types -- 11 целей) -- ряд чипов-узлов под целью, никогда
       // не слой карты (связь тип-узла -> точка не существует на клиенте).
       goalAcceptedNodesLabel: 'Подходящие узлы:',
+      // Блоки цели «труп задания» (LOT трупы 2026-07-15, stepguide.js
+      // goalCorpseExtras). Три уровня честности: принятые ТИПЫ (доказанные
+      // данные), зона СПАВНА (честное облако, не один труп на точку) и СОВЕТ
+      // игрока (3-й уровень: известно в игре, не извлечено — .player-hint).
+      goalAcceptedTypesLabel: 'Принятые типы:',
+      goalAcceptedTypePlaced: n => `размещено: ${n}`,
+      goalAcceptedTypeServer: 'спавн на сервере',
+      goalSpawnPoolLabel: (name, n) => `Зона спавна — ${name} (${n} т.)`,
+      goalSpawnPoolNote: 'Зона спавна трупов задания — не один труп на точку.',
+      playerHintLabel: 'Совет игрока',
       // Механизм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точное значение) — отличается от общего dropChanceApprox (расчётная
       // доля, здесь никогда нет "≈" — это заданный игрой процент).
@@ -856,7 +866,11 @@ export default {
     // (js/sidebar.js buildDecorGroup), см.  §3.1.
     decorFamily: {
       barrel: 'Бочки', boxes: 'Ящики', furniture: 'Мебель',
-      corpse: 'Трупы', books: 'Книги', misc: 'Разное', legacy: 'Устаревший сундук',
+      // Трупы разделены по contentRole (труп остаётся трупом — kind=corpse для
+      // всех трёх; различает их роль; config.js corpseRoleKey).
+      corpse: 'Трупы',
+      corpse_quest: 'Трупы заданий', corpse_loot: 'Обыскиваемые трупы', corpse_decor: 'Трупы (декор)',
+      books: 'Книги', misc: 'Разное', legacy: 'Устаревший сундук',
     },
     // "searchable" и "quest" переформулированы, чтобы не читаться как
     // верхнеуровневые статичные слои (cat.chest "Сундуки" / cat.quest

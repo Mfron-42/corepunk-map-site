@@ -4,7 +4,7 @@
 import { S } from './state.js';
 import {
   CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, prettyRegion,
+  campLabel, campQualifierLabel, chestTypeLabel, chestDisplayName, chestHex, chestKindLabel, prettyRegion,
   rarityLabel, itemKindLabel, weaponTypeLabel, professionLabel, familyKey,
   locationKindLabel, mapName, entityColor, nodeTierBadge, interactableBucketLabel,
 } from './config.js';
@@ -568,10 +568,16 @@ function buildChestSearchIndex() {
     // que le sous-groupe de l'arbre latéral. Dédup honnête quand le type EST le
     // seau (un skin sci_fi « Chest » du seau « Coffres » n'affiche pas
     // « Coffres · Coffre »). Repli sur le seau seul quand le type manque (~44).
-    const bucketLabel = r.category ? interactableBucketLabel(r.category) : null;
-    const subParts = (bucketLabel && typeLabel && fold(bucketLabel) === fold(typeLabel))
-      ? [typeLabel]
-      : [bucketLabel, typeLabel];
+    // CORPS (LOT corps) : le seau coarse « Interactives » cède au seau par RÔLE
+    // (chestKindLabel → contentRole : « Corps de quête »/« Corps fouillables »/
+    // « Corps (décor) ») — MÊME vocabulaire que l'arbre et la fiche ; le type
+    // « Corpse » redondant est omis (chaque skin corps est homogène en rôle).
+    const isCorpse = r.kind === 'corpse';
+    const bucketLabel = isCorpse ? chestKindLabel(r) : (r.category ? interactableBucketLabel(r.category) : null);
+    const subTypeLabel = isCorpse ? null : typeLabel;
+    const subParts = (bucketLabel && subTypeLabel && fold(bucketLabel) === fold(subTypeLabel))
+      ? [subTypeLabel]
+      : [bucketLabel, subTypeLabel];
     const chestSub = subParts.filter(Boolean).join(' · ') || null;
     // Couleur RÉELLE (chestHex — camp_chest/décor par famille/legacy, voir
     // config.js) : un skin d'asset donné (r.name) est TOUJOURS de la même

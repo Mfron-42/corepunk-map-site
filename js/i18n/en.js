@@ -397,6 +397,18 @@ export default {
       // under the objective, never a map layer (no node-type -> point
       // binding exists client-side, see data.js S.nodes doc).
       goalAcceptedNodesLabel: 'Accepted nodes:',
+      // Quest-corpse target extras (LOT corpses 2026-07-15, see stepguide.js
+      // goalCorpseExtras). Three honesty tiers, never conflated: accepted TYPES
+      // (proven data — name + how many are statically placed, or "server-spawn"
+      // for a 0-placed type like astronauts), a SPAWN pool (honest cloud, drawable
+      // like exact placements but "not one point per corpse"), and a PLAYER tip
+      // (3rd tier: known in-game, not extracted — visually distinct .player-hint).
+      goalAcceptedTypesLabel: 'Accepted types:',
+      goalAcceptedTypePlaced: n => `${n} placed`,
+      goalAcceptedTypeServer: 'server-spawn',
+      goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
+      goalSpawnPoolNote: 'Spawn zone for quest corpses — not one point per corpse.',
+      playerHintLabel: 'Player tip',
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,
@@ -953,7 +965,11 @@ export default {
     // (js/sidebar.js buildDecorGroup), see  §3.1.
     decorFamily: {
       barrel: 'Barrels', boxes: 'Boxes', furniture: 'Furniture',
-      corpse: 'Corpses', books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
+      // Corpses split by cooked contentRole (a corpse is a corpse — kind=corpse
+      // for all three — the role distinguishes them; see config.js corpseRoleKey).
+      corpse: 'Corpses',
+      corpse_quest: 'Quest corpses', corpse_loot: 'Searchable corpses', corpse_decor: 'Corpses (decor)',
+      books: 'Books', misc: 'Misc', legacy: 'Legacy chest',
     },
     // "searchable" and "quest" reworded so they no longer read as the
     // top-level static layers (cat.chest "Chests" / cat.quest "Quests"):

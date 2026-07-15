@@ -111,6 +111,93 @@ function toggleGoalPlacements(info) {
   addCampTrace(key, { pts: set.pts, hex: set.hex, label: set.label, kind: 'qao', refKind: 'qao', map: S.map });
 }
 
+/* ── Cible CORPS de quête : blocs supplémentaires (LOT corps 2026-07-15) ──────
+   Un but collect_from_object de corps porte trois signaux cuits que le résolveur
+   monolithique n'exposait pas ( / CORPSE_CHEST_TAXONOMY
+   LOT C/D). Trois tiers d'HONNÊTETÉ distincts, jamais confondus :
+     1. `accepted_types` [{name, keys, placed, count}] — DONNÉE prouvée : quels
+        TYPES de corps la quête accepte, avec le nombre de placements statiques ;
+        un type 0-placé (astronautes) est dit « spawn serveur », jamais un faux
+        pin (CORPSE §D.2).
+     2. `spawn_pools` [{label, points, role}] — ABSENCE localisée honnête : un
+        NUAGE de spawn (camps.json kind=searchable, points sans clé/loot) — pas
+        « un point = un corps », rendu comme affordance DESSINABLE (même campTrace
+        que les placements exacts) avec un caveat explicite.
+     3. `player_hint` {text, provenance:'player_knowledge'} — 3e tier : connu EN
+        JEU, jamais extrait de la data — un badge visuellement DISTINCT des
+        badges de donnée (.player-hint), pour ne jamais le lire comme une preuve. */
+
+/* Pool de spawn → camp searchable joint par NOM (label anglais stable toutes
+   locales, ex. « Quest Corpses ») avec repli par compte de points ; renvoie le
+   groupe de camp (pts) ou null si les camps ne sont pas encore chargés / le pool
+   n'est pas joignable (rendu honnête non dessinable dans ce cas). */
+function resolveSpawnPoolCamp(pool) {
+  const st = S.camps && S.camps.searchable;
+  if (!st || !st.groups) return null;
+  const want = fold(cleanLabel(pool.label || ''));
+  let hit = st.groups.find(g => fold(cleanLabel(g.name || '')) === want);
+  if (!hit && pool.points) hit = st.groups.find(g => (g.pts || []).length === pool.points);
+  return hit && hit.pts && hit.pts.length ? hit : null;
+}
+/* Affordance DESSINABLE d'un pool de spawn — RÉUTILISE le registre campTrace
+   (goalPlacementSets + toggleGoalPlacements via main.js), exactement comme le
+   chip des placements exacts, mais avec un subrole DISTINCT 'goal-spawn-pool' :
+   un pool est un NUAGE de spawn (roster serveur), pas les positions EXACTES de
+   conteneurs — les deux ne doivent jamais se confondre (le harnais
+   _verify_goal_placements attend exactement UN chip 'goal-placements' par but).
+   Clé namespace 'qpool:' (disjointe de 'qplace:'). Renvoie une ligne muette
+   honnête si le camp n'est pas joignable (jamais de tracé fabriqué). */
+function goalSpawnPoolChip(pool) {
+  const label = tr('goalSpawnPoolLabel', cleanLabel(pool.label || ''), pool.points || 0);
+  const camp = resolveSpawnPoolCamp(pool);
+  if (!camp) return `<span class="pos-region">${esc(label)}</span>`;
+  const raw = camp.pts.filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]));
+  const pts = raw.slice(0, GOAL_PLACEMENT_CAP).map(([x, z]) => ({ x, z }));
+  if (!pts.length) return `<span class="pos-region">${esc(label)}</span>`;
+  const key = `qpool:${cleanLabel(pool.label || '')}:${raw.length}`;
+  goalPlacementSets.set(key, { pts, hex: CATS.quest.hex, label });
+  const capMeta = pts.length < raw.length ? `· ${tr('goalPlacementsCapped', pts.length, raw.length)}` : null;
+  return ref({
+    kind: 'qao', subrole: 'goal-spawn-pool', key,
+    label, hex: CATS.quest.hex, hasFiche: false,
+    drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta: capMeta,
+  });
+}
+/* Les 3 blocs corps, empilés sous la vignette de cible (rien si la cible n'en
+   porte aucun — sûr pour tout target non-corps). */
+function goalCorpseExtras(t) {
+  if (!t) return '';
+  const rows = [];
+  // (1) Types acceptés — nom + « (N placés) » ou « (spawn serveur) » si placed=0.
+  const types = Array.isArray(t.accepted_types) ? t.accepted_types.filter(a => a && a.name) : [];
+  if (types.length) {
+    const list = types.map(a => {
+      // ×N quand le type couvre plusieurs clés-variantes (ex. Corpse astronaut
+      // ×2) ; « (N placés) » sinon « (spawn serveur) » quand 0 placement statique.
+      const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
+      const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
+      return `${esc(cleanLabel(a.name))}${mult} <span class="muted">(${esc(qual)})</span>`;
+    }).join(' · ');
+    rows.push(`<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span></div>
+      <div class="goal-target-row"><span class="goal-accepted-types">${list}</span></div>`);
+  }
+  // (2) Pools de spawn — affordance dessinable + caveat honnête « pas un point = un corps ».
+  for (const pool of Array.isArray(t.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : []) {
+    const chip = goalSpawnPoolChip(pool);
+    rows.push(`<div class="goal-target-row goal-target-row-pos">${chip}</div>
+      <div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`);
+  }
+  // (3) Astuce joueur — 3e tier visuellement distinct (connu en jeu, pas data).
+  const hint = t.player_hint;
+  if (hint && hint.text) {
+    rows.push(`<div class="goal-target-row player-hint">
+      <span class="player-hint-icon" aria-hidden="true">💡</span>
+      <span class="player-hint-body"><span class="player-hint-label">${esc(tr('playerHintLabel'))}</span> ${esc(hint.text)}</span>
+    </div>`);
+  }
+  return rows.join('');
+}
+
 /* Position d'une cible sans coordonnée fixe — désormais une Badge de l'axe
    PRÉCISION (blueprint §5.2), plus l'ancienne échelle posDynamic/posEstimatedZone/
    posUncatalogued (chacune son propre libellé/idiome). Trois rendus :
@@ -730,7 +817,9 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const objPosRow = posInRef ? '' : (t.x != null
       ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
       : posRow);
-    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${objPosRow}</div>`;
+    // Blocs corps de quête (types acceptés / pools de spawn / astuce joueur) —
+    // rien si la cible n'en porte aucun (voir goalCorpseExtras).
+    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${objPosRow}${goalCorpseExtras(t)}</div>`;
   }
 
   if (t.kind === 'monster') {

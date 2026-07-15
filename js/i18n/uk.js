@@ -349,6 +349,16 @@ export default {
       // target.node_types -- 11 цілей) -- ряд чипів-вузлів під ціллю, ніколи
       // не шар карти (зв'язок тип-вузла -> точка не існує на клієнті).
       goalAcceptedNodesLabel: 'Придатні вузли:',
+      // Блоки цілі «труп завдання» (LOT трупи 2026-07-15, stepguide.js
+      // goalCorpseExtras). Три рівні чесності: прийняті ТИПИ (доведені дані),
+      // зона СПАВНУ (чесна хмара, не один труп на точку) і ПОРАДА гравця (3-й
+      // рівень: відоме у грі, не вилучене — .player-hint).
+      goalAcceptedTypesLabel: 'Прийняті типи:',
+      goalAcceptedTypePlaced: n => `розміщено: ${n}`,
+      goalAcceptedTypeServer: 'спавн на сервері',
+      goalSpawnPoolLabel: (name, n) => `Зона спавну — ${name} (${n} т.)`,
+      goalSpawnPoolNote: 'Зона спавну трупів завдання — не один труп на точку.',
+      playerHintLabel: 'Порада гравця',
       // Механізм kill_collect/kill: target.drop_chance (0-100, побайтово
       // точне значення) — відрізняється від загального dropChanceApprox
       // (розрахункова частка, тут ніколи немає "≈" — це заданий грою відсоток).
@@ -857,7 +867,11 @@ export default {
     // (js/sidebar.js buildDecorGroup), див.  §3.1.
     decorFamily: {
       barrel: 'Бочки', boxes: 'Ящики', furniture: 'Меблі',
-      corpse: 'Трупи', books: 'Книги', misc: 'Різне', legacy: 'Застаріла скриня',
+      // Трупи поділені за contentRole (труп лишається трупом — kind=corpse для
+      // всіх трьох; розрізняє їх роль; config.js corpseRoleKey).
+      corpse: 'Трупи',
+      corpse_quest: 'Трупи завдань', corpse_loot: 'Оглядувані трупи', corpse_decor: 'Трупи (декор)',
+      books: 'Книги', misc: 'Різне', legacy: 'Застаріла скриня',
     },
     // "searchable" і "quest" переформульовано, щоб не читатися як
     // верхньорівневі статичні шари (cat.chest "Скрині" / cat.quest

@@ -883,7 +883,7 @@ function syncEntityRefDots() {
     // (S.campTraces, pins.js) — l'état ● relu de l'appartenance par sa clé, la
     // MÊME source que le bandeau ; sans ce resync la pastille resterait ○ après
     // un clic (retour visuel muet interdit).
-    else if (d.subrole === 'goal-placements' && d.key) { on = !!S.campTraces?.has(d.key); }
+    else if ((d.subrole === 'goal-placements' || d.subrole === 'goal-spawn-pool') && d.key) { on = !!S.campTraces?.has(d.key); }
     else {
       const k = d.subrole || d.key;
       if (k && S.camps && S.camps[k] !== undefined) on = !!S.camps[k]?.on;

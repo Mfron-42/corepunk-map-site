@@ -381,6 +381,17 @@ export default {
       // l'objectif, jamais une couche carte (aucun lien nœud->point côté
       // client, voir data.js S.nodes).
       goalAcceptedNodesLabel: 'Nœuds acceptés :',
+      // Blocs corps de quête (LOT corps 2026-07-15, voir stepguide.js
+      // goalCorpseExtras). Trois tiers d'honnêteté : TYPES acceptés (donnée
+      // prouvée — nom + nombre de placements, ou « spawn serveur » à 0 placement),
+      // POOL de spawn (nuage honnête, dessinable mais « pas un point = un corps »),
+      // ASTUCE joueur (3e tier : connu en jeu, pas extrait — .player-hint distinct).
+      goalAcceptedTypesLabel: 'Types acceptés :',
+      goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'placé' : 'placés'}`,
+      goalAcceptedTypeServer: 'spawn serveur',
+      goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
+      goalSpawnPoolNote: 'Zone de spawn des corps de quête — pas un point = un corps.',
+      playerHintLabel: 'Astuce joueur',
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).
@@ -918,7 +929,11 @@ export default {
     // (js/sidebar.js buildDecorGroup) — voir  §3.1.
     decorFamily: {
       barrel: 'Tonneaux', boxes: 'Caisses', furniture: 'Meubles',
-      corpse: 'Cadavres', books: 'Livres', misc: 'Divers', legacy: 'Coffre hérité',
+      // Corps scindés par contentRole cuit (un corps reste un corps — kind=corpse
+      // pour les trois — c'est le rôle qui les range ; config.js corpseRoleKey).
+      corpse: 'Cadavres',
+      corpse_quest: 'Corps de quête', corpse_loot: 'Corps fouillables', corpse_decor: 'Corps (décor)',
+      books: 'Livres', misc: 'Divers', legacy: 'Coffre hérité',
     },
     // "searchable" et "quest" reformulés pour ne plus lire comme les couches
     // statiques de haut niveau (cat.chest "Coffres" / cat.quest "Quêtes") :

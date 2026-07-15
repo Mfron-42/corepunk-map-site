@@ -8,7 +8,7 @@
    coordonnées, hooks de bascule de carte, init. Seul module qui importe
    tout le monde ; aucune logique métier propre. */
 import { S } from './state.js';
-import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, familyLayerHex, familyKey } from './config.js';
+import { CATS, CAMP_COLORS, DECOR_FAMILIES, DECOR_HEX, corpseRoleKey, familyLayerHex, familyKey } from './config.js';
 import { $, $$, esc, fmtCoord } from './utils.js';
 import { LANGS, setLangCode, tr } from './i18n/index.js';
 import {
@@ -337,7 +337,10 @@ initMapRefDelegation(document, {
         // togglable, listé au bandeau, teinte quête ; jamais la zone devinée.
         // Placé EN TÊTE (kind qao mode E porté par le subrole) pour précéder les
         // branches zone/camp/mode-C ci-dessous.
-        if (info.subrole === 'goal-placements') { toggleGoalPlacements(info); break; }
+        // 'goal-spawn-pool' (nuage de spawn de corps de quête, LOT corps) partage
+        // EXACTEMENT le même mécanisme de tracé (campTrace via goalPlacementSets),
+        // seul son subrole diffère (jamais confondu avec les placements exacts).
+        if (info.subrole === 'goal-placements' || info.subrole === 'goal-spawn-pool') { toggleGoalPlacements(info); break; }
         // Zone de recherche d'un OBJECTIF ([Région ●] de dynamicPosBadge,
         // vague 1) : dessine le cercle/les vrais points de cette search_zone
         // (viewGoalZone — même primitive que l'ancien bouton « Voir la
@@ -537,9 +540,15 @@ function registerAllDenseRenderers() {
   // regroupe group==="legacy_chest" (family réelle "greenville" ignorée ici,
   // voir data.js buildDecorGroups) ; les 6 autres clés sont group==="decor"
   // par family.
+  // Corps : trois couches par RÔLE cuit (corpse_quest/corpse_loot/corpse_decor)
+  // sélectionnées sur kind==='corpse' + contentRole (corpseRoleKey), plus jamais
+  // un seul seau « corpse » qui mélange les trois ( LOT C).
   for (const fam of DECOR_FAMILIES) {
-    registerDense('decor:' + fam, () => S.data.chest.filter(p =>
-      (fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)) && !isHiddenTest(p)),
+    const sel = fam.startsWith('corpse_')
+      ? () => S.data.chest.filter(p => p.kind === 'corpse' && corpseRoleKey(p) === fam && !isHiddenTest(p))
+      : () => S.data.chest.filter(p =>
+        (fam === 'legacy' ? p.group === 'legacy_chest' : (p.group === 'decor' && p.family === fam)) && !isHiddenTest(p));
+    registerDense('decor:' + fam, sel,
       DECOR_HEX[fam], p => popupHtml('chest', p, markerId('chest', S.data.chest.indexOf(p))));
   }
   // Compositeur de points de camp (#82 chunk (b), design §4.3) : UNE couche

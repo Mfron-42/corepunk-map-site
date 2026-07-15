@@ -5,7 +5,7 @@
 import { S } from './state.js';
 import { fold } from './utils.js';
 import { buildRarityGroups } from './rarity.js';
-import { DECOR_FAMILIES } from './config.js';
+import { DECOR_FAMILIES, corpseRoleKey } from './config.js';
 import { setClassLabels } from './classlabels.js';
 import { positionCounts, isHiddenTest } from './devcontent.js';
 
@@ -92,7 +92,11 @@ function buildDecorGroups(chests, prevOn = {}) {
   const byFam = {};
   for (const c of chests) {
     let fam = null;
-    if (c.group === 'decor') fam = c.family || 'misc';
+    // Corps : scindés par RÔLE cuit (contentRole → corpseRoleKey : corpse_quest/
+    // corpse_loot/corpse_decor) plutôt qu'un seul seau « corpse » — un corps
+    // reste un corps (kind=corpse), c'est son rôle qui le range (voir
+    //  LOT C ; config.js corpseRoleKey).
+    if (c.group === 'decor') fam = c.kind === 'corpse' ? corpseRoleKey(c) : (c.family || 'misc');
     else if (c.group === 'legacy_chest') fam = 'legacy';
     else continue;
     (byFam[fam] || (byFam[fam] = [])).push(c);

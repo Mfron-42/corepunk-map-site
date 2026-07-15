@@ -1980,6 +1980,27 @@ body {
    nom+niveau. */
 .goal-target-rel-verb { font-size: .74rem; font-style: italic; color: var(--muted); }
 .goal-target-row-rel-plain .goal-target-name { font-weight: 600; }
+/* Types acceptés d'une cible corps (goalCorpseExtras) : liste inline lisible,
+   le « (N placés) / (spawn serveur) » déjà en .muted. */
+.goal-accepted-types { font-size: .76rem; color: var(--ink); line-height: 1.5; }
+/* ASTUCE JOUEUR (goalCorpseExtras, 3e tier « connu en jeu, pas extrait de la
+   data ») : VISUELLEMENT DISTINCT des badges de donnée -- fond ambre tamisé,
+   liseré gauche accent, icône 💡. Jamais confondu avec une preuve extraite. */
+.goal-target-row.player-hint {
+  margin-top: 5px; padding: 6px 8px;
+  align-items: flex-start; gap: 7px;
+  border-radius: var(--radius-s, 6px);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel-3));
+}
+.player-hint-icon { flex: none; font-size: .92rem; line-height: 1.3; }
+.player-hint-body { font-size: .76rem; color: var(--ink); line-height: 1.45; min-width: 0; }
+.player-hint-label {
+  font-weight: 700; font-style: normal; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .03em; font-size: .68rem;
+  margin-right: 4px;
+}
 
 /* Ligne d'identité "item" (icône + nom + badge objet de quête/jeu) --
    voir goalTargetItemRow, js/fiches.js : renderer PARTAGÉ par les 3 cas où un
