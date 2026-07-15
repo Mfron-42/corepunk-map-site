@@ -85,6 +85,15 @@ export default {
       groupHarvest: 'Harvesting',
       groupContainers: 'Interactables',
       groupWorld: 'World',
+      // "Creatures" section (owner reorg 2026-07-15): merges the former root
+      // Monsters + Creeps sections + the Peaceful-fauna layer (camp:wildlife
+      // pool) into ONE section with three collapsible sub-groups.
+      // groupMonsters/groupCreeps KEPT above (i18n parity); the sub-group
+      // labels below now carry them in the tree.
+      groupCreatures: 'Creatures',
+      subMonstres: 'Monsters',
+      subCreeps: 'Creeps',
+      subFaunePaisible: 'Peaceful fauna',
       // Sub-group cascade dot (js/sidebar.js buildSubGroup) — root GROUP
       // headers no longer carry one (final correction 2026-07-11: pure
       // fold/unfold containers).
@@ -444,42 +453,42 @@ export default {
       // under the objective, never a map layer (no node-type -> point
       // binding exists client-side, see data.js S.nodes doc).
       goalAcceptedNodesLabel: 'Accepted nodes:',
-      // Quest-corpse target extras (LOT corpses 2026-07-15, see stepguide.js
-      // goalCorpseExtras). Three honesty tiers, never conflated: accepted TYPES
-      // (proven data — name + how many are statically placed, or "server-spawn"
-      // for a 0-placed type like astronauts), a SPAWN pool (honest cloud, drawable
-      // like exact placements but "not one point per corpse"), and a PLAYER tip
-      // (3rd tier: known in-game, not extracted — visually distinct .player-hint).
+      // Quest corpse/container target extras (rework 2026-07-15, stepguide.js
+      // goalCorpseExtras) — THE reusable THREE honesty-tier model, keyed off the
+      // data's own signals (never a hardcoded quest):
+      //   1. Accepted types — the COMPLETE bound_units list, condensed into a
+      //      collapsible summary (goalAcceptedSummary);
+      //   2. 🟢 Official positions (goalOfficialPositions) — exact placements +
+      //      the role="quest" pool; blue/data drawable ref;
+      //   3. 💡 Likely locations (goalHintLocations) — role="generic" pools
+      //      DERIVED via loot-table: 💡 family, "a hint, not official data" note
+      //      (goalHintLocationsNote);
+      //   4. 💡 Player tip (playerHintLabel) — known in-game, not extracted.
       goalAcceptedTypesLabel: 'Accepted types:',
       goalAcceptedTypePlaced: n => `${n} placed`,
       goalAcceptedTypeServer: 'server-spawn',
       goalAcceptedTypesMore: n => `+${n} more type${n > 1 ? 's' : ''}`,
+      goalAcceptedSummary: n => `${n} types`,
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
-      goalSpawnPoolNote: 'Spawn zone for quest corpses — not one point per corpse.',
       playerHintLabel: 'Player tip',
-      // Placed (fixed) corpses line on a corpse target (goalPlacementsChip when
-      // accepted_types are present) — distinct from the dynamic search zones
-      // ("spawn") below.
       goalCorpsePlacedN: n => `${n} placed corpses`,
-      // Search-zone aggregate (corpse UX rework 2026-07-15,
-      // goalSpawnPoolAggregate): ONE drawable line for all spawn pools whose
-      // toggle draws their union; a collapsed "detail" drawer lists each zone.
-      // The total is the data total (sum of the pools).
-      goalSpawnAggLabel: 'Search zones — corpses (spawn)',
+      // The two position-tier labels + the derived tier's note. The tier meta
+      // reuses goalAcceptedMeta (official: "N placed + M in zones") and
+      // goalSpawnAggMeta (hint: "M pts · N zones"). goalTierDetailN: the detail
+      // drawer summary (each source individually drawable).
+      goalOfficialPositions: 'Official positions',
+      goalHintLocations: 'Likely locations',
+      goalHintLocationsNote: 'inferred from loot — a hint, not official data',
+      // Tier 2 is drawn ONLY when it narrows the search (stepguide.js
+      // hintSpread): a map-wide pool (e.g. lost_crew, 9 zones / 8,273 pts)
+      // collapses to this concise note (no point cloud drawn), deferring to the
+      // player tip; the "see the N zones" drawer is still offered collapsed.
+      goalHintWidespread: 'these positions cover most of the map',
+      goalHintSeeTip: 'see the player tip below',
+      goalHintZonesDetail: n => `see the ${n} zone${n > 1 ? 's' : ''}`,
+      goalTierDetailN: n => `detail (${n})`,
       goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zones`,
-      goalSpawnAggRoles: (q, g) =>
-        q && g ? `incl. ${q} quest zone${q > 1 ? 's' : ''} + ${g} proven generic zone${g > 1 ? 's' : ''}`
-          : q ? `${q} quest zone${q > 1 ? 's' : ''}`
-            : `${g} proven generic zone${g > 1 ? 's' : ''}`,
-      goalSpawnDetailN: n => `detail (${n} zones)`,
-      // UNIFIED "Accepted objects" ref (2026-07-15) when a goal accepts BOTH
-      // placed objects AND spawn zones: one toggle draws the union (placed + all
-      // pools), the "detail" drawer keeps each form individually drawable.
-      // goalAcceptedMeta: "N placed + M in zones" (both DATA counts);
-      // goalAcceptedDetail: the collapsed drawer summary.
-      goalAcceptedRef: 'Accepted objects',
       goalAcceptedMeta: (placed, pts) => `${placed} placed + ${pts} in zones`,
-      goalAcceptedDetail: (placed, zones) => `detail: ${placed} placed · ${zones} zones`,
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,

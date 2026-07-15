@@ -561,11 +561,11 @@ function familyRowLi(fam, f, hex, withNode) {
        (wildlifeRestRow) — les pools de faune paisible génériques
        (peaceful-animals-<région>, ~5 900 points) ne portent AUCUN roster
        d'espèce côté client (attribué côté serveur, prouvé côté données),
-       mais leurs ZONES de spawn sont bien réelles. Depuis le retrait du
-       groupe Wildlife (2026-07-12), cette ligne vit dans le groupe World
-       (buildGroupWorld) comme couche de premier niveau (extraClass '') —
-       jamais un « Spawns non identifiés » qui se lirait comme une donnée
-       manquante.
+       mais leurs ZONES de spawn sont bien réelles. Cette ligne vit dans la
+       section Créatures ▸ Faune paisible (buildGroupWildlife,
+       #group-wildlife-list — reorg propriétaire 2026-07-15, ex-groupe World)
+       comme couche de premier niveau (extraClass '') — jamais un « Spawns non
+       identifiés » qui se lirait comme une donnée manquante.
    Même mécanique inchangée dans les deux cas (kindRestPoints, jeton
    camp.<kind>, couleur du pool CAMP_COLORS[kind] — #a3b18a pour wildlife) et
    même intégration légende (filterRow → collectActiveTags). */
@@ -582,40 +582,39 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
     rest.nPts, 0, st.on, on => { st.on = on; scheduleRedraw(); }, extraClass, { kind: rk, mode: 'C', subrole: kind }));
 }
 
-/* ── Arbre de couches : structure FINALE du panneau gauche (2026-07-11,
-   corrections utilisateur du jour — supersède « IA finale 4 groupes » ET le
-   « miroir de kinds en sous-groupes » ; groupe Wildlife retiré
-   2026-07-12) : 5 groupes RACINE (index.html), en-têtes NON sélectionnables
-   (titre + chevron natif, aucune case) :
+/* ── Arbre de couches : structure du panneau gauche (reorg propriétaire
+   2026-07-15, supersède les « 5 groupes racine » du 2026-07-11) : 4 sections
+   RACINE (index.html), en-têtes NON sélectionnables (titre + chevron natif,
+   aucune case) :
      1. World         — Zones · NPCs · Points d'intérêt (sous-groupe
                         poiType, 8 lignes — step 2 LIVRÉ, buildPoiSubGroup)
                         · Workshops · Shrines · Soulkeepers · Gardes
-                        (libellé honnête) · Animaux paisibles · Others
-     2. Monsters      — les lignes FAMILLE directement (nœuds dépliables →
-                        espèces ; la barre « Par famille » + [Tous][Aucun]
-                        est RETIRÉE, jugée inutile — la cascade des lignes
-                        suffit) + dernière ligne honnête « Spawns non
-                        identifiés » (camps monsters sans espèce jointe,
-                        rest-only — voir appendKindRestRow/kindRestPoints)
-     3. Creeps        — familles jointes rat/ratmutant (copies MIROIR,
-                        présence DOUBLE assumée : le moteur les spawne sous
-                        les 2 kinds) + espèces wild (turkey/rabbit/fox/
-                        squirrel/porcupine via camp_details) + « Spawns non
-                        identifiés » en dernier
-     4. Harvesting    — Herbalism · Logging · Mining (inchangé)
-     5. Interactables — rangés PAR TYPE d'objet (2026-07-15) : CORPS ▸ (Placés ·
+                        (libellé honnête) · Others
+     2. Créatures     — UNE section, trois sous-groupes repliables (chacun un
+                        <details class="side-sec"> imbriqué, sans pastille) :
+                        · Monstres      — les lignes FAMILLE directement (nœuds
+                          dépliables → espèces) + dernière ligne honnête
+                          « Spawns non identifiés » (camps monsters sans espèce
+                          jointe, rest-only — appendKindRestRow/kindRestPoints)
+                        · Creeps        — familles jointes rat/ratmutant (copies
+                          MIROIR, présence DOUBLE assumée) + espèces wild
+                          (turkey/rabbit/fox/squirrel/porcupine via camp_details)
+                          + « Spawns non identifiés » en dernier
+                        · Faune paisible — la couche « Animaux paisibles » (pool
+                          camp:wildlife) ; c'est une créature (ex-World avant le
+                          2026-07-15). Monstres/Creeps restent SYMÉTRIQUES
+                          (espèces/familles d'abord, « non identifiés » en dernier)
+     3. Interactables — rangés PAR TYPE d'objet (2026-07-15) : CORPS ▸ (Placés ·
                         Zones de spawn) · COFFRES ▸ (De camp · Fouillables ·
                         Hérité) · Tonneaux · Caisses · Meubles · Livres · Divers ·
                         Squelettes · Objets de quête · Zones de spawn — autres
                         (camps) ▸ (Autres · Destructibles · Réactifs) — chaque
                         type = une entrée, ses formes placée+spawn unifiées sous
                         elle, voir buildGroupContainers
-   (Ex-groupe 4 « Wildlife » RETIRÉ 2026-07-12, décision propriétaire — sa
-   seule couche dessinable « Animaux paisibles » (camp:wildlife) est passée
-   dans World ci-dessus ; ses espèces fauniques 0-camp quittent l'arbre mais
-   restent trouvables par la recherche, search.js buildWildSpeciesSearchIndex.)
-   Les deux groupes 2-3 (Monsters/Creeps) sont SYMÉTRIQUES : espèces/familles
-   d'abord, une ligne « non identifiés » en dernier. MÊMES lignes (filterRow/hiddenBadge),
+     4. Harvesting    — Herbalism · Logging · Mining (inchangé)
+   (Les espèces fauniques 0-camp — tortues/vache/… — restent HORS arbre mais
+   trouvables par la recherche, search.js buildWildSpeciesSearchIndex.)
+   MÊMES lignes (filterRow/hiddenBadge),
    MÊME hash `camp.*`/`decor.*`/`monfam.*`/`monsp.*`/`poi.*` (urlstate.js
    lit l'ÉTAT, jamais une position DOM).
 
@@ -1309,15 +1308,12 @@ function buildSubGroup(key, label, hex, leavesFn, count = null, hidden = 0, kind
 
 /* ── Groupe « World » : Zones · NPCs · Points d'intérêt (sous-groupe
    poiType, 8 lignes — voir buildPoiSubGroup ci-dessus) · Workshops ·
-   Shrines · Soulkeepers · Gardes · Animaux paisibles · Others.
-   « Animaux paisibles » (couche camp:wildlife, ~5 900 points, teinte
-   #a3b18a) a rejoint World au retrait du groupe « Faune sauvage »
-   (2026-07-12, décision propriétaire — seule couche dessinable qu'il
-   contenait) : couche de premier niveau (appendKindRestRow avec extraClass
-   '', pas indentée), placée après les kinds `world.*` — la faune paisible
-   est du décor de monde au même titre que les gardes/sanctuaires.
+   Shrines · Soulkeepers · Gardes · Others.
+   (« Animaux paisibles » / pool camp:wildlife a QUITTÉ World le 2026-07-15 —
+   c'est une créature, elle vit dans la section Créatures ▸ Faune paisible,
+   voir buildGroupWildlife.)
    npc/poi/workshop/zones : critiques (premier rendu) ; les lignes camp
-   (shrines/soulkeeper/guards/wildlife/other) attendent camps.bin (différé).
+   (shrines/soulkeeper/guards/other) attendent camps.bin (différé).
    Gardes : libellé honnête « Gardes (unité non identifiée) » — 2 camps/12
    points sans AUCUN lien espèce/PNJ/butin/niveau dans les données (voir
      §5) — jamais un pair
@@ -1346,12 +1342,9 @@ function buildGroupWorld() {
     const li = campRow(kind, campRowLabel(kind));
     if (li) ul.appendChild(li);
   }
-  // « Animaux paisibles » (ex-groupe Wildlife, retiré 2026-07-12) : la seule
-  // couche dessinable du pool camp:wildlife (spawns de faune paisible sans
-  // roster côté client), en couche de premier niveau (extraClass '') — voir
-  // appendKindRestRow. Rien dessiné/aucune ligne si le kind est absent de la
-  // carte active ou vide (garde interne d'appendKindRestRow).
-  appendKindRestRow(ul, 'wildlife', '');
+  // (« Animaux paisibles » / pool camp:wildlife a QUITTÉ World le 2026-07-15 :
+  // c'est une créature, elle vit désormais dans la section Créatures ▸ Faune
+  // paisible — voir buildGroupWildlife/#group-wildlife-list.)
   // Sous-groupe « Others » : les kinds `unclassified` (hors-arbre honnête —
   // abandoned/extraction/bg, repliés en kind `other` par le pipeline).
   // quest.pool/event.pool restent hors panneau (voir l'en-tête).
@@ -1411,13 +1404,11 @@ function buildGroupMonsters() {
    WILD (speciesRowLi — case S.monsp, hash monsp.<token moteur> ; pas de
    fiche monstre pour ces espèces, nom non cliquable honnête via speciesRep
    → null) + la ligne « Spawns non identifiés » en DERNIER.
-   (Le groupe « Wildlife » partageait autrefois ce constructeur — il est
-   RETIRÉ 2026-07-12, voir l'en-tête « Arbre de couches ». Les espèces
-   fauniques 0-camp qu'il listait — tortues/vache/poule/… — quittent l'arbre
-   avec le groupe mais restent trouvables par la recherche : search.js
-   buildWildSpeciesSearchIndex les indexe direct depuis S.wildlifeSpecies,
-   indépendamment de l'arbre. Sa seule couche dessinable, « Animaux
-   paisibles » (camp:wildlife), a migré dans World.) */
+   (Les espèces fauniques 0-camp — tortues/vache/poule/… — restent HORS arbre
+   mais trouvables par la recherche : search.js buildWildSpeciesSearchIndex les
+   indexe direct depuis S.wildlifeSpecies, indépendamment de l'arbre. La couche
+   dessinable « Animaux paisibles » (camp:wildlife) vit dans la section
+   Créatures ▸ Faune paisible, voir buildGroupWildlife.) */
 function buildKindGroup(listId, kind) {
   const ul = $(listId);
   if (!ul) return;
@@ -1431,6 +1422,23 @@ function buildKindGroup(listId, kind) {
   appendKindRestRow(ul, kind);
 }
 const buildGroupCreeps = () => buildKindGroup('#group-creeps-list', 'creeps');
+/* ── Sous-groupe « Faune paisible » (section Créatures, 3ᵉ sous-groupe —
+   reorg propriétaire 2026-07-15) : la seule couche dessinable du pool
+   camp:wildlife (« Animaux paisibles » — spawns de faune paisible sans roster
+   côté client, ~5 900 pts, teinte #a3b18a), en couche de premier niveau
+   (appendKindRestRow avec extraClass ''). MÊME ligne, MÊME jeton camp.wildlife,
+   MÊME couleur et MÊME défaut (OFF) qu'avant — seule sa <ul> parente change
+   (#group-wildlife-list, ex-#group-world-list). Rien dessiné / aucune ligne si
+   le kind est absent de la carte active ou vide (garde interne
+   d'appendKindRestRow), un indice de chargement tant que camps.bin n'est pas là
+   (symétrie avec Monstres/Creeps). */
+function buildGroupWildlife() {
+  const ul = $('#group-wildlife-list');
+  if (!ul) return;
+  ul.innerHTML = '';
+  if (!deferredReady) { ul.appendChild(loadingHintLi()); return; }
+  appendKindRestRow(ul, 'wildlife', '');
+}
 /* ── Groupe « Harvesting » : les kinds de catégorie cuite `harvest.*`
    (herbalism/logging/mining — ordre alphabétique de catégorie, identique à
    l'ancien ordre fixe sur toutes les cartes). */
@@ -1560,8 +1568,9 @@ function buildGroupContainers() {
 /* Point d'entrée unique -- nom CONSERVÉ pour ne pas toucher main.js/
    router.js/search.js, qui appellent tous buildFilters() tel quel à chaque
    cycle de vie (boot, bascule langue/carte, toggle dev-content, toggle
-   zones). Reconstruit les 4 groupes + le registre des cases de sous-groupe
-   + les états parent, puis rejoue le tout une fois camps.bin arrivé
+   zones). Reconstruit World + les 3 sous-groupes Créatures (Monstres/Creeps/
+   Faune paisible) + Harvesting + Interactables, le registre des cases de
+   sous-groupe et les états parent, puis rejoue le tout une fois camps.bin arrivé
    (whenDeferred : synchrone si déjà prêt — double rebuild idempotent, même
    dégénérescence assumée que l'ancien whenDeferred(buildCampFilters)). */
 function rebuildAllGroups() {
@@ -1569,6 +1578,7 @@ function rebuildAllGroups() {
   buildGroupWorld();
   buildGroupMonsters();
   buildGroupCreeps();
+  buildGroupWildlife();
   buildGroupHarvest();
   buildGroupContainers();
   refreshParentChecks();

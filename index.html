@@ -28,50 +28,60 @@
     </header>
 
     <nav id="filters" aria-label="Filtres" data-i18n-attr="aria-label:filtersAriaLabel">
-      <!-- ARBRE FINAL du panneau gauche (2026-07-11, corrections utilisateur
-           du même jour — supersède les « 4 groupes + miroir de kinds » ;
-           groupe Wildlife retiré 2026-07-12) :
-           5 groupes fixes — World / Monsters / Creeps / Harvesting /
-           Interactables. Monsters/Creeps sont montés au NIVEAU RACINE
-           (l'imbrication « Monsters > Monsters > Camps de monstres » jugée
-           confuse par l'utilisateur est retirée). Le groupe « Faune
-           sauvage » (Wildlife) est RETIRÉ (décision propriétaire 2026-07-12 :
-           « wildthings n'a que des animaux paisibles ») : sa seule couche
-           dessinable, « Animaux paisibles » (le pool camp:wildlife), a migré
-           dans World (voir js/sidebar.js buildGroupWorld) ; les espèces
-           fauniques 0-camp (tortues/vache/…) quittent l'arbre avec le groupe
-           mais restent trouvables par la recherche (search.js
+      <!-- ARBRE FINAL du panneau gauche (reorg propriétaire 2026-07-15,
+           supersède l'arbre « 5 groupes racine » du 2026-07-11) :
+           4 sections racine — World / Créatures / Interactables /
+           Harvesting. Les ex-groupes racine Monsters et Creeps sont FUSIONNÉS
+           dans une seule section « Créatures » à trois sous-groupes repliables
+           (Monstres · Creeps · Faune paisible). « Faune paisible » (le pool
+           camp:wildlife, « Animaux paisibles ») était temporairement classé
+           sous World (retrait du groupe Wildlife) — c'est une créature, il
+           REJOINT Créatures ▸ Faune paisible ici. Les builders sidebar.js
+           inchangés : buildGroupMonsters/#group-monsters-list,
+           buildGroupCreeps/#group-creeps-list, buildGroupWildlife/
+           #group-wildlife-list — seul l'emplacement des <ul> bouge.
+           Les espèces fauniques 0-camp (tortues/vache/…) restent hors arbre
+           mais trouvables par la recherche (search.js
            buildWildSpeciesSearchIndex, source S.wildlifeSpecies).
-           Les en-têtes de groupe ne sont PAS sélectionnables (décision
-           utilisateur, correction finale) : AUCUNE case/pastille de cascade
-           au niveau groupe — titre + chevron droit natifs (<summary>), purs
-           conteneurs plier/déplier. La sélection vit sur les LIGNES à
-           l'intérieur (pastille colorée = la case ; les parents
-           intermédiaires à unité de filtre réelle — familles, sous-groupes
-           POI/Interactables — gardent leur pastille de cascade, voir
-           js/sidebar.js buildSubGroup/wireParentCheck).
-           data-sec="group-containers" CONSERVÉ pour Interactables
-           (continuité de l'état ouvert/replié persisté en localStorage —
-           seul le libellé du groupe change). -->
+           Les en-têtes de SECTION et de sous-groupe ne sont PAS sélectionnables
+           (décision utilisateur) : AUCUNE case/pastille de cascade au niveau
+           section — titre + chevron droit natifs (<summary>), purs conteneurs
+           plier/déplier (les sous-groupes Créatures sont eux-mêmes des
+           <details class="side-sec"> imbriqués, sans pastille — jamais un
+           bucket .decor-group, pour que chaque ligne famille/espèce/pool se
+           tague INDIVIDUELLEMENT dans la légende, voir collectActiveTags). La
+           sélection vit sur les LIGNES à l'intérieur (pastille colorée = la
+           case ; les parents intermédiaires à unité de filtre réelle —
+           familles, sous-groupes POI/Interactables — gardent leur pastille de
+           cascade, voir js/sidebar.js buildSubGroup/wireParentCheck).
+           L'état ouvert/replié de chaque section ET sous-groupe est persisté
+           par data-sec en localStorage (voir js/sidebar.js). -->
       <details class="side-sec" data-sec="group-world" open>
         <summary><h2 data-i18n="groupWorld">Monde</h2></summary>
         <ul id="group-world-list" class="layer-list layer-scroll"></ul>
       </details>
-      <details class="side-sec" data-sec="group-monsters" open>
-        <summary><h2 data-i18n="groupMonsters">Monstres</h2></summary>
-        <ul id="group-monsters-list" class="layer-list layer-scroll"></ul>
-      </details>
-      <details class="side-sec" data-sec="group-creeps" open>
-        <summary><h2 data-i18n="groupCreeps">Creeps</h2></summary>
-        <ul id="group-creeps-list" class="layer-list layer-scroll"></ul>
-      </details>
-      <details class="side-sec" data-sec="group-harvest" open>
-        <summary><h2 data-i18n="groupHarvest">Récolte</h2></summary>
-        <ul id="group-harvest-list" class="layer-list layer-scroll"></ul>
+      <details class="side-sec" data-sec="group-creatures" open>
+        <summary><h2 data-i18n="groupCreatures">Créatures</h2></summary>
+        <details class="side-sec" data-sec="creatures-monsters" open>
+          <summary><span class="subf-title" data-i18n="subMonstres">Monstres</span></summary>
+          <ul id="group-monsters-list" class="layer-list layer-scroll"></ul>
+        </details>
+        <details class="side-sec" data-sec="creatures-creeps" open>
+          <summary><span class="subf-title" data-i18n="subCreeps">Creeps</span></summary>
+          <ul id="group-creeps-list" class="layer-list layer-scroll"></ul>
+        </details>
+        <details class="side-sec" data-sec="creatures-wildlife" open>
+          <summary><span class="subf-title" data-i18n="subFaunePaisible">Faune paisible</span></summary>
+          <ul id="group-wildlife-list" class="layer-list layer-scroll"></ul>
+        </details>
       </details>
       <details class="side-sec" data-sec="group-containers" open>
         <summary><h2 data-i18n="groupContainers">Interactables</h2></summary>
         <ul id="group-containers-list" class="layer-list layer-scroll"></ul>
+      </details>
+      <details class="side-sec" data-sec="group-harvest" open>
+        <summary><h2 data-i18n="groupHarvest">Récolte</h2></summary>
+        <ul id="group-harvest-list" class="layer-list layer-scroll"></ul>
       </details>
       <!-- Bestiaire (sidebar) RETIRÉ (2026-07-11, décision utilisateur) :
            l'arbre Monsters > Hostiles ci-dessus couvre déjà exactement le

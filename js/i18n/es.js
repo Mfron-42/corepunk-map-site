@@ -75,6 +75,15 @@ export default {
       groupHarvest: 'Recolección',
       groupContainers: 'Interactuables',
       groupWorld: 'Mundo',
+      // Sección «Criaturas» (reorg del propietario 2026-07-15): fusiona las
+      // antiguas secciones raíz Monstruos + Creeps + la capa de Fauna pacífica
+      // (grupo camp:wildlife) en UNA sección con tres subgrupos plegables.
+      // groupMonsters/groupCreeps CONSERVADOS arriba (paridad i18n); las
+      // etiquetas de subgrupo de abajo los representan ahora en el árbol.
+      groupCreatures: 'Criaturas',
+      subMonstres: 'Monstruos',
+      subCreeps: 'Creeps',
+      subFaunePaisible: 'Fauna pacífica',
       // Casillas de cascada (IA final): aria-label compartido de cada
       // casilla maestra de grupo/subgrupo (js/sidebar.js wireParentCheck).
       groupToggleAria: 'Marcar o desmarcar todas las capas de este grupo',
@@ -381,35 +390,43 @@ export default {
       // una hilera de chips de nodo bajo el objetivo, nunca una capa del
       // mapa (no existe un vínculo tipo-de-nodo -> punto en el cliente).
       goalAcceptedNodesLabel: 'Nodos aceptados:',
-      // Bloques de objetivo cadáver de misión (LOT cadáveres 2026-07-15,
-      // stepguide.js goalCorpseExtras). Tres niveles de honestidad: TIPOS
-      // aceptados (dato probado), zona de SPAWN (nube honesta, no un punto por
-      // cadáver) y CONSEJO de jugador (3.er nivel: conocido en el juego, no data).
+      // Bloques de objetivo cadáver/contenedor de misión (rediseño 2026-07-15,
+      // stepguide.js goalCorpseExtras) — EL modelo reutilizable de TRES niveles
+      // de honestidad, según las señales de los propios datos (nunca una misión
+      // codificada a mano):
+      //   1. Tipos aceptados — la lista bound_units COMPLETA, condensada en un
+      //      resumen plegable (goalAcceptedSummary);
+      //   2. 🟢 Posiciones oficiales (goalOfficialPositions) — colocaciones
+      //      exactas + el grupo role="quest"; referencia azul/dato dibujable;
+      //   3. 💡 Ubicaciones probables (goalHintLocations) — grupos role="generic"
+      //      DEDUCIDOS por el botín: familia 💡, nota «una pista, no datos
+      //      oficiales» (goalHintLocationsNote);
+      //   4. 💡 Consejo de jugador (playerHintLabel) — conocido en el juego, no data.
       goalAcceptedTypesLabel: 'Tipos aceptados:',
       goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'colocado' : 'colocados'}`,
       goalAcceptedTypeServer: 'aparece en el servidor',
       goalAcceptedTypesMore: n => `+${n} tipo${n > 1 ? 's' : ''} más`,
+      goalAcceptedSummary: n => `${n} tipos`,
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
-      goalSpawnPoolNote: 'Zona de aparición de cadáveres de misión — no un punto por cadáver.',
       playerHintLabel: 'Consejo de jugador',
-      // Cadáveres colocados (fijos) + agregado de zonas de búsqueda
-      // (goalSpawnPoolAggregate): UNA línea dibujable para todos los grupos de
-      // aparición cuya activación dibuja su unión; un cajón "detalle" plegado
-      // lista cada zona. El total es el de los datos (suma de los grupos).
       goalCorpsePlacedN: n => `${n} cadáveres colocados`,
-      goalSpawnAggLabel: 'Zonas de búsqueda — cadáveres (aparición)',
+      // Etiquetas de los dos niveles de posición + la nota del nivel deducido. La
+      // meta de los niveles reutiliza goalAcceptedMeta (oficial: «N colocados + M
+      // en zonas») y goalSpawnAggMeta (pista: «M pts · N zonas»). goalTierDetailN:
+      // el resumen del cajón "detalle" (cada fuente dibujable por separado).
+      goalOfficialPositions: 'Posiciones oficiales',
+      goalHintLocations: 'Ubicaciones probables',
+      goalHintLocationsNote: 'ubicaciones deducidas del botín — una pista, no datos oficiales',
+      // El nivel 2 se dibuja SOLO si acota la búsqueda (stepguide.js
+      // hintSpread): un grupo que cubre casi todo el mapa (p. ej. lost_crew, 9
+      // zonas / 8 273 pts) se reduce a esta nota concisa (sin nube de puntos) y
+      // remite al consejo de jugador; el cajón «ver las N zonas» sigue plegado.
+      goalHintWidespread: 'estas posiciones cubren casi todo el mapa',
+      goalHintSeeTip: 'ver el consejo de jugador abajo',
+      goalHintZonesDetail: n => `ver las ${n} zona${n > 1 ? 's' : ''}`,
+      goalTierDetailN: n => `detalle (${n})`,
       goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zonas`,
-      goalSpawnAggRoles: (q, g) =>
-        q && g ? `incl. ${q} zona${q > 1 ? 's' : ''} de misión + ${g} zona${g > 1 ? 's' : ''} genérica${g > 1 ? 's' : ''} probada${g > 1 ? 's' : ''}`
-          : q ? `${q} zona${q > 1 ? 's' : ''} de misión`
-            : `${g} zona${g > 1 ? 's' : ''} genérica${g > 1 ? 's' : ''} probada${g > 1 ? 's' : ''}`,
-      goalSpawnDetailN: n => `detalle (${n} zonas)`,
-      // Referencia UNIFICADA «Objetos aceptados» (2026-07-15): un solo botón dibuja
-      // la unión (colocados + todas las zonas), el cajón «detalle» mantiene cada
-      // forma dibujable por separado.
-      goalAcceptedRef: 'Objetos aceptados',
       goalAcceptedMeta: (placed, pts) => `${placed} colocados + ${pts} en zonas`,
-      goalAcceptedDetail: (placed, zones) => `detalle: ${placed} colocados · ${zones} zonas`,
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).

@@ -88,6 +88,15 @@ export default {
       groupHarvest: 'Récolte',
       groupContainers: 'Interactables',
       groupWorld: 'Monde',
+      // Section « Créatures » (reorg propriétaire 2026-07-15) : fusionne les
+      // ex-sections racine Monstres + Creeps + la couche Faune paisible (pool
+      // camp:wildlife) en UNE section à trois sous-groupes repliables.
+      // groupMonsters/groupCreeps CONSERVÉS ci-dessus (parité i18n) ; les
+      // libellés de sous-groupe ci-dessous les portent désormais dans l'arbre.
+      groupCreatures: 'Créatures',
+      subMonstres: 'Monstres',
+      subCreeps: 'Creeps',
+      subFaunePaisible: 'Faune paisible',
       // Pastille de cascade des sous-groupes (js/sidebar.js buildSubGroup) —
       // les en-têtes de GROUPE racine n'en ont plus (correction finale
       // 2026-07-11 : purs conteneurs plier/déplier).
@@ -428,41 +437,42 @@ export default {
       // l'objectif, jamais une couche carte (aucun lien nœud->point côté
       // client, voir data.js S.nodes).
       goalAcceptedNodesLabel: 'Nœuds acceptés :',
-      // Blocs corps de quête (LOT corps 2026-07-15, voir stepguide.js
-      // goalCorpseExtras). Trois tiers d'honnêteté : TYPES acceptés (donnée
-      // prouvée — nom + nombre de placements, ou « spawn serveur » à 0 placement),
-      // POOL de spawn (nuage honnête, dessinable mais « pas un point = un corps »),
-      // ASTUCE joueur (3e tier : connu en jeu, pas extrait — .player-hint distinct).
+      // Blocs corps/conteneur de quête (refonte 2026-07-15, stepguide.js
+      // goalCorpseExtras) — LE modèle réutilisable à TROIS TIERS d'honnêteté,
+      // keyé sur les signaux de la donnée (jamais une quête codée) :
+      //   1. Types acceptés — la liste bound_units COMPLÈTE, condensée en un
+      //      sommaire repliable (goalAcceptedSummary) ;
+      //   2. 🟢 Positions officielles (goalOfficialPositions) — placements exacts
+      //      + pool role="quest" ; réf bleue/donnée dessinable ;
+      //   3. 💡 Positions probables (goalHintLocations) — pools role="generic"
+      //      DÉDUITS via la loot-table : famille 💡, note « aide, pas données
+      //      officielles » (goalHintLocationsNote) ;
+      //   4. 💡 Astuce joueur (playerHintLabel) — connu en jeu, pas extrait.
       goalAcceptedTypesLabel: 'Types acceptés :',
       goalAcceptedTypePlaced: n => `${n} ${n === 1 ? 'placé' : 'placés'}`,
       goalAcceptedTypeServer: 'spawn serveur',
       goalAcceptedTypesMore: n => `+${n} type${n > 1 ? 's' : ''} de plus`,
+      goalAcceptedSummary: n => `${n} types`,
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
-      goalSpawnPoolNote: 'Zone de spawn des corps de quête — pas un point = un corps.',
       playerHintLabel: 'Astuce joueur',
-      // Ligne de CORPS PLACÉS (fixes) d'une cible corps (goalPlacementsChip
-      // quand accepted_types présents) — distincte des zones de fouille
-      // dynamiques (« spawn ») ci-dessous.
       goalCorpsePlacedN: n => `${n} corps placés`,
-      // Agrégat des zones de fouille (refonte UX corps 2026-07-15,
-      // goalSpawnPoolAggregate) : UNE ligne dessinable pour tous les pools de
-      // spawn, dont la bascule dessine l'union ; un tiroir « détail » replié
-      // liste chaque zone. Le total est celui de la donnée (somme des pools).
-      goalSpawnAggLabel: 'Zones de fouille — corps (spawn)',
+      // Libellés des deux tiers de positions + note du tier dérivé. La méta des
+      // tiers réutilise goalAcceptedMeta (officiel : « N placés + M en zones ») et
+      // goalSpawnAggMeta (indice : « M pts · N zones »). goalTierDetailN : le
+      // sommaire du tiroir détail (chaque source dessinable individuellement).
+      goalOfficialPositions: 'Positions officielles',
+      goalHintLocations: 'Positions probables',
+      goalHintLocationsNote: 'positions déduites (loot) — une aide, pas des données officielles',
+      // Tier 2 dessiné SEULEMENT s'il restreint la recherche (stepguide.js
+      // hintSpread) : un pool pan-carte (ex. lost_crew, 9 zones / 8 273 pts) se
+      // réduit à cette note concise (aucun nuage dessiné), déférant à l'astuce
+      // joueur ; le tiroir « voir les N zones » reste offert replié.
+      goalHintWidespread: 'ces positions couvrent presque toute la carte',
+      goalHintSeeTip: "voir l'astuce joueur ci-dessous",
+      goalHintZonesDetail: n => `voir les ${n} zone${n > 1 ? 's' : ''}`,
+      goalTierDetailN: n => `détail (${n})`,
       goalSpawnAggMeta: (pts, zones) => `${pts} pts · ${zones} zones`,
-      goalSpawnAggRoles: (q, g) =>
-        q && g ? `dont ${q} zone${q > 1 ? 's' : ''} de quête + ${g} zone${g > 1 ? 's' : ''} générique${g > 1 ? 's' : ''} prouvée${g > 1 ? 's' : ''}`
-          : q ? `${q} zone${q > 1 ? 's' : ''} de quête`
-            : `${g} zone${g > 1 ? 's' : ''} générique${g > 1 ? 's' : ''} prouvée${g > 1 ? 's' : ''}`,
-      goalSpawnDetailN: n => `détail (${n} zones)`,
-      // Référence UNIFIÉE « Objets acceptés » (2026-07-15) quand un but accepte À
-      // LA FOIS des objets placés ET des zones de spawn : une seule bascule dessine
-      // l'union (placés + tous les pools), le tiroir « détail » garde chaque forme
-      // dessinable. goalAcceptedMeta : « N placés + M en zones » (les deux comptes
-      // de la DONNÉE) ; goalAcceptedDetail : le sommaire du tiroir replié.
-      goalAcceptedRef: 'Objets acceptés',
       goalAcceptedMeta: (placed, pts) => `${placed} placés + ${pts} en zones`,
-      goalAcceptedDetail: (placed, zones) => `détail : ${placed} placés · ${zones} zones`,
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).

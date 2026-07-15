@@ -15,7 +15,7 @@ import {
 } from '../config.js';
 import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
+import { map, toLL, canvasR, clearHighlight, showHighlight, activeMap } from '../mapview.js';
 import { clearLocator, addCampTrace, removeCampTrace } from '../pins.js';
 import { unfocus } from '../urlstate.js';
 import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
@@ -27,124 +27,51 @@ import { ref, refDot } from '../mapref.js';
 import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
 
-/* ── Placements EXACTS de conteneurs fouillables (search_zone.basis ===
-   "chest_placement") ────────────────────────────────────────────────────────
-   Un but collect_from_object / kill_collect-sur-conteneur porte parfois les
-   VRAIES positions des conteneurs (target.placements : liste de [x,z]). Le
-   pipeline marque alors sa search_zone `basis:"chest_placement"` + `n_points`
-   (points groupés) — signal que ces points sont EXACTS, pas une proximité
-   estimée. Pour ces buts la bbox de la search_zone est un placeholder constant
-   (jamais la vraie emprise) : dessiner la zone devinée serait activement
-   trompeur. On dessine donc les POINTS eux-mêmes.
-   Mécanisme de dessin RÉUTILISÉ : le registre de tracés de lot de 1re classe
-   (pins.js S.campTraces / addCampTrace) — le MÊME qui porte déjà les nuages de
-   camps (pastille `[Camp(●)]`) et les skins de coffre de la recherche
-   (toggleLotTrace). Un nuage de points exacts de conteneurs EST ce cas :
-   togglable (dessine/efface), listé au bandeau-légende (collectActiveTags le
-   ramasse par refKind), retirable par sa pastille OU le ✕ du bandeau, teinte
-   cohérente (CATS.quest), survit à la fermeture de fiche / à la bascule de
-   carte. (À l'inverse la machinerie currentGoalZones/viewGoalZone est
-   single-slot, effacée à la fermeture de fiche, absente du bandeau et dessine
-   un CERCLE deviné — la mauvaise primitive pour des points exacts.)
-   HONNÊTETÉ : ce sont les emplacements des CONTENEURS fouillables, jamais « la
-   cible de CE joueur » — le libellé le dit (« N locations »), et le serveur
-   choisit dynamiquement lequel spawn. */
-const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN (les cas actuels ≤ 44 ; garde-fou)
-const ACCEPTED_TYPES_CAP = 8;     // plafond d'AFFICHAGE des types acceptés (données complètes dans le bin ; « +N types » au-delà)
-/* Instantané des points par clé de tracé (même idiome module-state que
-   currentGoalZones) : le rendu le peuple, le routeur de dessin (main.js →
-   toggleGoalPlacements) le relit au clic. Content-keyed → stable au re-rendu. */
+/* ── Positions d'un but : LE modèle réutilisable à TROIS TIERS d'honnêteté ────
+   Refonte 2026-07-15 (« un bordel » → propre). Un but exprime son « où » comme
+   des SOURCES DE POINTS, chacune un nuage nommé porté par le registre campTrace
+   de 1re classe (pins.js S.campTraces / addCampTrace — le même qui dessine les
+   camps et les skins de coffre : togglable, listé au bandeau-légende, retirable,
+   teinte quête). Ces sources se répartissent en tiers PAR LES SIGNAUX DE LA
+   DONNÉE (jamais une quête codée en dur), rendus par UN seul renderer partagé :
+     1. 🟢 OFFICIEL (donnée) — les positions que le but DÉCLARE vraiment : les
+        placements EXACTS de conteneurs (search_zone.basis === "chest_placement",
+        target.placements) et le pool de spawn role==="quest" (loot lt_*_quest).
+        Réf bleue/donnée, dessinable.
+     2. 💡 POSITIONS-INDICE (dérivées) — les positions qu'on INFÈRE : les pools
+        role==="generic" (zones de corps déduites via la loot-table). Famille
+        visuelle 💡 (.player-hint, sœur de l'astuce joueur), marquée « aide, pas
+        des données officielles » — jamais confondue avec la donnée bleue.
+     3. 💡 ASTUCE JOUEUR — target.player_hint (provenance player_knowledge) :
+        connu EN JEU, jamais extrait de la data ; rendu en dernier, secondaire.
+   Réutilisable : tout but portant ces signaux obtient le tier correspondant —
+   officiel seul → tier 1 ; dérivé seul → tier 2 ; etc. Ce n'est PAS un patch
+   lost_crew, c'est le contrat général du guide de quête. */
+const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN par jeu de points (garde-fou ; cas actuels ≤ 44)
+const ACCEPTED_TYPES_CAP = 8;     // plafond d'AFFICHAGE de la ventilation des types (« +N » au-delà)
+/* Instantané des jeux de points dessinables par clé de tracé (même idiome
+   module-state que currentGoalZones) : le rendu le peuple, le routeur de dessin
+   (main.js → toggleGoalPlacements) le relit au clic. Content-keyed → stable au
+   re-rendu. */
 const goalPlacementSets = new Map();
-/* Clé de tracé STABLE et disjointe (namespace 'qplace:' — jamais une clé de
-   camp `g.k` ni 'chest:'+skin) dérivée du CONTENU (libellé + compte + 1er/
-   dernier point) : identique au re-rendu de la même fiche (toggle-off marche,
-   la pastille relit l'appartenance à S.campTraces), unique par jeu de
-   placements. Deux buts ciblant les MÊMES conteneurs partageraient un tracé —
-   honnête (ce sont les mêmes points). */
+/* Clé de tracé STABLE d'un jeu de placements exacts (namespace 'qplace:',
+   dérivée du CONTENU : libellé + compte + 1er/dernier point) — identique au
+   re-rendu de la même fiche, unique par jeu de placements. */
 function goalPlacementKey(t, pl) {
   const a = pl[0], b = pl[pl.length - 1];
   return `qplace:${cleanLabel(t.label || '')}:${pl.length}:${a[0]},${a[1]}:${b[0]},${b[1]}`;
 }
-/* Affordance DESSINABLE `[Quest objects(●)] N locations` (+ repère d'orientation
-   honnête) pour un but à placements exacts — renvoie '' si aucun point valide. */
-function goalPlacementsChip(t) {
-  const pl = Array.isArray(t?.placements) ? t.placements : null;
-  if (!pl || !pl.length) return '';
-  const total = pl.length;
-  const pts = pl.slice(0, GOAL_PLACEMENT_CAP)
-    .filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]))
-    .map(([x, z]) => ({ x, z }));
-  if (!pts.length) return '';
-  // Corps placés vs conteneurs génériques (refonte UX corps 2026-07-15) : une
-  // cible CORPS (accepted_types présents) nomme sa ligne « N corps placés » —
-  // le concept POSÉ/FIXE, nettement distinct des zones de fouille dynamiques
-  // (l'agrégat plus bas, libellé « (spawn) »). Un conteneur ordinaire
-  // (chest_placement sans accepted_types — vrais coffres d'autres quêtes)
-  // garde « N emplacements ». Le libellé porte toujours le compte : la garde
-  // d'honnêteté (_verify_goal_placements) et le tag de légende le relisent.
-  const label = (Array.isArray(t.accepted_types) && t.accepted_types.length)
-    ? tr('goalCorpsePlacedN', total) : tr('goalLocationsN', total);
-  const key = goalPlacementKey(t, pl);
-  // Snapshot pour le routeur de dessin (campTrace fige ses points à l'ajout).
-  goalPlacementSets.set(key, { pts, hex: CATS.quest.hex, label });
-  // Cap de sécurité honnête : « · affichage de N sur M » (jamais déclenché ≤ 44).
-  const capMeta = pts.length < total ? `· ${tr('goalPlacementsCapped', pts.length, total)}` : null;
-  // Libellé de PRÉCISION porté par la réf elle-même : « N locations » (PRÉCIS,
-  // basis chest_placement) — plus jamais « zone estimée / area ». La pastille
-  // (mode E, subrole 'goal-placements' → main.js ref-draw) bascule le tracé des
-  // vrais points ; teinte quête cohérente ; pas de fiche (jeu de points synthétique).
-  const chip = ref({
-    kind: 'qao', subrole: 'goal-placements', key,
-    label, hex: CATS.quest.hex, hasFiche: false,
-    drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)),
-    meta: capMeta,
-  });
-  // Repère d'orientation (target.landmark) : texte honnête muet (.pos-region),
-  // jamais un pin — même registre visuel que le rappel de région.
-  const landmark = t.landmark
-    ? ` <span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span>`
-    : '';
-  return `${chip}${landmark}`;
-}
-/* Bascule du tracé des placements exacts (routé par main.js ref-draw sur
-   data-subrole="goal-placements") : self-toggle 1re classe — déjà tracé ⇒
-   retrait (parité re-clic + ✕ du bandeau), sinon pose (nuage dessiné + tag de
-   légende + caméra cadrée + persistance, tout par addCampTrace). refKind 'qao'
-   porte le mot de kind du bandeau (jamais re-déduit de la clé). */
-function toggleGoalPlacements(info) {
-  const key = info?.key;
-  if (!key) return;
-  if (S.campTraces?.has(key)) { removeCampTrace(key); return; }
-  const set = goalPlacementSets.get(key);
-  if (!set || !set.pts.length) return;
-  addCampTrace(key, { pts: set.pts, hex: set.hex, label: set.label, kind: 'qao', refKind: 'qao', map: S.map });
-}
-
-/* ── Cible CORPS de quête : blocs supplémentaires (LOT corps 2026-07-15) ──────
-   Un but collect_from_object de corps porte trois signaux cuits que le résolveur
-   monolithique n'exposait pas ( / CORPSE_CHEST_TAXONOMY
-   LOT C/D). Trois tiers d'HONNÊTETÉ distincts, jamais confondus :
-     1. `accepted_types` [{name, keys, placed, count}] — DONNÉE prouvée : quels
-        TYPES de corps la quête accepte, avec le nombre de placements statiques ;
-        un type 0-placé (astronautes) est dit « spawn serveur », jamais un faux
-        pin (CORPSE §D.2).
-     2. `spawn_pools` [{label, points, role}] — ABSENCE localisée honnête : un
-        NUAGE de spawn (camps.json kind=searchable, points sans clé/loot) — pas
-        « un point = un corps », rendu comme affordance DESSINABLE (même campTrace
-        que les placements exacts) avec un caveat explicite.
-     3. `player_hint` {text, provenance:'player_knowledge'} — 3e tier : connu EN
-        JEU, jamais extrait de la data — un badge visuellement DISTINCT des
-        badges de donnée (.player-hint), pour ne jamais le lire comme une preuve. */
+const validPt = p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]);
+const clampPts = arr => arr.slice(0, GOAL_PLACEMENT_CAP).filter(validPt).map(([x, z]) => ({ x, z }));
 
 /* Pool de spawn → camp searchable joint par NOM (label anglais stable toutes
    locales, ex. « Quest Corpses ») avec repli par compte de points ; renvoie le
    groupe de camp (pts) ou null si les camps ne sont pas encore chargés / le pool
-   n'est pas joignable (rendu honnête non dessinable dans ce cas). */
+   n'est pas joignable (rendu honnête non dessinable dans ce cas). Depuis le split
+   par contenu (config.js campStateKey) les camps de CORPS vivent sous plusieurs
+   clés de couche — on balaie donc TOUS les groupes de catégorie
+   'interactable.searchable', quelle que soit leur clé. */
 function resolveSpawnPoolCamp(pool) {
-  // Depuis le split par contenu (2026-07-15, config.js campStateKey), les camps
-  // searchable de CORPS vivent sous la clé `searchable_corpses`, les autres sous
-  // `searchable` — on balaie donc TOUS les groupes de catégorie
-  // `interactable.searchable`, quelle que soit leur clé de couche.
   const groups = [];
   for (const st of Object.values(S.camps || {}))
     for (const g of (st.groups || []))
@@ -155,266 +82,278 @@ function resolveSpawnPoolCamp(pool) {
   if (!hit && pool.points) hit = groups.find(g => (g.pts || []).length === pool.points);
   return hit && hit.pts && hit.pts.length ? hit : null;
 }
-/* Affordance DESSINABLE d'un pool de spawn — RÉUTILISE le registre campTrace
-   (goalPlacementSets + toggleGoalPlacements via main.js), exactement comme le
-   chip des placements exacts, mais avec un subrole DISTINCT 'goal-spawn-pool' :
-   un pool est un NUAGE de spawn (roster serveur), pas les positions EXACTES de
-   conteneurs — les deux ne doivent jamais se confondre (le harnais
-   _verify_goal_placements attend exactement UN chip 'goal-placements' par but).
-   Clé namespace 'qpool:' (disjointe de 'qplace:'). Renvoie une ligne muette
-   honnête si le camp n'est pas joignable (jamais de tracé fabriqué). */
-function goalSpawnPoolChip(pool) {
-  const label = tr('goalSpawnPoolLabel', cleanLabel(pool.label || ''), pool.points || 0);
-  const camp = resolveSpawnPoolCamp(pool);
-  if (!camp) return `<span class="pos-region">${esc(label)}</span>`;
-  const raw = camp.pts.filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]));
-  const pts = raw.slice(0, GOAL_PLACEMENT_CAP).map(([x, z]) => ({ x, z }));
-  if (!pts.length) return `<span class="pos-region">${esc(label)}</span>`;
-  const key = `qpool:${cleanLabel(pool.label || '')}:${raw.length}`;
-  goalPlacementSets.set(key, { pts, hex: CATS.quest.hex, label });
-  const capMeta = pts.length < raw.length ? `· ${tr('goalPlacementsCapped', pts.length, raw.length)}` : null;
-  return ref({
-    kind: 'qao', subrole: 'goal-spawn-pool', key,
-    label, hex: CATS.quest.hex, hasFiche: false,
-    drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta: capMeta,
-  });
+/* Le nom de groupe BRUT du pipeline « Corps1 » (jeton d'outil) → « Corpse
+   (type 1) » : humain, et DISTINCT des groupes « Corpse » / « Corpse astronaut »
+   — jamais réduit à un « Corpse » nu qui les doublerait. Le seul motif corps<N>
+   est transformé, cleanLabel fait ensuite son nettoyage normal. */
+const prettyAcceptedTypeName = name => String(name ?? '').replace(/^corps(\d+)$/i, 'Corpse (type $1)');
+
+/* ── Les sources de points d'un but, réparties par tier ─────────────────────
+   Chaque source : { subrole, key, label, pts, count, placed? }. `count` = le
+   compte de la DONNÉE (placements ou pool.points) porté par la méta du tier. */
+function placedSource(t) {
+  const pl = Array.isArray(t.placements) ? t.placements : [];
+  if (!(t.search_zone && t.search_zone.basis === 'chest_placement' && pl.length)) return null;
+  const pts = clampPts(pl);
+  if (!pts.length) return null;
+  const label = (Array.isArray(t.accepted_types) && t.accepted_types.length)
+    ? tr('goalCorpsePlacedN', pl.length) : tr('goalLocationsN', pl.length);
+  return { subrole: 'goal-placements', key: goalPlacementKey(t, pl), label, pts, count: pl.length, placed: true };
 }
-/* Agrégat de zones de fouille (refonte UX corps 2026-07-15) : le jeu lie
-   PLUSIEURS pools de spawn à un but corps (la pool de quête + les pools
-   génériques PROUVÉS dont un type bindé porte la loot-table) — lost_crew en a
-   10. Rendus un par un, ils formaient un MUR de puces « Zone de spawn — X »
-   toutes identiques (même tag [Objets de quête], seul le nom change). On les
-   ramène à UNE seule ligne dessinable honnête — « Zones de fouille — corps
-   (spawn) · <total> pts · <N> zones » — dont la bascule dessine l'UNION des
-   points de tous les pools joignables. RÉUTILISE la MÊME machinerie que les
-   puces (goalPlacementSets + campTrace, routé par main.js ref-draw →
-   toggleGoalPlacements) avec un subrole DISTINCT 'goal-spawn-agg' (clé
-   namespace 'qpoolagg:', disjointe de 'qpool:'/'qplace:'). Le détail par zone
-   — chaque pool encore dessinable individuellement, le rendu par-pool
-   d'origine — vit dans un tiroir replié « détail (N zones) » pour les joueurs
-   avancés. HONNÊTETÉ : le total affiché est celui de la DONNÉE (somme des
-   pools) ; une note muette distingue la zone de quête des zones génériques
-   PROUVÉES (subtype corpses via presets — une DONNÉE, jamais une astuce) ; le
-   caveat « pas un point = un corps » reste rendu une fois. */
-function goalSpawnPoolAggregate(pools) {
-  const nZones = pools.length;
-  const totalPts = pools.reduce((s, p) => s + (Number(p.points) || 0), 0);
-  // UNION des points de tous les pools joignables (chacun plafonné comme sa
-  // propre puce via GOAL_PLACEMENT_CAP), dédupliqués par coordonnée arrondie :
-  // « dessine toutes les zones à la fois ». Un pool non joint (camp pas chargé
-  // sur la carte active) est simplement absent — jamais un point fabriqué.
-  const seen = new Set();
-  const union = [];
-  const drawCap = nZones * GOAL_PLACEMENT_CAP;      // même densité par zone que les puces
-  for (const pool of pools) {
-    const camp = resolveSpawnPoolCamp(pool);
-    if (!camp) continue;
-    let taken = 0;
-    for (const p of camp.pts) {
-      if (taken >= GOAL_PLACEMENT_CAP || union.length >= drawCap) break;
-      if (!Array.isArray(p) || !Number.isFinite(+p[0]) || !Number.isFinite(+p[1])) continue;
-      const k = `${Math.round(p[0])},${Math.round(p[1])}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      union.push({ x: p[0], z: p[1] });
-      taken++;
-    }
-  }
-  const label = tr('goalSpawnAggLabel');
-  const meta = tr('goalSpawnAggMeta', totalPts.toLocaleString(numberLocale()), nZones);
-  // Ligne dessinable agrégée. Repli honnête NON dessinable quand aucun pool ne
-  // joint sur la carte active (jamais un toggle mort) — mêmes états que les
-  // puces individuelles (goalSpawnPoolChip rend alors une ligne muette aussi).
-  let aggChip;
-  if (union.length) {
-    const key = `qpoolagg:${cleanLabel(pools[0].label || '')}:${nZones}:${totalPts}`;
-    goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label });
-    aggChip = ref({
-      kind: 'qao', subrole: 'goal-spawn-agg', key,
-      label, hex: CATS.quest.hex, hasFiche: false,
-      drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta,
-    });
-  } else {
-    aggChip = ref({
-      kind: 'qao', subrole: 'goal-spawn-agg', label,
-      hex: CATS.quest.hex, hasFiche: false, drawable: false, meta,
-    });
-  }
-  // Répartition honnête quête vs génériques PROUVÉES — muette, simple (owner :
-  // « pas embrouillant »). Les zones génériques restent une DONNÉE prouvée.
-  const questZones = pools.filter(p => p.role === 'quest').length;
-  const rolesNote = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnAggRoles', questZones, nZones - questZones))}</span></div>`;
-  // Tiroir replié par DÉFAUT (fiche-dialogs, l'idiome des tiroirs secondaires
-  // de la fiche) : chaque pool y garde SA puce dessinable — quête en premier,
-  // exactement le rendu par-pool d'origine (goalSpawnPoolChip inchangé).
-  const detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalSpawnDetailN', nZones))}</summary>${
-    pools.map(p => `<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(p)}</div>`).join('')
-  }</details>`;
-  const note = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`;
-  return `<div class="goal-target-row goal-target-row-pos">${aggChip}</div>${rolesNote}${detail}${note}`;
+function spawnPoolSource(pool) {
+  const camp = resolveSpawnPoolCamp(pool);
+  const raw = camp ? camp.pts.filter(validPt) : [];
+  const pts = raw.slice(0, GOAL_PLACEMENT_CAP).map(([x, z]) => ({ x, z }));
+  return {
+    subrole: 'goal-spawn-pool',
+    key: `qpool:${cleanLabel(pool.label || '')}:${raw.length}`,
+    label: tr('goalSpawnPoolLabel', cleanLabel(pool.label || ''), pool.points || 0),
+    pts, count: Number(pool.points) || 0,
+  };
+}
+/* Répartition PAR RÔLE (le signal de la donnée) : placements + pools quête →
+   OFFICIEL ; pools génériques → INDICE. Réutilisable par tout but. */
+function goalLocationSources(t) {
+  const pools = Array.isArray(t?.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
+  const official = [];
+  const placed = placedSource(t);
+  if (placed) official.push(placed);
+  for (const p of pools) if (p.role === 'quest') official.push(spawnPoolSource(p));
+  const hint = pools.filter(p => p.role !== 'quest').map(spawnPoolSource);
+  return { official, hint };
+}
+function goalHasLocationTiers(t) {
+  if (!t) return false;
+  const { official, hint } = goalLocationSources(t);
+  return official.length > 0 || hint.length > 0;
 }
 
-/* ── UNE référence « Objets acceptés » UNIFIÉE (refonte UX corps, 2026-07-15) ──
-   Un but qui accepte À LA FOIS des objets PLACÉS (t.placements, basis
-   chest_placement) ET des zones de SPAWN (t.spawn_pools) portait deux affordances
-   dessinables séparées : la puce des placements exacts (« 11 corps placés »)
-   d'un côté, l'agrégat des zones de fouille de l'autre. On les FUSIONNE en UNE
-   seule référence dessinable — « Objets acceptés · N placés + M en zones » — dont
-   la bascule dessine l'UNION des points acceptés (les placements exacts + tous
-   les points des pools de spawn joignables). Le détail par forme — la puce des
-   placés + chaque pool, chacun ENCORE dessinable individuellement — vit dans un
-   tiroir replié.
-   HONNÊTETÉ : la réf représente EXACTEMENT ce que le but accepte (bound_units) —
-   les placements sont déjà les positions acceptées, les pools sont déjà les zones
-   liées à la loot-table ; aucun corps non-accepté n'est ajouté. La note de rôle
-   honnête (« dont X zone(s) de quête + Y génériques prouvées ») et l'astuce
-   joueur (💡, provenance player_knowledge) restent en complément.
-   RÉUTILISE la machinerie goal-spawn-agg (goalPlacementSets sous une clé
-   'qpoolagg:', routée par main.js ref-draw → toggleGoalPlacements) — la SEULE
-   différence est que l'union inclut aussi le jeu placé.
-   Réutilisable : ne s'applique QU'à un but portant placements ET pools (voir
-   goalAcceptedMerged) ; un but à placements SEULS ou spawn SEULS garde sa ligne
-   unique (aucune fusion redondante). */
-function goalAcceptedMerged(t) {
-  const pools = Array.isArray(t?.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
-  const hasPlaced = !!(t?.search_zone && t.search_zone.basis === 'chest_placement'
-    && Array.isArray(t.placements) && t.placements.length);
-  return hasPlaced && pools.length > 0;
+/* Une source → puce dessinable `[Objet de quête(●)] <libellé>` : enregistre ses
+   points dans goalPlacementSets, méta de plafond honnête ; ligne muette non
+   dessinable (.pos-region) quand le pool ne joint pas la carte active. */
+function sourceChip(src) {
+  if (!src.pts.length) return `<span class="pos-region">${esc(src.label)}</span>`;
+  goalPlacementSets.set(src.key, { pts: src.pts, hex: CATS.quest.hex, label: src.label });
+  const capMeta = src.pts.length < src.count ? `· ${tr('goalPlacementsCapped', src.pts.length, src.count)}` : null;
+  return ref({
+    kind: 'qao', subrole: src.subrole, key: src.key, label: src.label, hex: CATS.quest.hex,
+    hasFiche: false, drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(src.key)), meta: capMeta,
+  });
 }
-function goalAcceptedUnifiedRef(t, pools) {
-  const placedRaw = Array.isArray(t.placements) ? t.placements : [];
-  const nPlaced = placedRaw.length;
-  const placedPts = placedRaw.slice(0, GOAL_PLACEMENT_CAP)
-    .filter(p => Array.isArray(p) && Number.isFinite(+p[0]) && Number.isFinite(+p[1]))
-    .map(([x, z]) => ({ x, z }));
-  const nZones = pools.length;
-  const spawnTotal = pools.reduce((s, p) => s + (Number(p.points) || 0), 0);
-  // UNION dédupliquée (par coordonnée arrondie) : d'abord les placements exacts,
-  // puis les points de chaque pool joignable (chacun plafonné comme sa puce via
-  // GOAL_PLACEMENT_CAP). Un pool non joint (camp pas chargé) est simplement
-  // absent — jamais un point fabriqué.
+/* Union dédupliquée (coordonnée arrondie) des points de toutes les sources
+   joignables — « dessine tout à la fois ». Une source non jointe (camp pas
+   chargé) est simplement absente, jamais un point fabriqué. */
+function unionSourcePts(sources) {
   const seen = new Set();
   const union = [];
-  const drawCap = (nZones + 1) * GOAL_PLACEMENT_CAP;   // placés + zones, même densité par jeu que les puces
-  for (const p of placedPts) {
-    if (union.length >= drawCap) break;
-    const k = `${Math.round(p.x)},${Math.round(p.z)}`;
-    if (seen.has(k)) continue;
-    seen.add(k);
-    union.push({ x: p.x, z: p.z });
-  }
-  for (const pool of pools) {
-    const camp = resolveSpawnPoolCamp(pool);
-    if (!camp) continue;
-    let taken = 0;
-    for (const p of camp.pts) {
-      if (taken >= GOAL_PLACEMENT_CAP || union.length >= drawCap) break;
-      if (!Array.isArray(p) || !Number.isFinite(+p[0]) || !Number.isFinite(+p[1])) continue;
-      const k = `${Math.round(p[0])},${Math.round(p[1])}`;
+  const cap = Math.max(1, sources.length) * GOAL_PLACEMENT_CAP;
+  for (const s of sources) {
+    for (const p of s.pts) {
+      if (union.length >= cap) break;
+      const k = `${Math.round(p.x)},${Math.round(p.z)}`;
       if (seen.has(k)) continue;
       seen.add(k);
-      union.push({ x: p[0], z: p[1] });
-      taken++;
+      union.push({ x: p.x, z: p.z });
     }
   }
-  const label = tr('goalAcceptedRef');
-  const meta = tr('goalAcceptedMeta', nPlaced, spawnTotal.toLocaleString(numberLocale()));
-  // Référence unifiée dessinable (union = placés + tous les spawn). Repli honnête
-  // NON dessinable si rien ne joint sur la carte active (jamais un toggle mort).
-  let mainRef;
-  if (union.length) {
-    const key = `qpoolagg:${cleanLabel(pools[0].label || '')}:${nZones}:${nPlaced}:${spawnTotal}`;
-    goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label });
-    mainRef = ref({
-      kind: 'qao', subrole: 'goal-spawn-agg', key,
-      label, hex: CATS.quest.hex, hasFiche: false,
-      drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta,
-    });
-  } else {
-    mainRef = ref({
-      kind: 'qao', subrole: 'goal-spawn-agg', label,
-      hex: CATS.quest.hex, hasFiche: false, drawable: false, meta,
-    });
-  }
-  // Répartition honnête quête vs génériques PROUVÉES (muette, complément).
-  const questZones = pools.filter(p => p.role === 'quest').length;
-  const rolesNote = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnAggRoles', questZones, nZones - questZones))}</span></div>`;
-  // Tiroir replié : la puce des PLACÉS (goal-placements, encore dessinable
-  // individuellement) PUIS chaque pool de spawn (goal-spawn-pool, idem). Le
-  // rendu par-pool d'origine est inchangé (goalSpawnPoolChip).
-  const placedChip = goalPlacementsChip(t);
-  const detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalAcceptedDetail', nPlaced, nZones))}</summary>${
-    (placedChip ? `<div class="goal-target-row goal-target-row-pos">${placedChip}</div>` : '')
-    + pools.map(p => `<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(p)}</div>`).join('')
-  }</details>`;
-  const note = `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`;
-  return `<div class="goal-target-row goal-target-row-pos">${mainRef}</div>${rolesNote}${detail}${note}`;
+  return union;
 }
-/* Le nom de groupe BRUT du pipeline « Corps1 » (préfixe de clé tc_chest_corps1_*,
-   6 clés serveur-spawn) est un jeton d'outil illisible. Prettifié en « Corpse
-   (type 1) » : humain, et surtout DISTINCT des groupes « Corpse » (1 clé,
-   11 corps placés) et « Corpse astronaut » (2 clés) — jamais réduit à un
-   « Corpse » nu qui doublerait le groupe existant. Local à cette vue :
-   cleanLabel (utils.js) est partagé par ~25 sites d'appel, jamais élargi ici ;
-   ce helper transforme le seul motif corps<N> puis laisse cleanLabel faire son
-   nettoyage normal (no-op sur « Corpse (type 1) », sans underscore). */
-const prettyAcceptedTypeName = name => String(name ?? '').replace(/^corps(\d+)$/i, 'Corpse (type $1)');
-/* Les 3 blocs corps, empilés sous la vignette de cible (rien si la cible n'en
-   porte aucun — sûr pour tout target non-corps). */
-function goalCorpseExtras(t) {
-  if (!t) return '';
-  const rows = [];
-  // (1) Types acceptés — la liste COMPLÈTE des types que le jeu accepte
-  // (bound_units), nom + « (N placés) » ou « (spawn serveur) » si placed=0. Un
-  // but peut binder BEAUCOUP de types (barils/décor, 40+) : cap d'affichage
-  // lisible « +N types » (la donnée reste complète dans le bin).
+/* ── Garde de DESSIN du tier 2 (dérivé) : ne dessiner que s'il RESTREINT ─────
+   Un pool role="generic" (💡 positions probables) n'aide QUE s'il est localisé.
+   Quand les positions déduites couvrent l'essentiel de la carte (ex.
+   lost_crew_search : « cherche des corps PARTOUT »), leur nuage de points est du
+   BRUIT — redondant avec l'astuce joueur qui dit déjà « partout ». On décide du
+   caractère WIDESPREAD par la FORME PROPRE du pool (jamais une quête codée en
+   dur), sur deux signaux robustes, l'un suffit :
+     • DENSITÉ — pool gros/éparpillé : ≥ WIDESPREAD_ZONES zones distinctes OU
+       ≥ WIDESPREAD_PTS points au total. C'est l'indicateur sûr (une bbox peut être
+       faussée par 2 grappes éloignées) et le moins cher — dérivé des COMPTES de
+       la donnée, disponible même si les camps ne sont pas encore chargés.
+     • ÉTENDUE — OU la bbox des points déduits couvre ≥ WIDESPREAD_BBOX_FRAC du
+       cadre carte actif sur LES DEUX axes (empreinte vraiment pan-carte, quel
+       que soit le compte).
+   lost_crew_search — 9 zones · 8 273 pts, bbox ≈ 53 %×51 % du cadre 9600×7680 —
+   déclenche la DENSITÉ (les deux comptes) ; une quête vraiment localisée à 1–3
+   zones ne déclenche aucun signal → tier 2 dessiné normalement (inchangé). */
+const WIDESPREAD_ZONES = 6;        // ≥ ce nb de zones dérivées distinctes ⇒ pan-carte
+const WIDESPREAD_PTS = 2000;       // ≥ ce nb de points dérivés ⇒ pan-carte
+const WIDESPREAD_BBOX_FRAC = 0.55; // ≥ cette part du cadre carte sur LES DEUX axes
+function hintSpread(sources) {
+  const zones = sources.length;
+  const pts = sources.reduce((s, x) => s + (x.count || 0), 0);
+  const union = unionSourcePts(sources);
+  let fx = 0, fz = 0;
+  if (union.length && activeMap && activeMap.w && activeMap.h) {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const p of union) {
+      if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x;
+      if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
+    }
+    fx = (x1 - x0) / activeMap.w;
+    fz = (z1 - z0) / activeMap.h;
+  }
+  const widespread = zones >= WIDESPREAD_ZONES || pts >= WIDESPREAD_PTS
+    || (fx >= WIDESPREAD_BBOX_FRAC && fz >= WIDESPREAD_BBOX_FRAC);
+  return { zones, pts, fx, fz, widespread };
+}
+/* Tier 2 WIDESPREAD : une SEULE ligne muette dans la famille 💡 (sœur de
+   l'astuce), AUCUNE réf-point agrégée dessinable (le gros nuage pan-carte
+   disparaît) ; défère à l'astuce joueur juste dessous. Le tiroir par-zone reste
+   offert REPLIÉ pour les power users (« voir les N zones » — chaque source y
+   demeure dessinable individuellement), mais ce n'est PLUS le tier dessiné par
+   défaut. */
+function hintTierWidespread(sources, hasTip) {
+  const tierLabel = tr('goalHintLocations');
+  const note = tr('goalHintWidespread') + (hasTip ? ` — ${tr('goalHintSeeTip')}` : '');
+  const detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalHintZonesDetail', sources.length))}</summary>${
+    sources.map(s => `<div class="goal-target-row goal-target-row-pos">${sourceChip(s)}</div>`).join('')
+  }</details>`;
+  return `<div class="goal-target-row player-hint" data-provenance="derived">
+      <span class="player-hint-icon" aria-hidden="true">💡</span>
+      <span class="player-hint-body"><span class="player-hint-label">${esc(tierLabel)}</span> <span class="pos-region">${esc(note)}</span></span>
+    </div>${detail}`;
+}
+/* Méta du tier (comptes de la DONNÉE) : officiel = « N placés + M en zones »
+   (placés + pts des pools quête) ; indice = « M pts · N zones ». */
+function tierMeta(sources, isHint) {
+  if (isHint) {
+    const pts = sources.reduce((s, x) => s + (x.count || 0), 0);
+    return tr('goalSpawnAggMeta', pts.toLocaleString(numberLocale()), sources.length);
+  }
+  const placed = sources.find(s => s.placed);
+  const spawnPts = sources.filter(s => !s.placed).reduce((s, x) => s + (x.count || 0), 0);
+  if (placed && spawnPts) return tr('goalAcceptedMeta', placed.count, spawnPts.toLocaleString(numberLocale()));
+  if (placed) return tr('goalCorpsePlacedN', placed.count);
+  return tr('goalSpawnAggMeta', spawnPts.toLocaleString(numberLocale()), sources.length);
+}
+/* UN tier d'honnêteté (officiel 🟢 ou indice 💡). RÉUTILISABLE par tout but :
+   liste de sources + type de tier. Source UNIQUE → sa propre puce mène (garde
+   son subrole, notamment goal-placements). Plusieurs → UNE réf agrégée
+   'goal-spawn-agg' dessine l'UNION, avec un tiroir replié gardant chaque source
+   dessinable individuellement. RÉUTILISE la machinerie campTrace : les subroles
+   goal-placements / goal-spawn-pool / goal-spawn-agg routent tous vers
+   toggleGoalPlacements (main.js). `note`/`extra` (muets) sont rendus dans le
+   tier. */
+function locationTier(sources, tier, { note = '', extra = '' } = {}) {
+  if (!sources.length) return '';
+  const isHint = tier === 'hint';
+  const tierLabel = isHint ? tr('goalHintLocations') : tr('goalOfficialPositions');
+  let lead, detail = '';
+  if (sources.length === 1) {
+    lead = sourceChip(sources[0]);
+  } else {
+    const union = unionSourcePts(sources);
+    const meta = tierMeta(sources, isHint);
+    const key = `qpoolagg:${tier}:${cleanLabel(sources[0].label || '')}:${sources.length}`;
+    if (union.length) {
+      goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label: tierLabel });
+      lead = ref({
+        kind: 'qao', subrole: 'goal-spawn-agg', key, label: '', hex: CATS.quest.hex,
+        hasFiche: false, drawable: true, mode: 'E', drawn: !!(S.campTraces?.has(key)), meta,
+      });
+    } else {
+      lead = ref({
+        kind: 'qao', subrole: 'goal-spawn-agg', label: '', hex: CATS.quest.hex,
+        hasFiche: false, drawable: false, meta,
+      });
+    }
+    detail = `<details class="fiche-dialogs goal-spawn-detail"><summary>${esc(tr('goalTierDetailN', sources.length))}</summary>${
+      sources.map(s => `<div class="goal-target-row goal-target-row-pos">${sourceChip(s)}</div>`).join('')
+    }</details>`;
+  }
+  if (isHint) {
+    // Tier DÉRIVÉ 💡 — la famille visuelle player-hint (ambre, sœur de l'astuce
+    // joueur), clairement PAS de la donnée bleue ; une note muette rappelle
+    // « aide, pas des données officielles ».
+    const noteHtml = note ? `<span class="pos-region"> — ${esc(note)}</span>` : '';
+    return `<div class="goal-target-row player-hint" data-provenance="derived">
+      <span class="player-hint-icon" aria-hidden="true">💡</span>
+      <span class="player-hint-body"><span class="player-hint-label">${esc(tierLabel)}</span> ${lead}${noteHtml}</span>
+    </div>${detail}`;
+  }
+  // Tier OFFICIEL 🟢 — ligne de donnée, réf bleue.
+  return `<div class="goal-target-row goal-target-row-pos">
+    <span class="goal-target-rel-verb">🟢 ${esc(tierLabel)}</span> ${lead}
+  </div>${detail}${extra}`;
+}
+
+/* Types acceptés — la liste COMPLÈTE des types que le jeu bind (bound_units),
+   CONDENSÉE : un sommaire « Types acceptés : N types » qui déplie la ventilation
+   détaillée (nom + « (N placés) / (spawn serveur) » + ×N variante) dans un
+   tiroir replié — plus jamais la longue phrase inline. */
+function acceptedTypesBlock(t) {
   const types = Array.isArray(t.accepted_types) ? t.accepted_types.filter(a => a && a.name) : [];
-  if (types.length) {
-    const shown = types.slice(0, ACCEPTED_TYPES_CAP);
-    const list = shown.map(a => {
-      // ×N quand le type couvre plusieurs clés-variantes (ex. Corpse astronaut
-      // ×2) ; « (N placés) » sinon « (spawn serveur) » quand 0 placement statique.
-      const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
-      const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
-      return `${esc(cleanLabel(prettyAcceptedTypeName(a.name)))}${mult} <span class="muted">(${esc(qual)})</span>`;
-    }).join(' · ');
-    const moreN = types.length - shown.length;
-    const more = moreN > 0 ? ` <span class="muted">${esc(tr('goalAcceptedTypesMore', moreN))}</span>` : '';
-    rows.push(`<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span></div>
-      <div class="goal-target-row"><span class="goal-accepted-types">${list}${more}</span></div>`);
-  }
-  // (2) Objets acceptés — placés ET/OU zones de fouille (pools de spawn).
-  //   • placés + spawn  → UNE référence UNIFIÉE « Objets acceptés » dont la
-  //     bascule dessine l'union, tiroir détail replié (goalAcceptedUnifiedRef).
-  //     La puce des placés est ALORS DANS ce tiroir — le but suppose que
-  //     goalTargetChip a supprimé la ligne de position séparée (goalAcceptedMerged).
-  //   • spawn SEUL : un seul pool → puce unique ; plusieurs → agrégat + tiroir.
-  //   • placés SEULS : rien ici — la puce des placés reste sur la ligne de
-  //     position (dynamicPosBadge/objPosRow), inchangée.
-  // Caveat « pas un point = un corps » rendu une fois dans chaque branche.
-  const pools = Array.isArray(t.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
-  if (goalAcceptedMerged(t)) {
-    rows.push(goalAcceptedUnifiedRef(t, pools));
-  } else if (pools.length === 1) {
-    rows.push(`<div class="goal-target-row goal-target-row-pos">${goalSpawnPoolChip(pools[0])}</div>`);
-    rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalSpawnPoolNote'))}</span></div>`);
-  } else if (pools.length > 1) {
-    rows.push(goalSpawnPoolAggregate(pools));
-  }
-  // (3) Astuce joueur — 3e tier visuellement distinct (connu EN JEU, pas
-  // extrait de la data : d'où le badge .player-hint + data-provenance). Depuis
-  // que les zones de fouille sont montrées comme DONNÉE juste au-dessus, cette
-  // astuce est un COMPLÉMENT (« au-delà de ces zones, ces corps apparaissent
-  // aussi ailleurs ») — le texte livré le dit déjà (« … PARTOUT sur la carte,
-  // pas seulement ici … ») — et non plus l'info principale. Rendue en dernier,
-  // secondaire ; styling 💡 et provenance:player_knowledge conservés.
+  if (!types.length) return '';
+  const nVariants = types.reduce((s, a) => s + (a.count || 1), 0);
+  const shown = types.slice(0, ACCEPTED_TYPES_CAP);
+  const list = shown.map(a => {
+    const mult = a.count > 1 ? ` <span class="muted">×${a.count}</span>` : '';
+    const qual = a.placed > 0 ? tr('goalAcceptedTypePlaced', a.placed) : tr('goalAcceptedTypeServer');
+    return `${esc(cleanLabel(prettyAcceptedTypeName(a.name)))}${mult} <span class="muted">(${esc(qual)})</span>`;
+  }).join(' · ');
+  const moreN = types.length - shown.length;
+  const more = moreN > 0 ? ` <span class="muted">${esc(tr('goalAcceptedTypesMore', moreN))}</span>` : '';
+  return `<details class="fiche-dialogs goal-accepted"><summary><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span> <span class="muted">${esc(tr('goalAcceptedSummary', nVariants))}</span></summary>
+    <div class="goal-target-row"><span class="goal-accepted-types">${list}${more}</span></div></details>`;
+}
+/* Astuce joueur — 3e tier, VISUELLEMENT DISTINCT (connu EN JEU, pas extrait :
+   badge .player-hint + data-provenance). Rendu en dernier, secondaire. */
+function playerTipRow(t) {
   const hint = t.player_hint;
-  if (hint && hint.text) {
-    rows.push(`<div class="goal-target-row player-hint" data-provenance="${esc(hint.provenance || 'player_knowledge')}">
+  if (!hint || !hint.text) return '';
+  return `<div class="goal-target-row player-hint" data-provenance="${esc(hint.provenance || 'player_knowledge')}">
       <span class="player-hint-icon" aria-hidden="true">💡</span>
       <span class="player-hint-body"><span class="player-hint-label">${esc(tr('playerHintLabel'))}</span> ${esc(hint.text)}</span>
-    </div>`);
+    </div>`;
+}
+
+/* Bascule d'un tracé de jeu de points (routé par main.js sur data-subrole
+   goal-placements / goal-spawn-pool / goal-spawn-agg) : déjà tracé ⇒ retrait
+   (parité re-clic + ✕ du bandeau), sinon pose (nuage + tag de légende + caméra
+   cadrée + persistance, tout par addCampTrace). */
+function toggleGoalPlacements(info) {
+  const key = info?.key;
+  if (!key) return;
+  if (S.campTraces?.has(key)) { removeCampTrace(key); return; }
+  const set = goalPlacementSets.get(key);
+  if (!set || !set.pts.length) return;
+  addCampTrace(key, { pts: set.pts, hex: set.hex, label: set.label, kind: 'qao', refKind: 'qao', map: S.map });
+}
+
+/* Blocs supplémentaires d'un but à positions (corps / conteneur), empilés sous
+   la ligne d'identité — LA structure propre à 3 tiers (rien si la cible n'en
+   porte aucun). Réutilisable : chaque tier n'apparaît que si la donnée le porte.
+     1. Types acceptés (sommaire repliable)
+     2. 🟢 Positions officielles (placements + pool quête)  + indice landmark
+     3. 💡 Positions probables (pools génériques, dérivées) — DESSINÉ seulement
+        s'il restreint la recherche ; pan-carte → note concise, pas de dessin
+        (voir hintSpread/hintTierWidespread)
+     4. 💡 Astuce joueur */
+function goalCorpseExtras(t) {
+  if (!t) return '';
+  const { official, hint } = goalLocationSources(t);
+  const rows = [];
+  const acc = acceptedTypesBlock(t);
+  if (acc) rows.push(acc);
+  if (official.length) {
+    // Repère d'orientation (target.landmark) : texte muet honnête (.pos-region)
+    // rendu une fois près des positions officielles — jamais un pin.
+    const extra = t.landmark
+      ? `<div class="goal-target-row"><span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span></div>`
+      : '';
+    rows.push(locationTier(official, 'official', { extra }));
   }
+  if (hint.length) {
+    // Tier 2 dessiné SEULEMENT s'il RESTREINT la recherche (hintSpread). Pool
+    // pan-carte (ex. lost_crew) → note muette concise, aucune réf-point
+    // agrégée ; localisé (1–3 zones) → tier 2 dessinable inchangé.
+    const hasTip = !!(t.player_hint && t.player_hint.text);
+    rows.push(hintSpread(hint).widespread
+      ? hintTierWidespread(hint, hasTip)
+      : locationTier(hint, 'hint', { note: tr('goalHintLocationsNote') }));
+  }
+  const tip = playerTipRow(t);
+  if (tip) rows.push(tip);
   return rows.join('');
 }
 
@@ -444,17 +383,17 @@ function goalCorpseExtras(t) {
      jamais une affirmation dessinable. */
 function dynamicPosBadge(t, regionHint, itemKey) {
   const sz = t && t.search_zone;
-  // PLACEMENTS EXACTS (search_zone.basis === "chest_placement") : quand le
-  // pipeline porte les VRAIES positions des conteneurs fouillables, on rend la
-  // chip DESSINABLE `[Quest objects(●)] N locations` (points exacts via campTrace,
-  // togglable + bandeau) au lieu de la zone devinée — dont la bbox n'est qu'un
-  // placeholder constant pour ces buts. Le libellé de précision dit « N
-  // locations » (PRÉCIS), jamais « area » ; réservé aux search_zone de proximité
-  // (basis proximity/region — repli inchangé plus bas). Priorité absolue : les
-  // points exacts priment sur toute estimation.
-  if (sz && sz.basis === 'chest_placement' && Array.isArray(t.placements) && t.placements.length) {
-    const chip = goalPlacementsChip(t);
-    if (chip) return chip;
+  // PLACEMENTS EXACTS (search_zone.basis === "chest_placement") : les VRAIES
+  // positions des conteneurs → la puce DESSINABLE de la source OFFICIELLE
+  // (points exacts via campTrace, togglable + bandeau) au lieu de la zone
+  // devinée — dont la bbox n'est qu'un placeholder constant pour ces buts.
+  // Repli défensif : pour un but OBJET, le tier officiel (goalCorpseExtras) rend
+  // déjà ces placements et l'appelant coupe posRow (goalHasLocationTiers) — ce
+  // chemin ne sert que si un autre appelant atteint dynamicPosBadge avec des
+  // placements. Les points exacts priment sur toute estimation.
+  if (sz && sz.basis === 'chest_placement') {
+    const src = placedSource(t);
+    if (src) return sourceChip(src);
   }
   if (sz && (sz.confidence === 'high' || sz.confidence === 'medium')) {
     // Item COMMUN du catalogue avec de vrais canaux d'obtention (vendu /
@@ -980,7 +919,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // par cible, jamais deux pins pour le même point (loi d'uniformisation,
     // même logique que hasLayerResolution côté monstre).
     let posInRef = !!(itemRow && itemFoundAtPos);
-    if (itemRow && namedContainer) {
+    // SIMPLIFICATION corps/conteneur (2026-07-15) : un but à accepted_types voit
+    // ses conteneurs ÉNUMÉRÉS dans le tier « Types acceptés » (goalCorpseExtras)
+    // et ses positions dans les tiers 🟢/💡 — le verbe « trouvé dans [Objet]
+    // <label> » / « obtenu ici » ne ferait alors que répéter la cible du but, on
+    // le SUPPRIME (garde la ligne d'identité d'item). Les vrais conteneurs nommés
+    // d'autres mécaniques (sans accepted_types, ex. « Old crate ») le gardent.
+    const containerNamedInTiers = Array.isArray(t.accepted_types) && t.accepted_types.length > 0;
+    if (itemRow && namedContainer && !containerNamedInTiers) {
       // collect_from_object avec un conteneur DISTINCT nommé : « found in
       // [Objet ●] <conteneur> » — contexte secondaire léger (verbe + nom),
       // jamais une entrée co-égale. Pastille locate quand son placement est
@@ -998,10 +944,11 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
             <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
             ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
           </div>`;
-    } else if (itemRow && differing && !itemFoundAtPos) {
+    } else if (itemRow && differing && !itemFoundAtPos && !containerNamedInTiers) {
       // Conteneur DISTINCT mais anonyme ET sans position : le verbe honnête seul
       // (« obtenu ici ») — quand une position existe, le chip d'item la porte
-      // déjà (son « trouvé à ») et rend ce verbe redondant, donc omis.
+      // déjà (son « trouvé à ») et rend ce verbe redondant, donc omis. Idem quand
+      // les tiers énumèrent déjà les conteneurs (containerNamedInTiers).
       relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
     }
     // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
@@ -1031,13 +978,14 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // Position restante : l'item ramassé porte son « trouvé à » en ligne
     // (itemFoundAt) ET l'objet activable pur porte son pin [Qao ●] en ligne
     // (repli ci-dessus) — dans les deux cas posInRef supprime la ligne séparée.
-    // FUSION corps (goalAcceptedMerged) : la puce des placements exacts est
-    // désormais DANS la référence unifiée « Objets acceptés » (goalCorpseExtras
-    // ci-dessous, tiroir détail) — pas de ligne de position séparée qui la
-    // doublerait. Ne reste sinon ici que l'objet activable PUR encore positionné
-    // (aucun item, kind honnête [Objet ●]) ou le repli zone/dynamique (t.x
-    // absent : search_zone estimée / « non localisé »), jamais un pin fabriqué.
-    const objPosRow = (posInRef || goalAcceptedMerged(t)) ? '' : (t.x != null
+    // TIERS DE POSITIONS (goalHasLocationTiers) : dès que le but porte des
+    // placements OU des pools de spawn, goalCorpseExtras ci-dessous rend le(s)
+    // tier(s) 🟢/💡 — la ligne de position séparée disparaît (elle doublerait la
+    // source officielle, moins précise). Ne reste sinon ici que l'objet activable
+    // PUR encore positionné (aucun item, kind honnête [Objet ●]) ou le repli
+    // zone/dynamique (t.x absent : search_zone estimée / « non localisé »),
+    // jamais un pin fabriqué.
+    const objPosRow = (posInRef || goalHasLocationTiers(t)) ? '' : (t.x != null
       ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
       : posRow);
     // Blocs corps de quête (types acceptés / pools de spawn / astuce joueur) —
