@@ -180,20 +180,40 @@ function officialPositionsTier(sources, t) {
     + `${badge({ axis: 'provenance', value: 'official' })} ${combinedDrawTag(sources, 'official', officialTierLabel(t))}`
     + `</div>`;
 }
-/* POSITIONS CONSEILLÉES — UNE astuce LÉGÈRE (refonte owner 2026-07-16b : les
-   zones de spawn de corps sont une SUGGESTION, pas une donnée exacte à mettre en
-   avant). Famille visuelle player-hint (💡, ton ambre tamisé) : libellé court
-   « Positions conseillées : Zones de spawn de corps », AUCUN compte « N pts » mis
-   en avant, AUCUN plafond ; la nuance « n'importe quel corps de ces types, partout »
-   repliée dans une info-bulle d'une ligne (title du conteneur). Reste DESSINABLE —
-   un clic dessine l'union de TOUS les pools (quête + génériques), togglable comme
-   « Animaux paisibles » ; le compte de données réel voyage dans le tracé/bandeau. */
+/* Couches d'ARBRE (fkeys) qu'une astuce de fouille de corps propose d'ALLUMER —
+   les DEUX formes honnêtes d'un corps, telles qu'elles vivent DÉJÀ dans l'arbre de
+   gauche (groupe « Corps ▸ ») : la forme PLACÉE (decor:corpse — TOUS les corps
+   placés) + la forme SPAWN (camp:searchable_corpses — TOUTES les zones de spawn de
+   corps). Data-driven et extensible : un autre type de contenu (squelettes → sa
+   propre couche) mappera un jour vers d'autres fkeys ; aujourd'hui seul le corps
+   est livré, d'où UN seul jeu constant. Jamais une quête codée en dur. */
+const CORPSE_TREE_LAYERS = ['decor:corpse', 'camp:searchable_corpses'];
+
+/* POSITIONS CONSEILLÉES — UNE astuce LÉGÈRE (refonte owner 2026-07-16c : au lieu
+   de dessiner un tracé ÉPHÉMÈRE d'un seul coup, l'astuce ALLUME les VRAIES couches
+   « Corps » de l'arbre de gauche — persistantes, explorables, retirables par leurs
+   PROPRES cases). Famille visuelle player-hint (💡, ton ambre tamisé) : libellé
+   court « Positions conseillées : Zones de spawn de corps », AUCUN compte, AUCUN
+   plafond ; la nuance « n'importe quel corps de ces types, partout » repliée dans
+   une info-bulle (title du conteneur).
+   AFFORDANCE (honnêteté) : PAS une pastille ○/● — activateCategoryNode est
+   ENSURE-only (coche si besoin, ne décoche JAMAIS), donc un ● « éteignable »
+   mentirait sur un toggle persistant. C'est un `.link` cliquable : l'idiome
+   d'ACTION non-ref du site (souligné POINTILLÉ, distinct du souligné plein « ouvre
+   une fiche »). Un clic → main.js (data-act « enable-layers ») allume CHAQUE fkey
+   de data-fkeys via activateCategoryNode('row', fkey) : tout le groupe « Corps »
+   (placés + spawn) s'affiche via ses couches réelles, puis reste géré par l'arbre.
+   `sources` (les pools de spawn de la donnée) n'est plus que le SIGNAL « c'est un
+   but de fouille de corps » ; les couches à allumer sont CORPSE_TREE_LAYERS. */
 function hintZonesTier(sources) {
   if (!sources.length) return '';
   return `<div class="goal-target-row player-hint" data-provenance="derived" title="${esc(tr('goalHintZonesNote'))}">`
     + `<span class="player-hint-icon" aria-hidden="true">💡</span>`
-    + `<span class="player-hint-body">${esc(tr('goalSuggestedPositionsLabel'))} ${combinedDrawTag(sources, 'hint', tr('goalHintZonesTag'), false)}</span>`
-    + `</div>`;
+    + `<span class="player-hint-body">${esc(tr('goalSuggestedPositionsLabel'))} `
+    + `<span class="link" role="button" tabindex="0" data-act="enable-layers"`
+    + ` data-subrole="goal-enable-corpse-layers" data-fkeys="${esc(CORPSE_TREE_LAYERS.join(','))}">`
+    + `${esc(tr('goalHintZonesTag'))}</span>`
+    + `</span></div>`;
 }
 
 /* Astuce joueur — 3e tier, connu EN JEU mais pas prouvable dans la data extraite.
@@ -229,9 +249,10 @@ function toggleGoalPlacements(info) {
    la ligne d'identité — DROPDOWN-FREE, au plus DEUX lignes (rien si la cible n'en
    porte aucune). Réutilisable : chaque bloc n'apparaît que si la donnée le porte.
      1. Corps placés — badge(official) : les placements EXACTS seuls ;
-     2. Positions conseillées — astuce légère 💡 : les zones de spawn de corps
-        (union quête + génériques), une SUGGESTION dessinable, pas une donnée mise
-        en avant. Replie la nuance player_hint dans son info-bulle.
+     2. Positions conseillées — astuce légère 💡 : un `.link` cliquable qui ALLUME
+        les VRAIES couches « Corps » de l'arbre (placés + zones de spawn), un aide
+        de fouille large et persistant, pas un tracé éphémère. Replie la nuance
+        player_hint dans son info-bulle.
    L'astuce joueur autonome ne subsiste QUE sans ce tier (sinon repliée) ; la ligne
    « types acceptés » et le repère landmark sont retirés (owner : minimal). */
 function goalCorpseExtras(t) {

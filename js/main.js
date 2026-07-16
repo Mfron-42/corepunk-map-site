@@ -209,6 +209,19 @@ document.addEventListener('click', e => {
   // focus/historique que les drapeaux (pas de pushFocusState/unfocus),
   // l'autre voie de retrait étant la pastille/le ✕ du bandeau-légende.
   else if (b.dataset.act === 'remove-locate-pin') removeLocatePin(b.dataset.id);
+  // « Allumer des couches » (astuce de fouille de corps, stepguide.js
+  // hintZonesTier / data-subrole="goal-enable-corpse-layers") : un clic ALLUME les
+  // VRAIES couches d'arbre nommées dans data-fkeys (ex. decor:corpse +
+  // camp:searchable_corpses) — persistantes/explorables via leurs propres cases,
+  // jamais un tracé éphémère. activateCategoryNode est ENSURE-only (coche si pas
+  // déjà coché, ne décoche jamais, puis révèle) : GÉNÉRIQUE, aucune couche codée
+  // en dur ici (les fkeys viennent de l'affordance). Pas de pushFocusState — un
+  // allumage de filtre ne crée pas d'entrée d'historique (même modèle qu'une case
+  // d'arbre, voir filterRow/syncHash).
+  else if (b.dataset.act === 'enable-layers') {
+    for (const fkey of (b.dataset.fkeys || '').split(',').map(s => s.trim()).filter(Boolean))
+      activateCategoryNode('row', fkey);
+  }
   // Une ouverture de fiche par data-act (fiche-camp/-monster/-item/… ci-dessus)
   // vient de (re)rendre #detail : resynchronise ses pastilles `[Camp(●)]` avec
   // les tracés actifs (campRef rend drawn:false, l'état doit être relu à la
