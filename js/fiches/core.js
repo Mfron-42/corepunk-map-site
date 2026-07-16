@@ -259,7 +259,10 @@ function setFicheHash(kind, id) {
    free-floating hedging prose). Labels + tooltips come EXCLUSIVELY from the
    i18n `badge` section (E'c-0, tbl('badge', <key>)) — the front never invents
    a honesty word of its own.
-     axis 'provenance' — where a fact comes from: official / derived / inferred / absent
+     axis 'provenance' — where a fact comes from: official / derived / inferred / absent /
+                         player_knowledge (labelled game-experience tier — a hint we
+                         KNOW in-game but cannot prove from the extracted data; its own
+                         dashed-amber tone, distinct from `derived`)
      axis 'precision'  — how exact a location is: pinned / area / via-chain / unlocated
      axis 'content'    — orthogonal flag: dev (danger-red, NOT a fact-provenance)
      axis 'value'      — the 3 typed value-renders: weight-share / roster-server-side / cospawn-probable
@@ -274,7 +277,7 @@ function setFicheHash(kind, id) {
      inline — the compact chip modifier used by the runtime-value placeholder
              (varPlaceholder below). */
 const BADGE_KEY = {
-  provenance: { official: 'provOfficial', derived: 'provDerived', inferred: 'provInferred', absent: 'provAbsent' },
+  provenance: { official: 'provOfficial', derived: 'provDerived', inferred: 'provInferred', absent: 'provAbsent', player_knowledge: 'provPlayerKnowledge' },
   precision: { pinned: 'precPinned', area: 'precArea', 'via-chain': 'precViaChain', unlocated: 'precUnlocated' },
   content: { dev: 'contentDev' },
   value: { 'weight-share': 'valWeightShare', 'roster-server-side': 'valRosterServerSide', 'cospawn-probable': 'valCospawnProbable' },

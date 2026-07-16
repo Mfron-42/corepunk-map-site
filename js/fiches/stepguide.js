@@ -23,20 +23,26 @@ import { regionFicheExists } from './zone.js';
    a validé) — jamais une liste par-zone, jamais un tiroir. Chaque étiquette
    bascule d'un clic tout son nuage via le registre campTrace de 1re classe
    (pins.js S.campTraces / addCampTrace — togglable, listé au bandeau-légende,
-   retirable, teinte quête). Réparties PAR LES SIGNAUX DE LA DONNÉE (jamais une
-   quête codée en dur) :
-     • 🟢 POSITIONS (donnée) — l'UNION des placements EXACTS de conteneurs
-       (search_zone.basis === "chest_placement", target.placements) et des pools
-       de spawn role==="quest". UNE réf bleue dessinable, dessine tout d'un coup.
-     • 💡 ZONES DE CORPS FOUILLABLES (dérivées) — l'UNION de TOUS les pools
-       role==="generic" (déduits via la loot-table). UNE réf 💡 (.player-hint,
-       sœur de l'astuce joueur), map-wide assumé : une seule étiquette, comme
-       « Animaux paisibles » (aussi pan-carte), jamais un nuage éclaté.
+   retirable, teinte quête).
+   HONNÊTETÉ : le tier de chaque étiquette est marqué par le VOCABULAIRE UNIQUE
+   du site — la puce badge() (fiches/core.js), jamais un emoji propre au guide
+   d'étapes (la convergence 2026-07-16 a retiré les 🟢/💡 qui inventaient une 2e
+   langue d'honnêteté, la seule teinte verte de l'app). Réparties PAR LES SIGNAUX
+   DE LA DONNÉE (jamais une quête codée en dur) :
+     • badge(provenance:'official') — POSITIONS (donnée) : l'UNION des placements
+       EXACTS de conteneurs (search_zone.basis === "chest_placement",
+       target.placements) et des pools de spawn role==="quest". UNE réf
+       dessinable NOMMÉE par la cible réelle du but (target.label, ex. « Corps
+       d'astronautes ») — jamais un « Positions » générique — dessine tout d'un coup.
+     • badge(provenance:'derived') — ZONES DE CORPS FOUILLABLES (dérivées) :
+       l'UNION de TOUS les pools role==="generic" (déduits via la loot-table).
+       UNE réf, map-wide assumé : une seule étiquette, comme « Animaux paisibles »
+       (aussi pan-carte), jamais un nuage éclaté.
    Puis, muettes : la ligne inline « Types acceptés : N types », le repère
-   d'orientation (landmark), et l'astuce joueur (target.player_hint, provenance
-   player_knowledge). Réutilisable : tout but portant ces signaux obtient
-   l'étiquette correspondante — officiel seul → 🟢 seule ; dérivé seul → 💡
-   seule ; aucun → la ligne objet/types seule. */
+   d'orientation (landmark), et l'astuce joueur (target.player_hint,
+   badge(provenance:'player_knowledge')). Réutilisable : tout but portant ces
+   signaux obtient l'étiquette correspondante — officiel seul, dérivé seul, ou
+   la ligne objet/types seule. */
 const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN par jeu de points (garde-fou ; cas actuels ≤ 44)
 /* Instantané des jeux de points dessinables par clé de tracé (même idiome
    module-state que currentGoalZones) : le rendu le peuple, le routeur de dessin
@@ -160,22 +166,37 @@ function combinedDrawTag(sources, tier, label) {
     count: dataPts,
   });
 }
-/* 🟢 POSITIONS — UNE étiquette bleue : l'union des placements exacts + pools
-   role="quest". Réutilisable par tout but portant des sources officielles. */
-function officialPositionsTier(sources) {
+/* Libellé DESCRIPTIF de l'étiquette officielle (owner : « never write "Positions",
+   give a real name so the user understands what's highlighted ») : le NOM RÉEL de
+   ce que la cible du but fait ramasser (target.label — « Astronaut corpses »,
+   « Dead Bodies »…, nettoyé), jamais le générique « Positions ». Repli défensif
+   goalPositions uniquement si la cible n'a AUCUN label (jamais observé sur les
+   buts qui rendent ce tier — tous portent un target.label). */
+function officialTierLabel(t) {
+  const name = t && t.label ? cleanLabel(t.label) : '';
+  return name || tr('goalPositions');
+}
+/* POSITIONS — UNE étiquette de DONNÉE : l'union des placements exacts + pools
+   role="quest". Tier marqué par badge(provenance:'official') — le vocabulaire
+   d'honnêteté UNIQUE de l'app (plus d'emoji 🟢). Nommée par la cible réelle
+   (officialTierLabel). Réutilisable par tout but portant des sources officielles. */
+function officialPositionsTier(sources, t) {
   if (!sources.length) return '';
   return `<div class="goal-target-row goal-target-row-pos">`
-    + `<span class="goal-target-rel-verb" aria-hidden="true">🟢</span> ${combinedDrawTag(sources, 'official', tr('goalPositions'))}`
+    + `${badge({ axis: 'provenance', value: 'official' })} ${combinedDrawTag(sources, 'official', officialTierLabel(t))}`
     + `</div>`;
 }
-/* 💡 ZONES DE CORPS FOUILLABLES — UNE étiquette 💡 (famille player-hint, ambre,
-   clairement PAS de la donnée bleue) : l'union de TOUS les pools role="generic".
-   Map-wide assumé, une seule étiquette comme « Animaux paisibles » (elle-même
-   pan-carte) — jamais un nuage éclaté ni un tiroir par-zone. */
+/* ZONES DE CORPS FOUILLABLES — UNE étiquette DÉRIVÉE (marquée
+   badge(provenance:'derived') — même vocabulaire d'honnêteté que tout le site,
+   plus d'emoji 💡) : l'union de TOUS les pools role="generic". Map-wide assumé,
+   une seule étiquette comme « Animaux paisibles » (elle-même pan-carte) — jamais
+   un nuage éclaté ni un tiroir par-zone. Le conteneur .player-hint[data-provenance]
+   reste (regroupement visuel discret du tier), mais le SIGNAL d'honnêteté est
+   désormais la puce badge, jamais l'ancien emoji. */
 function hintZonesTier(sources) {
   if (!sources.length) return '';
   return `<div class="goal-target-row player-hint" data-provenance="derived">`
-    + `<span class="player-hint-icon" aria-hidden="true">💡</span>`
+    + `${badge({ axis: 'provenance', value: 'derived' })}`
     + `<span class="player-hint-body">${combinedDrawTag(sources, 'hint', tr('goalHintZonesTag'))}</span>`
     + `</div>`;
 }
@@ -189,14 +210,19 @@ function acceptedTypesLine(t) {
   const nVariants = types.reduce((s, a) => s + (a.count || 1), 0);
   return `<div class="goal-target-row goal-target-row-types"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span> <span class="muted">${esc(tr('goalAcceptedSummary', nVariants))}</span></div>`;
 }
-/* Astuce joueur — 3e tier, VISUELLEMENT DISTINCT (connu EN JEU, pas extrait :
-   badge .player-hint + data-provenance). Rendu en dernier, secondaire. */
+/* Astuce joueur — 3e tier, connu EN JEU mais pas prouvable dans la data extraite.
+   Son mark d'honnêteté est désormais la puce badge(provenance:'player_knowledge')
+   — le tier player_knowledge du vocabulaire UNIQUE de l'app (core.js), portant
+   son propre libellé (« Astuce joueur ») et son ton ambre-pointillé distinct du
+   « dérivé » ; plus d'emoji 💡 ni de .player-hint-label redondant (le badge EST
+   le libellé du tier). Le conteneur .player-hint[data-provenance] reste (le
+   regroupement visuel discret). Rendu en dernier, secondaire. */
 function playerTipRow(t) {
   const hint = t.player_hint;
   if (!hint || !hint.text) return '';
   return `<div class="goal-target-row player-hint" data-provenance="${esc(hint.provenance || 'player_knowledge')}">
-      <span class="player-hint-icon" aria-hidden="true">💡</span>
-      <span class="player-hint-body"><span class="player-hint-label">${esc(tr('playerHintLabel'))}</span> ${esc(hint.text)}</span>
+      ${badge({ axis: 'provenance', value: 'player_knowledge' })}
+      <span class="player-hint-body">${esc(hint.text)}</span>
     </div>`;
 }
 
@@ -218,9 +244,10 @@ function toggleGoalPlacements(info) {
    si la cible n'en porte aucune). Réutilisable : chaque bloc n'apparaît que si la
    donnée le porte.
      1. Types acceptés — ligne inline « N types » (jamais un tiroir)
-     2. 🟢 Positions — UNE étiquette (placements + pools quête)  + repère landmark
-     3. 💡 Zones de corps fouillables — UNE étiquette (pools génériques, dérivés)
-     4. 💡 Astuce joueur */
+     2. Positions — UNE étiquette badge(official), nommée par la cible réelle
+        (target.label) + repère landmark
+     3. Zones de corps fouillables — UNE étiquette badge(derived) (pools génériques)
+     4. Astuce joueur — badge(player_knowledge) */
 function goalCorpseExtras(t) {
   if (!t) return '';
   const { official, hint } = goalLocationSources(t);
@@ -228,7 +255,7 @@ function goalCorpseExtras(t) {
   const acc = acceptedTypesLine(t);
   if (acc) rows.push(acc);
   if (official.length) {
-    rows.push(officialPositionsTier(official));
+    rows.push(officialPositionsTier(official, t));
     // Repère d'orientation (target.landmark) : texte muet honnête (.pos-region)
     // rendu une fois près des positions officielles — jamais un pin.
     if (t.landmark) rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span></div>`);
@@ -805,7 +832,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     let posInRef = !!(itemRow && itemFoundAtPos);
     // SIMPLIFICATION corps/conteneur (2026-07-15) : un but à accepted_types voit
     // ses conteneurs ÉNUMÉRÉS dans le tier « Types acceptés » (goalCorpseExtras)
-    // et ses positions dans les tiers 🟢/💡 — le verbe « trouvé dans [Objet]
+    // et ses positions dans les tiers officiel/dérivé (badge()) — le verbe « trouvé dans [Objet]
     // <label> » / « obtenu ici » ne ferait alors que répéter la cible du but, on
     // le SUPPRIME (garde la ligne d'identité d'item). Les vrais conteneurs nommés
     // d'autres mécaniques (sans accepted_types, ex. « Old crate ») le gardent.
@@ -864,7 +891,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     // (repli ci-dessus) — dans les deux cas posInRef supprime la ligne séparée.
     // TIERS DE POSITIONS (goalHasLocationTiers) : dès que le but porte des
     // placements OU des pools de spawn, goalCorpseExtras ci-dessous rend le(s)
-    // tier(s) 🟢/💡 — la ligne de position séparée disparaît (elle doublerait la
+    // tier(s) officiel/dérivé (badge()) — la ligne de position séparée disparaît (elle doublerait la
     // source officielle, moins précise). Ne reste sinon ici que l'objet activable
     // PUR encore positionné (aucun item, kind honnête [Objet ●]) ou le repli
     // zone/dynamique (t.x absent : search_zone estimée / « non localisé »),

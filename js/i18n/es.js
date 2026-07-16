@@ -73,13 +73,16 @@ export default {
       // Secciones raíz PLANAS Monstruos / Creeps / Fauna pacífica (reorg del
       // propietario 2026-07-15b: se deshizo la sección paraguas «Criaturas» con
       // subgrupos anidados — cada una vuelve a ser su propia sección raíz).
-      // groupWildlife es el TÍTULO DE SECCIÓN de la Fauna pacífica (grupo
-      // camp:wildlife) — mismo valor «Fauna pacífica» que la subetiqueta
-      // subFaunePaisible (eliminada).
+      // groupWildlife es el TÍTULO DE SECCIÓN del grupo camp:wildlife —
+      // UNIFICADO 2026-07-16 al MISMO término que su fila/capa/leyenda/ficha
+      // (wildlifeRestRow «Animales pacíficos»): una sola palabra en todas partes,
+      // no más «Fauna pacífica» vs «Animales pacíficos».
       groupCreeps: 'Creeps',
-      groupWildlife: 'Fauna pacífica',
+      groupWildlife: 'Animales pacíficos',
       groupHarvest: 'Recolección',
-      groupContainers: 'Interactuables',
+      // «Objetos interactivos» (2026-07-16) — sustituye el anglicismo acuñado
+      // «Interactuables» (RU/UK ya decían «objetos interactivos»).
+      groupContainers: 'Objetos interactivos',
       groupWorld: 'Mundo',
       // Casillas de cascada (IA final): aria-label compartido de cada
       // casilla maestra de grupo/subgrupo (js/sidebar.js wireParentCheck).
@@ -391,20 +394,23 @@ export default {
       // stepguide.js goalCorpseExtras) — SIN menú desplegable, como mucho DOS
       // etiquetas dibujables, según las señales de los propios datos (nunca una
       // misión codificada a mano):
+      //   El tier de cada etiqueta lo marca la ficha badge() (el ÚNICO vocabulario
+      //   de honestidad de la app), nunca un emoji propio de la guía:
       //   1. Tipos aceptados — línea inline «N tipos» (goalAcceptedSummary);
-      //   2. 🟢 Posiciones (goalPositions) — UNA ref: unión de colocaciones
-      //      exactas + grupos role="quest";
-      //   3. 💡 Zonas de cadáveres registrables (goalHintZonesTag) — UNA ref:
-      //      unión de grupos role="generic", familia 💡, como «Animales pacíficos»;
-      //   4. 💡 Consejo de jugador (playerHintLabel) — conocido en el juego, no data.
+      //   2. Posiciones — badge(official) — UNA ref NOMBRADA por el objetivo real
+      //      (target.label): unión de colocaciones exactas + grupos role="quest";
+      //   3. Zonas de cadáveres registrables (goalHintZonesTag) — badge(derived) —
+      //      UNA ref: unión de grupos role="generic", como «Animales pacíficos»;
+      //   4. Consejo de jugador — badge(player_knowledge, provPlayerKnowledge):
+      //      conocido en el juego, no en los datos (el badge lleva el rótulo).
       goalAcceptedTypesLabel: 'Tipos aceptados:',
       goalAcceptedSummary: n => `${n} tipos`,
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
-      playerHintLabel: 'Consejo de jugador',
       goalCorpsePlacedN: n => `${n} cadáveres colocados`,
-      // Las DOS etiquetas combinadas de posiciones (cada una dibuja la unión de
-      // sus puntos con un clic): 🟢 el dato (colocaciones + grupos de misión), 💡
-      // las zonas deducidas del botín (cubren el mapa, una sola etiqueta).
+      // goalHintZonesTag: el rótulo DERIVADO (cubre el mapa, una sola etiqueta).
+      // goalPositions: repliegue DEFENSIVO solo — la etiqueta oficial la nombra el
+      // objetivo real (officialTierLabel/target.label), nunca esta palabra
+      // genérica; conservada solo para el caso (nunca observado) sin label.
       goalPositions: 'Posiciones',
       goalHintZonesTag: 'Zonas de cadáveres registrables',
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
@@ -899,6 +905,11 @@ export default {
       provInferredTip: 'Emparejado de forma heurística (por nombre, proximidad o texto): probable, no seguro.',
       provAbsent: 'Ausente',
       provAbsentTip: 'Honestamente ausente de los datos extraídos.',
+      // Tier «consejo de jugador» — conocido EN EL JUEGO por la experiencia,
+      // nunca demostrable con los datos extraídos; tono ámbar-punteado distinto
+      // del «derivado» (reutiliza el rótulo del antiguo playerHintLabel).
+      provPlayerKnowledge: 'Consejo de jugador',
+      provPlayerKnowledgeTip: 'Conocido en el juego por la experiencia — nunca demostrable con los datos extraídos.',
       // Eje de precisión — cuán exacta es una posición
       precPinned: 'Exacto',
       precPinnedTip: 'Coordenadas exactas.',

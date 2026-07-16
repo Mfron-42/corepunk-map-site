@@ -2472,6 +2472,15 @@ button.rar-pill:hover {
   background: rgba(224, 100, 92, .14);
   border: 1px solid rgba(224, 100, 92, .4);
 }
+/* astuce joueur — connu EN JEU par l'expérience, honnêtement PAS prouvable dans
+   la data extraite : réutilise la famille AMBRE (une astuce, jamais une absence
+   grise) mais liseré POINTILLÉ — distinct du « dérivé » (ambre PLEIN, réel-mais-
+   nuancé) : un ton propre, minimal, sans nouvelle couleur. */
+.badge--provenance-player_knowledge {
+  color: var(--accent-hi);
+  background: var(--accent-soft-2);
+  border: 1px dashed var(--accent);
+}
 /* Placeholder "?" compact d'une valeur runtime non résolue (varPlaceholder,
    DATA_CONTRACT §3.2) — la famille Badge dans une petite forme carrée inline.
    Ton `runtime` = valeur calculée en jeu (accent, jamais un trou de donnée) ;
@@ -3103,6 +3112,19 @@ span.ref-tag { cursor: default; }
    demi-éteinte — l'état dessiné reste lisible même sans rien à dessiner ici
    (retour QA 2026-07-11 : jamais un clic sans retour visuel). */
 .ref-bubble[data-fill="empty-on"] { opacity: .55; }
+/* F8 — pastille des tracés de ZONE/RÉGION ONE-SHOT (subroles goal-zone /
+   monster-zone / region : dessin single-slot, effacé à la fermeture de fiche,
+   jamais un toggle persistant). Forme LOSANGE distincte du CERCLE ●/○, celui-ci
+   désormais RÉSERVÉ aux bascules PERSISTANTES (campTrace, couches espèce/famille,
+   pins locate). Le ● ne veut plus dire qu'UNE chose ; « voir/flasher la zone »
+   porte son propre glyphe. Le remplissage on/off (data-fill, syncGoalZoneDots)
+   reste inchangé — même feedback, forme différente. */
+.ref[data-kind="zone"][data-subrole="goal-zone"] .ref-bubble,
+.ref[data-kind="zone"][data-subrole="monster-zone"] .ref-bubble,
+.ref[data-kind="zone"][data-subrole="region"] .ref-bubble {
+  border-radius: 1.5px;
+  transform: rotate(45deg);
+}
 /* ⊘ « 0 point sur cette carte » : la référence entière se grise honnêtement
    (même retrait que .sp-zero/.fam-zero dans l'arbre), jamais masquée. */
 .ref-empty .ref-tag, .ref-empty .ref-label, .ref-empty .ref-meta { opacity: .6; }

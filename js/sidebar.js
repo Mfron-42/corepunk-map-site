@@ -615,7 +615,8 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
      5. Interactables — rangés PAR TYPE d'objet (2026-07-15) : CORPS ▸ (Placés ·
                         Zones de spawn) · COFFRES ▸ (De camp · Fouillables ·
                         Hérité) · Tonneaux · Caisses · Meubles · Livres · Divers ·
-                        Squelettes · Objets de quête · Zones de spawn — autres
+                        Objets de quête · Squelettes (couche de spawn, adjacente) ·
+                        Zones de spawn — autres
                         (camps) ▸ (Autres · Destructibles · Réactifs) — chaque
                         type = une entrée, ses formes placée+spawn unifiées sous
                         elle, voir buildGroupContainers
@@ -930,9 +931,10 @@ function syncEntityRefDots() {
     // Étiquettes de POSITIONS du step-guide (mode E, tracés campTrace, S.campTraces) —
     // l'état ● relu de l'appartenance par clé, la MÊME source que le bandeau ;
     // sans ce resync la pastille resterait ○ après un clic (retour visuel muet
-    // interdit). Couvre les DEUX étiquettes combinées (goal-spawn-agg : 🟢
-    // Positions / 💡 Zones de corps fouillables) ET les puces individuelles
-    // (goal-placements / goal-spawn-pool) encore émises par les replis.
+    // interdit). Couvre les DEUX étiquettes combinées (goal-spawn-agg : l'étiquette
+    // officielle nommée par la cible + « Zones de corps fouillables » dérivée) ET
+    // les puces individuelles (goal-placements / goal-spawn-pool) encore émises par
+    // les replis.
     else if ((d.subrole === 'goal-placements' || d.subrole === 'goal-spawn-pool' || d.subrole === 'goal-spawn-agg') && d.key) { on = !!S.campTraces?.has(d.key); }
     else {
       const k = d.subrole || d.key;
@@ -1502,8 +1504,10 @@ const spawnRowRank = k => { const i = SPAWN_ROW_ORDER.indexOf(k); return i < 0 ?
            Fouillables (searchable_chest — ON par défaut)
            Hérité      (decor:legacy)
      3-7. Tonneaux · Caisses · Meubles · Livres · Divers (props PLACÉS, décor)
-     8.  Squelettes  (camp:reactive_skeleton — subtype `skeleton`, à PLAT)
-     9.  Objets de quête (qao)
+     8.  Objets de quête (qao)
+     9.  Squelettes  (camp:reactive_skeleton — subtype `skeleton`, à PLAT mais
+         ADJACENTE au groupe des zones de spawn ci-dessous : c'est une COUCHE DE
+         SPAWN, plus jamais un rang parmi les props placés tonneaux/livres)
      10. ▸ Zones de spawn — autres (camps) — parent repliable pour les camps de
          spawn NON scindés par contenu :
            Autres        (searchable résiduel)
@@ -1561,12 +1565,14 @@ function buildGroupContainers() {
   // 3-7. Props PLACÉS (décor), ordre FIXE — decorRow rend null si la famille est
   // absente de la carte active.
   for (const fam of ['barrel', 'boxes', 'furniture', 'books', 'misc']) add(decorRow(fam, ''));
-  // 8. Squelettes (camp:reactive_skeleton, subtype `skeleton`) — couche de spawn
-  // typée par contenu, à PLAT (distincte des autres zones de spawn). N'apparaît
-  // qu'une fois camps.bin arrivé.
-  if (deferredReady) add(campRow('reactive_skeleton', campRowLabel('reactive_skeleton'), ''));
-  // 9. Objets de quête activables.
+  // 8. Objets de quête activables.
   add(catRow('qao'));
+  // 9. Squelettes (camp:reactive_skeleton, subtype `skeleton`) — couche de SPAWN
+  // typée par contenu, à PLAT mais placée ADJACENTE au groupe « Zones de spawn —
+  // autres (camps) » ci-dessous (elle EST une zone de spawn, jamais un prop placé
+  // parmi les tonneaux/livres — retour concept 2026-07-16). Token/toggle/tracé
+  // inchangés (campRow('reactive_skeleton')). N'apparaît qu'une fois camps.bin arrivé.
+  if (deferredReady) add(campRow('reactive_skeleton', campRowLabel('reactive_skeleton'), ''));
   // 10. « Zones de spawn — autres (camps) » : les camps de spawn NON scindés par
   // contenu (fouille résiduelle + destructibles + réactifs), sous UN parent
   // repliable — MÊME prédicat de catégorie que jadis, moins les deux kinds

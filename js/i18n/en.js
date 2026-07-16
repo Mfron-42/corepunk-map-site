@@ -80,13 +80,16 @@ export default {
       // FLAT root sections Monsters / Creeps / Peaceful fauna (owner reorg
       // 2026-07-15b: the "Creatures" umbrella with nested sub-groups was undone —
       // each becomes its own root section again). groupCreeps follows the
-      // shipped campKind ("Creeps"); groupWildlife is the Peaceful-fauna SECTION
-      // TITLE (camp:wildlife pool) — same "Peaceful fauna" value as the removed
-      // subFaunePaisible sub-label.
+      // shipped campKind ("Creeps"); groupWildlife is the camp:wildlife pool
+      // SECTION TITLE — UNIFIED 2026-07-16 onto the SAME term as its row/layer/
+      // legend/fiche (wildlifeRestRow "Peaceful animals"): one word everywhere,
+      // no more "Peaceful fauna" vs "Peaceful animals".
       groupCreeps: 'Creeps',
-      groupWildlife: 'Peaceful fauna',
+      groupWildlife: 'Peaceful animals',
       groupHarvest: 'Harvesting',
-      groupContainers: 'Interactables',
+      // "Interactive objects" (2026-07-16) — replaces the coined anglicism
+      // "Interactables" (RU/UK already said "Interactive objects").
+      groupContainers: 'Interactive objects',
       groupWorld: 'World',
       // Sub-group cascade dot (js/sidebar.js buildSubGroup) — root GROUP
       // headers no longer carry one (final correction 2026-07-11: pure
@@ -450,20 +453,23 @@ export default {
       // Quest corpse/container target extras (rework 2026-07-16, stepguide.js
       // goalCorpseExtras) — DROPDOWN-FREE, at most TWO drawable tags, keyed off
       // the data's own signals (never a hardcoded quest):
+      //   Each tag's tier is marked by the badge() chip (the app's ONE honesty
+      //   vocabulary), never a step-guide-only emoji:
       //   1. Accepted types — inline "N types" line (goalAcceptedSummary);
-      //   2. 🟢 Positions (goalPositions) — ONE ref: union of exact placements +
-      //      role="quest" pools;
-      //   3. 💡 Searchable corpse zones (goalHintZonesTag) — ONE ref: union of
-      //      role="generic" pools, 💡 family, like "Peaceful animals";
-      //   4. 💡 Player tip (playerHintLabel) — known in-game, not extracted.
+      //   2. Positions — badge(official) — ONE ref NAMED by the real target
+      //      (target.label): union of exact placements + role="quest" pools;
+      //   3. Searchable corpse zones (goalHintZonesTag) — badge(derived) — ONE ref:
+      //      union of role="generic" pools, like "Peaceful animals";
+      //   4. Player tip — badge(player_knowledge, provPlayerKnowledge): known
+      //      in-game, not extracted (the badge carries the tier label).
       goalAcceptedTypesLabel: 'Accepted types:',
       goalAcceptedSummary: n => `${n} types`,
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
-      playerHintLabel: 'Player tip',
       goalCorpsePlacedN: n => `${n} placed corpses`,
-      // The two combined position tags (each draws the UNION of its points on
-      // one click): 🟢 the data (placements + quest pools), 💡 the loot-derived
-      // zones (map-wide, one single tag).
+      // goalHintZonesTag: the DERIVED label (map-wide, one single tag).
+      // goalPositions: DEFENSIVE fallback only — the official tag is NAMED by the
+      // goal's real target (officialTierLabel/target.label), never this generic
+      // word; kept solely for the (never-observed) case of a target with no label.
       goalPositions: 'Positions',
       goalHintZonesTag: 'Searchable corpse zones',
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
@@ -979,6 +985,11 @@ export default {
       provInferredTip: 'Matched heuristically (by name, proximity or text) — likely, not certain.',
       provAbsent: 'Missing',
       provAbsentTip: 'Honestly absent from the extracted data.',
+      // "Player tip" tier — known IN-GAME from play experience, never provable
+      // from the extracted data; dashed-amber tone distinct from "derived"
+      // (reuses the ex-playerHintLabel wording).
+      provPlayerKnowledge: 'Player tip',
+      provPlayerKnowledgeTip: 'Known in-game from play experience — never provable from the extracted data.',
       // Precision axis — how exact a location is
       precPinned: 'Pinned',
       precPinnedTip: 'Exact coordinates.',

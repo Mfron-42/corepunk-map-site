@@ -288,7 +288,15 @@ function liveDrawn(desc) {
    aucun retour visuel est interdit, l'état dessiné se lit TOUJOURS, même à
    0 point) / 'partial' ◐ / 'on' ● / 'off' ○. Le 0-point (⊘) PRIME sur la
    forme : une référence dessinable avec 0 point ici n'est jamais « pas de
-   pastille » — mais il ne masque plus l'état. */
+   pastille » — mais il ne masque plus l'état.
+   GLYPHE (F8, 2026-07-16) : le ● (cercle) est RÉSERVÉ aux bascules PERSISTANTES
+   (campTrace, couches espèce/famille, pins locate). Les tracés de zone/région
+   ONE-SHOT single-slot (subroles goal-zone / monster-zone / region — dessinés
+   par viewGoalZone/drawNamedZone, effacés à la fermeture de fiche, jamais un
+   toggle persistant) portent un LOSANGE distinct : même data-fill on/off (donc
+   même feedback + même resync syncGoalZoneDots), forme différente via CSS
+   (`.ref[data-kind="zone"][data-subrole="…"] .ref-bubble`). Le composant ne
+   change pas sa logique d'état — seule la PRÉSENTATION distingue les deux sens. */
 function refFill(desc) {
   if (!isDrawable(desc)) return null;
   const drawn = desc.drawn !== undefined ? desc.drawn : liveDrawn(desc);

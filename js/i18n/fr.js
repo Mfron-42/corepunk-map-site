@@ -82,12 +82,16 @@ export default {
       // propriétaire 2026-07-15b : l'owner a défait l'umbrella « Créatures » à
       // sous-groupes imbriqués — chacune redevient sa propre section racine).
       // groupCreeps suit le campKind expédié (« Creeps ») ; groupWildlife est le
-      // TITRE DE SECTION de la Faune paisible (pool camp:wildlife) — même valeur
-      // « Faune paisible » que l'ex-sous-libellé subFaunePaisible (retiré).
+      // TITRE DE SECTION du pool camp:wildlife — UNIFIÉ 2026-07-16 sur le MÊME
+      // terme que sa ligne/couche/légende/fiche (wildlifeRestRow « Animaux
+      // paisibles ») : un seul mot partout, plus de « Faune paisible » vs
+      // « Animaux paisibles ».
       groupCreeps: 'Creeps',
-      groupWildlife: 'Faune paisible',
+      groupWildlife: 'Animaux paisibles',
       groupHarvest: 'Récolte',
-      groupContainers: 'Interactables',
+      // « Objets interactifs » (2026-07-16) — remplace l'anglicisme forgé
+      // « Interactables » (RU/UK disaient déjà « objets interactifs »).
+      groupContainers: 'Objets interactifs',
       groupWorld: 'Monde',
       // Pastille de cascade des sous-groupes (js/sidebar.js buildSubGroup) —
       // les en-têtes de GROUPE racine n'en ont plus (correction finale
@@ -431,21 +435,25 @@ export default {
       goalAcceptedNodesLabel: 'Nœuds acceptés :',
       // Blocs corps/conteneur de quête (refonte 2026-07-16, stepguide.js
       // goalCorpseExtras) — DROPDOWN-FREE, au plus DEUX étiquettes dessinables,
-      // keyées sur les signaux de la donnée (jamais une quête codée) :
+      // keyées sur les signaux de la donnée (jamais une quête codée). Le tier de
+      // chaque étiquette est marqué par la puce badge() (le vocabulaire d'honnêteté
+      // UNIQUE de l'app), jamais un emoji propre au guide :
       //   1. Types acceptés — ligne inline « N types » (goalAcceptedSummary) ;
-      //   2. 🟢 Positions (goalPositions) — UNE réf : union des placements exacts
-      //      + pools role="quest" ;
-      //   3. 💡 Zones de corps fouillables (goalHintZonesTag) — UNE réf : union
-      //      des pools role="generic", famille 💡, comme « Animaux paisibles » ;
-      //   4. 💡 Astuce joueur (playerHintLabel) — connu en jeu, pas extrait.
+      //   2. Positions — badge(official) — UNE réf NOMMÉE par la cible réelle
+      //      (target.label) : union des placements exacts + pools role="quest" ;
+      //   3. Zones de corps fouillables (goalHintZonesTag) — badge(derived) — UNE
+      //      réf : union des pools role="generic", comme « Animaux paisibles » ;
+      //   4. Astuce joueur — badge(player_knowledge, provPlayerKnowledge) : connu
+      //      en jeu, pas extrait (le badge porte le libellé du tier).
       goalAcceptedTypesLabel: 'Types acceptés :',
       goalAcceptedSummary: n => `${n} types`,
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
-      playerHintLabel: 'Astuce joueur',
       goalCorpsePlacedN: n => `${n} corps placés`,
-      // Les DEUX étiquettes combinées de positions (chacune dessine l'union de
-      // ses points d'un clic) : 🟢 la donnée (placements + pools quête), 💡 les
-      // zones dérivées de la loot-table (map-wide, une seule étiquette).
+      // goalHintZonesTag : le libellé DÉRIVÉ (map-wide, une seule étiquette).
+      // goalPositions : repli DÉFENSIF seul — l'étiquette officielle est nommée
+      // par la cible réelle du but (officialTierLabel/target.label), jamais ce mot
+      // générique ; conservé uniquement pour le cas (jamais observé) d'une cible
+      // sans label.
       goalPositions: 'Positions',
       goalHintZonesTag: 'Zones de corps fouillables',
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
@@ -942,6 +950,11 @@ export default {
       provInferredTip: 'Rapproché par heuristique (nom, proximité ou texte) — probable, pas certain.',
       provAbsent: 'Manquant',
       provAbsentTip: 'Honnêtement absent des données extraites.',
+      // Tier « astuce joueur » — connu EN JEU par l'expérience de jeu, jamais
+      // prouvable depuis la data extraite ; ton ambre-pointillé distinct du
+      // « dérivé » (réutilise le libellé de l'ex-playerHintLabel).
+      provPlayerKnowledge: 'Astuce joueur',
+      provPlayerKnowledgeTip: 'Connu en jeu par l\'expérience de jeu — jamais prouvable depuis la data extraite.',
       // Axe précision — quelle est l'exactitude d'une position
       precPinned: 'Précis',
       precPinnedTip: 'Coordonnées exactes.',
