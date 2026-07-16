@@ -125,13 +125,16 @@ export default {
       destroyableCampsRow: 'Destructibles',
       reactiveCampsRow: 'Reactivos',
       // Bucket genérico `other` cuando cae en una categoría interactable —
-      // distinto del «Otros» de las zonas de registro residuales.
-      otherCampsRow: 'Otros (sin tipo)',
+      // desambiguado 2026-07-16b: «Campamentos varios» (distinto de «Registro sin
+      // tipo», el antiguo «Otros» de las zonas de registro residuales, abajo).
+      otherCampsRow: 'Campamentos varios',
       // Filas de aparición TIPIFICADAS por contenido probado (2026-07-15):
       // «Cadáveres» de aparición aquí y «Cadáveres colocados» en decorFamily
       // son el mismo concepto en dos formas honestas.
       searchSpotsCorpsesRow: 'Cadáveres',
-      searchSpotsOtherRow: 'Otros',
+      // Bucket `searchable` residual — desambiguado 2026-07-16b: «Registro sin
+      // tipo» (ya no «Otros», que duplicaba «Campamentos varios» del bucket `other`).
+      searchSpotsOtherRow: 'Registro sin tipo',
       skeletonCampsRow: 'Esqueletos',
       // Interactivos organizados POR TIPO (2026-07-15): cada tipo = una entrada,
       // sus formas colocada+aparición unificadas. CADÁVERES ▸ y COFRES ▸ son
@@ -143,7 +146,9 @@ export default {
       subCoffresCamp: 'De campamento',
       subCoffresFouillables: 'Registrables',
       subCoffresHerite: 'Heredado',
-      spawnAutresGroup: 'Zonas de aparición — otras (campamentos)',
+      // Renombrado 2026-07-16b («Zonas de aparición — otras (campamentos)» →
+      // «Campamentos dinámicos (aparición)»): el padre ya no es «… otras».
+      dynamicCampsGroup: 'Campamentos dinámicos (aparición)',
       campContentLabel: 'Contenido',
       campCorpsePct: p => `~${p}% cadáveres`,
       campContentPresetNote: 'Composición probada por el preajuste de aparición del servidor.',
@@ -390,29 +395,27 @@ export default {
       // una hilera de chips de nodo bajo el objetivo, nunca una capa del
       // mapa (no existe un vínculo tipo-de-nodo -> punto en el cliente).
       goalAcceptedNodesLabel: 'Nodos aceptados:',
-      // Bloques de objetivo cadáver/contenedor de misión (rediseño 2026-07-16,
-      // stepguide.js goalCorpseExtras) — SIN menú desplegable, como mucho DOS
-      // etiquetas dibujables, según las señales de los propios datos (nunca una
-      // misión codificada a mano):
-      //   El tier de cada etiqueta lo marca la ficha badge() (el ÚNICO vocabulario
-      //   de honestidad de la app), nunca un emoji propio de la guía:
-      //   1. Tipos aceptados — línea inline «N tipos» (goalAcceptedSummary);
-      //   2. Posiciones — badge(official) — UNA ref NOMBRADA por el objetivo real
-      //      (target.label): unión de colocaciones exactas + grupos role="quest";
-      //   3. Zonas de cadáveres registrables (goalHintZonesTag) — badge(derived) —
-      //      UNA ref: unión de grupos role="generic", como «Animales pacíficos»;
-      //   4. Consejo de jugador — badge(player_knowledge, provPlayerKnowledge):
-      //      conocido en el juego, no en los datos (el badge lleva el rótulo).
-      goalAcceptedTypesLabel: 'Tipos aceptados:',
-      goalAcceptedSummary: n => `${n} tipos`,
+      // Bloques de objetivo cadáver/contenedor de misión (rediseño del propietario
+      // 2026-07-16b, stepguide.js goalCorpseExtras) — SIN menú desplegable, como
+      // mucho DOS filas, según las señales de los propios datos (nunca una misión
+      // codificada a mano):
+      //   1. Cadáveres colocados (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official):
+      //      SOLO las colocaciones exactas, nombre honesto (nunca el objetivo exagerado);
+      //   2. Ubicaciones sugeridas (goalSuggestedPositionsLabel) — pista ligera 💡:
+      //      las Zonas de aparición de cadáveres (goalHintZonesTag), unión de los
+      //      grupos de misión y genéricos, una SUGERENCIA dibujable; el matiz
+      //      (goalHintZonesNote) en un tooltip de una línea.
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} cadáveres colocados`,
-      // goalHintZonesTag: el rótulo DERIVADO (cubre el mapa, una sola etiqueta).
-      // goalPositions: repliegue DEFENSIVO solo — la etiqueta oficial la nombra el
-      // objetivo real (officialTierLabel/target.label), nunca esta palabra
-      // genérica; conservada solo para el caso (nunca observado) sin label.
-      goalPositions: 'Posiciones',
-      goalHintZonesTag: 'Zonas de cadáveres registrables',
+      // Rótulos HONESTOS del tier oficial (SOLO colocaciones exactas): «Cadáveres
+      // colocados» cuando el objetivo acepta tipos de cadáver, si no «Ubicaciones».
+      goalPlacedCorpsesTag: 'Cadáveres colocados',
+      goalPlacementsTag: 'Ubicaciones',
+      // Pista ligera 💡: prefijo «Ubicaciones sugeridas:» + el concepto de zonas
+      // de aparición (goalHintZonesTag) + el matiz plegado en un tooltip.
+      goalSuggestedPositionsLabel: 'Ubicaciones sugeridas:',
+      goalHintZonesTag: 'Zonas de aparición de cadáveres',
+      goalHintZonesNote: 'Cualquier cadáver de estos tipos cuenta, en cualquier parte del mapa.',
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
       // nunca "≈" aquí, es el porcentaje diseñado por el juego).
@@ -431,9 +434,6 @@ export default {
       // dibujable indica la precisión — « N ubicaciones » (nunca « Zona
       // estimada ») — y su punto dibuja esos puntos exactos (campTrace).
       goalLocationsN: n => `${n} ubicaciones`,
-      // Pista de orientación honesta (target.landmark) como meta atenuada junto a
-      // la ficha — nunca un pin. El landmark es una frase de guía, de ahí « Pista: ».
-      goalLandmarkLabel: s => `Pista: ${s}`,
       // Límite de seguridad de los puntos DIBUJADOS (GOAL_PLACEMENT_CAP):
       // « mostrando N de M » honesto si un conjunto supera el límite (casos ≤ 44).
       goalPlacementsCapped: (shown, total) => `mostrando ${shown} de ${total}`,

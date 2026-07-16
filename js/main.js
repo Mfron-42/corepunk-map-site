@@ -31,6 +31,7 @@ import {
 import { switchMap, loadMapManifest, onMapSwitch, reloadActiveMapForLang } from './multimap.js';
 import {
   campGroupByKey, monsterFamilies, speciesPoints, kindBoundCampKeys, isSpeciesException,
+  campIncludedMask, familyMatches,
 } from './pointsets.js';
 import { toggleSpecies, speciesCampWinner, setFamilyOn } from './specieslayer.js';
 import { activateSpeciesLayer, activateFamilyLayers, activateCategoryNode } from './layeractivate.js';
@@ -581,19 +582,24 @@ function compositeCampPoints() {
   // (1) sélecteurs famille actifs → camp gagné par la PREMIÈRE famille
   // active qui le contient (rat avant ratmutant : mêmes 10 camps, la
   // couleur du mieux classé gagne — données réelles, design §13.3).
-  const famWinner = new Map();   // campKey -> hex de la famille gagnante
+  const famWinner = new Map();   // campKey -> { hex, matches } de la famille gagnante
   const fams = monsterFamilies();
   for (let i = 0; i < fams.length; i++) {
     const f = fams[i];
     if (!S.monfam[f.family]?.on) continue;
     const hex = familyLayerHex(f.family);
-    for (const k of f.campKeys) if (!famWinner.has(k)) famWinner.set(k, hex);
+    const matches = familyMatches(f.family);   // restriction par famille (camp mixte)
+    for (const k of f.campKeys) if (!famWinner.has(k)) famWinner.set(k, { hex, matches });
   }
   // (2) gagnant par GROUPE de camp : ESPÈCE cochée (chunk (d) — première
   // espèce cochée contenant le camp, js/specieslayer.js speciesCampWinner)
-  // > famille > kind.
+  // > famille > kind. Un gagnant espèce/famille porte un `matches` → masque
+  // d'ancres (campIncludedMask) : sur un camp MIXTE (creeps, pointSpecies) seule
+  // sa part est dessinée ; sur un camp sans pointSpecies (monsters/kind) le
+  // masque est null → nuage entier (invariant « compté == dessiné »). Le kind
+  // « spawns non identifiés » ne restreint jamais (mask null).
   const spWinner = speciesCampWinner();
-  const winner = new Map();      // objet groupe -> hex gagnant
+  const winner = new Map();      // objet groupe -> { hex, mask }
   for (const [kind, st] of Object.entries(S.camps)) {
     const kindHex = st.on ? (CAMP_COLORS[kind] || '#888') : null;
     // Règle « reste seulement » UNIVERSELLE et dérivée de la donnée
@@ -610,20 +616,24 @@ function compositeCampPoints() {
     // camp.creeps/camp.wildlife/camp.monsters.
     const bound = kindHex ? kindBoundCampKeys(kind) : null;
     for (const g of st.groups) {
-      const hex = spWinner.get(g.k) || famWinner.get(g.k)
-        || (bound && bound.has(g.k) ? null : kindHex);
-      if (hex) winner.set(g, hex);
+      const w = spWinner.get(g.k) || famWinner.get(g.k);
+      if (w) { winner.set(g, { hex: w.hex, mask: campIncludedMask(g, w.matches) }); continue; }
+      const kh = bound && bound.has(g.k) ? null : kindHex;
+      if (kh) winner.set(g, { hex: kh, mask: null });
     }
   }
   if (!winner.size) return [];
   // (3) une passe sur les points : chaque point appartient à UN groupe →
-  // dessiné au plus une fois, avec la couleur du gagnant de son camp.
+  // dessiné au plus une fois, avec la couleur du gagnant de son camp, ET
+  // seulement si le masque de restriction (mask, par ancre p.pi) l'inclut —
+  // un woodraptor sur un camp mixte ne dessine que ses raptors.
   const out = [];
   for (const st of Object.values(S.camps)) {
     for (const p of st.points) {
-      const hex = winner.get(p.g);
-      if (!hex) continue;
-      p.c = hex;
+      const w = winner.get(p.g);
+      if (!w) continue;
+      if (w.mask && !w.mask.has(p.pi)) continue;
+      p.c = w.hex;
       out.push(p);
     }
   }

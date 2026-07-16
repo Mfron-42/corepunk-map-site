@@ -140,23 +140,27 @@ export default {
       destroyableCampsRow: 'Destructibles',
       reactiveCampsRow: 'Réactifs',
       // Seau générique `other` quand il tombe en catégorie interactable —
-      // distinct du « Autres » des zones de fouille résiduelles.
-      otherCampsRow: 'Autres (non typés)',
+      // désambiguïsé 2026-07-16b : « Divers camps » (distinct de « Fouille non
+      // typée », l'ex-« Autres » des zones de fouille résiduelles ci-dessous).
+      otherCampsRow: 'Divers camps',
       // Lignes de spawn TYPÉES par contenu prouvé (2026-07-15, camps.bin
       // `subtype`/`corpseFraction`) : la couche dominante de spawn de corps,
       // le reste, et les camps réactifs de squelettes — teintées vers leur
       // concept (Corps mauve / Os). Le « Corps » de spawn ici et le « Corps
       // placés » de decorFamily sont le même concept en deux formes honnêtes.
       searchSpotsCorpsesRow: 'Corps',
-      searchSpotsOtherRow: 'Autres',
+      // Seau `searchable` résiduel — désambiguïsé 2026-07-16b : « Fouille non
+      // typée » (plus jamais « Autres », qui doublait le « Divers camps » de
+      // `other` dans le même groupe).
+      searchSpotsOtherRow: 'Fouille non typée',
       skeletonCampsRow: 'Squelettes',
       // Objets interactifs rangés PAR TYPE (2026-07-15) : chaque type = une
       // entrée, ses formes placée+spawn unifiées. CORPS ▸ (Placés · Zones de
       // spawn) et COFFRES ▸ (De camp · Fouillables · Hérité) sont des parents
       // repliables ; les libellés d'enfant sont COURTS (le parent porte le
-      // contexte). « Zones de spawn — autres (camps) » regroupe les camps de
-      // spawn non scindés par contenu (Autres · Destructibles · Réactifs).
-      // GLOSSARY-PENDING (libellés structurels).
+      // contexte). « Camps dynamiques (spawn) » regroupe les camps de spawn non
+      // scindés par contenu (Fouille non typée · Destructibles · Réactifs ·
+      // Divers camps). GLOSSARY-PENDING (libellés structurels).
       groupCorps: 'Corps',
       subCorpsPlaces: 'Placés',
       subCorpsSpawn: 'Zones de spawn',
@@ -164,7 +168,9 @@ export default {
       subCoffresCamp: 'De camp',
       subCoffresFouillables: 'Fouillables',
       subCoffresHerite: 'Hérité',
-      spawnAutresGroup: 'Zones de spawn — autres (camps)',
+      // Renommé 2026-07-16b (« Zones de spawn — autres (camps) » → « Camps
+      // dynamiques (spawn) ») : le parent n'est plus « … autres ».
+      dynamicCampsGroup: 'Camps dynamiques (spawn)',
       // Contenu prouvé d'un pool (popup/fiche camp).
       campContentLabel: 'Contenu',
       campCorpsePct: p => `~${p} % de corps`,
@@ -413,10 +419,6 @@ export default {
       // précision — « N emplacements » (jamais « Zone estimée ») — et sa pastille
       // dessine ces points exacts (campTrace). N = nombre d'emplacements.
       goalLocationsN: n => `${n} emplacements`,
-      // Repère d'orientation honnête (target.landmark) en méta muette près de la
-      // chip — jamais un pin. Le landmark livré est une phrase de guidage
-      // (« … autour de Goldenfield… »), d'où le cadre neutre « Indice : ».
-      goalLandmarkLabel: s => `Indice : ${s}`,
       // Plafond de sécurité du DESSIN (GOAL_PLACEMENT_CAP) : « affichage de N sur
       // M » honnête si un jeu dépasse le plafond (cas actuels ≤ 44).
       goalPlacementsCapped: (shown, total) => `affichage de ${shown} sur ${total}`,
@@ -433,29 +435,25 @@ export default {
       // l'objectif, jamais une couche carte (aucun lien nœud->point côté
       // client, voir data.js S.nodes).
       goalAcceptedNodesLabel: 'Nœuds acceptés :',
-      // Blocs corps/conteneur de quête (refonte 2026-07-16, stepguide.js
-      // goalCorpseExtras) — DROPDOWN-FREE, au plus DEUX étiquettes dessinables,
-      // keyées sur les signaux de la donnée (jamais une quête codée). Le tier de
-      // chaque étiquette est marqué par la puce badge() (le vocabulaire d'honnêteté
-      // UNIQUE de l'app), jamais un emoji propre au guide :
-      //   1. Types acceptés — ligne inline « N types » (goalAcceptedSummary) ;
-      //   2. Positions — badge(official) — UNE réf NOMMÉE par la cible réelle
-      //      (target.label) : union des placements exacts + pools role="quest" ;
-      //   3. Zones de corps fouillables (goalHintZonesTag) — badge(derived) — UNE
-      //      réf : union des pools role="generic", comme « Animaux paisibles » ;
-      //   4. Astuce joueur — badge(player_knowledge, provPlayerKnowledge) : connu
-      //      en jeu, pas extrait (le badge porte le libellé du tier).
-      goalAcceptedTypesLabel: 'Types acceptés :',
-      goalAcceptedSummary: n => `${n} types`,
+      // Blocs corps/conteneur de quête (refonte owner 2026-07-16b, stepguide.js
+      // goalCorpseExtras) — DROPDOWN-FREE, au plus DEUX lignes, keyées sur les
+      // signaux de la donnée (jamais une quête codée) :
+      //   1. Corps placés (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official) :
+      //      les placements EXACTS seuls, nom honnête (jamais la cible sur-revendiquée) ;
+      //   2. Positions conseillées (goalSuggestedPositionsLabel) — astuce légère 💡 :
+      //      les Zones de spawn de corps (goalHintZonesTag), union quête + génériques,
+      //      une SUGGESTION dessinable ; la nuance (goalHintZonesNote) en info-bulle.
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} corps placés`,
-      // goalHintZonesTag : le libellé DÉRIVÉ (map-wide, une seule étiquette).
-      // goalPositions : repli DÉFENSIF seul — l'étiquette officielle est nommée
-      // par la cible réelle du but (officialTierLabel/target.label), jamais ce mot
-      // générique ; conservé uniquement pour le cas (jamais observé) d'une cible
-      // sans label.
-      goalPositions: 'Positions',
-      goalHintZonesTag: 'Zones de corps fouillables',
+      // Libellés HONNÊTES du tier officiel (placements exacts SEULS) : « Corps
+      // placés » quand le but accepte des types de corps, sinon « Emplacements ».
+      goalPlacedCorpsesTag: 'Corps placés',
+      goalPlacementsTag: 'Emplacements',
+      // Astuce légère 💡 : préfixe « Positions conseillées : » + le concept des
+      // zones de spawn (goalHintZonesTag) + la nuance repliée en info-bulle.
+      goalSuggestedPositionsLabel: 'Positions conseillées :',
+      goalHintZonesTag: 'Zones de spawn de corps',
+      goalHintZonesNote: 'N\'importe quel corps de ces types compte, partout sur la carte.',
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
       // calculée, jamais "≈" ici, c'est le pourcentage conçu par le jeu).

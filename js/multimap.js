@@ -70,7 +70,9 @@ async function loadMapData(mid) {
     const k = campStateKey(g);
     if (!campsState[k]) campsState[k] = { on: false, points: [], groups: [] };
     campsState[k].groups.push(g);
-    g.pts.forEach(pt => campsState[k].points.push({ x: pt[0], z: pt[1], g }));
+    // `pi` = index d'ancre (aligné 1:1 sur g.pointContent) — lu par le masque
+    // de restriction du compositeur (main.js compositeCampPoints, species point-narrowing).
+    g.pts.forEach((pt, pi) => campsState[k].points.push({ x: pt[0], z: pt[1], g, pi }));
   });
   const snap = {
     data: { npc: npcs, poi: [], quest: quests, qao, workshop: workshops, chest: chests, searchable_chest: searchableChests },

@@ -137,22 +137,26 @@ export default {
       destroyableCampsRow: 'Destroyables',
       reactiveCampsRow: 'Reactives',
       // Generic `other` bucket when it falls under an interactable category —
-      // distinct from the residual search-zones "Other".
-      otherCampsRow: 'Other (untyped)',
+      // disambiguated 2026-07-16b: "Misc camps" (distinct from "Untyped search",
+      // the residual search-zones ex-"Other" below).
+      otherCampsRow: 'Misc camps',
       // Spawn rows TYPED by proven content (2026-07-15, camps.bin
       // `subtype`/`corpseFraction`): the dominant corpse-spawn layer, the
       // rest, and reactive skeleton camps — tinted toward their concept
       // (Corpses mauve / Bone). The spawn "Corpses" here and the "Placed
       // corpses" of decorFamily are the same concept in two honest forms.
       searchSpotsCorpsesRow: 'Corpses',
-      searchSpotsOtherRow: 'Other',
+      // Residual `searchable` bucket — disambiguated 2026-07-16b: "Untyped
+      // search" (no longer "Other", which doubled `other`'s "Misc camps" in the
+      // same group).
+      searchSpotsOtherRow: 'Untyped search',
       skeletonCampsRow: 'Skeletons',
       // Interactables arranged BY OBJECT TYPE (2026-07-15): each type = one
       // entry, its placed+spawn forms unified. CORPSES ▸ (Placed · Spawn zones)
       // and CHESTS ▸ (From camp · Searchable · Legacy) are collapsible parents;
-      // child labels are SHORT (the parent carries the context). "Spawn zones —
-      // other (camps)" groups the camp spawns not content-split
-      // (Other · Destroyables · Reactives). GLOSSARY-PENDING (structural labels).
+      // child labels are SHORT (the parent carries the context). "Dynamic camps
+      // (spawn)" groups the camp spawns not content-split (Untyped search ·
+      // Destroyables · Reactives · Misc camps). GLOSSARY-PENDING (structural labels).
       groupCorps: 'Corpses',
       subCorpsPlaces: 'Placed',
       subCorpsSpawn: 'Spawn zones',
@@ -160,7 +164,9 @@ export default {
       subCoffresCamp: 'From camp',
       subCoffresFouillables: 'Searchable',
       subCoffresHerite: 'Legacy',
-      spawnAutresGroup: 'Spawn zones — other (camps)',
+      // Renamed 2026-07-16b ("Spawn zones — other (camps)" → "Dynamic camps
+      // (spawn)"): the parent is no longer "… other".
+      dynamicCampsGroup: 'Dynamic camps (spawn)',
       // Proven pool content (camp popup/fiche).
       campContentLabel: 'Content',
       campCorpsePct: p => `~${p}% corpses`,
@@ -430,10 +436,6 @@ export default {
       // precision — "N locations" (never "Estimated area") — and its dot draws
       // those exact points (campTrace). N = count of container spots.
       goalLocationsN: n => `${n} locations`,
-      // Honest orientation hint (target.landmark) shown as muted meta beside the
-      // placements chip — never a pin. The shipped landmark is a guidance
-      // sentence (e.g. "…around Goldenfield…"), hence a neutral "Hint:" framing.
-      goalLandmarkLabel: s => `Hint: ${s}`,
       // Safety cap on the DRAWN points (GOAL_PLACEMENT_CAP): honest "showing N of
       // M" if a placement set ever exceeds the cap (current cases ≤ 44).
       goalPlacementsCapped: (shown, total) => `showing ${shown} of ${total}`,
@@ -450,28 +452,25 @@ export default {
       // under the objective, never a map layer (no node-type -> point
       // binding exists client-side, see data.js S.nodes doc).
       goalAcceptedNodesLabel: 'Accepted nodes:',
-      // Quest corpse/container target extras (rework 2026-07-16, stepguide.js
-      // goalCorpseExtras) — DROPDOWN-FREE, at most TWO drawable tags, keyed off
-      // the data's own signals (never a hardcoded quest):
-      //   Each tag's tier is marked by the badge() chip (the app's ONE honesty
-      //   vocabulary), never a step-guide-only emoji:
-      //   1. Accepted types — inline "N types" line (goalAcceptedSummary);
-      //   2. Positions — badge(official) — ONE ref NAMED by the real target
-      //      (target.label): union of exact placements + role="quest" pools;
-      //   3. Searchable corpse zones (goalHintZonesTag) — badge(derived) — ONE ref:
-      //      union of role="generic" pools, like "Peaceful animals";
-      //   4. Player tip — badge(player_knowledge, provPlayerKnowledge): known
-      //      in-game, not extracted (the badge carries the tier label).
-      goalAcceptedTypesLabel: 'Accepted types:',
-      goalAcceptedSummary: n => `${n} types`,
+      // Quest corpse/container target extras (owner rework 2026-07-16b,
+      // stepguide.js goalCorpseExtras) — DROPDOWN-FREE, at most TWO rows, keyed
+      // off the data's own signals (never a hardcoded quest):
+      //   1. Placed corpses (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official):
+      //      the EXACT placements ONLY, honest name (never the over-claimed target);
+      //   2. Suggested locations (goalSuggestedPositionsLabel) — light 💡 hint:
+      //      the Corpse spawn zones (goalHintZonesTag), union of quest + generic
+      //      pools, a drawable SUGGESTION; the nuance (goalHintZonesNote) in a tooltip.
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} placed corpses`,
-      // goalHintZonesTag: the DERIVED label (map-wide, one single tag).
-      // goalPositions: DEFENSIVE fallback only — the official tag is NAMED by the
-      // goal's real target (officialTierLabel/target.label), never this generic
-      // word; kept solely for the (never-observed) case of a target with no label.
-      goalPositions: 'Positions',
-      goalHintZonesTag: 'Searchable corpse zones',
+      // HONEST labels for the official tier (exact placements ONLY): "Placed
+      // corpses" when the goal accepts corpse types, else "Locations".
+      goalPlacedCorpsesTag: 'Placed corpses',
+      goalPlacementsTag: 'Locations',
+      // Light 💡 hint: "Suggested locations:" prefix + the spawn-zone concept
+      // (goalHintZonesTag) + the nuance folded into a one-line tooltip.
+      goalSuggestedPositionsLabel: 'Suggested locations:',
+      goalHintZonesTag: 'Corpse spawn zones',
+      goalHintZonesNote: 'Any corpse of these types counts, anywhere on the map.',
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
       // loot-table dropChanceApprox (that one is a computed weight SHARE,

@@ -59,26 +59,33 @@ function creepDisp(c) {
   if (d && typeof d === 'object') return d.value || null;
   return null;
 }
-/* Disposition HONNÊTE d'une espèce de faune (openWildlifeFiche) : creeps.bin
-   porte la disposition (fait client officiel) mais la jointure wildlife→creep
-   n'est PAS 1:1. On collecte les creeps candidats par (a) clé directe = l'id
-   d'espèce, (b) famille RÉELLE partagée (jamais family=null → jointure vide
-   ambiguë), (c) clés de mob (key/species) des camps de l'espèce
+/* Disposition HONNÊTE d'une espèce de faune (openWildlifeFiche) -> { value, prov }
+   | null : creeps.bin porte la disposition (fait client) mais la jointure
+   wildlife→creep n'est PAS 1:1. On collecte les creeps candidats par (a) clé
+   directe = l'id d'espèce, (b) famille RÉELLE partagée (jamais family=null →
+   jointure vide ambiguë), (c) clés de mob (key/species) des camps de l'espèce
    (camp_details). On ne renvoie une disposition que si TOUS les candidats
    s'accordent (sinon rien : jamais trancher/inventer une disposition douteuse).
    8/25 espèces résolvent proprement ; les 17 autres n'affichent HONNÊTEMENT
-   aucun badge plutôt qu'un « peaceful » deviné. */
+   aucun badge plutôt qu'un « peaceful » deviné. PROVENANCE (task honesty fix
+   2026-07-16) : chaque creep contributeur porte `dispositionProv` (creeps.bin,
+   "official"/"inferred") ; comme la valeur retenue est une JOINTURE, le badge
+   se dégrade en « inféré » dès qu'UN creep contributeur l'est — jamais
+   sur-revendiquer « officiel » sur une valeur en partie inférée. */
 function wildlifeDisposition(id, w) {
-  const vals = new Set();
-  const addKey = k => { const c = creepFor(k); if (c) { const d = creepDisp(c); if (d) vals.add(d); } };
+  const byVal = new Map();   // disposition -> Set<prov> des creeps contributeurs
+  const add = c => { const d = creepDisp(c); if (d) { let s = byVal.get(d); if (!s) byVal.set(d, s = new Set()); s.add(c.dispositionProv || 'official'); } };
+  const addKey = k => { const c = creepFor(k); if (c) add(c); };
   addKey(id);
   const fam = w && w.family;
-  if (fam) for (const c of Object.values(S.creeps || {})) if (c.family === fam) { const d = creepDisp(c); if (d) vals.add(d); }
+  if (fam) for (const c of Object.values(S.creeps || {})) if (c.family === fam) add(c);
   for (const cmp of (w && w.camps) || []) {
     const det = S.campDetails[cmp.camp];
     for (const m of (det && det.mobs) || []) { addKey(m.key); addKey(m.species); }
   }
-  return vals.size === 1 ? [...vals][0] : null;
+  if (byVal.size !== 1) return null;
+  const [value, provs] = [...byVal][0];
+  return { value, prov: provs.has('inferred') ? 'inferred' : 'official' };
 }
 /* Ligne muette « niv <min>–<max> ×N · <attaque> » d'une ligne de faune de
    camp (camp_details `mobs[]`, folded PAR ESPÈCE — task #80) : `lvl`/`lvlMax`
@@ -499,10 +506,12 @@ function openWildlifeFiche(id) {
         drawable: true, count: spRes.nPts, drawn: !!S.monsp[id]?.on }
     : null;
   // DispositionBadge : la posture de l'animal (peaceful/neutral) résolue depuis
-  // creeps.bin (fait client officiel) par jointure honnête (voir
-  // wildlifeDisposition) — 8/25 espèces résolvent proprement, les autres
-  // n'affichent AUCUN badge (jamais un « peaceful » deviné).
-  const dispHtml = dispositionChip(wildlifeDisposition(id, w), 'official');
+  // creeps.bin par jointure honnête (voir wildlifeDisposition) — 8/25 espèces
+  // résolvent proprement, les autres n'affichent AUCUN badge (jamais un
+  // « peaceful » deviné). La provenance suit la jointure (official/inferred),
+  // jamais un « official » codé en dur (task honesty fix).
+  const wDisp = wildlifeDisposition(id, w);
+  const dispHtml = dispositionChip(wDisp?.value, wDisp?.prov);
   const variants = (w.namesAll || []).filter(nm => fold(nm) !== fold(w.name));
   const variantsHtml = variants.length
     ? `<p class="hint">${esc(tr('wildlifeVariants', variants.join(' · ')))}</p>` : '';
@@ -1023,14 +1032,15 @@ function openMonsterFiche(key) {
   // stats -> butin (kill puis dépeçage) -> objets de quête qui en dépendent
   // -> capacités -> bestiaire/lore (le contenu le plus "lecture", en dernier).
   // DispositionBadge : la posture du monstre (hostile/neutral/…), résolue par
-  // data.js dispositionFor(key) — `monsters.disposition` est une CHAÎNE.
-  // Le champ est désormais CUIT et LIVE dans les données (913/916 monstres en
-  // portent une) : dispositionFor le lit et dispositionChip rend le badge
-  // « official » ci-dessous. Le lecteur reste 404/null-tolérant (blueprint §7)
+  // data.js dispositionFor(key). PROVENANCE (task honesty fix 2026-07-16) : lue
+  // sur le creep correspondant (`creepFor(key)?.dispositionProv`, "official"/
+  // "inferred") plutôt que codée en dur « official » — une disposition inférée
+  // se badge « inféré ». Absence de creep/champ → défaut de dispositionChip
+  // (« official ») conservé. Le lecteur reste 404/null-tolérant (blueprint §7)
   // — un monstre sans disposition connue ne rend simplement aucun badge, jamais
   // une valeur inventée. (La disposition monstre reste un badge de fiche unique
-  // et honnête : ~910/913 hostile, donc pas un axe discriminant d'arbre/recherche.)
-  const dispHtml = dispositionChip(dispositionFor(key), 'official');
+  // et honnête, pas un axe discriminant d'arbre/recherche.)
+  const dispHtml = dispositionChip(dispositionFor(key), creepFor(key)?.dispositionProv);
   openFiche(`
     ${ficheHeader({
       avatar: iconTag(icon, 'fiche-avatar', initials(m.name)),

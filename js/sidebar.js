@@ -616,8 +616,8 @@ function appendKindRestRow(ul, kind, extraClass = 'filter-row-sub') {
                         Zones de spawn) · COFFRES ▸ (De camp · Fouillables ·
                         Hérité) · Tonneaux · Caisses · Meubles · Livres · Divers ·
                         Objets de quête · Squelettes (couche de spawn, adjacente) ·
-                        Zones de spawn — autres
-                        (camps) ▸ (Autres · Destructibles · Réactifs) — chaque
+                        Camps dynamiques (spawn) ▸ (Fouille non typée ·
+                        Destructibles · Réactifs · Divers camps) — chaque
                         type = une entrée, ses formes placée+spawn unifiées sous
                         elle, voir buildGroupContainers
      6. Harvesting    — Herbalism · Logging · Mining (inchangé)
@@ -655,23 +655,26 @@ function kindsOfCategory(pred, byPtsDesc = false) {
 }
 /* Surcharges d'AFFICHAGE par kind (libellés i18n, jamais une
    classification) : gardes honnêtes ; libellés COURTS des lignes de spawn
-   rangées sous le parent « Zones de spawn (camps) » — le parent porte déjà le
+   rangées sous le parent « Camps dynamiques (spawn) » — le parent porte déjà le
    contexte, la ligne dit juste son TYPE (voir buildGroupContainers). */
 const CAMP_ROW_LABEL_KEY = {
   guards: 'guardsRowLabel',
   destroyable: 'destroyableCampsRow',
   reactive: 'reactiveCampsRow',
   // Le seau générique `other` peut, selon la carte, tomber en catégorie
-  // interactable.* (il rejoint alors le groupe « Zones de spawn (camps) ») :
-  // libellé DISTINCT « Autres (non typés) » pour ne pas se confondre avec le
-  // « Autres » du seau `searchable` résiduel ci-dessous. (Quand `other` est
-  // `unclassified`, il vit dans World › Autres via campKindLabel, pas ici —
+  // interactable.* (il rejoint alors le groupe « Camps dynamiques (spawn) ») :
+  // libellé DISTINCT « Divers camps » — désambiguïsation 2026-07-16b : le parent
+  // n'est plus « … autres » et ses deux ex-lignes « Autres » (searchable résiduel
+  // + `other`) portent maintenant des noms distincts (« Fouille non typée » /
+  // « Divers camps »), plus jamais deux « Autres » côte à côte. (Quand `other`
+  // est `unclassified`, il vit dans World › Autres via campKindLabel, pas ici —
   // campRowLabel n'y est pas consulté.)
   other: 'otherCampsRow',
   // Split par contenu PROUVÉ (2026-07-15, config.js campStateKey) : les zones
   // de fouille dominées par des corps et les camps réactifs de squelettes sont
   // des couches distinctes, libellées par leur TYPE (« Corps », « Squelettes »).
-  // Le seau `searchable` résiduel (zones sans corps prouvés) devient « Autres ».
+  // Le seau `searchable` résiduel (zones sans corps prouvés) = « Fouille non typée »
+  // (désambiguïsé de `other` « Divers camps », voir ci-dessus).
   searchable: 'searchSpotsOtherRow',
   searchable_corpses: 'searchSpotsCorpsesRow',
   reactive_skeleton: 'skeletonCampsRow',
@@ -1481,8 +1484,8 @@ function buildGroupHarvest() {
   }
 }
 /* Ordre FIXE des lignes de spawn (présentation, pas une classification) : le rang
-   sert le groupe « Zones de spawn — autres (camps) » (Autres · Destructibles ·
-   Réactifs) — les kinds Corps (searchable_corpses) et Squelettes
+   sert le groupe « Camps dynamiques (spawn) » (Fouille non typée · Destructibles ·
+   Réactifs · Divers camps) — les kinds Corps (searchable_corpses) et Squelettes
    (reactive_skeleton) gardent leur rang ici mais sont désormais rendus par TYPE
    ailleurs (CORPS ▸ / Squelettes à plat). Un kind absent de la carte active ne
    crée simplement pas de ligne (campRow rend null). */
@@ -1508,11 +1511,12 @@ const spawnRowRank = k => { const i = SPAWN_ROW_ORDER.indexOf(k); return i < 0 ?
      9.  Squelettes  (camp:reactive_skeleton — subtype `skeleton`, à PLAT mais
          ADJACENTE au groupe des zones de spawn ci-dessous : c'est une COUCHE DE
          SPAWN, plus jamais un rang parmi les props placés tonneaux/livres)
-     10. ▸ Zones de spawn — autres (camps) — parent repliable pour les camps de
-         spawn NON scindés par contenu :
-           Autres        (searchable résiduel)
-           Destructibles (destroyable)
-           Réactifs      (reactive, HORS squelettes déjà sortis ci-dessus)
+     10. ▸ Camps dynamiques (spawn) — parent repliable pour les camps de
+         spawn NON scindés par contenu (les deux ex-« Autres » désambiguïsés) :
+           Fouille non typée (searchable résiduel)
+           Destructibles     (destroyable)
+           Réactifs          (reactive, HORS squelettes déjà sortis ci-dessus)
+           Divers camps      (other, seau générique tombé en interactable.*)
    Les libellés INTERNES aux groupes sont COURTS (le parent porte le contexte) ;
    les tokens de couche/hash restent decor:<famille> / cat.* / camp.<kind>, une
    ligne qui passe DANS un groupe garde son jeton (les deep-links résolvent
@@ -1568,16 +1572,19 @@ function buildGroupContainers() {
   // 8. Objets de quête activables.
   add(catRow('qao'));
   // 9. Squelettes (camp:reactive_skeleton, subtype `skeleton`) — couche de SPAWN
-  // typée par contenu, à PLAT mais placée ADJACENTE au groupe « Zones de spawn —
-  // autres (camps) » ci-dessous (elle EST une zone de spawn, jamais un prop placé
+  // typée par contenu, à PLAT mais placée ADJACENTE au groupe « Camps dynamiques
+  // (spawn) » ci-dessous (elle EST une zone de spawn, jamais un prop placé
   // parmi les tonneaux/livres — retour concept 2026-07-16). Token/toggle/tracé
   // inchangés (campRow('reactive_skeleton')). N'apparaît qu'une fois camps.bin arrivé.
   if (deferredReady) add(campRow('reactive_skeleton', campRowLabel('reactive_skeleton'), ''));
-  // 10. « Zones de spawn — autres (camps) » : les camps de spawn NON scindés par
-  // contenu (fouille résiduelle + destructibles + réactifs), sous UN parent
-  // repliable — MÊME prédicat de catégorie que jadis, moins les deux kinds
-  // désormais sortis par type (searchable_corpses → CORPS, reactive_skeleton →
-  // Squelettes à plat). N'apparaît qu'une fois camps.bin arrivé.
+  // 10. « Camps dynamiques (spawn) » (ex-« Zones de spawn — autres (camps) »,
+  // renommé 2026-07-16b : le parent n'est plus « … autres ») : les camps de spawn
+  // NON scindés par contenu (fouille résiduelle + destructibles + réactifs), sous
+  // UN parent repliable — MÊME prédicat de catégorie que jadis, moins les deux
+  // kinds désormais sortis par type (searchable_corpses → CORPS, reactive_skeleton
+  // → Squelettes à plat). Les deux ex-lignes « Autres » (searchable résiduel +
+  // `other`) sont désambiguïsées (« Fouille non typée » / « Divers camps »), plus
+  // jamais deux « Autres ». N'apparaît qu'une fois camps.bin arrivé.
   if (deferredReady) {
     const spawnKinds = kindsOfCategory(c => c === 'interactable.searchable'
       || c === 'interactable.destroyable' || c === 'interactable.reactive')
@@ -1585,7 +1592,7 @@ function buildGroupContainers() {
       .sort((a, b) => spawnRowRank(a) - spawnRowRank(b));
     if (spawnKinds.length) {
       const total = spawnKinds.reduce((s, k) => s + (S.camps[k]?.points.length || 0), 0);
-      const grp = buildSubGroup('containers-spawn-other', tr('spawnAutresGroup'), CAMP_COLORS.searchable,
+      const grp = buildSubGroup('containers-spawn-other', tr('dynamicCampsGroup'), CAMP_COLORS.searchable,
         () => campLeavesOf(spawnKinds), total, 0, 'camp');
       for (const kind of spawnKinds) {
         const row = campRow(kind, campRowLabel(kind), 'filter-row-sub');

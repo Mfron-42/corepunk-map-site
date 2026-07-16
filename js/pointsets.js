@@ -84,23 +84,70 @@ function speciesCampSet(spId) {
   return set;
 }
 
+/* ── Primitive de RESTRICTION par espèce (species point-narrowing, 2026-07-16) ─
+   Un camp « creeps » MIXTE (windreach-woods, steppes, goldenfield-town…) porte,
+   ALIGNÉ 1:1 avec ses ancres (g.pointContent — un jeton par point : "raptor"/
+   "rat"/…/null) et la liste des espèces qui y spawnent (g.pointSpecies —
+   entrées "token:axis:key", ex. "raptor:monster:woodraptor"). LA seule
+   primitive qui restreint le nuage d'un camp à la part d'UNE sélection : un
+   woodraptor récupéré ne compte/dessine que SES 3 682 raptors (windreach 1912 +
+   tempest 144 + steppes 730 + …) au lieu des 11 939 points des 8 camps mixtes.
+   Invariant d'honnêteté « compté == dessiné » : consommée À LA FOIS par les
+   compteurs (speciesPoints/familyPoints/familyTable, via pointsOfCampSet) ET par
+   le tracé (main.js compositeCampPoints, via le masque d'indices). Un camp SANS
+   pointSpecies — TOUT camp kind=monsters/récolte/… (byte-vérifié : seuls ~8
+   camps creeps de Kwalat en portent, zéro camp monsters) : campTokenSet==null →
+   aucun filtrage, g.pts entiers → imp/wolf/scrag restent BYTE-IDENTIQUES. */
+function campTokenSet(g, matches) {
+  const ps = g.pointSpecies;
+  if (!ps) return null;
+  const s = new Set();
+  for (const e of ps) { const [tok, axis, key] = e.split(':'); if (matches(axis, key)) s.add(tok); }
+  return s;
+}
+function campNarrowedCount(g, matches) {
+  const t = campTokenSet(g, matches);
+  if (t === null) return g.pts.length;
+  const pc = g.pointContent || [];
+  let n = 0;
+  for (let i = 0; i < pc.length; i++) if (t.has(pc[i])) n++;
+  return n;
+}
+function campIncludedMask(g, matches) {
+  const t = campTokenSet(g, matches);
+  if (t === null) return null;
+  const pc = g.pointContent || [], m = new Set();
+  for (let i = 0; i < pc.length; i++) if (t.has(pc[i])) m.add(i);
+  return m;
+}
+/* Prédicats `matches(axis, key)` d'une sélection : une ESPÈCE ⇔ sa clé exacte ;
+   une FAMILLE ⇔ la famille (post-alias) de l'espèce catalogue sur l'axe
+   `monster`, la clé wildlife telle quelle sinon (une espèce de faune EST sa
+   propre « famille » d'arbre — pas de catalogue species.bin pour elle). */
+const speciesMatches = spId => (axis, key) => key === spId;
+const familyMatches = fam => (axis, key) => (axis === 'monster' ? familyKey((S.species || {})[key]?.family) : key) === fam;
+
 /* Ensemble de points concret d'un Set de clés de camp — forme commune à
    speciesPoints/familyPoints/qui-veut : { camps:[{key,g}], pts:[{x,z}],
    nCamps, nPts } | null si vide (repli honnête : jamais un bouton/une ligne
-   qui n'allumerait rien — même règle que le bouton highlight actuel). */
-function pointsOfCampSet(campSet) {
+   qui n'allumerait rien — même règle que le bouton highlight actuel). Avec un
+   prédicat `matches` (chemin espèce/famille) chaque camp est RESTREINT à ses
+   ancres qui matchent (campIncludedMask) — un camp mixte ne compte alors que sa
+   part ; sans `matches`, ou pour un camp sans pointSpecies, g.pts entiers. */
+function pointsOfCampSet(campSet, matches) {
   if (!campSet || !campSet.size) return null;
   const camps = [], pts = [];
   for (const key of campSet) {
     const g = campGroupByKey(key);
     if (!g) continue;
+    const mask = matches ? campIncludedMask(g, matches) : null;
     camps.push({ key, g });
-    for (const [x, z] of g.pts) pts.push({ x, z });
+    g.pts.forEach(([x, z], i) => { if (mask && !mask.has(i)) return; pts.push({ x, z }); });
   }
-  if (!camps.length) return null;
+  if (!camps.length || !pts.length) return null;
   return { camps, pts, nCamps: camps.length, nPts: pts.length };
 }
-function speciesPoints(spId) { return pointsOfCampSet(speciesCampSet(spId)); }
+function speciesPoints(spId) { return pointsOfCampSet(speciesCampSet(spId), speciesMatches(spId)); }
 
 /* ── Famille → camps (grain de l'arbre statique, design §4) ─────
    Union des speciesCampSet de chaque espèce NON-test de la famille
@@ -129,8 +176,13 @@ function familyTable() {
   // §4.3 « jamais de hasard par session ») et l'ordre des lignes du panneau.
   const rows = [];
   for (const [family, campKeys] of byFam) {
+    // nPts RESTREINT à la part de la famille dans chaque camp (campNarrowedCount) :
+    // un camp mixte (creeps) ne compte que ses ancres woodraptor, jamais tout le
+    // nuage ; un camp monsters (sans pointSpecies) compte g.pts entiers (comme
+    // avant). `family` est déjà post-alias (clé de byFam) → familyMatches direct.
+    const m = familyMatches(family);
     let nPts = 0;
-    for (const k of campKeys) { const g = campGroupByKey(k); if (g) nPts += g.pts.length; }
+    for (const k of campKeys) { const g = campGroupByKey(k); if (g) nPts += campNarrowedCount(g, m); }
     rows.push({ family, campKeys, nCamps: campKeys.size, nPts });
   }
   rows.sort((a, b) => b.nPts - a.nPts || a.family.localeCompare(b.family));
@@ -147,7 +199,7 @@ function familyCampSet(family) {
   const row = familyTable().find(r => r.family === fam);
   return row ? row.campKeys : new Set();
 }
-function familyPoints(family) { return pointsOfCampSet(familyCampSet(family)); }
+function familyPoints(family) { return pointsOfCampSet(familyCampSet(family), familyMatches(familyKey(family))); }
 
 /* ── Exceptions PAR-ENTITÉ (arbre Option A+, décision ratifiée 2026-07-14) ──
    L'arbre Monstres vit au grain FAMILLE (« l'arbre reflète ce qui se
@@ -320,10 +372,15 @@ function qaoPoints(sel) {
   return { rows, pts: rows.map(p => ({ x: p.x, z: p.z })), nPts: rows.length };
 }
 
+// campIncludedMask/speciesMatches/familyMatches : primitive de restriction par
+// espèce (species point-narrowing) — le masque d'ancres pour le tracé (main.js
+// compositeCampPoints) + les prédicats de sélection (specieslayer.js
+// speciesCampWinner / main.js famWinner).
 export {
   campGroupByKey, speciesCampSet, speciesPoints,
   familyCampSet, familyPoints, monsterFamilies,
   familyExceptionSpecies, isSpeciesException,
   wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints,
   qaoPoints,
+  campIncludedMask, speciesMatches, familyMatches,
 };

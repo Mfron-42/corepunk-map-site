@@ -15,34 +15,26 @@ import { ref } from '../mapref.js';
 import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
 
-/* ── Positions d'un but : DEUX étiquettes combinées, sans tiroir ──────────────
-   Refonte 2026-07-16 (owner : « simple, clair, sans menu déroulant »). Un but
-   qui se remplit en fouillant des objets/corps exprime son « où » comme des
-   SOURCES DE POINTS, chacune un nuage nommé, réunies en AU PLUS DEUX étiquettes
-   dessinables (le même modèle que le but faune « Animaux paisibles » que l'owner
-   a validé) — jamais une liste par-zone, jamais un tiroir. Chaque étiquette
-   bascule d'un clic tout son nuage via le registre campTrace de 1re classe
-   (pins.js S.campTraces / addCampTrace — togglable, listé au bandeau-légende,
-   retirable, teinte quête).
-   HONNÊTETÉ : le tier de chaque étiquette est marqué par le VOCABULAIRE UNIQUE
-   du site — la puce badge() (fiches/core.js), jamais un emoji propre au guide
-   d'étapes (la convergence 2026-07-16 a retiré les 🟢/💡 qui inventaient une 2e
-   langue d'honnêteté, la seule teinte verte de l'app). Réparties PAR LES SIGNAUX
-   DE LA DONNÉE (jamais une quête codée en dur) :
-     • badge(provenance:'official') — POSITIONS (donnée) : l'UNION des placements
-       EXACTS de conteneurs (search_zone.basis === "chest_placement",
-       target.placements) et des pools de spawn role==="quest". UNE réf
-       dessinable NOMMÉE par la cible réelle du but (target.label, ex. « Corps
-       d'astronautes ») — jamais un « Positions » générique — dessine tout d'un coup.
-     • badge(provenance:'derived') — ZONES DE CORPS FOUILLABLES (dérivées) :
-       l'UNION de TOUS les pools role==="generic" (déduits via la loot-table).
-       UNE réf, map-wide assumé : une seule étiquette, comme « Animaux paisibles »
-       (aussi pan-carte), jamais un nuage éclaté.
-   Puis, muettes : la ligne inline « Types acceptés : N types », le repère
-   d'orientation (landmark), et l'astuce joueur (target.player_hint,
-   badge(provenance:'player_knowledge')). Réutilisable : tout but portant ces
-   signaux obtient l'étiquette correspondante — officiel seul, dérivé seul, ou
-   la ligne objet/types seule. */
+/* ── Positions d'un but : UN tag officiel + UNE astuce légère, sans tiroir ──────
+   Refonte owner 2026-07-16b (« un seul tag officiel + une astuce "positions
+   conseillées" légère — pas de détail lourd »). Un but qui se remplit en
+   fouillant des corps exprime son « où » en AU PLUS DEUX lignes dessinables,
+   réparties PAR LES SIGNAUX DE LA DONNÉE (jamais une quête codée en dur) :
+     • badge(provenance:'official') — CORPS PLACÉS : les placements EXACTS de
+       conteneurs SEULS (search_zone.basis === "chest_placement",
+       target.placements). Nom HONNÊTE « Corps placés · N » — ce sont des points
+       placés exacts, jamais la cible sur-revendiquée du but (les 11 « Corpse 01 »
+       ne sont pas des « astronautes »). UNE réf dessinable, dessine ses points.
+     • astuce légère 💡 (famille player-hint) — POSITIONS CONSEILLÉES : les ZONES
+       DE SPAWN DE CORPS (l'union du pool de quête + de TOUS les pools génériques).
+       Présentée comme une SUGGESTION, pas une donnée mise en avant : libellé
+       court, aucun « N pts », aucun plafond ; la nuance « n'importe quel corps de
+       ces types, partout » repliée dans une info-bulle. Reste DESSINABLE (toggle
+       l'union), comme « Animaux paisibles ». L'astuce joueur (player_hint) n'est
+       gardée en ligne séparée QUE si le but n'a pas ce tier (sinon repliée dedans) ;
+       la ligne « types acceptés » et le repère landmark sont retirés (minimal).
+   Réutilisable : placements seuls → le tag officiel seul ; zones seules → l'astuce
+   seule ; les deux → les deux. */
 const GOAL_PLACEMENT_CAP = 200;   // plafond de DESSIN par jeu de points (garde-fou ; cas actuels ≤ 44)
 /* Instantané des jeux de points dessinables par clé de tracé (même idiome
    module-state que currentGoalZones) : le rendu le peuple, le routeur de dessin
@@ -100,15 +92,16 @@ function spawnPoolSource(pool) {
     pts, count: Number(pool.points) || 0,
   };
 }
-/* Répartition PAR RÔLE (le signal de la donnée) : placements + pools quête →
-   OFFICIEL ; pools génériques → INDICE. Réutilisable par tout but. */
+/* Répartition PAR RÔLE (le signal de la donnée) : placements EXACTS → OFFICIEL ;
+   TOUS les pools de spawn (quête + génériques) → ASTUCE. Le pool de quête est une
+   ZONE de spawn, pas un placement exact — il rejoint l'astuce, jamais le compte
+   officiel. Réutilisable par tout but. */
 function goalLocationSources(t) {
   const pools = Array.isArray(t?.spawn_pools) ? t.spawn_pools.filter(p => p && p.label) : [];
   const official = [];
   const placed = placedSource(t);
   if (placed) official.push(placed);
-  for (const p of pools) if (p.role === 'quest') official.push(spawnPoolSource(p));
-  const hint = pools.filter(p => p.role !== 'quest').map(spawnPoolSource);
+  const hint = pools.map(spawnPoolSource);
   return { official, hint };
 }
 function goalHasLocationTiers(t) {
@@ -154,62 +147,55 @@ function unionSourcePts(sources) {
    chargement différé des camps ; l'union dessinée le rejoint une fois les camps
    joints. Union vide (camps pas encore joints, aucun placement) → réf NON
    dessinable = texte simple, jamais une pastille morte (règle owner). */
-function combinedDrawTag(sources, tier, label) {
+function combinedDrawTag(sources, tier, label, showCount = true) {
   const union = unionSourcePts(sources);
   const dataPts = sources.reduce((s, x) => s + (x.count || 0), 0);
   const key = `qpoolagg:${tier}:${cleanLabel(sources[0].label || '')}:${sources.length}`;
   if (union.length) goalPlacementSets.set(key, { pts: union, hex: CATS.quest.hex, label });
+  // showCount=false (l'astuce légère) : aucun « · N pts » mis en avant — juste un
+  // libellé court togglable. Le compte réel reste porté par le tracé/bandeau.
   return ref({
     kind: 'qao', subrole: 'goal-spawn-agg', key: union.length ? key : undefined,
     label, hex: CATS.quest.hex, hasFiche: false, mode: 'E',
     drawable: union.length > 0, drawn: !!(union.length && S.campTraces?.has(key)),
-    count: dataPts,
+    count: showCount ? dataPts : undefined,
   });
 }
-/* Libellé DESCRIPTIF de l'étiquette officielle (owner : « never write "Positions",
-   give a real name so the user understands what's highlighted ») : le NOM RÉEL de
-   ce que la cible du but fait ramasser (target.label — « Astronaut corpses »,
-   « Dead Bodies »…, nettoyé), jamais le générique « Positions ». Repli défensif
-   goalPositions uniquement si la cible n'a AUCUN label (jamais observé sur les
-   buts qui rendent ce tier — tous portent un target.label). */
+/* Libellé HONNÊTE du tier officiel : ce sont des CORPS/CONTENEURS PLACÉS (points
+   exacts), jamais la cible sur-revendiquée du but (target.label « Astronaut
+   corpses » sur-revendiquait — les 11 points placés sont des « Corpse 01 », pas
+   des astronautes). « Corps placés » quand le but accepte des types de corps
+   (accepted_types), sinon le générique « Emplacements ». Data-driven, réutilisable. */
 function officialTierLabel(t) {
-  const name = t && t.label ? cleanLabel(t.label) : '';
-  return name || tr('goalPositions');
+  return (Array.isArray(t.accepted_types) && t.accepted_types.length)
+    ? tr('goalPlacedCorpsesTag') : tr('goalPlacementsTag');
 }
-/* POSITIONS — UNE étiquette de DONNÉE : l'union des placements exacts + pools
-   role="quest". Tier marqué par badge(provenance:'official') — le vocabulaire
-   d'honnêteté UNIQUE de l'app (plus d'emoji 🟢). Nommée par la cible réelle
-   (officialTierLabel). Réutilisable par tout but portant des sources officielles. */
+/* CORPS PLACÉS — UNE étiquette de DONNÉE : les placements EXACTS seuls (le pool
+   de quête est parti dans l'astuce). Tier marqué par badge(provenance:'official').
+   Nom honnête via officialTierLabel (« Corps placés »/« Emplacements », jamais la
+   cible sur-revendiquée). Réutilisable par tout but portant des placements. */
 function officialPositionsTier(sources, t) {
   if (!sources.length) return '';
   return `<div class="goal-target-row goal-target-row-pos">`
     + `${badge({ axis: 'provenance', value: 'official' })} ${combinedDrawTag(sources, 'official', officialTierLabel(t))}`
     + `</div>`;
 }
-/* ZONES DE CORPS FOUILLABLES — UNE étiquette DÉRIVÉE (marquée
-   badge(provenance:'derived') — même vocabulaire d'honnêteté que tout le site,
-   plus d'emoji 💡) : l'union de TOUS les pools role="generic". Map-wide assumé,
-   une seule étiquette comme « Animaux paisibles » (elle-même pan-carte) — jamais
-   un nuage éclaté ni un tiroir par-zone. Le conteneur .player-hint[data-provenance]
-   reste (regroupement visuel discret du tier), mais le SIGNAL d'honnêteté est
-   désormais la puce badge, jamais l'ancien emoji. */
+/* POSITIONS CONSEILLÉES — UNE astuce LÉGÈRE (refonte owner 2026-07-16b : les
+   zones de spawn de corps sont une SUGGESTION, pas une donnée exacte à mettre en
+   avant). Famille visuelle player-hint (💡, ton ambre tamisé) : libellé court
+   « Positions conseillées : Zones de spawn de corps », AUCUN compte « N pts » mis
+   en avant, AUCUN plafond ; la nuance « n'importe quel corps de ces types, partout »
+   repliée dans une info-bulle d'une ligne (title du conteneur). Reste DESSINABLE —
+   un clic dessine l'union de TOUS les pools (quête + génériques), togglable comme
+   « Animaux paisibles » ; le compte de données réel voyage dans le tracé/bandeau. */
 function hintZonesTier(sources) {
   if (!sources.length) return '';
-  return `<div class="goal-target-row player-hint" data-provenance="derived">`
-    + `${badge({ axis: 'provenance', value: 'derived' })}`
-    + `<span class="player-hint-body">${combinedDrawTag(sources, 'hint', tr('goalHintZonesTag'))}</span>`
+  return `<div class="goal-target-row player-hint" data-provenance="derived" title="${esc(tr('goalHintZonesNote'))}">`
+    + `<span class="player-hint-icon" aria-hidden="true">💡</span>`
+    + `<span class="player-hint-body">${esc(tr('goalSuggestedPositionsLabel'))} ${combinedDrawTag(sources, 'hint', tr('goalHintZonesTag'), false)}</span>`
     + `</div>`;
 }
 
-/* Types acceptés — ligne INLINE muette « Types acceptés : N types » (N = total
-   des variantes de bound_units) : plus jamais un tiroir ni la ventilation
-   par-type ; le décompte suffit, les positions vivent dans les deux étiquettes. */
-function acceptedTypesLine(t) {
-  const types = Array.isArray(t.accepted_types) ? t.accepted_types.filter(a => a && a.name) : [];
-  if (!types.length) return '';
-  const nVariants = types.reduce((s, a) => s + (a.count || 1), 0);
-  return `<div class="goal-target-row goal-target-row-types"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedTypesLabel'))}</span> <span class="muted">${esc(tr('goalAcceptedSummary', nVariants))}</span></div>`;
-}
 /* Astuce joueur — 3e tier, connu EN JEU mais pas prouvable dans la data extraite.
    Son mark d'honnêteté est désormais la puce badge(provenance:'player_knowledge')
    — le tier player_knowledge du vocabulaire UNIQUE de l'app (core.js), portant
@@ -240,31 +226,30 @@ function toggleGoalPlacements(info) {
 }
 
 /* Blocs supplémentaires d'un but à positions (corps / conteneur), empilés sous
-   la ligne d'identité — DROPDOWN-FREE, au plus DEUX étiquettes dessinables (rien
-   si la cible n'en porte aucune). Réutilisable : chaque bloc n'apparaît que si la
-   donnée le porte.
-     1. Types acceptés — ligne inline « N types » (jamais un tiroir)
-     2. Positions — UNE étiquette badge(official), nommée par la cible réelle
-        (target.label) + repère landmark
-     3. Zones de corps fouillables — UNE étiquette badge(derived) (pools génériques)
-     4. Astuce joueur — badge(player_knowledge) */
+   la ligne d'identité — DROPDOWN-FREE, au plus DEUX lignes (rien si la cible n'en
+   porte aucune). Réutilisable : chaque bloc n'apparaît que si la donnée le porte.
+     1. Corps placés — badge(official) : les placements EXACTS seuls ;
+     2. Positions conseillées — astuce légère 💡 : les zones de spawn de corps
+        (union quête + génériques), une SUGGESTION dessinable, pas une donnée mise
+        en avant. Replie la nuance player_hint dans son info-bulle.
+   L'astuce joueur autonome ne subsiste QUE sans ce tier (sinon repliée) ; la ligne
+   « types acceptés » et le repère landmark sont retirés (owner : minimal). */
 function goalCorpseExtras(t) {
   if (!t) return '';
   const { official, hint } = goalLocationSources(t);
   const rows = [];
-  const acc = acceptedTypesLine(t);
-  if (acc) rows.push(acc);
-  if (official.length) {
-    rows.push(officialPositionsTier(official, t));
-    // Repère d'orientation (target.landmark) : texte muet honnête (.pos-region)
-    // rendu une fois près des positions officielles — jamais un pin.
-    if (t.landmark) rows.push(`<div class="goal-target-row"><span class="pos-region">${esc(tr('goalLandmarkLabel', cleanLabel(t.landmark)))}</span></div>`);
-  }
+  if (official.length) rows.push(officialPositionsTier(official, t));
   if (hint.length) {
+    // L'astuce légère 💡 REPLIE la nuance « n'importe quel corps de ces types,
+    // partout » (son info-bulle) — la ligne player-tip autonome, la ligne
+    // landmark et la ligne « types acceptés » sont toutes retirées (minimal).
     rows.push(hintZonesTier(hint));
+  } else {
+    // Aucune zone de spawn où replier la nuance → on garde l'astuce joueur
+    // autonome (son propre tier d'honnêteté), pour ne pas perdre son guidage.
+    const tip = playerTipRow(t);
+    if (tip) rows.push(tip);
   }
-  const tip = playerTipRow(t);
-  if (tip) rows.push(tip);
   return rows.join('');
 }
 

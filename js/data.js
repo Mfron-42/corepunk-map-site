@@ -291,7 +291,9 @@ async function loadDeferred() {
     const k = campStateKey(g);
     if (!kwCamps[k]) kwCamps[k] = { on: prevOn[k] || false, points: [], groups: [] };
     kwCamps[k].groups.push(g);
-    g.pts.forEach(pt => kwCamps[k].points.push({ x: pt[0], z: pt[1], g }));
+    // `pi` = index d'ancre (aligné 1:1 sur g.pointContent) — lu par le masque
+    // de restriction du compositeur (main.js compositeCampPoints, species point-narrowing).
+    g.pts.forEach((pt, pi) => kwCamps[k].points.push({ x: pt[0], z: pt[1], g, pi }));
   });
   if (S.mapCache.Kwalat) S.mapCache.Kwalat.camps = kwCamps;
   if (S.map === 'Kwalat') S.camps = kwCamps;

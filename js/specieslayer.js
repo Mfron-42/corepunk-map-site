@@ -29,7 +29,7 @@
    partagés et le sélecteur du compositeur. */
 import { S } from './state.js';
 import { speciesLayerHex, familyKey } from './config.js';
-import { speciesCampSet } from './pointsets.js';
+import { speciesCampSet, speciesMatches } from './pointsets.js';
 import { isHiddenTest } from './devcontent.js';
 
 /* Coche une espèce (clic-double-effet des chips de fiche, bouton « voir les
@@ -89,14 +89,17 @@ function applySpeciesTokens(onSet) {
 }
 
 /* Sélecteur du COMPOSITEUR de camps (main.js compositeCampPoints, priorité
-   espèce > famille > kind) : camp → teinte de la PREMIÈRE espèce cochée qui
-   le contient (ordre d'insertion S.monsp, même règle premier-gagnant que les
-   familles). */
+   espèce > famille > kind) : camp → { hex, matches } de la PREMIÈRE espèce
+   cochée qui le contient (ordre d'insertion S.monsp, même règle premier-gagnant
+   que les familles). `matches` = le prédicat de RESTRICTION de l'espèce
+   (speciesMatches) que main.js applique par camp (campIncludedMask) pour ne
+   dessiner QUE ses ancres — invariant « compté == dessiné » (pointsets.js). */
 function speciesCampWinner() {
   const winner = new Map();
   for (const id of checkedSpeciesIds()) {
     const hex = speciesLayerHex(id);
-    for (const k of speciesCampSet(id)) if (!winner.has(k)) winner.set(k, hex);
+    const matches = speciesMatches(id);
+    for (const k of speciesCampSet(id)) if (!winner.has(k)) winner.set(k, { hex, matches });
   }
   return winner;
 }
