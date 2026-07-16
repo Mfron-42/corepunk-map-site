@@ -605,8 +605,11 @@ function heroSpecLabel(code) {
   const cls = HERO_SPEC_CLASS[m[1]];
   return cls ? `${weaponClassLabel(cls)} ${m[2]}` : code;
 }
-function goalTargetChip(t, label, regionHint, isTestQuest) {
-  if (!t || t.kind === 'multiple') return '';
+/* Contexte de position d'un but : le petit etat partage que lisent les branches
+   de goalTargetChip — posX/posZ (join de pin PNJ ou t.x/z), posCat, npcName, et
+   la ligne posRow deja construite. Chaine pure : l'extraire ne change aucun octet
+   rendu (le rendu de chaque branche reste identique). */
+function goalPosCtx(t, label, regionHint) {
   // Cible NPC déjà résolue par nom (voir la branche t.kind === 'npc' plus
   // bas, même npcIndexByName) : quand une position fixe existe déjà (t.x !=
   // null), viser le pin NPC réel plutôt que la position brute de la cible --
@@ -657,8 +660,139 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
         // gardent le rendu zone/unlocated inchangé.
         : dynamicPosBadge(t, regionHint, t.kind === 'item' ? t.key : null)
   }</div>`;
+  return { posX, posZ, posCat, posRow, npcName };
+}
 
-  if (t.kind === 'item') {
+/* Cible « players » (kill_player) : les specs de heros en clair, sans lieu. */
+function renderPlayersTarget(t) {
+    // kill_player (mechanism): mech_target.player_specs codes (e.g.
+    // "CHA_S1") -- see heroSpecLabel's own doc for the class-name join. No
+    // position: a PvP kill objective has no single world location.
+    const specs = (t.player_specs || []).map(heroSpecLabel);
+    if (!specs.length) return '';
+    // EntityRef (vague 1) : `[Joueurs] <specs>` — tag + libellé en clair
+    // (§3.3 : ni carte — un kill PvP n'a pas de lieu — ni fiche : aucune
+    // page de classe/héros n'existe, no-page justifié). Le verbe vit déjà
+    // dans la phrase d'objectif au-dessus, plus jamais une phrase dupliquée.
+    return `<div class="goal-target"><div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${ref({ kind: 'players', label: specs.join(', ') })}</div></div>`;
+}
+
+/* Cible « dynamic » : aucune identite, juste la ligne de position partagee. */
+function renderDynamicTarget(ctx) {
+  const { posRow } = ctx;
+    return `<div class="goal-target">${posRow}</div>`;
+}
+
+/* Cible « ability » (use_ability) : le chip de capacite, ou rien si le libelle n'est qu'un jeton moteur. */
+function renderAbilityTarget(t) {
+    // use_ability (mechanism): mech_target.label is a raw slot/trigger name
+    // (e.g. "use_ability", "quest ability death_raven"), not always a real
+    // in-game ability display name -- shown as-is (cleaned), never guessed
+    // against S.abilities by name (no reliable fold-match source exists for
+    // these labels, unlike npc/monster names -- a wrong ability link would
+    // be worse than a plain unlinked chip). No position: casting an ability
+    // has no location concept (unlike a harvest node or a zone), so `posRow`
+    // is deliberately NOT rendered here -- same "never a fabricated position
+    // for a non-world target" rule as the craft branch above.
+    // cleanLabel porte désormais la garde générique anti-jeton moteur
+    // (underscores → espaces, audit classe E : « use_ability »,
+    // « activate_qao_… ») ; première lettre capitalisée pour le chip.
+    const ab = t.key ? S.abilities?.[t.key] : null;
+    // Placeholder de capacité MOTEUR (audit classe E) : « use_ability »,
+    // « quest ability <slug> », « activate_… » — un jeton technique, pas une
+    // capacité NOMMÉE. Non résolu au catalogue ET libellé BRUT à underscore
+    // (= identifiant moteur, même hypothèse vérifiée que cleanLabel utils.js) :
+    // le chip « [Capacité] Use ability » n'ajoute RIEN à côté du texte
+    // d'objectif (« Combine the ingredients », « Repair The Destroyer ») et se
+    // lit comme une référence cassée — on le SUPPRIME (l'action EST tout
+    // l'objectif, aucune cible à montrer, aucune position non plus). Une
+    // capacité vraiment nommée (résolue, ou libellé propre sans underscore)
+    // garde son chip.
+    const genericAbility = !ab && /_/.test(String(t.label || ''));
+    const abLabel = t.label ? cleanLabel(t.label).replace(/^./, c => c.toUpperCase()) : null;
+    if (!abLabel || genericAbility) return '';
+    // EntityRef (vague 1, GAP §7.1 de la spec) : `[Capacité] Nom` — le
+    // k-chip détaché devient le kind-tag. Souligné (ref-open →
+    // openAbilityFiche, routé main.js) UNIQUEMENT quand la CLÉ de la cible
+    // résout sur S.abilities — jamais un match par nom (la garde d'origine
+    // de cette branche : un lien de capacité faux serait pire que pas de
+    // lien). Jamais de pastille : lancer une capacité n'a pas de lieu.
+    return `<div class="goal-target">
+      <div class="goal-target-row goal-target-item">
+        <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
+        ${ref({ kind: 'ability', key: ab ? t.key : null, label: ab?.name || abLabel, hasFiche: !!ab })}
+      </div>
+    </div>`;
+}
+
+/* Cible « zone » (enter/exit_zone) : la reference de region nommee + le repli de position. */
+function renderZoneTarget(t, ctx) {
+  const { posRow } = ctx;
+    // enter_zone/exit_zone (mechanism): a named area (mech_target.label),
+    // sometimes with a real slot position ('s enter_zone branch) --
+    // `posRow` (shared, computed above) already renders it (gotoBtn) or the
+    // honest generic dynamic-position fallback when it isn't known.
+    const zLabel = t.label ? cleanLabel(t.label) : null;
+    // Couleur d'entité (task #77) : ZONE_HEX, même teinte que la ligne "Zones
+    // (régions)" du panneau/de la recherche -- ce n'est ni un PNJ ni un
+    // monstre, une zone nommée est une entité de carte à part entière.
+    // Ping cliquable (retour utilisateur « activable n'est plus cliquable ») :
+    // quand le pipeline a joint le centroïde du polygone de zone décodé (t.x,
+    //  zone_geo — trigger enter_zone sans slot placé), le NOM devient un
+    // goto vers ce centre au lieu d'un libellé mort. La zone reste le bon
+    // barreau d'échelle (une AIRE, pas un objet placé) : le clic centre la
+    // carte dessus, et la fiche offre en plus « Voir la zone » (contour
+    // complet, S.zonesQuest). Sans centroïde (zone sans géométrie décodée :
+    // « Around wreck », honnête trou), reste un libellé simple.
+    // EntityRef (vague 1) : `[Région ●] Nom` — pastille locate ⇔ le centroïde
+    // du polygone décodé est joint (t.x,  zone_geo) ; elle absorbe la
+    // ligne « Carte » séparée (une seule affordance carte). Nom JAMAIS
+    // souligné tant que la fiche région n'existe pas (vague R — honnêteté
+    // §3.5 : pas de lien vers une page qui n'existe pas). Sans centroïde
+    // (« Around wreck », trou honnête) : tag+nom nus, posRow garde ses replis.
+    // Q7 (pins locate toggle) : plus de `drawn:false` figé — l'état de la
+    // pastille est relu en direct de S.locates (mapref.js liveDrawn, mode L),
+    // comme toute autre pastille locate (le centroïde devient un pin
+    // persistant, listé dans le bandeau-légende, retirable).
+    // E'c-R : le NOM de la zone devient une réf `[Région(●)]` SOULIGNÉE quand une
+    // vraie région cataloguée porte ce nom (regionFicheExists) → ref-open ouvre
+    // openRegionFiche (main.js). La pastille reste un pin LOCATE au centroïde
+    // décodé (mode L, inchangé) — deux affordances distinctes coexistent. Un
+    // sous-lieu de quête sans région cataloguée (« Around wreck », « House Hilda
+    // Deeproot ») reste en clair (honnêteté §3.5 : jamais un lien vers une page
+    // inexistante) et garde sa seule pastille locate.
+    const canPing = t.x != null;
+    const zoneRef = zLabel ? ref({
+      kind: 'zone', label: zLabel, hasFiche: regionFicheExists(zLabel), drawable: canPing,
+      pos: canPing ? { x: t.x, z: t.z } : undefined,
+    }) : '';
+    const nameRow = zoneRef ? `<div class="goal-target-row goal-target-row-rel">${zoneRef}</div>` : '';
+    return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
+}
+
+/* Repli honnete : un kind de cible inconnu/residuel — le nom brut resolu, jamais une relation/position fabriquee. */
+function renderFallbackTarget(t, isTestQuest) {
+  // Honest last-resort fallback (batch-wiring pass, mechanism decode job A):
+  // an unrecognized/future target kind (or one of the 4 byte-parse-gap
+  // residuals, mechanism: null --  sec 12) never renders
+  // silently blank under a normal-looking objective sentence -- shows
+  // whatever name the resolver actually produced, never a fabricated
+  // relation/position beyond what's genuinely on `t`.
+  const customName = t.label ? cleanLabel(t.label) : null;
+  if (!customName) return '';
+  // Pastille "unknown" ( #15, task #67) : ce résidu
+  // couvre 4 buts au total -- 3 sur test_craft_trigger (quête de test) + 1
+  // sur zero_to_hero_ish (contenu joueur RÉEL, opcode moteur non décodé --
+  // ni "dev", ni "dynamique", juste non déterminable depuis les données
+  // extraites, voir  §12). Jamais pour le contenu de test (déjà
+  // couvert par isTest ailleurs) -- pas de double pastille sur le même but.
+  const unknownChip = isTestQuest ? '' : ` ${badge({ axis: 'provenance', value: 'absent' })}`;
+  return `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span>${unknownChip}</div></div>`;
+}
+
+/* Cible « item » : l'identite de l'item lui-meme (+ relation reward_of / craft eventuelle) et son seul « ou ». */
+function renderItemTarget(t, label, ctx) {
+  const { posX, posZ, posRow } = ctx;
     // La cible EST l'item lui-même -- rien à relier, juste son identité
     // (nom catalogue en priorité ; repli sur `label`, la phrase d'objectif
     // DÉJÀ nettoyée et affichée juste au-dessus -- JAMAIS t.label brut, dont
@@ -705,191 +839,106 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       return `<div class="goal-target">${itemRow}${craftRow}</div>`;
     }
     return `<div class="goal-target">${itemRow}${soleWhere}</div>`;
-  }
+}
 
-  if (t.kind === 'object') {
-    // Ladder des nœuds acceptés (#81, target.node_types -- 11 buts / ~8
-    // quêtes, ex. a_fortune_forewarned ×3, heartwood_gethering) : QUELS types
-    // de nœud (S.nodes, gn_*) satisfont ce but de récolte, quand byte-prouvé
-    // -- une ligne de chips cliquables (nodeChip, ouvre la fiche nœud),
-    // JAMAIS une couche carte (le lien nœud->point n'existe pas côté client,
-    // voir data.js S.nodes/js/state.js) : une liste de référence, pas un
-    // "va ici". Calculé une fois, ajouté aux DEUX branches ci-dessous (avec
-    // ou sans `t.profession`) puisque les 11 buts observés se répartissent
-    // sur les deux (voir  #3).
-    // EntityRef (vague 1) : chaque type de nœud accepté est une référence
-    // [Nœud] Nom — souligné ⇔ résolu sur S.nodes (chargement différé : se
-    // répare seul au re-rendu, même garde que l'ancien nodeChip) ; jamais de
-    // pastille (le lien nœud→point n'existe pas côté client, byte-prouvé).
-    const nodesRow = (t.node_types && t.node_types.length)
-      ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedNodesLabel'))}</span></div>
-         <div class="goal-target-row"><div class="reward-chips">${t.node_types.map(nk => {
-    const n = S.nodes?.[nk];
-    return ref({ kind: 'node', key: nk, label: n ? n.name : pretty(nk.replace(/^gn_/, '')), hex: nodeHex(n), hasFiche: !!n });
-  }).join('')}</div></div>`
-      : '';
-    // harvest (mechanism): a resource-gathering node (logging/herbalism/
-    // mining -- 's dedicated harvest branch, `target.profession`),
-    // never an "Activatable" quest prop -- checked FIRST, before the
-    // generic item_key/key join below (a harvest target always carries
-    // item_key too, which would otherwise misroute it into the differing/
-    // "Activatable" wording meant for actual interactive objects). No
-    // position ever ships for these ( never resolves one) -- `posRow`
-    // still renders its honest generic "dynamic position" fallback, exactly
-    // like any other position-less target.
-    if (t.profession) {
+/* Cible « npc » : le PNJ a qui parler/aider (ou le donneur d'un item), reference locate + relation. */
+function renderNpcTarget(t, ctx) {
+  const { posX, posZ, posCat, posRow, npcName } = ctx;
+    // Quest-granted item ('s given_by_giver, e.g. eight_legged_freaks'
+    // "Time of Death" handed over in Ophelia Voss's own dialog, already
+    // listed in this quest's own reward table): item chip first (identity,
+    // clickable to its fiche) + an explicit "given by <giver>" relation row
+    // -- never a spawn zone, this was never a world spawn (see 
+    // resolve_goal_item's craft/given_by_giver pre-check). `t.label` here IS
+    // the giver's real name (unlike the plain npc branch below, whose only
+    // reliable name source is the objective sentence `label` -- see its own
+    // comment) -- resolved through the same npcIndexByName lookup so the
+    // giver's name is clickable to their fiche when known on the active map.
+    // `posRow` (shared, computed above) still renders correctly here: t.x/z
+    // are the giver's own position when known (see 's `given["x"]`),
+    // never a fabricated one.
+    if (t.given_by_giver) {
+      // receive_reward (mechanism) whose reward_of names a quest OTHER than
+      // the one currently open: "obtained by completing <that quest>" wins
+      // over the plain given-by wording below -- t.label here is merely
+      // THAT quest's own turn-in NPC ('s _resolve_target_mech
+      // receive_reward branch, e.g. eight_legged_freaks' Ophelia Voss
+      // handing over thistlebrooks_terrifying_task's "Time of Death"),
+      // saying "given by" would misattribute the grant to the OPEN quest.
+      // Same-quest rewards (reward_of holding only the open quest's own
+      // slug, e.g. puzzles_of_the_afterlife's saddle) return '' here and
+      // fall through to the unchanged given-by wording -- this quest really
+      // is the source. See rewardOfRelRow's own doc.
+      const reward = rewardOfRelRow(t);
+      if (reward.html) {
+        // Même dédup que la branche item : la réf `[Quête(●)]` épingle le donneur
+        // de la quête source ; quand elle porte ce pin, aucune autre pastille.
+        // Sinon (ratification 2026-07-13) la position du PNJ remetteur (t.x —
+        // là où l'item s'obtient) vit SUR le chip d'item (`[Quest Item(●)]`),
+        // plus jamais un `[Position(●)]` nu adjacent ; `posRow` ne reste que
+        // comme SEUL « où » (pas de chip, ou pas de position fixe).
+        const handPos = (t.x != null && !reward.pinnable) ? { x: posX, z: posZ } : null;
+        const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx, '', undefined, handPos) || '';
+        const soleWhere = (itemRow && handPos) ? '' : posRow;
+        return `<div class="goal-target">${itemRow}${reward.html}${reward.pinnable ? '' : soleWhere}</div>`;
+      }
       const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
-      const profLabel = professionLabel(capitalize(t.profession));
-      const relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalHarvestLabel', profLabel))}</span></div>`;
-      return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posRow}</div>`;
-    }
-    // t.item_key (quest-guide-feature plan sec 5.2) est une chose DIFFÉRENTE
-    // de t.key ci-dessus : t.key est la clé catalogue PROPRE de cet objet
-    // (rare), t.item_key est l'item de quête concret que cette interaction
-    // a produit -- `differing` distingue les deux mécaniques réelles :
-    //   - item_key === key (ou pas de key du tout) : l'objet EST l'item
-    //     (ramassage au sol) -- une seule ligne d'identité suffit.
-    //   - item_key !== key : interagir avec un AUTRE objet (levier, machine,
-    //     baril...) produit cet item -- ligne de relation explicite en plus.
-    const differing = !!(t.item_key && t.item_key !== t.key);
-    const primaryKey = differing ? t.item_key : (t.item_key || t.key);
-    const approxForItem = t.item_key ? t.item_approx : t.approx;
-    // [collect-ITEM-from-object] (retour owner 2026-07-13, priorité #1
-    // followability -- « Quest item should be itself [Item(●)] : no need object
-    // position normally, self item knows where / how to find ») : un but qui
-    // RAMASSE un item (t.item_key présent) mène désormais sa carte de cible par
-    // l'IDENTITÉ DE L'ITEM ; l'objet/conteneur n'est plus qu'un contexte
-    // secondaire léger, JAMAIS une seconde entrée « Objet … à <position> »
-    // co-égale (le double-listage exact que l'owner a signalé, ex. Souvenir
-    // Sword). La position éventuelle de l'objet devient le « trouvé à » de
-    // l'ITEM : portée par SON chip — `[Quest Item(●)] Nom` (pos de
-    // goalTargetItemRow, mode L promu par mapref.js — même idiome que
-    // questItemRow, ratification 2026-07-13 : la pastille vit SUR l'entité,
-    // jamais un `[Position(●)]` adjacent). Sans item ramassé (use_object pur,
-    // ex. l'aéronef « soplo » : t.item_key absent) l'objet RESTE la cible
-    // `[Qao(●)]` (repli activable plus bas) — inchangé.
-    //
-    // DISCRIMINATEUR HONNÊTE : l'item ne mène QUE lorsqu'il est lié au but par
-    // le MÉCANISME du jeu (`item_join === "mechanism"`) — le seul join prouvé,
-    // jamais un match inféré. Deux mécanismes le portent : collect_from_object
-    // (relation collect_from) et kill_collect sur un objet (relation drops_from
-    // — détruire un conteneur/coffre/veine pour en récolter l'item). Les
-    // vraies interactions d'objet (use_object / talk / harvest) rattachent leur
-    // item par déduction (item_join token_overlap / sole_candidate / archetype) :
-    // là, l'OBJET est le but, l'item n'est qu'un candidat — ils GARDENT la cible
-    // `[Qao(●)]` (repli conteneur/activable inchangé), exactement le « ne change
-    // pas les vraies interactions d'objet » de la consigne owner.
-    const collectsItem = !!t.item_key && t.item_join === 'mechanism';
-    // Conteneur NOMMÉ et DISTINCT (differing + label réel : interagir avec un
-    // AUTRE objet — « Old crate » — pour produire l'item) : il vaut d'être nommé
-    // en contexte (« found in ») et porte lui-même le pin. Un objet
-    // NON-differing (item_key === key) ne fait que ré-étiqueter l'item
-    // (casse/apostrophes : « Sword » vs « Souvenir Sword » — 13/13 des libellés
-    // « distincts » mesurés sont la MÊME entité) : aucun conteneur réel à
-    // nommer, l'item seul suffit.
-    const namedContainer = differing && !!t.label;
-    // « Trouvé à » de l'item : la position de l'objet portée par le CHIP DE
-    // L'ITEM lui-même — `[Quest Item(●)] Nom` (ratification 2026-07-13 : la
-    // pastille locate vit SUR l'entité, l'ex-`[Position(●)]` inline est mort ;
-    // même pin Q7, togglable, listé sous la barre de recherche, retirable).
-    // Seulement quand un item est réellement ramassé ET qu'aucun conteneur
-    // nommé ne porte déjà ce pin (sinon deux pins pour le même point). Jamais
-    // fabriqué : uniquement quand t.x existe vraiment (sinon l'item se tient
-    // seul, sa fiche EST le guide).
-    const itemFoundAtPos = (collectsItem && !namedContainer && t.x != null)
-      ? { x: posX, z: posZ }
-      : null;
-    // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
-    // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
-    // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
-    // TODO(chunk (c)) : quand les sous-lignes `qao.<type>` existeront, le
-    // clic d'un chip objet devra cocher la ligne de SON type (placements
-    // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
-    // t.label — 45), même clic-double-effet que les chips monstre.
-    // L'item MÈNE — son « trouvé à » (itemFoundAtPos) porté par SON chip,
-    // jamais une ligne de position séparée co-égale.
-    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, '', undefined, itemFoundAtPos);
-    let relRow = '';
-    // Quand l'item porte déjà son pin (itemFoundAtPos) OU qu'un conteneur nommé
-    // le porte, la ligne position séparée disparaît — une seule affordance carte
-    // par cible, jamais deux pins pour le même point (loi d'uniformisation,
-    // même logique que hasLayerResolution côté monstre).
-    let posInRef = !!(itemRow && itemFoundAtPos);
-    // SIMPLIFICATION corps/conteneur (2026-07-15) : un but à accepted_types voit
-    // ses conteneurs ÉNUMÉRÉS dans le tier « Types acceptés » (goalCorpseExtras)
-    // et ses positions dans les tiers officiel/dérivé (badge()) — le verbe « trouvé dans [Objet]
-    // <label> » / « obtenu ici » ne ferait alors que répéter la cible du but, on
-    // le SUPPRIME (garde la ligne d'identité d'item). Les vrais conteneurs nommés
-    // d'autres mécaniques (sans accepted_types, ex. « Old crate ») le gardent.
-    const containerNamedInTiers = Array.isArray(t.accepted_types) && t.accepted_types.length > 0;
-    if (itemRow && namedContainer && !containerNamedInTiers) {
-      // collect_from_object avec un conteneur DISTINCT nommé : « found in
-      // [Objet ●] <conteneur> » — contexte secondaire léger (verbe + nom),
-      // jamais une entrée co-égale. Pastille locate quand son placement est
-      // byte-joint (t.x) : le CONTENEUR porte alors le pin (pas l'item), jamais
-      // un nom de conteneur fabriqué.
+      // EntityRef (vague 1) : le donneur est une référence [PNJ ●] — nom
+      // souligné ⇔ le PNJ résout sur la carte active (jamais un lien
+      // deviné), pastille locate ⇔ une position est connue (elle remplace la
+      // ligne « Carte » séparée : une seule affordance carte par cible).
+      const ni = t.label ? npcIndexByName(t.label) : -1;
       const canPing = t.x != null;
-      posInRef = canPing;
-      // NB whitespace : l'indentation INTERNE de ce littéral (12/10 espaces)
-      // est volontairement conservée telle quelle malgré le dé-imbriquement du
-      // bloc — le blanc à l'intérieur des backticks est rendu littéralement,
-      // donc la garder identique laisse les buts « found in » NON concernés
-      // (use_object inféré) byte-identiques (render-diff : seuls les buts
-      // réellement modifiés changent).
-      relRow = `<div class="goal-target-row goal-target-row-rel">
-            <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
-            ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
-          </div>`;
-    } else if (itemRow && differing && !itemFoundAtPos && !containerNamedInTiers) {
-      // Conteneur DISTINCT mais anonyme ET sans position : le verbe honnête seul
-      // (« obtenu ici ») — quand une position existe, le chip d'item la porte
-      // déjà (son « trouvé à ») et rend ce verbe redondant, donc omis. Idem quand
-      // les tiers énumèrent déjà les conteneurs (containerNamedInTiers).
-      relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+      const giverRef = t.label ? ref({
+        kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: t.label,
+        hasFiche: ni >= 0, mode: 'L', drawable: canPing,
+        pos: canPing ? { x: posX, z: posZ } : undefined, subrole: posCat || null,
+      }) : '';
+      const relRow = giverRef
+        ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverRef}</div>` : '';
+      return `<div class="goal-target">${itemRow}${relRow}${canPing ? '' : posRow}</div>`;
     }
-    // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
-    // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
-    // `label` (la phrase d'objectif déjà affichée au-dessus), la seule donnée
-    // honnête qu'on ait pour nommer cet objet. EntityRef (vague 1) : l'objet
-    // activable sans clé catalogue (ex. « soplo », l'aéronef d'Inspect the
-    // aircraft) est une référence [Objet] — pastille locate quand son
-    // placement qao est byte-joint (le retour « activable n'est plus
-    // cliquable »), tag+libellé nus sinon (honnête : rien à viser).
-    // OBJET DE MONDE à clé HORS catalogue (audit 2026-07-13 classe C) : les
-    // clés QuestActiveObject sont sorties du catalogue d'items (« [Item] Qao
-    // Mixing Pot » était un pseudo-item de fuite de classifieur) — quand la
-    // cible porte une telle clé ET son propre nom (t.label, « Mixing Pot »),
-    // l'étape use_object rend l'OBJET lui-même sous son nom, jamais la phrase
-    // d'objectif répétée. Les cibles SANS clé gardent la phrase (t.label y est
-    // souvent un jeton d'éditeur brut — « soplo », « Pod Active »).
-    if (!itemRow) {
-      const canPing = t.x != null;
-      posInRef = canPing;
-      const worldObjName = (t.key && !S.items[t.key] && t.label) ? cleanLabel(t.label) : null;
-      itemRow = `<div class="goal-target-row goal-target-item">
-        <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
-        ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: worldObjName || label || '' })}
-      </div>`;
-    }
-    // Position restante : l'item ramassé porte son « trouvé à » en ligne
-    // (itemFoundAt) ET l'objet activable pur porte son pin [Qao ●] en ligne
-    // (repli ci-dessus) — dans les deux cas posInRef supprime la ligne séparée.
-    // TIERS DE POSITIONS (goalHasLocationTiers) : dès que le but porte des
-    // placements OU des pools de spawn, goalCorpseExtras ci-dessous rend le(s)
-    // tier(s) officiel/dérivé (badge()) — la ligne de position séparée disparaît (elle doublerait la
-    // source officielle, moins précise). Ne reste sinon ici que l'objet activable
-    // PUR encore positionné (aucun item, kind honnête [Objet ●]) ou le repli
-    // zone/dynamique (t.x absent : search_zone estimée / « non localisé »),
-    // jamais un pin fabriqué.
-    const objPosRow = (posInRef || goalHasLocationTiers(t)) ? '' : (t.x != null
-      ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
-      : posRow);
-    // Blocs corps de quête (types acceptés / pools de spawn / astuce joueur) —
-    // rien si la cible n'en porte aucun (voir goalCorpseExtras).
-    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${objPosRow}${goalCorpseExtras(t)}</div>`;
-  }
+    // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) —
+    // CORRIGÉ (audit quêtes 2026-07-11, classe A : 88 buts « talk/help »
+    // rendus SANS lien) : l'ancien commentaire « les cibles npc ne portent
+    // jamais leur propre t.label » était PÉRIMÉ — la passe mechanism-decode
+    // du pipeline expédie le PNJ résolu dans `t.label` (+ `t.key: "npc:*"`
+    // sur 62 des 88) ; résoudre/afficher la PHRASE d'objectif (« Help
+    // Jennifer Davyna ») ne matchait le catalogue que quand la phrase se
+    // trouvait être exactement le nom (204/292), et dupliquait la phrase en
+    // pseudo-chip de nom sous elle-même. Source : t.label d'abord (le NOM),
+    // phrase en repli (`npcName`, calculé en tête de fonction avec le join
+    // de pin) ; repli texte simple si le PNJ n'est pas sur la carte active
+    // (jamais un lien deviné).
+    // EntityRef (vague 1) : `[PNJ ●] Nom` — nom souligné ⇔ le PNJ résout sur
+    // la carte active (mêmes gardes/sources qu'avant, voir le commentaire
+    // ci-dessus), pastille locate ⇔ une position existe (pin réel corrigé en
+    // tête de fonction — posX/posZ/posCat) ; elle absorbe la ligne « Carte »
+    // séparée. PNJ sur une AUTRE carte sans coordonnée locale (t.map seul,
+    // ex. le Fantôme de l'Île-prison) : ratification 2026-07-13 — la bascule
+    // de carte vit SUR le chip PNJ lui-même (pastille mode L à pos.x nul →
+    // switchMap, main.js ; nom de la carte en méta — même idiome que les
+    // acteurs cross-carte), plus jamais un `[Position(●)] <carte>` adjacent.
+    // Sans rien : tag+nom sans pastille, et posRow garde son repli honnête
+    // (position dynamique).
+    const ni = npcName ? npcIndexByName(npcName) : -1;
+    const canPing = t.x != null;
+    const crossMap = !canPing && !!t.map;
+    const npcTargetRef = npcName ? ref({
+      kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: cleanLabel(npcName),
+      hasFiche: ni >= 0, mode: 'L', drawable: canPing || crossMap,
+      pos: canPing ? { x: posX, z: posZ }
+        : crossMap ? { x: null, z: null, map: t.map } : undefined,
+      subrole: posCat || null,
+      meta: crossMap ? `· ${mapName(t.map)}` : null,
+    }) : '';
+    const nameRow = npcTargetRef ? `<div class="goal-target-row goal-target-row-rel">${npcTargetRef}</div>` : '';
+    return `<div class="goal-target">${nameRow}${(canPing || (crossMap && npcTargetRef)) ? '' : posRow}</div>`;
+}
 
-  if (t.kind === 'monster') {
+/* Cible « monster » : l'espece/famille/faune a tuer (+ item lache eventuel), position via la couche de spawn. */
+function renderMonsterTarget(t, label, ctx) {
+  const { posRow } = ctx;
     // BUG FIX (popup/bubble layout cleanup pass): `label` (the objective
     // sentence above this chip, e.g. "Collect Imp Executioner") and `t.label`
     // (the target's own actor/catalog label, e.g. "Imp executioner") are TWO
@@ -1156,218 +1205,204 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       ? `<div class="goal-target-row goal-target-row-where">${badge({ axis: 'precision', value: 'via-chain' })}</div>`
       : (faunaPoolRow || posRow);
     return `<div class="goal-target">${itemRow}${relRow}${monsterPosRow}</div>`;
-  }
+}
 
-  if (t.kind === 'npc') {
-    // Quest-granted item ('s given_by_giver, e.g. eight_legged_freaks'
-    // "Time of Death" handed over in Ophelia Voss's own dialog, already
-    // listed in this quest's own reward table): item chip first (identity,
-    // clickable to its fiche) + an explicit "given by <giver>" relation row
-    // -- never a spawn zone, this was never a world spawn (see 
-    // resolve_goal_item's craft/given_by_giver pre-check). `t.label` here IS
-    // the giver's real name (unlike the plain npc branch below, whose only
-    // reliable name source is the objective sentence `label` -- see its own
-    // comment) -- resolved through the same npcIndexByName lookup so the
-    // giver's name is clickable to their fiche when known on the active map.
-    // `posRow` (shared, computed above) still renders correctly here: t.x/z
-    // are the giver's own position when known (see 's `given["x"]`),
-    // never a fabricated one.
-    if (t.given_by_giver) {
-      // receive_reward (mechanism) whose reward_of names a quest OTHER than
-      // the one currently open: "obtained by completing <that quest>" wins
-      // over the plain given-by wording below -- t.label here is merely
-      // THAT quest's own turn-in NPC ('s _resolve_target_mech
-      // receive_reward branch, e.g. eight_legged_freaks' Ophelia Voss
-      // handing over thistlebrooks_terrifying_task's "Time of Death"),
-      // saying "given by" would misattribute the grant to the OPEN quest.
-      // Same-quest rewards (reward_of holding only the open quest's own
-      // slug, e.g. puzzles_of_the_afterlife's saddle) return '' here and
-      // fall through to the unchanged given-by wording -- this quest really
-      // is the source. See rewardOfRelRow's own doc.
-      const reward = rewardOfRelRow(t);
-      if (reward.html) {
-        // Même dédup que la branche item : la réf `[Quête(●)]` épingle le donneur
-        // de la quête source ; quand elle porte ce pin, aucune autre pastille.
-        // Sinon (ratification 2026-07-13) la position du PNJ remetteur (t.x —
-        // là où l'item s'obtient) vit SUR le chip d'item (`[Quest Item(●)]`),
-        // plus jamais un `[Position(●)]` nu adjacent ; `posRow` ne reste que
-        // comme SEUL « où » (pas de chip, ou pas de position fixe).
-        const handPos = (t.x != null && !reward.pinnable) ? { x: posX, z: posZ } : null;
-        const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx, '', undefined, handPos) || '';
-        const soleWhere = (itemRow && handPos) ? '' : posRow;
-        return `<div class="goal-target">${itemRow}${reward.html}${reward.pinnable ? '' : soleWhere}</div>`;
-      }
+/* Cible « object » : objet interactif / recolte — identite d'item menante, conteneur nomme, tiers de positions. */
+function renderObjectTarget(t, label, ctx) {
+  const { posX, posZ, posRow } = ctx;
+    // Ladder des nœuds acceptés (#81, target.node_types -- 11 buts / ~8
+    // quêtes, ex. a_fortune_forewarned ×3, heartwood_gethering) : QUELS types
+    // de nœud (S.nodes, gn_*) satisfont ce but de récolte, quand byte-prouvé
+    // -- une ligne de chips cliquables (nodeChip, ouvre la fiche nœud),
+    // JAMAIS une couche carte (le lien nœud->point n'existe pas côté client,
+    // voir data.js S.nodes/js/state.js) : une liste de référence, pas un
+    // "va ici". Calculé une fois, ajouté aux DEUX branches ci-dessous (avec
+    // ou sans `t.profession`) puisque les 11 buts observés se répartissent
+    // sur les deux (voir  #3).
+    // EntityRef (vague 1) : chaque type de nœud accepté est une référence
+    // [Nœud] Nom — souligné ⇔ résolu sur S.nodes (chargement différé : se
+    // répare seul au re-rendu, même garde que l'ancien nodeChip) ; jamais de
+    // pastille (le lien nœud→point n'existe pas côté client, byte-prouvé).
+    const nodesRow = (t.node_types && t.node_types.length)
+      ? `<div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain"><span class="goal-target-rel-verb">${esc(tr('goalAcceptedNodesLabel'))}</span></div>
+         <div class="goal-target-row"><div class="reward-chips">${t.node_types.map(nk => {
+    const n = S.nodes?.[nk];
+    return ref({ kind: 'node', key: nk, label: n ? n.name : pretty(nk.replace(/^gn_/, '')), hex: nodeHex(n), hasFiche: !!n });
+  }).join('')}</div></div>`
+      : '';
+    // harvest (mechanism): a resource-gathering node (logging/herbalism/
+    // mining -- 's dedicated harvest branch, `target.profession`),
+    // never an "Activatable" quest prop -- checked FIRST, before the
+    // generic item_key/key join below (a harvest target always carries
+    // item_key too, which would otherwise misroute it into the differing/
+    // "Activatable" wording meant for actual interactive objects). No
+    // position ever ships for these ( never resolves one) -- `posRow`
+    // still renders its honest generic "dynamic position" fallback, exactly
+    // like any other position-less target.
+    if (t.profession) {
       const itemRow = goalTargetItemRow(t.item_key, t.item_label, t.item_approx) || '';
-      // EntityRef (vague 1) : le donneur est une référence [PNJ ●] — nom
-      // souligné ⇔ le PNJ résout sur la carte active (jamais un lien
-      // deviné), pastille locate ⇔ une position est connue (elle remplace la
-      // ligne « Carte » séparée : une seule affordance carte par cible).
-      const ni = t.label ? npcIndexByName(t.label) : -1;
-      const canPing = t.x != null;
-      const giverRef = t.label ? ref({
-        kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: t.label,
-        hasFiche: ni >= 0, mode: 'L', drawable: canPing,
-        pos: canPing ? { x: posX, z: posZ } : undefined, subrole: posCat || null,
-      }) : '';
-      const relRow = giverRef
-        ? `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalGivenByLabel'))}</span>${giverRef}</div>` : '';
-      return `<div class="goal-target">${itemRow}${relRow}${canPing ? '' : posRow}</div>`;
+      const profLabel = professionLabel(capitalize(t.profession));
+      const relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalHarvestLabel', profLabel))}</span></div>`;
+      return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${posRow}</div>`;
     }
-    // Nom cliquable (mirrors actorRows' own npcIndexByName lookup) —
-    // CORRIGÉ (audit quêtes 2026-07-11, classe A : 88 buts « talk/help »
-    // rendus SANS lien) : l'ancien commentaire « les cibles npc ne portent
-    // jamais leur propre t.label » était PÉRIMÉ — la passe mechanism-decode
-    // du pipeline expédie le PNJ résolu dans `t.label` (+ `t.key: "npc:*"`
-    // sur 62 des 88) ; résoudre/afficher la PHRASE d'objectif (« Help
-    // Jennifer Davyna ») ne matchait le catalogue que quand la phrase se
-    // trouvait être exactement le nom (204/292), et dupliquait la phrase en
-    // pseudo-chip de nom sous elle-même. Source : t.label d'abord (le NOM),
-    // phrase en repli (`npcName`, calculé en tête de fonction avec le join
-    // de pin) ; repli texte simple si le PNJ n'est pas sur la carte active
-    // (jamais un lien deviné).
-    // EntityRef (vague 1) : `[PNJ ●] Nom` — nom souligné ⇔ le PNJ résout sur
-    // la carte active (mêmes gardes/sources qu'avant, voir le commentaire
-    // ci-dessus), pastille locate ⇔ une position existe (pin réel corrigé en
-    // tête de fonction — posX/posZ/posCat) ; elle absorbe la ligne « Carte »
-    // séparée. PNJ sur une AUTRE carte sans coordonnée locale (t.map seul,
-    // ex. le Fantôme de l'Île-prison) : ratification 2026-07-13 — la bascule
-    // de carte vit SUR le chip PNJ lui-même (pastille mode L à pos.x nul →
-    // switchMap, main.js ; nom de la carte en méta — même idiome que les
-    // acteurs cross-carte), plus jamais un `[Position(●)] <carte>` adjacent.
-    // Sans rien : tag+nom sans pastille, et posRow garde son repli honnête
-    // (position dynamique).
-    const ni = npcName ? npcIndexByName(npcName) : -1;
-    const canPing = t.x != null;
-    const crossMap = !canPing && !!t.map;
-    const npcTargetRef = npcName ? ref({
-      kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: cleanLabel(npcName),
-      hasFiche: ni >= 0, mode: 'L', drawable: canPing || crossMap,
-      pos: canPing ? { x: posX, z: posZ }
-        : crossMap ? { x: null, z: null, map: t.map } : undefined,
-      subrole: posCat || null,
-      meta: crossMap ? `· ${mapName(t.map)}` : null,
-    }) : '';
-    const nameRow = npcTargetRef ? `<div class="goal-target-row goal-target-row-rel">${npcTargetRef}</div>` : '';
-    return `<div class="goal-target">${nameRow}${(canPing || (crossMap && npcTargetRef)) ? '' : posRow}</div>`;
-  }
-
-  if (t.kind === 'dynamic') {
-    return `<div class="goal-target">${posRow}</div>`;
-  }
-
-  if (t.kind === 'ability') {
-    // use_ability (mechanism): mech_target.label is a raw slot/trigger name
-    // (e.g. "use_ability", "quest ability death_raven"), not always a real
-    // in-game ability display name -- shown as-is (cleaned), never guessed
-    // against S.abilities by name (no reliable fold-match source exists for
-    // these labels, unlike npc/monster names -- a wrong ability link would
-    // be worse than a plain unlinked chip). No position: casting an ability
-    // has no location concept (unlike a harvest node or a zone), so `posRow`
-    // is deliberately NOT rendered here -- same "never a fabricated position
-    // for a non-world target" rule as the craft branch above.
-    // cleanLabel porte désormais la garde générique anti-jeton moteur
-    // (underscores → espaces, audit classe E : « use_ability »,
-    // « activate_qao_… ») ; première lettre capitalisée pour le chip.
-    const ab = t.key ? S.abilities?.[t.key] : null;
-    // Placeholder de capacité MOTEUR (audit classe E) : « use_ability »,
-    // « quest ability <slug> », « activate_… » — un jeton technique, pas une
-    // capacité NOMMÉE. Non résolu au catalogue ET libellé BRUT à underscore
-    // (= identifiant moteur, même hypothèse vérifiée que cleanLabel utils.js) :
-    // le chip « [Capacité] Use ability » n'ajoute RIEN à côté du texte
-    // d'objectif (« Combine the ingredients », « Repair The Destroyer ») et se
-    // lit comme une référence cassée — on le SUPPRIME (l'action EST tout
-    // l'objectif, aucune cible à montrer, aucune position non plus). Une
-    // capacité vraiment nommée (résolue, ou libellé propre sans underscore)
-    // garde son chip.
-    const genericAbility = !ab && /_/.test(String(t.label || ''));
-    const abLabel = t.label ? cleanLabel(t.label).replace(/^./, c => c.toUpperCase()) : null;
-    if (!abLabel || genericAbility) return '';
-    // EntityRef (vague 1, GAP §7.1 de la spec) : `[Capacité] Nom` — le
-    // k-chip détaché devient le kind-tag. Souligné (ref-open →
-    // openAbilityFiche, routé main.js) UNIQUEMENT quand la CLÉ de la cible
-    // résout sur S.abilities — jamais un match par nom (la garde d'origine
-    // de cette branche : un lien de capacité faux serait pire que pas de
-    // lien). Jamais de pastille : lancer une capacité n'a pas de lieu.
-    return `<div class="goal-target">
-      <div class="goal-target-row goal-target-item">
+    // t.item_key (quest-guide-feature plan sec 5.2) est une chose DIFFÉRENTE
+    // de t.key ci-dessus : t.key est la clé catalogue PROPRE de cet objet
+    // (rare), t.item_key est l'item de quête concret que cette interaction
+    // a produit -- `differing` distingue les deux mécaniques réelles :
+    //   - item_key === key (ou pas de key du tout) : l'objet EST l'item
+    //     (ramassage au sol) -- une seule ligne d'identité suffit.
+    //   - item_key !== key : interagir avec un AUTRE objet (levier, machine,
+    //     baril...) produit cet item -- ligne de relation explicite en plus.
+    const differing = !!(t.item_key && t.item_key !== t.key);
+    const primaryKey = differing ? t.item_key : (t.item_key || t.key);
+    const approxForItem = t.item_key ? t.item_approx : t.approx;
+    // [collect-ITEM-from-object] (retour owner 2026-07-13, priorité #1
+    // followability -- « Quest item should be itself [Item(●)] : no need object
+    // position normally, self item knows where / how to find ») : un but qui
+    // RAMASSE un item (t.item_key présent) mène désormais sa carte de cible par
+    // l'IDENTITÉ DE L'ITEM ; l'objet/conteneur n'est plus qu'un contexte
+    // secondaire léger, JAMAIS une seconde entrée « Objet … à <position> »
+    // co-égale (le double-listage exact que l'owner a signalé, ex. Souvenir
+    // Sword). La position éventuelle de l'objet devient le « trouvé à » de
+    // l'ITEM : portée par SON chip — `[Quest Item(●)] Nom` (pos de
+    // goalTargetItemRow, mode L promu par mapref.js — même idiome que
+    // questItemRow, ratification 2026-07-13 : la pastille vit SUR l'entité,
+    // jamais un `[Position(●)]` adjacent). Sans item ramassé (use_object pur,
+    // ex. l'aéronef « soplo » : t.item_key absent) l'objet RESTE la cible
+    // `[Qao(●)]` (repli activable plus bas) — inchangé.
+    //
+    // DISCRIMINATEUR HONNÊTE : l'item ne mène QUE lorsqu'il est lié au but par
+    // le MÉCANISME du jeu (`item_join === "mechanism"`) — le seul join prouvé,
+    // jamais un match inféré. Deux mécanismes le portent : collect_from_object
+    // (relation collect_from) et kill_collect sur un objet (relation drops_from
+    // — détruire un conteneur/coffre/veine pour en récolter l'item). Les
+    // vraies interactions d'objet (use_object / talk / harvest) rattachent leur
+    // item par déduction (item_join token_overlap / sole_candidate / archetype) :
+    // là, l'OBJET est le but, l'item n'est qu'un candidat — ils GARDENT la cible
+    // `[Qao(●)]` (repli conteneur/activable inchangé), exactement le « ne change
+    // pas les vraies interactions d'objet » de la consigne owner.
+    const collectsItem = !!t.item_key && t.item_join === 'mechanism';
+    // Conteneur NOMMÉ et DISTINCT (differing + label réel : interagir avec un
+    // AUTRE objet — « Old crate » — pour produire l'item) : il vaut d'être nommé
+    // en contexte (« found in ») et porte lui-même le pin. Un objet
+    // NON-differing (item_key === key) ne fait que ré-étiqueter l'item
+    // (casse/apostrophes : « Sword » vs « Souvenir Sword » — 13/13 des libellés
+    // « distincts » mesurés sont la MÊME entité) : aucun conteneur réel à
+    // nommer, l'item seul suffit.
+    const namedContainer = differing && !!t.label;
+    // « Trouvé à » de l'item : la position de l'objet portée par le CHIP DE
+    // L'ITEM lui-même — `[Quest Item(●)] Nom` (ratification 2026-07-13 : la
+    // pastille locate vit SUR l'entité, l'ex-`[Position(●)]` inline est mort ;
+    // même pin Q7, togglable, listé sous la barre de recherche, retirable).
+    // Seulement quand un item est réellement ramassé ET qu'aucun conteneur
+    // nommé ne porte déjà ce pin (sinon deux pins pour le même point). Jamais
+    // fabriqué : uniquement quand t.x existe vraiment (sinon l'item se tient
+    // seul, sa fiche EST le guide).
+    const itemFoundAtPos = (collectsItem && !namedContainer && t.x != null)
+      ? { x: posX, z: posZ }
+      : null;
+    // Cibles OBJET et l'arbre de gauche (#82 chunk (d)) : PAS de nœud à
+    // cocher aujourd'hui — l'analogue des sous-lignes espèce pour les objets
+    // de quête est le découpage qao PAR TYPE du chunk (c), pas encore livré.
+    // TODO(chunk (c)) : quand les sous-lignes `qao.<type>` existeront, le
+    // clic d'un chip objet devra cocher la ligne de SON type (placements
+    // joints par clé t.key — 25 cibles mesurées — sinon par nom replié
+    // t.label — 45), même clic-double-effet que les chips monstre.
+    // L'item MÈNE — son « trouvé à » (itemFoundAtPos) porté par SON chip,
+    // jamais une ligne de position séparée co-égale.
+    let itemRow = goalTargetItemRow(primaryKey, t.item_label, approxForItem, '', undefined, itemFoundAtPos);
+    let relRow = '';
+    // Quand l'item porte déjà son pin (itemFoundAtPos) OU qu'un conteneur nommé
+    // le porte, la ligne position séparée disparaît — une seule affordance carte
+    // par cible, jamais deux pins pour le même point (loi d'uniformisation,
+    // même logique que hasLayerResolution côté monstre).
+    let posInRef = !!(itemRow && itemFoundAtPos);
+    // SIMPLIFICATION corps/conteneur (2026-07-15) : un but à accepted_types voit
+    // ses conteneurs ÉNUMÉRÉS dans le tier « Types acceptés » (goalCorpseExtras)
+    // et ses positions dans les tiers officiel/dérivé (badge()) — le verbe « trouvé dans [Objet]
+    // <label> » / « obtenu ici » ne ferait alors que répéter la cible du but, on
+    // le SUPPRIME (garde la ligne d'identité d'item). Les vrais conteneurs nommés
+    // d'autres mécaniques (sans accepted_types, ex. « Old crate ») le gardent.
+    const containerNamedInTiers = Array.isArray(t.accepted_types) && t.accepted_types.length > 0;
+    if (itemRow && namedContainer && !containerNamedInTiers) {
+      // collect_from_object avec un conteneur DISTINCT nommé : « found in
+      // [Objet ●] <conteneur> » — contexte secondaire léger (verbe + nom),
+      // jamais une entrée co-égale. Pastille locate quand son placement est
+      // byte-joint (t.x) : le CONTENEUR porte alors le pin (pas l'item), jamais
+      // un nom de conteneur fabriqué.
+      const canPing = t.x != null;
+      posInRef = canPing;
+      // NB whitespace : l'indentation INTERNE de ce littéral (12/10 espaces)
+      // est volontairement conservée telle quelle malgré le dé-imbriquement du
+      // bloc — le blanc à l'intérieur des backticks est rendu littéralement,
+      // donc la garder identique laisse les buts « found in » NON concernés
+      // (use_object inféré) byte-identiques (render-diff : seuls les buts
+      // réellement modifiés changent).
+      relRow = `<div class="goal-target-row goal-target-row-rel">
+            <span class="goal-target-rel-verb">${esc(tr('goalFoundInLabel'))}</span>
+            ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: cleanLabel(t.label) })}
+          </div>`;
+    } else if (itemRow && differing && !itemFoundAtPos && !containerNamedInTiers) {
+      // Conteneur DISTINCT mais anonyme ET sans position : le verbe honnête seul
+      // (« obtenu ici ») — quand une position existe, le chip d'item la porte
+      // déjà (son « trouvé à ») et rend ce verbe redondant, donc omis. Idem quand
+      // les tiers énumèrent déjà les conteneurs (containerNamedInTiers).
+      relRow = `<div class="goal-target-row goal-target-row-rel"><span class="goal-target-rel-verb">${esc(tr('goalObtainedHereLabel'))}</span></div>`;
+    }
+    // Repli quand RIEN ne résout au catalogue (ni item_key ni key, ~14 % des
+    // objets sur l'ensemble des quêtes) : jamais une vignette vide -- réutilise
+    // `label` (la phrase d'objectif déjà affichée au-dessus), la seule donnée
+    // honnête qu'on ait pour nommer cet objet. EntityRef (vague 1) : l'objet
+    // activable sans clé catalogue (ex. « soplo », l'aéronef d'Inspect the
+    // aircraft) est une référence [Objet] — pastille locate quand son
+    // placement qao est byte-joint (le retour « activable n'est plus
+    // cliquable »), tag+libellé nus sinon (honnête : rien à viser).
+    // OBJET DE MONDE à clé HORS catalogue (audit 2026-07-13 classe C) : les
+    // clés QuestActiveObject sont sorties du catalogue d'items (« [Item] Qao
+    // Mixing Pot » était un pseudo-item de fuite de classifieur) — quand la
+    // cible porte une telle clé ET son propre nom (t.label, « Mixing Pot »),
+    // l'étape use_object rend l'OBJET lui-même sous son nom, jamais la phrase
+    // d'objectif répétée. Les cibles SANS clé gardent la phrase (t.label y est
+    // souvent un jeton d'éditeur brut — « soplo », « Pod Active »).
+    if (!itemRow) {
+      const canPing = t.x != null;
+      posInRef = canPing;
+      const worldObjName = (t.key && !S.items[t.key] && t.label) ? cleanLabel(t.label) : null;
+      itemRow = `<div class="goal-target-row goal-target-item">
         <span class="goal-target-icon">${ACTIVABLE_GLYPH}</span>
-        ${ref({ kind: 'ability', key: ab ? t.key : null, label: ab?.name || abLabel, hasFiche: !!ab })}
-      </div>
-    </div>`;
-  }
+        ${ref({ kind: 'qao', mode: canPing ? 'L' : 'N', pos: canPing ? { x: t.x, z: t.z } : undefined, label: worldObjName || label || '' })}
+      </div>`;
+    }
+    // Position restante : l'item ramassé porte son « trouvé à » en ligne
+    // (itemFoundAt) ET l'objet activable pur porte son pin [Qao ●] en ligne
+    // (repli ci-dessus) — dans les deux cas posInRef supprime la ligne séparée.
+    // TIERS DE POSITIONS (goalHasLocationTiers) : dès que le but porte des
+    // placements OU des pools de spawn, goalCorpseExtras ci-dessous rend le(s)
+    // tier(s) officiel/dérivé (badge()) — la ligne de position séparée disparaît (elle doublerait la
+    // source officielle, moins précise). Ne reste sinon ici que l'objet activable
+    // PUR encore positionné (aucun item, kind honnête [Objet ●]) ou le repli
+    // zone/dynamique (t.x absent : search_zone estimée / « non localisé »),
+    // jamais un pin fabriqué.
+    const objPosRow = (posInRef || goalHasLocationTiers(t)) ? '' : (t.x != null
+      ? `<div class="goal-target-row goal-target-row-pos">${ref({ kind: 'qao', mode: 'L', pos: { x: posX, z: posZ }, label: '' })}</div>`
+      : posRow);
+    // Blocs corps de quête (types acceptés / pools de spawn / astuce joueur) —
+    // rien si la cible n'en porte aucun (voir goalCorpseExtras).
+    return `<div class="goal-target">${itemRow}${relRow}${nodesRow}${objPosRow}${goalCorpseExtras(t)}</div>`;
+}
 
-  if (t.kind === 'zone') {
-    // enter_zone/exit_zone (mechanism): a named area (mech_target.label),
-    // sometimes with a real slot position ('s enter_zone branch) --
-    // `posRow` (shared, computed above) already renders it (gotoBtn) or the
-    // honest generic dynamic-position fallback when it isn't known.
-    const zLabel = t.label ? cleanLabel(t.label) : null;
-    // Couleur d'entité (task #77) : ZONE_HEX, même teinte que la ligne "Zones
-    // (régions)" du panneau/de la recherche -- ce n'est ni un PNJ ni un
-    // monstre, une zone nommée est une entité de carte à part entière.
-    // Ping cliquable (retour utilisateur « activable n'est plus cliquable ») :
-    // quand le pipeline a joint le centroïde du polygone de zone décodé (t.x,
-    //  zone_geo — trigger enter_zone sans slot placé), le NOM devient un
-    // goto vers ce centre au lieu d'un libellé mort. La zone reste le bon
-    // barreau d'échelle (une AIRE, pas un objet placé) : le clic centre la
-    // carte dessus, et la fiche offre en plus « Voir la zone » (contour
-    // complet, S.zonesQuest). Sans centroïde (zone sans géométrie décodée :
-    // « Around wreck », honnête trou), reste un libellé simple.
-    // EntityRef (vague 1) : `[Région ●] Nom` — pastille locate ⇔ le centroïde
-    // du polygone décodé est joint (t.x,  zone_geo) ; elle absorbe la
-    // ligne « Carte » séparée (une seule affordance carte). Nom JAMAIS
-    // souligné tant que la fiche région n'existe pas (vague R — honnêteté
-    // §3.5 : pas de lien vers une page qui n'existe pas). Sans centroïde
-    // (« Around wreck », trou honnête) : tag+nom nus, posRow garde ses replis.
-    // Q7 (pins locate toggle) : plus de `drawn:false` figé — l'état de la
-    // pastille est relu en direct de S.locates (mapref.js liveDrawn, mode L),
-    // comme toute autre pastille locate (le centroïde devient un pin
-    // persistant, listé dans le bandeau-légende, retirable).
-    // E'c-R : le NOM de la zone devient une réf `[Région(●)]` SOULIGNÉE quand une
-    // vraie région cataloguée porte ce nom (regionFicheExists) → ref-open ouvre
-    // openRegionFiche (main.js). La pastille reste un pin LOCATE au centroïde
-    // décodé (mode L, inchangé) — deux affordances distinctes coexistent. Un
-    // sous-lieu de quête sans région cataloguée (« Around wreck », « House Hilda
-    // Deeproot ») reste en clair (honnêteté §3.5 : jamais un lien vers une page
-    // inexistante) et garde sa seule pastille locate.
-    const canPing = t.x != null;
-    const zoneRef = zLabel ? ref({
-      kind: 'zone', label: zLabel, hasFiche: regionFicheExists(zLabel), drawable: canPing,
-      pos: canPing ? { x: t.x, z: t.z } : undefined,
-    }) : '';
-    const nameRow = zoneRef ? `<div class="goal-target-row goal-target-row-rel">${zoneRef}</div>` : '';
-    return `<div class="goal-target">${nameRow}${canPing ? '' : posRow}</div>`;
-  }
-
-  if (t.kind === 'players') {
-    // kill_player (mechanism): mech_target.player_specs codes (e.g.
-    // "CHA_S1") -- see heroSpecLabel's own doc for the class-name join. No
-    // position: a PvP kill objective has no single world location.
-    const specs = (t.player_specs || []).map(heroSpecLabel);
-    if (!specs.length) return '';
-    // EntityRef (vague 1) : `[Joueurs] <specs>` — tag + libellé en clair
-    // (§3.3 : ni carte — un kill PvP n'a pas de lieu — ni fiche : aucune
-    // page de classe/héros n'existe, no-page justifié). Le verbe vit déjà
-    // dans la phrase d'objectif au-dessus, plus jamais une phrase dupliquée.
-    return `<div class="goal-target"><div class="goal-target-row goal-target-row-rel goal-target-row-rel-plain">${ref({ kind: 'players', label: specs.join(', ') })}</div></div>`;
-  }
-
-  // Honest last-resort fallback (batch-wiring pass, mechanism decode job A):
-  // an unrecognized/future target kind (or one of the 4 byte-parse-gap
-  // residuals, mechanism: null --  sec 12) never renders
-  // silently blank under a normal-looking objective sentence -- shows
-  // whatever name the resolver actually produced, never a fabricated
-  // relation/position beyond what's genuinely on `t`.
-  const customName = t.label ? cleanLabel(t.label) : null;
-  if (!customName) return '';
-  // Pastille "unknown" ( #15, task #67) : ce résidu
-  // couvre 4 buts au total -- 3 sur test_craft_trigger (quête de test) + 1
-  // sur zero_to_hero_ish (contenu joueur RÉEL, opcode moteur non décodé --
-  // ni "dev", ni "dynamique", juste non déterminable depuis les données
-  // extraites, voir  §12). Jamais pour le contenu de test (déjà
-  // couvert par isTest ailleurs) -- pas de double pastille sur le même but.
-  const unknownChip = isTestQuest ? '' : ` ${badge({ axis: 'provenance', value: 'absent' })}`;
-  return `<div class="goal-target"><div class="goal-target-row goal-target-item"><span class="goal-target-item-label">${esc(customName)}</span>${unknownChip}</div></div>`;
+function goalTargetChip(t, label, regionHint, isTestQuest) {
+  if (!t || t.kind === 'multiple') return '';
+  const ctx = goalPosCtx(t, label, regionHint);
+  if (t.kind === 'item') return renderItemTarget(t, label, ctx);
+  if (t.kind === 'object') return renderObjectTarget(t, label, ctx);
+  if (t.kind === 'monster') return renderMonsterTarget(t, label, ctx);
+  if (t.kind === 'npc') return renderNpcTarget(t, ctx);
+  if (t.kind === 'dynamic') return renderDynamicTarget(ctx);
+  if (t.kind === 'ability') return renderAbilityTarget(t);
+  if (t.kind === 'zone') return renderZoneTarget(t, ctx);
+  if (t.kind === 'players') return renderPlayersTarget(t);
+  return renderFallbackTarget(t, isTestQuest);
 }
 
 /* Détecte si la cible d'un objectif fait partie d'une SÉRIE NUMÉROTÉE (ex.
