@@ -401,20 +401,18 @@ export default {
       // codificada a mano):
       //   1. Cadáveres colocados (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official):
       //      SOLO las colocaciones exactas, nombre honesto (nunca el objetivo exagerado);
-      //   2. Ubicaciones sugeridas (goalSuggestedPositionsLabel) — pista ligera 💡:
-      //      las Zonas de aparición de cadáveres (goalHintZonesTag), unión de los
-      //      grupos de misión y genéricos, una SUGERENCIA dibujable; el matiz
-      //      (goalHintZonesNote) en un tooltip de una línea.
+      //   2. Pista 💡 — la referencia estándar [Cadáveres(●)] (refKind.corpse),
+      //      un conmutador REAL de las capas «Cadáveres»; rótulo goalHintZonesTag,
+      //      el matiz (goalHintZonesNote) en un tooltip. El 💡 es su marca, no una frase.
       goalSpawnPoolLabel: (name, n) => `Zona de aparición — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} cadáveres colocados`,
       // Rótulos HONESTOS del tier oficial (SOLO colocaciones exactas): «Cadáveres
       // colocados» cuando el objetivo acepta tipos de cadáver, si no «Ubicaciones».
       goalPlacedCorpsesTag: 'Cadáveres colocados',
       goalPlacementsTag: 'Ubicaciones',
-      // Pista ligera 💡: prefijo «Ubicaciones sugeridas:» + el concepto de zonas
-      // de aparición (goalHintZonesTag) + el matiz plegado en un tooltip.
-      goalSuggestedPositionsLabel: 'Ubicaciones sugeridas:',
-      goalHintZonesTag: 'Zonas de aparición de cadáveres',
+      // Rótulo de la referencia-pista [Cadáveres(●)] — sin «de cadáveres» (el punto
+      // ya lleva el kind «Cadáveres»): la referencia se lee `[Cadáveres(●)] Zonas de aparición`.
+      goalHintZonesTag: 'Zonas de aparición',
       goalHintZonesNote: 'Cualquier cadáver de estos tipos cuenta, en cualquier parte del mapa.',
       // Mecanismo kill_collect/kill: target.drop_chance (0-100, exacto por
       // bytes) — distinto del dropChanceApprox genérico (parte calculada,
@@ -870,6 +868,9 @@ export default {
     // categoría. Ver js/mapref.js + en.js para la doc completa.
     refKind: {
       loot: 'Tabla de botín', position: 'Posición', players: 'Jugadores',
+      // El grupo «Cadáveres» del árbol (pista de búsqueda de cadáveres de un
+      // objetivo) — misma palabra que groupCorps; tinte del llamador (DECOR_HEX.corpse).
+      corpse: 'Cadáveres',
     },
     // EntityRef: etiquetas genéricas degradadas (spec §6.3, conjunto
     // CERRADO) — nunca la clave interna, nunca lore inventado.

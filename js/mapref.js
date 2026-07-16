@@ -62,7 +62,7 @@ function uiRef(key, ...args) {
 /* Mots de kind ADDITIONNELS (pas dans searchCat/cat/campKind) — repli local
    jusqu'à l'application de la table i18n `refKind` (staged). */
 const KIND_WORD_FALLBACK = {
-  loot: 'Loot table', position: 'Position', players: 'Players',
+  loot: 'Loot table', position: 'Position', players: 'Players', corpse: 'Corpses',
 };
 const kindWord = key => tbl('refKind', key) || KIND_WORD_FALLBACK[key] || pretty(key);
 /* Libellés génériques anonymisés (§6.3, ensemble FERMÉ) — utilisés quand
@@ -127,6 +127,16 @@ const KINDS = {
   // camp:wildlife (fkey `camp:wildlife` → ref-draw retombe sur activateCategoryNode,
   // main.js) — jamais un point précis présenté comme l'animal lui-même.
   wildlife:     { word: () => ck('wildlife'),                           fiche: false, mode: 'C' },
+  // Groupe « Corps » de l'arbre (les DEUX formes honnêtes d'un corps : la forme
+  // PLACÉE decor:corpse + la forme SPAWN camp:searchable_corpses) — une astuce
+  // de fouille de but qui bascule TOUT le groupe d'un geste. Mode C (catégorie,
+  // aucune fiche) : la pastille ●/◐/○ reflète l'état RÉEL des couches, relu de
+  // leurs cases d'arbre (syncEntityRefDots) ; les couches à basculer voyagent
+  // en `data-fkeys` (jamais codées ici), routées par main.js (draw, subrole
+  // 'goal-enable-corpse-layers') vers un toggle symétrique. Le mot = celui du
+  // groupe d'arbre (« Corps »/« Corpses »). Teinte fournie par l'appelant
+  // (desc.hex = DECOR_HEX.corpse, la teinte de la ligne d'arbre des corps).
+  corpse:       { word: () => kindWord('corpse'),                       fiche: false, mode: 'C' },
   node:         { word: () => sc('node'),                               fiche: true, mode: 'N' },
   // ── Fiche seule (tag + libellé souligné, PAS de pastille) ──
   // item/quest_item/recipe : mode N par défaut (catalogue sans position) MAIS
@@ -382,6 +392,11 @@ function wrapAttrs(desc, p) {
     `data-mode="${esc(p.mode)}"`,
     desc.key != null ? `data-key="${esc(String(desc.key))}"` : '',
     desc.fkey ? `data-fkey="${esc(desc.fkey)}"` : '',
+    // Réf COMBINÉE sur plusieurs couches (data-fkeys pluriel) : un toggle unique
+    // qui bascule >1 case d'arbre à la fois (ex. l'astuce de fouille de corps →
+    // decor:corpse + camp:searchable_corpses). L'état ●/◐/○ est relu de TOUTES
+    // par syncEntityRefDots ; le routeur (main.js draw) les bascule ensemble.
+    desc.fkeys ? `data-fkeys="${esc(Array.isArray(desc.fkeys) ? desc.fkeys.join(',') : String(desc.fkeys))}"` : '',
     desc.family ? `data-family="${esc(desc.family)}"` : '',
     desc.subrole ? `data-subrole="${esc(desc.subrole)}"` : '',
     desc.pos ? `data-x="${esc(String(desc.pos.x))}" data-z="${esc(String(desc.pos.z))}"${desc.pos.map ? ` data-map="${esc(desc.pos.map)}"` : ''}` : '',
@@ -473,6 +488,9 @@ function readRefInfo(wrap) {
     kind: d.kind,
     key: d.key != null ? d.key : null,
     fkey: d.fkey || null,
+    // Couches d'une réf combinée (data-fkeys pluriel) → tableau de fkeys ; le
+    // routeur draw les bascule ensemble (toggle symétrique). Absent → null.
+    fkeys: d.fkeys ? d.fkeys.split(',').map(s => s.trim()).filter(Boolean) : null,
     mode: d.mode || null,
     family: d.family || null,
     subrole: d.subrole || null,

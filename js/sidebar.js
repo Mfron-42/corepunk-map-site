@@ -977,6 +977,24 @@ function syncEntityRefDots() {
   // fiche « ne savait plus si elle était cochée » (retour owner 2026-07-12).
   for (const btn of document.querySelectorAll('.ref[data-mode="C"] [data-act="ref-draw"]')) {
     const d = btn.closest('.ref').dataset;
+    // Réf COMBINÉE sur plusieurs couches (data-fkeys pluriel — ex. l'astuce de
+    // fouille de corps : decor:corpse + camp:searchable_corpses) : l'état ● ⇔
+    // TOUTES les cases cochées, ◐ si certaines seulement, ○ si aucune. Même
+    // source que l'arbre/le bandeau (les cases par fkey), jamais un état privé ;
+    // générique (n fkeys). Garde la pastille honnête après un toggle d'arbre
+    // indépendant OU une réouverture de fiche.
+    if (d.fkeys) {
+      const inputs = d.fkeys.split(',').map(s => s.trim()).filter(Boolean)
+        .map(fk => document.querySelector(`#filters li[data-fkey="${CSS.escape(fk)}"] input`)).filter(Boolean);
+      const allOn = inputs.length > 0 && inputs.every(i => i.checked);
+      const anyOn = inputs.some(i => i.checked);
+      const partial = anyOn && !allOn;
+      btn.setAttribute('aria-pressed', String(allOn || partial));
+      const bub = btn.querySelector('.ref-bubble');
+      if (bub && bub.dataset.fill !== 'empty' && bub.dataset.fill !== 'empty-on')
+        bub.dataset.fill = partial ? 'partial' : (allOn ? 'on' : 'off');
+      continue;
+    }
     if (!d.fkey) continue;
     const input = document.querySelector(`#filters li[data-fkey="${CSS.escape(d.fkey)}"] input`);
     if (!input) continue;

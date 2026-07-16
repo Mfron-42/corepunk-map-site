@@ -457,19 +457,18 @@ export default {
       // off the data's own signals (never a hardcoded quest):
       //   1. Placed corpses (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official):
       //      the EXACT placements ONLY, honest name (never the over-claimed target);
-      //   2. Suggested locations (goalSuggestedPositionsLabel) — light 💡 hint:
-      //      the Corpse spawn zones (goalHintZonesTag), union of quest + generic
-      //      pools, a drawable SUGGESTION; the nuance (goalHintZonesNote) in a tooltip.
+      //   2. Hint 💡 — the standard [Corpses(●)] ref (refKind.corpse), a REAL
+      //      toggle of the "Corpses" layers; label goalHintZonesTag, the nuance
+      //      (goalHintZonesNote) in a tooltip. The 💡 is its mark, not a sentence.
       goalSpawnPoolLabel: (name, n) => `Spawn zone — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} placed corpses`,
       // HONEST labels for the official tier (exact placements ONLY): "Placed
       // corpses" when the goal accepts corpse types, else "Locations".
       goalPlacedCorpsesTag: 'Placed corpses',
       goalPlacementsTag: 'Locations',
-      // Light 💡 hint: "Suggested locations:" prefix + the spawn-zone concept
-      // (goalHintZonesTag) + the nuance folded into a one-line tooltip.
-      goalSuggestedPositionsLabel: 'Suggested locations:',
-      goalHintZonesTag: 'Corpse spawn zones',
+      // Label of the [Corpses(●)] hint ref — no trailing "corpse" (the bubble
+      // already carries the "Corpses" kind): the ref reads `[Corpses(●)] Spawn zones`.
+      goalHintZonesTag: 'Spawn zones',
       goalHintZonesNote: 'Any corpse of these types counts, anywhere on the map.',
       // kill_collect/kill mechanism: target.drop_chance (0-100, byte-exact),
       // shown next to the dropped-by name+level — distinct from the generic
@@ -946,6 +945,9 @@ export default {
     // never a category (all-vs-one), so no plural form. See js/mapref.js.
     refKind: {
       loot: 'Loot table', position: 'Position', players: 'Players',
+      // The tree's "Corpses" group (a goal corpse-search hint) — same word as
+      // groupCorps; tint supplied by the caller (DECOR_HEX.corpse).
+      corpse: 'Corpses',
     },
     // EntityRef degraded generic labels (spec §6.3) — the CLOSED set shown
     // when the backing entity is display-gated: never the internal key, never

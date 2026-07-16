@@ -209,19 +209,6 @@ document.addEventListener('click', e => {
   // focus/historique que les drapeaux (pas de pushFocusState/unfocus),
   // l'autre voie de retrait étant la pastille/le ✕ du bandeau-légende.
   else if (b.dataset.act === 'remove-locate-pin') removeLocatePin(b.dataset.id);
-  // « Allumer des couches » (astuce de fouille de corps, stepguide.js
-  // hintZonesTier / data-subrole="goal-enable-corpse-layers") : un clic ALLUME les
-  // VRAIES couches d'arbre nommées dans data-fkeys (ex. decor:corpse +
-  // camp:searchable_corpses) — persistantes/explorables via leurs propres cases,
-  // jamais un tracé éphémère. activateCategoryNode est ENSURE-only (coche si pas
-  // déjà coché, ne décoche jamais, puis révèle) : GÉNÉRIQUE, aucune couche codée
-  // en dur ici (les fkeys viennent de l'affordance). Pas de pushFocusState — un
-  // allumage de filtre ne crée pas d'entrée d'historique (même modèle qu'une case
-  // d'arbre, voir filterRow/syncHash).
-  else if (b.dataset.act === 'enable-layers') {
-    for (const fkey of (b.dataset.fkeys || '').split(',').map(s => s.trim()).filter(Boolean))
-      activateCategoryNode('row', fkey);
-  }
   // Une ouverture de fiche par data-act (fiche-camp/-monster/-item/… ci-dessus)
   // vient de (re)rendre #detail : resynchronise ses pastilles `[Camp(●)]` avec
   // les tracés actifs (campRef rend drawn:false, l'état doit être relu à la
@@ -345,6 +332,23 @@ initMapRefDelegation(document, {
         break;
       }
       default: {
+        // Astuce de fouille de corps (stepguide.js hintZonesTier — la réf standard
+        // [Corps(●)] mode C, data-subrole "goal-enable-corpse-layers", data-fkeys =
+        // les DEUX couches « Corps ») : TOGGLE SYMÉTRIQUE des couches nommées —
+        // toutes cochées → toutes décochées, sinon toutes cochées. GÉNÉRIQUE : les
+        // fkeys viennent du DOM (data-fkeys), aucune couche codée ici ; réutilise
+        // la case d'arbre (input.click → l'écouteur `change` de filterRow : toggle +
+        // syncHash + refreshParentChecks, qui resynchronise la pastille de la fiche).
+        if (info.subrole === 'goal-enable-corpse-layers' && info.fkeys?.length) {
+          const inputs = info.fkeys
+            .map(fk => document.querySelector(`#filters li[data-fkey="${CSS.escape(fk)}"] input`))
+            .filter(Boolean);
+          if (inputs.length) {
+            const target = !inputs.every(i => i.checked);   // toutes ON → tout OFF ; sinon tout ON
+            for (const i of inputs) if (i.checked !== target) i.click();
+          }
+          break;
+        }
         // Placements EXACTS de conteneurs (chip [Quest objects(●)] N locations
         // de dynamicPosBadge, subrole "goal-placements") : bascule le TRACÉ de
         // 1re classe (campTrace) des vrais points des conteneurs fouillables —

@@ -1983,9 +1983,10 @@ body {
 /* Types acceptés d'une cible corps (goalCorpseExtras) : liste inline lisible,
    le « (N placés) / (spawn serveur) » déjà en .muted. */
 .goal-accepted-types { font-size: .76rem; color: var(--ink); line-height: 1.5; }
-/* ASTUCE JOUEUR (goalCorpseExtras, 3e tier « connu en jeu, pas extrait de la
+/* ASTUCE JOUEUR (playerTipRow, 3e tier « connu en jeu, pas extrait de la
    data ») : VISUELLEMENT DISTINCT des badges de donnée -- fond ambre tamisé,
-   liseré gauche accent, icône 💡. Jamais confondu avec une preuve extraite. */
+   liseré gauche accent. Jamais confondu avec une preuve extraite. (Encart
+   autonome, distinct du tier ASTUCE 💡 apparié ci-dessous.) */
 .goal-target-row.player-hint {
   margin-top: 5px; padding: 6px 8px;
   align-items: flex-start; gap: 7px;
@@ -1994,6 +1995,17 @@ body {
   border-left: 3px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 9%, var(--panel-3));
 }
+/* Tier ASTUCE 💡 (stepguide.js hintZonesTier) — le SECOND tier « où » d'un but de
+   fouille de corps, apparié au tier officiel (.goal-target-row-pos) juste au-dessus.
+   MÊME idiome de ligne PROPRE que lui (.goal-target-row aligné au centre, pastille
+   sur une base nette) : plus de boîte ambre lourde ni de libellé qui pendait sous
+   le 💡. Le 💡 est sa MARQUE d'astuce en tête — alignée à gauche avec le badge
+   [Officiel] du tier au-dessus (les deux marques partent du même bord) — suivi de
+   la réf standard [Corps(●)] teintée corps, sans « N pts » (une suggestion, pas une
+   donnée). Glissé tout contre le tier officiel : les deux se lisent comme une paire
+   propre et alignée. Aucune couleur neuve, aucun encart : le 💡 + la teinte corps +
+   l'absence de compteur suffisent à le distinguer du tier de données. */
+.goal-target-row-hint { gap: 7px; margin-top: 1px; }
 .player-hint-icon { flex: none; font-size: .92rem; line-height: 1.3; }
 .player-hint-body { font-size: .76rem; color: var(--ink); line-height: 1.45; min-width: 0; }
 .player-hint-label {

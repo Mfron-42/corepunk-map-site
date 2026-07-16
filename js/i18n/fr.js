@@ -440,19 +440,18 @@ export default {
       // signaux de la donnée (jamais une quête codée) :
       //   1. Corps placés (goalPlacedCorpsesTag / goalPlacementsTag) — badge(official) :
       //      les placements EXACTS seuls, nom honnête (jamais la cible sur-revendiquée) ;
-      //   2. Positions conseillées (goalSuggestedPositionsLabel) — astuce légère 💡 :
-      //      les Zones de spawn de corps (goalHintZonesTag), union quête + génériques,
-      //      une SUGGESTION dessinable ; la nuance (goalHintZonesNote) en info-bulle.
+      //   2. Astuce 💡 — la réf standard [Corps(●)] (refKind.corpse), un VRAI toggle
+      //      des couches « Corps » ; libellé goalHintZonesTag, la nuance
+      //      (goalHintZonesNote) en info-bulle. Le 💡 est sa marque, pas une phrase.
       goalSpawnPoolLabel: (name, n) => `Zone de spawn — ${name} (${n} pts)`,
       goalCorpsePlacedN: n => `${n} corps placés`,
       // Libellés HONNÊTES du tier officiel (placements exacts SEULS) : « Corps
       // placés » quand le but accepte des types de corps, sinon « Emplacements ».
       goalPlacedCorpsesTag: 'Corps placés',
       goalPlacementsTag: 'Emplacements',
-      // Astuce légère 💡 : préfixe « Positions conseillées : » + le concept des
-      // zones de spawn (goalHintZonesTag) + la nuance repliée en info-bulle.
-      goalSuggestedPositionsLabel: 'Positions conseillées :',
-      goalHintZonesTag: 'Zones de spawn de corps',
+      // Libellé de la réf d'astuce [Corps(●)] — sans « de corps » (la pastille
+      // porte déjà le kind « Corps ») : la réf se lit `[Corps(●)] Zones de spawn`.
+      goalHintZonesTag: 'Zones de spawn',
       goalHintZonesNote: 'N\'importe quel corps de ces types compte, partout sur la carte.',
       // Mécanisme kill_collect/kill : target.drop_chance (0-100, exact,
       // depuis les octets) — distinct du dropChanceApprox générique (part
@@ -912,6 +911,9 @@ export default {
     // catégorie. Voir js/mapref.js + en.js pour la doc complète.
     refKind: {
       loot: 'Table de butin', position: 'Position', players: 'Joueurs',
+      // Groupe « Corps » de l'arbre (astuce de fouille de but) — même mot que
+      // groupCorps ; teinte fournie par l'appelant (DECOR_HEX.corpse).
+      corpse: 'Corps',
     },
     // EntityRef : libellés génériques dégradés (spec §6.3, ensemble FERMÉ) —
     // jamais la clé interne, jamais du lore inventé.
