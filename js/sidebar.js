@@ -1040,10 +1040,22 @@ function syncEntityRefDots() {
 let dotsExpanded = false;
 let dotsOutsideHandler = null;
 
+/* Sélecteur PARTAGÉ de la case d'une catégorie d'arbre, résolu PAR CLÉ au
+   moment de l'appel (jamais un nœud DOM capturé : l'arbre peut avoir été
+   reconstruit entretemps) : `bucket` = sous-groupe à pastille (data-subgroup +
+   .subgrp-check), sinon = ligne filterRow simple (data-fkey). Source UNIQUE
+   consommée ici (activeTagInput, bandeau de légende) ET par layeractivate.js
+   (activateCategoryNode) — data-fkey/data-subgroup/.subgrp-check sont le contrat
+   DOM stable de filterRow/buildSubGroup. */
+function categoryInputSelector(kind, key) {
+  return kind === 'bucket'
+    ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] .subgrp-check`)
+    : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] input`);
+}
 function activeTagInput(d) {
-  if (d.sub) return document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(d.key)}"] .subgrp-check`);
+  if (d.sub) return categoryInputSelector('bucket', d.key);
   if (d.sp) return document.querySelector(`#filters li[data-species="${CSS.escape(d.key)}"] input`);
-  return document.querySelector(`#filters li[data-fkey="${CSS.escape(d.key)}"] input`);
+  return categoryInputSelector('row', d.key);
 }
 function collectActiveTags() {
   const tags = [];
@@ -1698,4 +1710,4 @@ $('#panel-toggle').addEventListener('click', () => {
   setTimeout(() => map.invalidateSize(), 280);
 });
 
-export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, revealNode, syncEntityRefDots };
+export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, revealNode, syncEntityRefDots, categoryInputSelector };

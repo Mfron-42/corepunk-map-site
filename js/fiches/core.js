@@ -453,6 +453,15 @@ function clearGoalZone() {
   if (goalZoneLayer) { map.removeLayer(goalZoneLayer); goalZoneLayer = null; }
   if (currentGoalZoneIdx != null) { currentGoalZoneIdx = null; syncGoalZoneDots(); }
 }
+/* Style partagé du cercle/polygone de zone d'objectif (quest) — source UNIQUE
+   des 3 tracés (drawGoalZone, contour de points drawEstimatedZone,
+   drawMonsterZone) : liseré plein/rempli (estimate=false, zone affirmée) vs
+   fin/pointillé/pâle (estimate=true, zone prudente). */
+const goalZoneStyle = (estimate = false) => ({
+  color: CATS.quest.hex, weight: estimate ? 1.4 : 2,
+  dashArray: estimate ? '2 8' : '5 6',
+  fillColor: CATS.quest.hex, fillOpacity: estimate ? .06 : .12, interactive: false,
+});
 /* `estimate` (repli d'une zone confiance MOYENNE dont le camp cité n'a pas pu
    être joint à un vrai point, voir drawEstimatedZone ci-dessous) : même
    géométrie que le cercle confiance haute, mais liseré plus fin/pointillé
@@ -469,11 +478,7 @@ function drawGoalZone(sz, { estimate = false } = {}) {
   // centroïde + bbox — repli assumé et documenté : un cercle centré sur le
   // centroïde, rayon = demi-diagonale de la bbox.
   const r = Math.max(35, Math.hypot(maxX - minX, maxZ - minZ) / 2);
-  const circle = L.circle(toLL(cx, cz), {
-    radius: r, color: CATS.quest.hex, weight: estimate ? 1.4 : 2,
-    dashArray: estimate ? '2 8' : '5 6',
-    fillColor: CATS.quest.hex, fillOpacity: estimate ? .06 : .12, interactive: false,
-  });
+  const circle = L.circle(toLL(cx, cz), { radius: r, ...goalZoneStyle(estimate) });
   goalZoneLayer = L.layerGroup([circle]).addTo(map);
   map.flyToBounds(circle.getBounds().pad(0.25));
 }
@@ -543,10 +548,7 @@ function drawEstimatedZone(sz) {
     const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     const r = Math.max(35, Math.hypot(Math.max(...xs) - Math.min(...xs),
                                       Math.max(...zs) - Math.min(...zs)) / 2 + 12);
-    goalZoneLayer = L.layerGroup([L.circle(toLL(cx, cz), {
-      radius: r, color: CATS.quest.hex, weight: 1.4, dashArray: '2 8',
-      fillColor: CATS.quest.hex, fillOpacity: .06, interactive: false,
-    })]).addTo(map);
+    goalZoneLayer = L.layerGroup([L.circle(toLL(cx, cz), { radius: r, ...goalZoneStyle(true) })]).addTo(map);
     showHighlight(pts, CATS.quest.hex);
     return;
   }
@@ -582,9 +584,7 @@ function drawMonsterZone(zoneNames, { estimate = false } = {}) {
   const pts = [];
   zones.forEach(z => (z.rings || []).forEach(ring => {
     L.polygon(ring.map(([x, zz]) => { pts.push(toLL(x, zz)); return toLL(x, zz); }), {
-      color: CATS.quest.hex, weight: estimate ? 1.4 : 2,
-      dashArray: estimate ? '2 8' : '5 6',
-      fillColor: CATS.quest.hex, fillOpacity: estimate ? .06 : .12, interactive: false,
+      ...goalZoneStyle(estimate),
     }).addTo(g);
   }));
   goalZoneLayer = g.addTo(map);
@@ -991,7 +991,7 @@ function viewGoalZone(zi) {
 export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
   abilityCooldown, abilityDescHtml, abilityCooldownHtml,
-  fmtNum, fmtPct, dropRow, dropRateHtml, lootRowsHtml,
+  fmtNum, fmtPct, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
   qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef, questRef,
   disambiguateQuestItems, disambiguatedItemName,

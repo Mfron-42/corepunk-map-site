@@ -162,17 +162,6 @@ function searchableChestPopup(r) {
    quête se lit désormais sur le pin de son donneur (popup PNJ « N quêtes » +
    fiche « Quêtes données ») et via la recherche, jamais via son propre marqueur. */
 
-/* Libellé de mob commun (partagé fiche/popup) : `[Espèce] Nom` (EntityRef,
-   identité — souligné → fiche monstre quand elle existe). Honesty-light : pas de
-   pastille (contexte popup). Note : ce helper n'a plus d'appelant vivant (rendu
-   des mobs de popup inliné dans campPopup) ; conservé pour compat d'export. */
-function mobLabelHtml(m, cls) {
-  const mk = monsterKeyFor(m.key, m.name, m.lvl);
-  const spId = mk ? S.monsters?.[mk]?.species : null;
-  const hex = spId ? speciesLayerHex(spId) : MONSTER_HEX;
-  return ref({ kind: 'species', key: mk || null, label: m.name, hex, hasFiche: !!mk, drawable: false });
-}
-
 function campPopup(p, n) {
   const g = p.g;
   const det = S.campDetails[g.k];
@@ -212,4 +201,4 @@ function campPopup(p, n) {
     ${contentLine}${extra}</div>`;
 }
 
-export { popupHtml, campPopup, mobLabelHtml, searchableChestPopup };
+export { popupHtml, campPopup, searchableChestPopup };

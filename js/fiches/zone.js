@@ -317,4 +317,4 @@ function openRegionFiche(zoneRef) {
   drawNamedZone(name);
 }
 
-export { openRegionFiche, regionRef, regionFicheExists, regionIdForName };
+export { openRegionFiche, regionRef, regionFicheExists };

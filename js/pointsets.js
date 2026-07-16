@@ -305,22 +305,6 @@ function kindJoinTable() {
    espèce du sous-groupe Creeps/Wildlife (sidebar.js). */
 function wildSpeciesOfKind(kind) { return kindJoinTable().get(kind)?.wild || []; }
 
-/* Espèces fauniques SANS AUCUN camp connu, catalogue ENTIER (job pass
-   2026-07-11b, wildlife_species.bin `camps: []` — 19/25 espèces : tortues
-   ×5, poule, oie, coq, corbeau, castor, rat ambiant, voglet, brisk, manta,
-   petit poisson, cochon, vache, buffle, chien). Contrairement à
-   wildSpeciesOfKind ci-dessus (jointure PAR kind via camp_details), ces
-   espèces n'ont RIEN à joindre nulle part -- listées quand même sous
-   Wildlife (sidebar.js buildKindGroup) : catalogue browsable/
-   recherchable, honnêteté "l'arbre est le bestiaire" ()
-   appliquée ici à la faune. GLOBAL (pas de résolution par carte, contrairement
-   à speciesCampSet -- il n'y a simplement aucun camp à résoudre). */
-function zeroCampWildlifeSpecies() {
-  return Object.entries(S.wildlifeSpecies || {})
-    .filter(([, w]) => !(w.camps && w.camps.length))
-    .map(([id, w]) => ({ id, name: w.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-}
 /* Camps d'un kind joints à AU MOINS une espèce (catalogue ou wild). */
 function kindBoundCampKeys(kind) { return kindJoinTable().get(kind)?.bound || new Set(); }
 /* Camps d'un kind SANS aucune espèce jointe + leur volume de points — la
@@ -378,9 +362,9 @@ function qaoPoints(sel) {
 // speciesCampWinner / main.js famWinner).
 export {
   campGroupByKey, speciesCampSet, speciesPoints,
-  familyCampSet, familyPoints, monsterFamilies,
+  familyPoints, monsterFamilies,
   familyExceptionSpecies, isSpeciesException,
-  wildSpeciesOfKind, zeroCampWildlifeSpecies, kindBoundCampKeys, kindRestPoints,
+  wildSpeciesOfKind, kindBoundCampKeys, kindRestPoints,
   qaoPoints,
   campIncludedMask, speciesMatches, familyMatches,
 };

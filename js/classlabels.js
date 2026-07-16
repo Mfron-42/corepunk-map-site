@@ -35,8 +35,5 @@ function gameLabel(group, token) {
     && classLabels.subtypes[group][token];
   return (e && e.src === 'game' && e.label) ? e.label : null;
 }
-/* Donnée brute (passe i18n / debug) — jamais consommée pour l'affichage
-   direct en dehors de gameLabel. */
-const classLabelsData = () => classLabels;
 
-export { setClassLabels, gameLabel, classLabelsData };
+export { setClassLabels, gameLabel };

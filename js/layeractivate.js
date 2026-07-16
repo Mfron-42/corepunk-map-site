@@ -18,7 +18,7 @@
    l'arbre elle-même (specieslayer.js/sidebar.js, INCHANGÉS) — compose
    seulement leurs primitives déjà exportées. */
 import { ensureSpeciesOn, setFamilyOn } from './specieslayer.js';
-import { buildFilters, revealMonsterNode, revealNode } from './sidebar.js';
+import { buildFilters, revealMonsterNode, revealNode, categoryInputSelector } from './sidebar.js';
 import { scheduleRedraw } from './mapview.js';
 import { syncHash } from './urlstate.js';
 import { S } from './state.js';
@@ -89,21 +89,14 @@ function activateFamilyLayers(fams) {
    sélecteur par data-subgroup + .subgrp-check). Résolu PAR CLÉ AU MOMENT
    DU CLIC — jamais une référence DOM capturée à l'indexation (sidebar.js
    peut avoir reconstruit l'arbre entretemps, ex. arrivée de camps.bin ou
-   changement de langue) : même exigence documentée que sidebar.js
-   activeTagInput()/buildTagEl() pour le bandeau de légende — ces deux
-   sélecteurs (2 lignes) sont dupliqués ici À L'IDENTIQUE plutôt que
-   d'exporter cette fonction privée d'un fichier verrouillé (sidebar.js,
-   propriété d'une autre mission en cours) ; data-fkey/data-subgroup/
-   .subgrp-check sont le contrat DOM stable déjà documenté par filterRow/
-   buildSubGroup elles-mêmes, aucune logique métier n'est dupliquée.
+   changement de langue) : même exigence que sidebar.js activeTagInput()/
+   buildTagEl() pour le bandeau de légende — la résolution est désormais la
+   fonction PARTAGÉE categoryInputSelector, importée de sidebar.js (source
+   unique) ; data-fkey/data-subgroup/.subgrp-check sont le contrat DOM stable
+   déjà documenté par filterRow/buildSubGroup elles-mêmes.
 
    ENSURE-only (jamais un toggle, même discipline qu'activateSpeciesLayer) :
    re-cliquer un résultat déjà coché re-révèle simplement la ligne. */
-function resolveCategoryInput(kind, key) {
-  return kind === 'bucket'
-    ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] .subgrp-check`)
-    : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] input`);
-}
 /* Révèle la ligne/le bucket fraîchement (re)ciblé : RÉSOUT le nœud (sélecteurs
    propres à cet arbre — data-fkey/subgroup, distincts des data-species/data-fam
    de sidebar.revealMonsterNode) puis délègue l'ouverture des <details> ancêtres,
@@ -118,7 +111,7 @@ function revealCategoryNode(kind, key) {
   revealNode(target);
 }
 function activateCategoryNode(kind, key) {
-  const input = resolveCategoryInput(kind, key);
+  const input = categoryInputSelector(kind, key);
   if (!input) return;
   // .click() natif (pas .checked=true + dispatchEvent) : simule un VRAI
   // clic utilisateur -- toggle + 'change' + tout listener 'click' propre à

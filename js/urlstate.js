@@ -294,7 +294,7 @@ function unfocus(clearFn) {
 }
 
 export {
-  buildHash, syncHash, readHash, pushFocusState, canGoBackLocally, unfocus,
+  syncHash, readHash, pushFocusState, unfocus,
   FICHE_HASH_KEYS,
   npcTokenForIndex, npcIndexForToken,
   chestTokenForIndex, chestIndexForToken,

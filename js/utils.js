@@ -88,30 +88,6 @@ function fold(s) {
     .replace(/[^a-z0-9Ѐ-ӿ]+/g, ' ').trim();
 }
 
-/* Distance d'édition bornée (bande de largeur maxD, abandon dès que la
-   ligne dépasse maxD) — assez rapide pour être rejouée sur tout l'index
-   à chaque frappe. */
-function editLe(a, b, maxD) {
-  const la = a.length, lb = b.length;
-  if (Math.abs(la - lb) > maxD) return maxD + 1;
-  let prev = new Array(lb + 1), cur = new Array(lb + 1);
-  for (let j = 0; j <= lb; j++) prev[j] = j;
-  for (let i = 1; i <= la; i++) {
-    cur[0] = i;
-    let rowMin = cur[0];
-    const from = Math.max(1, i - maxD), to = Math.min(lb, i + maxD);
-    for (let j = 1; j <= lb; j++) {
-      if (j < from || j > to) { cur[j] = maxD + 1; continue; }
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-      if (cur[j] < rowMin) rowMin = cur[j];
-    }
-    if (rowMin > maxD) return maxD + 1;
-    const t = prev; prev = cur; cur = t;
-  }
-  return prev[lb];
-}
-
 /* Nettoyage d'AFFICHAGE des libellés issus du client : suffixe technique
    « TEXTURING » et préfixe « QItem » (artefacts d'assets, jamais du contenu
    joueur — vus sur les acteurs/objets de quête). Les clés et l'index de
@@ -126,4 +102,4 @@ function editLe(a, b, maxD) {
 const cleanLabel = s => String(s ?? '').replace(/\s*TEXTURING\b/gi, '').replace(/\bQItem\s+/gi, '')
   .replace(/\b[\w]+(?:_[\w]+)+\b/g, m => m.replace(/_+/g, ' '));
 
-export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, npcIconUrl, reduceMotion, fold, editLe, cleanLabel };
+export { $, $$, esc, fmtCoord, pretty, capitalize, initials, itemGlyph, iconTag, npcIconUrl, reduceMotion, fold, cleanLabel };

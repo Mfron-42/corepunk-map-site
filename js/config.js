@@ -132,7 +132,6 @@ const CAMP_COLORS = {
   searchable_corpses: '#9d6f88', reactive_skeleton: '#c9bda3',
 };
 const campKindLabel = key => tbl('campKind', key) || pretty(key);
-const actorKindLabel = key => tbl('kind', key) || key;
 /* Accent colors for the new search-only categories (monsters/zones/lore/
    abilities) added on top of the pre-existing CATS/CAMP_COLORS palette —
    monster reuses CAMP_COLORS.monsters (same creature, same color whether
@@ -183,7 +182,6 @@ const DISPOSITION_HEX = {
   neutral:  '#d1a054',   // ambre prudence
   hostile:  '#d1495b',   // rouge hostile — distinct du rouge-danger « dev »
 };
-const dispositionHex = d => DISPOSITION_HEX[d] || 'var(--muted)';
 /* Palier de nœud de récolte (échelle de tier de la fiche nœud, blueprint
    §1.2/§3.3) : rampe métallique chaude, monotone en luminosité (T1 bronze mat
    → T5 or clair), lisible sur fond sombre. Axe ORTHOGONAL à la couleur de
@@ -620,7 +618,6 @@ const MONSTER_FAMILY_HEX_CYCLE = [
   '#df8c49', '#cddf49', '#69df49', '#49df8c',
   '#49cddf', '#4969df', '#8c49df', '#df49cd',
 ];
-const familyHexByRank = i => MONSTER_FAMILY_HEX_CYCLE[((i % 8) + 8) % 8];
 /* Teinte d'une FAMILLE — assignation DÉTERMINISTE par IDENTITÉ (hash djb2 de
    la clé de famille post-alias, exactement comme speciesLayerHex ci-dessous),
    stable ×sessions/cartes/langues/surfaces. Remplace l'ancien rang de liste
@@ -803,19 +800,19 @@ function ecAttr(hex, kind) {
 }
 
 export {
-  KWALAT_DEFAULTS, TILE_BASE, familyKey, MONSTER_FAMILY_HEX_CYCLE, familyHexByRank, familyLayerHex,
-  SPECIES_LAYER_HEX_CYCLE, speciesLayerHex, entityColor, kindBaseHex,
-  CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel, actorKindLabel,
+  KWALAT_DEFAULTS, TILE_BASE, familyKey, familyLayerHex,
+  speciesLayerHex, entityColor, kindBaseHex,
+  CATS, catLabel, POI_TYPES, poiTypeLabel, CAMP_COLORS, campKindLabel,
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
-  REGION_HEX, DISPOSITION_HEX, dispositionHex, NODE_TIER_HEX, nodeTierHex, nodeTierNum, nodeTierBadge,
-  INTERACTABLE_BUCKET_KEY, interactableBucketLabel,
+  REGION_HEX, nodeTierBadge,
+  interactableBucketLabel,
   monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
-  prettyMapId, mapName, ecAttr,
-  campDisplayName, campLabel, campTypeLabel, campQualifierLabel, campQualifierChip, campModeLabel,
+  mapName, ecAttr,
+  campLabel, campQualifierLabel, campQualifierChip, campModeLabel,
   campStateKey, campLayerHex, campContentInfo, campContentValue,
   chestTypeLabel, activableTypeLabel, chestDisplayName,
   DECOR_FAMILIES, DECOR_HEX, decorFamilyLabel, corpseRoleKey, chestHex, chestKindLabel,
-  prettyRegion, LOOT_TABLE_HEX,
+  prettyRegion,
 };

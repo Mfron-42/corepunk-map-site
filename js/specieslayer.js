@@ -105,6 +105,6 @@ function speciesCampWinner() {
 }
 
 export {
-  ensureSpeciesOn, toggleSpecies, checkedSpeciesIds, applySpeciesTokens,
+  ensureSpeciesOn, toggleSpecies, applySpeciesTokens,
   speciesCampWinner, setFamilyOn,
 };
