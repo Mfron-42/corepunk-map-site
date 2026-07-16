@@ -45,12 +45,16 @@ export default {
       abcSortSlot: 'Ranura',
       abcFilterPlaceholder: 'Filtrar habilidades mostradas…',
       abcNoResults: 'Ninguna habilidad coincide con estos filtros.',
-      // Ficha de habilidad — línea de enfriamiento + resolución mustache (ver core.js).
+      // Ficha de habilidad — línea de enfriamiento (a.cooldown) + efecto/control, parámetros en bruto, origen monstruo.
       abilityCooldownLabel: 'Enfriamiento',
       abilityCooldownSeconds: n => `${n} s`,
       abilityCooldownUnspecified: 'no especificado',
-      abilityParamTooltip: 'Resuelto a partir de los parámetros de esta habilidad',
       abilityNoDetail: 'No hay descripción ni fórmula en los datos del cliente para esta habilidad.',
+      abilityEffectTitle: 'Efecto',
+      abilityEffectDurationLabel: 'Duración',
+      abilityParamsTitle: 'Parámetros en bruto',
+      abilityParamsHint: 'Códigos internos del cliente, tal cual — sin traducir a estadísticas de jugador.',
+      abilityOriginMonster: 'Habilidad de monstruo',
       pageTitle: 'Kwalat — Mapa comunitario de Corepunk',
       pageDescription: 'Mapa interactivo de Kwalat (Corepunk): PNJ, misiones, talleres, cofres, campamentos y puntos de interés.',
       panelAriaLabel: 'Leyenda y filtros',

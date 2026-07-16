@@ -46,12 +46,16 @@ export default {
       abcSortSlot: 'Слот',
       abcFilterPlaceholder: 'Фільтрувати показані здібності…',
       abcNoResults: 'Жодна здібність не відповідає цим фільтрам.',
-      // Картка здібності — рядок перезарядки + розбір mustache (див. core.js).
+      // Картка здібності — рядок перезарядки (a.cooldown) + ефект/контроль, сирі параметри, походження-монстр.
       abilityCooldownLabel: 'Перезарядка',
       abilityCooldownSeconds: n => `${n} с`,
       abilityCooldownUnspecified: 'не вказано',
-      abilityParamTooltip: 'Отримано з параметрів цієї здібності',
       abilityNoDetail: 'У клієнтських даних немає опису чи формули для цієї здібності.',
+      abilityEffectTitle: 'Ефект',
+      abilityEffectDurationLabel: 'Тривалість',
+      abilityParamsTitle: 'Сирі параметри',
+      abilityParamsHint: 'Рушійні коди клієнта, як є — без перекладу в ігрові характеристики.',
+      abilityOriginMonster: 'Здатність монстра',
       pageTitle: 'Kwalat — Карта спільноти Corepunk',
       pageDescription: 'Інтерактивна карта Квалата (Corepunk): НПС, квести, майстерні, скрині, табори та точки інтересу.',
       panelAriaLabel: 'Легенда та фільтри',

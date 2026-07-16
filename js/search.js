@@ -959,15 +959,18 @@ function buildLocationSearchIndex() {
   });
 }
 
-/* Capacités NOMMÉES seulement (202/1765 — sorts de héros Q/W/E/R/MA ; les
-   capacités de monstre n'ont aucune localisation dans le client, voir
-    abilities.json) : indexer les ~1560 restantes n'aurait
-   affiché que des libellés de repli vides de sens, sans bénéfice pour la
-   recherche. */
+/* Capacités du catalogue expédié (abilities.bin, S.abilities) : sorts de héros
+   NOMMÉS (slot Q/W/E/R/MA) PLUS les 20 capacités de monstre porteuses de contenu
+   (origin:'monster' — nom prettifié par le pipeline, pas une localisation en
+   jeu). Ces dernières portent un sous-libellé « capacité de monstre » (lu sur
+   a.origin) pour rester trouvables SANS être confondues avec un sort de héros ;
+   les sorts gardent leur slot en sous-libellé. Les capacités sans aucun contenu
+   ne sont pas expédiées, donc pas indexées ici. */
 function buildAbilitySearchIndex() {
   Object.entries(S.abilities).forEach(([key, a]) => {
+    const sub = a.origin === 'monster' ? tr('abilityOriginMonster') : (a.slot || '');
     pushSearchEntry(a.name, 'ability', ABILITY_HEX, null, null, () => openAbilityFiche(key),
-      null, a.slot || '', '✨');
+      null, sub, '✨');
   });
 }
 

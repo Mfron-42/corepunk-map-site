@@ -11,7 +11,7 @@ import { campGroupByKey } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
 import { ref } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, abilityDescHtml, abilityCooldownHtml, fmtNum, fmtPct, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, abilityCooldownHtml, fmtNum, fmtPct, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    ( finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -606,17 +606,77 @@ function effectLinesSection(it) {
   return `<div class="fiche-section"><h3>${esc(tr('effectLinesTitle'))}</h3>${blocks}</div>`;
 }
 
-/* Fiche capacité (sorts de héros/monstres NOMMÉS) : icône, emplacement
-   (Q/W/E/R/MA quand présent), cooldown SI la règle le résout (voir core.js
-   abilityCooldownHtml — 3/240 résolus, « non spécifié » honnête quand déclaré
-   mais non décodé), description avec chaque {{mustache}} résolu par
-   formula.params ou remplacé par la pastille « ? » (core.js abilityDescHtml,
-   JAMAIS de {{brut}} affiché), tags verbatim, formule de dégâts reconstruite/
-   localisée quand décodée (a.formula, 20/240 — voir formulaHtml) et mise à
-   l'échelle par rareté quand connue (a.rarity_scaling -- 0 aujourd'hui côté
-   capacités, mais le champ est traité comme sur un item pour rester correct
-   si le pipeline en expose un jour). Absence honnête typée pour les 14
-   capacités sans description NI formule (rien de chiffrable côté client). */
+/* Effet(s) d'une capacité (abilities.bin `effect`) : chaîne d'entrées
+   {class, duration?, modifiers?} décodée au build. Rendue dans la MÊME grammaire
+   visuelle que les lignes d'effet d'objet (une ligne de durée en secondes par
+   valeur distincte, puis une ligne par modificateur de stat, dans un stat-grid).
+   Discipline « codes moteur verbatim » (comme rarityColsGridHtml / effectLines
+   v.params) : le nom joueur du modificateur quand le client le porte (Movement
+   Speed…), sinon le code brut (ACP5) — jamais un nom inventé ; la magnitude
+   n'est affichée que lorsqu'elle existe (m.value), sinon la stat est listée
+   seule (l'effet s'applique, son ampleur reste côté serveur). Les entrées sans
+   durée NI modificateur (set_ai/shield/tick pur) ne rendent rien -> section
+   absente quand aucune ligne n'est produite (jamais un bloc vide fabriqué). */
+function abilityEffectSection(a) {
+  const chain = a.effect;
+  if (!Array.isArray(chain) || !chain.length) return '';
+  const durations = [];
+  let modRows = '';
+  for (const e of chain) {
+    if (e.duration != null && !durations.includes(e.duration)) durations.push(e.duration);
+    for (const m of e.modifiers || []) {
+      const label = m.name || m.code;
+      if (!label) continue;
+      const val = m.value != null ? fmtNum(m.value) : '';
+      modRows += `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(val)}</div>`;
+    }
+  }
+  const durRows = durations.map(d =>
+    `<div class="stat-row-label">${esc(tr('abilityEffectDurationLabel'))}</div>`
+    + `<div class="stat-row-value">${esc(tr('abilityCooldownSeconds', fmtNum(d)))}</div>`).join('');
+  const rows = durRows + modRows;
+  if (!rows) return '';
+  return `<div class="fiche-section"><h3>${esc(tr('abilityEffectTitle'))}</h3><div class="stat-grid">${rows}</div></div>`;
+}
+
+/* Mise à l'échelle par rareté (`byRarity`, 2 runes actives) + paramètres
+   scalaires bruts (`params`) d'une capacité : la grille par rareté réutilise le
+   helper partagé rarityColsGridHtml (colonnes = codes moteur verbatim, ex.
+   ACP1) ; les params sont les scalaires pliés de l'enregistrement (mêmes codes
+   verbatim, même discipline que effectLinesSection v.params) — jamais un nom de
+   stat joueur inventé. `C` (cooldown) est retiré de la grille params : déjà
+   surfacé en ligne « Cooldown » dédiée, pas répété. Section(s) absente(s) quand
+   le champ manque (null-safe). */
+function abilityScalingSection(a) {
+  const parts = [];
+  if (a.byRarity) {
+    const rows = rarityColsGridHtml(a.byRarity);
+    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityRarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
+  }
+  if (a.params) {
+    const rows = Object.entries(a.params)
+      .filter(([c]) => c !== 'C')
+      .map(([c, v]) => `<div class="stat-row-label">${esc(c)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`)
+      .join('');
+    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityParamsTitle'))}</h3><p class="hint">${esc(tr('abilityParamsHint'))}</p><div class="stat-grid">${rows}</div></div>`);
+  }
+  return parts.join('');
+}
+
+/* Fiche capacité (sorts de héros / capacités de monstres NOMMÉES) : icône,
+   emplacement (Q/W/E/R/MA quand présent), cooldown SI déclaré (core.js
+   abilityCooldownHtml, lu sur `a.cooldown` — chiffre résolu ou « non spécifié »
+   honnête). La description arrive déjà résolue du pipeline (`a.resolvedDesc` +
+   `a.unresolved[]`) et passe par effectResolvedTextHtml — MÊMES pastilles
+   honnêtes que les effets d'objet (base/formule/par-rareté décodés en ligne,
+   runtime/non-extrait en pastille « ? », JAMAIS de {{brut}}). Puis l'effet/CC
+   (a.effect : durées + modificateurs de stat), les tags verbatim, la formule de
+   dégâts reconstruite/localisée quand décodée (a.formula — voir formulaHtml) et
+   la mise à l'échelle par rareté + paramètres bruts (a.byRarity/a.params).
+   Provenance « capacité de monstre » (a.origin==='monster', 20 clés) dite dans
+   le sous-titre : le nom est un libellé prettifié du pipeline, pas une
+   localisation en jeu. Absence honnête typée quand rien n'est chiffrable côté
+   client (ni desc, ni effet, ni formule, ni scaling, ni cooldown). */
 function openAbilityFiche(key) {
   const a = S.abilities[key];
   if (!a) return;
@@ -624,14 +684,21 @@ function openAbilityFiche(key) {
   const avatar = a.icon ? iconTag(`icons/${a.icon}`, 'fiche-avatar', '✨') : '';
   const tagsHtml = a.tags?.length
     ? `<div class="fiche-section reward-chips">${a.tags.map(t => `<span class="chip">${esc(t)}</span>`).join('')}</div>` : '';
+  const cooldownHtml = abilityCooldownHtml(a);
+  const descHtml = a.resolvedDesc
+    ? `<div class="fiche-section"><p class="fiche-journal">${effectResolvedTextHtml(a)}</p></div>` : '';
+  const effectHtml = abilityEffectSection(a);
   const formulaHtmlBlock = a.formula ? formulaHtml(a.formula) : '';
-  const scalingHtml = scalingSection(a);
-  const emptyNote = (!a.desc && !a.formula)
+  const scalingHtml = abilityScalingSection(a);
+  const originSub = a.origin === 'monster' ? ` · ${esc(tr('abilityOriginMonster'))}` : '';
+  const hasDetail = cooldownHtml || descHtml || effectHtml || formulaHtmlBlock || scalingHtml;
+  const emptyNote = !hasDetail
     ? `<div class="fiche-section"><p class="hint">${badge({ axis: 'provenance', value: 'absent', extra: tr('abilityNoDetail') })}</p></div>` : '';
   openFiche(`
-    ${ficheHeader({ avatar, name: a.name, hex: entityColor('ability', a.name), sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}` })}
-    ${abilityCooldownHtml(a)}
-    ${a.desc ? `<div class="fiche-section"><p class="fiche-journal">${abilityDescHtml(a)}</p></div>` : ''}
+    ${ficheHeader({ avatar, name: a.name, hex: entityColor('ability', a.name), sub: `${esc(tr('abilityLabel'))}${a.slot ? ' · ' + esc(a.slot) : ''}${originSub}` })}
+    ${cooldownHtml}
+    ${descHtml}
+    ${effectHtml}
     ${tagsHtml}
     ${formulaHtmlBlock}
     ${scalingHtml}

@@ -45,12 +45,16 @@ export default {
       abcSortSlot: 'Emplacement',
       abcFilterPlaceholder: 'Filtrer les capacités affichées…',
       abcNoResults: 'Aucune capacité ne correspond à ces filtres.',
-      // Fiche capacité — ligne cooldown + résolution mustache (voir core.js).
+      // Fiche capacité — ligne cooldown (a.cooldown) + effet/CC, params bruts, provenance monstre.
       abilityCooldownLabel: 'Cooldown',
       abilityCooldownSeconds: n => `${n} s`,
       abilityCooldownUnspecified: 'non spécifié',
-      abilityParamTooltip: 'Résolu depuis les paramètres de cette capacité',
       abilityNoDetail: 'Aucune description ni formule dans les données client pour cette capacité.',
+      abilityEffectTitle: 'Effet',
+      abilityEffectDurationLabel: 'Durée',
+      abilityParamsTitle: 'Paramètres bruts',
+      abilityParamsHint: 'Codes moteur du client, tels quels — non traduits en stats joueur.',
+      abilityOriginMonster: 'Capacité de monstre',
       pageTitle: 'Kwalat — Carte communautaire Corepunk',
       pageDescription: "Carte interactive de Kwalat (Corepunk) : PNJ, quêtes, ateliers, coffres, camps et points d'intérêt.",
       panelAriaLabel: 'Légende et filtres',

@@ -45,12 +45,16 @@ export default {
       abcSortSlot: 'Slot',
       abcFilterPlaceholder: 'Filter shown abilities…',
       abcNoResults: 'No abilities match these filters.',
-      // Ability fiche — cooldown line + mustache resolution (see core.js).
+      // Ability fiche — cooldown line (a.cooldown) + effect/CC, raw params, monster origin.
       abilityCooldownLabel: 'Cooldown',
       abilityCooldownSeconds: n => `${n} s`,
       abilityCooldownUnspecified: 'not specified',
-      abilityParamTooltip: 'Decoded from this ability’s parameters',
       abilityNoDetail: 'No description or formula in the client data for this ability.',
+      abilityEffectTitle: 'Effect',
+      abilityEffectDurationLabel: 'Duration',
+      abilityParamsTitle: 'Raw parameters',
+      abilityParamsHint: 'Client engine codes, verbatim — not translated to player stats.',
+      abilityOriginMonster: 'Monster ability',
       pageTitle: 'Kwalat — Corepunk Community Map',
       pageDescription: 'Interactive map of Kwalat (Corepunk): NPCs, quests, workshops, chests, camps and points of interest.',
       panelAriaLabel: 'Legend and filters',

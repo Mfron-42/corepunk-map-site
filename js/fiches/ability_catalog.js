@@ -1,9 +1,8 @@
 /* Kwalat — fiches/ability_catalog.js : la RÉFÉRENCE DES CAPACITÉS à facettes
    (nouvelle surface, jumelle du catalogue d'objets fiches/catalog.js). Aucune
    donnée régénérée : lit UNIQUEMENT les champs déjà expédiés dans abilities.bin
-   (slot / tags / desc / formula), plus la seule dérivation prouvée — le cooldown
-   résolu par la règle documentée (core.js abilityCooldown : jeton {{…C}} de la
-   description ↔ formula.params.C du MÊME enregistrement). Rendu dans le tiroir
+   (slot / tags / resolvedDesc / formula / origin), plus le cooldown lu tel quel
+   sur le scalaire `a.cooldown` cuit au build (core.js abilityCooldown). Rendu dans le tiroir
    latéral comme une fiche d'un NOUVEAU type (même openFiche/ficheHeader que le
    catalogue d'objets), branché au barrel fiches.js.
 
@@ -42,7 +41,7 @@ import { ref } from '../mapref.js';
 /* ── Accès aux champs (jamais re-dérivé ailleurs) ─────────────────────────── */
 function detailValues(a) {
   const out = [];
-  if (a.desc) out.push('desc');
+  if (a.resolvedDesc) out.push('desc');
   if (a.formula) out.push('formula');
   const cd = abilityCooldown(a);
   if (cd && cd.value != null) out.push('cooldown');
@@ -203,6 +202,11 @@ function sortResults(list) {
 }
 function rowMetaHtml(a) {
   const bits = [];
+  // Provenance « capacité de monstre » (a.origin==='monster') : petit tag muet
+  // — le nom est un libellé prettifié du pipeline, pas une localisation joueur ;
+  // le signaler évite de le confondre avec un sort de héros (jamais un lien/une
+  // couleur inventés, juste un rappel de provenance honnête).
+  if (a.origin === 'monster') bits.push(`<span class="cat-meta-t">${esc(tr('abilityOriginMonster'))}</span>`);
   if (a.slot) bits.push(`<span class="cat-meta-t">${esc(a.slot)}</span>`);
   const cd = abilityCooldown(a);
   if (cd && cd.value != null) bits.push(`<span class="cat-meta-r">${esc(tr('abilityCooldownSeconds', cd.value.toLocaleString(numberLocale())))}</span>`);
