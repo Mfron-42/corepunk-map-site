@@ -1,29 +1,16 @@
 /* Kwalat — fiches/entity.js (issu du découpage de fiches.js, vague E'c-S).
    Fiches d'entités vivantes : monstre/espèce, famille, faune, PNJ, camp. */
 import { S } from '../state.js';
-import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
-  rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
-  campLayerHex, campContentInfo, campContentValue,
-  statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
-  speciesLayerHex, familyLayerHex, entityColor,
-} from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
+import { CAMP_COLORS, RARITY, MONSTER_HEX, campKindLabel, monsterAttackLabel, harvestMethodLabel, campLabel, campQualifierChip, campModeLabel, campLayerHex, campContentInfo, campContentValue, statLabel, statTierLabel, familyKey, speciesLayerHex, familyLayerHex, entityColor } from '../config.js';
+import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize } from '../utils.js';
 import { tr, tbl, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
-import { clearLocator } from '../pins.js';
-import { unfocus } from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems, dispositionFor, creepFor } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints, isSpeciesException } from '../pointsets.js';
-import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs, visibleQuestSlugsSplit } from '../devcontent.js';
-import { ref, refDot } from '../mapref.js';
+import { map } from '../mapview.js';
+import { monsterKeyFor, loreIndexFor, lootTableItems, dispositionFor, creepFor } from '../data.js';
+import { campGroupByKey, speciesPoints, familyPoints, kindRestPoints, isSpeciesException } from '../pointsets.js';
+import { isHiddenTest, visibleQuestSlugsSplit } from '../devcontent.js';
+import { ref } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, questRef } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, badge, stateBadge, lootRowsHtml, fmtNum, fmtPct, pillHtml, pillSelectHtml, isRecipeKind, itemEcHex, speciesRef, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, questRef } from './core.js';
 import { regionRef, regionFicheExists } from './zone.js';
 
 /* Fiche camp — ouvrable pour TOUT camp, y compris sans fiche détaillée
@@ -416,8 +403,7 @@ function campModeSort(a, b) {
   return (+tierA || 0) - (+tierB || 0);
 }
 function campWeightPct(w) {
-  const pct = w * 100;
-  return pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct > 0 && pct < 10 ? 1 : 0 }) + ' %';
+  return fmtPct(w) + ' %';
 }
 function campPresenceHtml(det) {
   if (!det) return '';
@@ -581,11 +567,17 @@ const MONSTER_STAT_ROWS = [
   'accuracy', 'attack_speed', 'movement_speed', 'vision',
   'health_regen', 'mana', 'mana_regen',
 ];
-function statsGridHtml(stats) {
-  const rows = MONSTER_STAT_ROWS.filter(k => stats[k] != null).map(k =>
-    `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(String(stats[k]))}</div>`).join('');
+/* Grille de stats générique : une ligne label(i18n)+valeur pour chaque clé de
+   `keys` dont `obj[k]` est renseigné, formatée par `fmt`, enveloppée dans
+   .stat-grid. Corps partagé par statsGridHtml (valeurs brutes) et
+   computedStatsGridHtml (valeurs calculées arrondies) — mêmes lignes mot pour
+   mot, seuls la liste de clés et le formateur changent. */
+function statGridRows(obj, keys, fmt) {
+  const rows = keys.filter(k => obj[k] != null).map(k =>
+    `<div class="stat-row-label">${esc(statLabel(k))}</div><div class="stat-row-value">${esc(fmt(obj[k]))}</div>`).join('');
   return `<div class="stat-grid">${rows}</div>`;
 }
+function statsGridHtml(stats) { return statGridRows(stats, MONSTER_STAT_ROWS, String); }
 
 /* Fourchette de stats PAR PALIER (fiches.js) — voir  "Monster
    stats" +  Le client ne nomme
@@ -626,11 +618,7 @@ function fmtStatNum(v) {
 }
 /* Grille {stat -> valeur} calculée, arrondie/localisée (stats_computed d'un
    record ou d'un template le cas échéant). */
-function computedStatsGridHtml(sc) {
-  const rows = PER_TIER_STATS.filter(s => sc[s] != null).map(s =>
-    `<div class="stat-row-label">${esc(statLabel(s))}</div><div class="stat-row-value">${esc(fmtStatNum(sc[s]))}</div>`).join('');
-  return `<div class="stat-grid">${rows}</div>`;
-}
+function computedStatsGridHtml(sc) { return statGridRows(sc, PER_TIER_STATS, fmtStatNum); }
 /* Table fourchette : lignes = stats, colonnes = les 5 paliers (libellés
    courts). Enveloppée dans un conteneur défilable horizontalement pour ne
    jamais faire déborder le tiroir de fiche sur mobile. */

@@ -18,7 +18,7 @@
    l'arbre elle-même (specieslayer.js/sidebar.js, INCHANGÉS) — compose
    seulement leurs primitives déjà exportées. */
 import { ensureSpeciesOn, setFamilyOn } from './specieslayer.js';
-import { buildFilters, revealMonsterNode } from './sidebar.js';
+import { buildFilters, revealMonsterNode, revealNode } from './sidebar.js';
 import { scheduleRedraw } from './mapview.js';
 import { syncHash } from './urlstate.js';
 import { S } from './state.js';
@@ -104,25 +104,18 @@ function resolveCategoryInput(kind, key) {
     ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] .subgrp-check`)
     : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] input`);
 }
-/* Révèle la ligne/le bucket fraîchement (re)ciblé : ouvre tout <details>
-   ancêtre fermé (groupe racine + bucket lui-même), flash, scroll — même
-   idiome que sidebar.js revealMonsterNode (non réutilisable telle quelle :
-   ses deux sélecteurs sont câblés sur data-species/data-fam, pas sur un
-   fkey/subgroup arbitraire), y compris la même garantie « l'ouverture
-   programmatique de <details> déclenche le 'toggle' natif, donc
-   subOpen/localStorage restent synchrones côté sidebar.js ». Aucun
-   mouvement caméra (le geste caméra reste goto/zone, inchangé). */
+/* Révèle la ligne/le bucket fraîchement (re)ciblé : RÉSOUT le nœud (sélecteurs
+   propres à cet arbre — data-fkey/subgroup, distincts des data-species/data-fam
+   de sidebar.revealMonsterNode) puis délègue l'ouverture des <details> ancêtres,
+   le flash et le scroll au revealNode PARTAGÉ de sidebar.js (le tail identique,
+   jadis dupliqué ici, garantit toujours que l'ouverture programmatique de
+   <details> déclenche le 'toggle' natif → subOpen/localStorage restent
+   synchrones). Aucun mouvement caméra (le geste caméra reste goto/zone). */
 function revealCategoryNode(kind, key) {
   const target = kind === 'bucket'
     ? document.querySelector(`#filters details.decor-group[data-subgroup="${CSS.escape(key)}"] summary`)
     : document.querySelector(`#filters li[data-fkey="${CSS.escape(key)}"] .filter-row`);
-  if (!target) return;
-  for (let el = target.parentElement; el; el = el.parentElement) {
-    if (el.tagName === 'DETAILS' && !el.open) el.open = true;
-  }
-  target.classList.add('node-flash');
-  setTimeout(() => target.classList.remove('node-flash'), 1600);
-  target.scrollIntoView({ block: 'nearest' });
+  revealNode(target);
 }
 function activateCategoryNode(kind, key) {
   const input = resolveCategoryInput(kind, key);

@@ -230,14 +230,12 @@ async function loadDeferred() {
     // LANGUE (jamais par carte) : rechargé par setLang via ce même load.
     // 404-tolérant -> null (les libellés ◇ restent, jamais un plantage).
     fetchJson(dataPath('class_labels.bin')).catch(() => null),
-    // ── Nouveaux jeux différés (SCAFFOLDING E′c-0,  §2) ──
+    // ── Jeux de données additifs ( §2) ──
     // Enregistrés ici EXACTEMENT comme species.bin/nodes.bin ci-dessus, tous
     // 404-tolérants (doctrine additive : un déploiement partiel dégrade en
-    // silence, jamais un plantage). Ils EXISTENT déjà sur disque (construits en
-    // amont) mais RIEN ne consomme encore leurs index (zoneContentsFor/
-    // creepFor/dispositionFor plus bas) — le rendu reste donc identique, ils se
-    // chargent silencieusement en attendant leurs vagues (région E′c-R, faune/
-    // disposition E′c-4, builds E′c-8).
+    // silence, jamais un plantage). Leurs index sont désormais LUS en jeu :
+    // zoneContentsFor par la fiche région (zone.js), dispositionFor/creepFor par
+    // la fiche entité (entity.js, DispositionBadge + faune) — voir plus bas.
     // Contenus inversés par région (zones_contents.bin) : zone_id -> {display,
     // camps, monsters, creeps, objects, quests} — future fiche région.
     fetchJson(dataPath('zones_contents.bin')).catch(() => ({})),
@@ -449,18 +447,17 @@ function lootTableItems(label) {
   return lootTableIdxFallback.get(label) || null;
 }
 
-/* ── Index paresseux des nouveaux jeux différés (SCAFFOLDING E′c-0) ──────────
+/* ── Index paresseux des jeux de données additifs ───────────────────────────
    Mêmes idiomes que monsterKeyFor/loreIndexFor/lootTableItems ci-dessus : une
    variable d'index au niveau module, construite à la PREMIÈRE lecture et
    invalidée (=null) au rechargement des jeux différés (loadDeferred/setLang).
-   RIEN ne les appelle aujourd'hui — ils ne se construisent donc jamais et le
-   rendu reste identique ; ils attendent leurs vagues (région/faune/build). */
+   Tous LUS en jeu désormais (zone.js / entity.js) — construits à la demande. */
 
 /* Contenu inversé d'une région (zones_contents.bin,  §2) :
    zone_id -> {display, camps, monsters, creeps, objects, quests}. Le bundle est
    déjà un objet indexé par zone_id (accès direct comme lootTableContents) ; le
    Map paresseux tolère aussi une forme tableau {zone_id|id, …} par robustesse.
-   Consommé par la future fiche région (openRegionFiche, vague E′c-R). */
+   Consommé par la fiche région (zone.js). */
 let zoneContentsIdx = null;
 function zoneContentsFor(zoneId) {
   if (zoneId == null) return null;
@@ -479,8 +476,8 @@ function zoneContentsFor(zoneId) {
 
 /* Creep par clé (creeps.bin,  §2) : clé -> {name, family,
    disposition, …}. Objet indexé par clé (le cas courant) ou tableau {key|id, …}
-   par robustesse. Consommé par la future fiche faune/creep (openWildlifeFiche)
-   et dispositionFor ci-dessous. */
+   par robustesse. Consommé par la fiche entité (entity.js : faune) et par
+   dispositionFor ci-dessous. */
 let creepIdx = null;
 function creepFor(key) {
   if (!key) return null;
@@ -502,7 +499,7 @@ function creepFor(key) {
    monstre pourra arriver en chaîne OU en objet {value} ( §2 /
    blueprint §3.3 « normalize on read ») — aplatie ici à la lecture. Index
    paresseux fusionnant S.creeps puis S.monsters (le creep gagne si les deux
-   portent la clé). Consommé par la future DispositionBadge (vague E′c-4). */
+   portent la clé). Consommé par la fiche entité (entity.js dispositionChip). */
 let dispositionIdx = null;
 function normDisposition(d) {
   if (d == null) return null;

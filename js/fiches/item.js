@@ -2,28 +2,16 @@
    Fiches d'objets : objet, recette, table de butin, nœud de récolte, capacité —
    plus les plages de jet/formules/effets/scaling et les sections farm/contenants. */
 import { S } from '../state.js';
-import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
-  rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
-  statLabel, statTierLabel, formulaTermLabel, nodeTierBadge,
-  chestHex, chestKindLabel, prettyRegion, familyKey,
-  speciesLayerHex, familyLayerHex, entityColor,
-} from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
+import { CATS, CAMP_COLORS, RARITY, RECIPE_HEX, nodeHex, campKindLabel, rarityLabel, itemKindLabel, professionLabel, weaponTypeLine, statLabel, formulaTermLabel, nodeTierBadge, familyKey, familyLayerHex, entityColor } from '../config.js';
+import { $, esc, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
-import { clearLocator } from '../pins.js';
-import { unfocus } from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
+import { map } from '../mapview.js';
+import { monsterKeyFor, npcIndexByName, lootTableItems } from '../data.js';
+import { campGroupByKey } from '../pointsets.js';
 import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
-import { ref, refDot } from '../mapref.js';
+import { ref } from '../mapref.js';
 
-import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, abilityDescHtml, abilityCooldownHtml, fmtNum, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
+import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, varPlaceholder, abilityDescHtml, abilityCooldownHtml, fmtNum, fmtPct, pillHtml, pillSelectHtml, farmCapRows, farmCampRow, farmUnjoinedRow, familyHasMembers, qtyChipList, itemChip, isRecipeKind, speciesRef, npcRef, questRef, disambiguateQuestItems, disambiguatedItemName } from './core.js';
 
 /* Fiche « table de butin » : contenu COMPLET d'une table nommée du client
    ( finding #2 -- lu depuis S.lootTableContents, bundle dédié construit
@@ -137,10 +125,20 @@ function bandText(band) {
    quand il est connu ; à défaut (~9/158 items sans tier résolu, cf. audit
    Phase 4), on montre tous les tiers présents, étiquetés "(T1)"/"(T2)"/"(T3)"
    plutôt que d'en deviner un seul. */
+/* Deux idiomes de résolution de plage partagés par tieredStatRows /
+   derivedDpsRow / rollQualitySection : quel(s) tier montrer (le tier résolu
+   seul, sinon tous triés) et quelle bande lire (la rareté demandée, repli
+   « common »). Extraits mot pour mot — sortie inchangée. */
+function resolveTierKeys(tiersObj, tier) {
+  return (tier && tiersObj[tier]) ? [tier] : Object.keys(tiersObj).sort();
+}
+function resolveBand(byRarity, rarity) {
+  return byRarity[rarity] || byRarity.common;
+}
 function tieredStatRows(label, tiersObj, tier, rarity) {
-  const tierKeys = (tier && tiersObj[tier]) ? [tier] : Object.keys(tiersObj).sort();
+  const tierKeys = resolveTierKeys(tiersObj, tier);
   return tierKeys.map(tk => {
-    const band = tiersObj[tk][rarity] || tiersObj[tk].common;
+    const band = resolveBand(tiersObj[tk], rarity);
     const txt = bandText(band);
     if (txt == null) return '';
     const rowLabel = tierKeys.length > 1 ? `${label} (${tk})` : label;
@@ -183,8 +181,8 @@ function rollRarityPickHtml(key, active) {
    UNE stat isolée). */
 function derivedDpsRow(wd, tier, rarity) {
   if (!tier || !wd.attack_speed?.[tier] || !wd.weapon_damage?.[tier]) return '';
-  const asBand = wd.attack_speed[tier][rarity] || wd.attack_speed[tier].common;
-  const dmgBand = wd.weapon_damage[tier][rarity] || wd.weapon_damage[tier].common;
+  const asBand = resolveBand(wd.attack_speed[tier], rarity);
+  const dmgBand = resolveBand(wd.weapon_damage[tier], rarity);
   if (!asBand || !dmgBand) return '';
   const lo = Math.round(asBand.min * dmgBand.min * 100) / 100;
   const hi = Math.round(asBand.max * dmgBand.max * 100) / 100;
@@ -377,7 +375,7 @@ function effectVarChip(u) {
     const inner = RARITY_BANDS.map(r => {
       const v = u.values[r];
       if (v == null) return '';
-      const hex = RARITY[capitalize(r)]?.hex || 'var(--muted)';
+      const hex = bandRarityHex(r);
       return `<span style="color:${hex}">${esc(fmtNum(v))}</span>`;
     }).filter(Boolean).join('<span class="effect-var-sep">/</span>');
     const title = `${tr('effectVarPerRarityTooltip')} — ${RARITY_BANDS.map(r => `${bandRarityLabel(r)}: ${u.values[r] ?? '—'}`).join(', ')}`;
@@ -456,9 +454,9 @@ function rollQualitySection(it, key) {
   const rarity = activeRollRarity(key);
   const rows = mainSids.map(sid => {
     const tiersObj = it.stat_ranges[sid];
-    const tierKeys = (tier && tiersObj[tier]) ? [tier] : Object.keys(tiersObj).sort();
+    const tierKeys = resolveTierKeys(tiersObj, tier);
     return tierKeys.map(tk => {
-      const band = tiersObj[tk][rarity] || tiersObj[tk].common;
+      const band = resolveBand(tiersObj[tk], rarity);
       if (!band || band.min == null || band.max == null || band.min === band.max) return '';
       const at33 = band.min + 0.33 * (band.max - band.min);
       const at66 = band.min + 0.66 * (band.max - band.min);
@@ -484,14 +482,7 @@ function rollQualitySection(it, key) {
 function scalingSection(it) {
   const parts = [];
   if (it.rarity_scaling) {
-    const cols = Object.entries(it.rarity_scaling);
-    const multiCol = cols.length > 1;
-    const rows = cols.flatMap(([col, byRarity]) => RARITY_BANDS.map(r => {
-      const v = byRarity[r];
-      if (v == null) return '';
-      const label = multiCol ? `${bandRarityLabel(r)} (${col})` : bandRarityLabel(r);
-      return `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
-    })).join('');
+    const rows = rarityColsGridHtml(it.rarity_scaling);   // même grille par rareté que rune/overclock (helper partagé)
     if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('rarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
   } else if (it.rarity_scaling_status === 'no_template') {
     // Pastille "unknown" ( #13, task #67) : contenu
@@ -866,8 +857,7 @@ function harvestedOnHtml(it) {
 function containerChanceText(ch) {
   const pct = ch * 100;
   if (pct < 1) return tr('containerChanceBelowOne');
-  const rounded = pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct < 10 ? 1 : 0 });
-  return tr('containerChanceUpTo', rounded);
+  return tr('containerChanceUpTo', fmtPct(ch));
 }
 function containerRarityLabel(r) {
   const cap = r ? r[0].toUpperCase() + r.slice(1) : '';

@@ -132,4 +132,4 @@ function positionCounts(list) {
   return { shown, hidden };
 }
 
-export { isHiddenTest, devContentCounts, visibleQuestSlugs, visibleQuestSlugsSplit, isDialogueBark, positionCounts };
+export { isHiddenTest, devContentCounts, visibleQuestSlugsSplit, isDialogueBark, positionCounts };

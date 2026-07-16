@@ -65,4 +65,4 @@ function tbl(section, key) {
 /* Locale numérique de la langue active (séparateurs de milliers, etc.). */
 const numberLocale = () => (LANGS[LANG] || LANGS[DEFAULT_LANG]).numberLocale;
 
-export { LANGS, DEFAULT_LANG, LANG, setLangCode, tr, tbl, numberLocale };
+export { LANGS, LANG, setLangCode, tr, tbl, numberLocale };

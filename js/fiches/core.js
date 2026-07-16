@@ -3,28 +3,15 @@
    lignes de butin, badges d'état, boutons carte, références EntityRef (speciesRef/
    npcRef/campRef), lignes de camp, et la machinerie de zone d'objectif/monstre. */
 import { S } from '../state.js';
-import {
-  CATS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
-  rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName, campLayerHex,
-  statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
-  speciesLayerHex, familyLayerHex, entityColor,
-} from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, cleanLabel } from '../utils.js';
+import { CATS, RARITY, MONSTER_HEX, RECIPE_HEX, mapName, campLabel, campQualifierChip, campLayerHex, ecAttr, familyKey, speciesLayerHex, familyLayerHex, entityColor } from '../config.js';
+import { $, esc, fold, iconTag, itemGlyph, pretty, cleanLabel } from '../utils.js';
 import { tr, tbl, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
+import { map, toLL, clearHighlight, showHighlight } from '../mapview.js';
 import { clearLocator } from '../pins.js';
-import {
-  unfocus, FICHE_HASH_KEYS,
-  npcTokenForIndex, chestTokenForIndex, locationTokenForIndex,
-} from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
-import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
+import { unfocus, FICHE_HASH_KEYS, npcTokenForIndex, chestTokenForIndex, locationTokenForIndex } from '../urlstate.js';
+import { npcIndexByName } from '../data.js';
+import { speciesPoints, familyPoints } from '../pointsets.js';
+import { isHiddenTest } from '../devcontent.js';
 import { ref, refDot } from '../mapref.js';
 
 /* ── En-tête de fiche PARTAGÉ (TASK 1, owner 2026-07-12) ─────────────────────
@@ -120,6 +107,16 @@ function fmtNum(n) {
   if (n == null) return '?';
   return n.toLocaleString(numberLocale(), { maximumFractionDigits: 4 });
 }
+/* Fraction (0..1) → chaîne-NOMBRE de pourcentage, sans unité ni habillage :
+   1 décimale sous 10 % (mais pas pour 0), 0 au-delà. Règle d'arrondi partagée
+   par entity.campWeightPct (qui ajoute « % ») et item.containerChanceText (qui
+   l'enveloppe dans containerChanceUpTo, après son propre repli < 1 %). Comme
+   ce dernier ne formate JAMAIS en dessous de 1 %, le garde `pct > 0` n'y change
+   rien — sortie identique aux deux inlines d'origine. */
+function fmtPct(fraction) {
+  const pct = fraction * 100;
+  return pct.toLocaleString(numberLocale(), { maximumFractionDigits: pct > 0 && pct < 10 ? 1 : 0 });
+}
 /* Une pastille "rar-pill" (allumée = span figé / éteinte = bouton cliquable)
    -- helper partagé par les 3 sélecteurs qui utilisent ce composant visuel
    (rareté de plage de jet ci-dessous, variantes de rareté d'objet et
@@ -190,9 +187,9 @@ function openFiche(html) {
   $('#detail-body').innerHTML = html;
   detail.classList.add('open');
 }
-/* Lien profond de fiche dans le hash — les 15 kinds sont mutuellement exclusifs,
-   une seule fiche ouverte à la fois (blueprint §1.2, objectif 17/17 des surfaces
-   deep-linkables). Table UNIQUE kind→jeton ci-dessous ; la liste des noms de
+/* Lien profond de fiche dans le hash — les kinds sont mutuellement exclusifs,
+   une seule fiche ouverte à la fois (blueprint §1.2). Table UNIQUE kind→jeton
+   ci-dessous (FICHE_TOKEN, la source de vérité du compte) ; la liste des noms de
    paramètre vit dans urlstate.js (FICHE_HASH_KEYS) — même source pour l'exclusion
    mutuelle ici et le report à travers un pan/zoom (buildHash).
    `history.state` (pas `null`) : préserve le marqueur {cpm,cpmSeq} de l'entrée
@@ -212,7 +209,7 @@ const FICHE_TOKEN = {
   // couverts par la boucle d'exclusion mutuelle de setFicheHash + le report à
   // travers un pan/zoom (buildHash) — ET relus au chargement (restoreState).
   // Rien de spécifique à ajouter ici : leur sérialisation passe par FICHE_TOKEN
-  // comme les 15 autres kinds.
+  // comme les autres kinds.
   talent: 'tal', spec: 'spec', profession: 'prof',
   // Catalogue d'objets à facettes (nouvelle surface, fiches/catalog.js) : le
   // jeton `cat=` porte l'ÉTAT DES FACETTES encodé (pas une clé d'entité —
@@ -237,7 +234,7 @@ function ficheTokenValue(kind, id) {
 }
 function setFicheHash(kind, id) {
   const p = new URLSearchParams(location.hash.slice(1));
-  for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul des 18 jetons de fiche (tal/spec/prof compris — E'c-8)
+  for (const t of FICHE_HASH_KEYS) p.delete(t);       // exclusion mutuelle : un seul jeton de fiche à la fois (tal/spec/prof compris — E'c-8)
   // Openers historiques du monde/objet (coffre, coffre fouillable, chronique,
   // table de butin, nœud, capacité, recette) : ils posent S.openFiche puis
   // appellent setFicheHash(null) (leur module précède le deep-link) — on dérive
@@ -991,7 +988,7 @@ function viewGoalZone(zi) {
 export {
   ficheHeader, openFiche, closeFiche, setFicheHash, badge, stateBadge, varPlaceholder,
   abilityCooldown, abilityDescHtml, abilityCooldownHtml,
-  fmtNum, dropRow, dropRateHtml, lootRowsHtml,
+  fmtNum, fmtPct, dropRow, dropRateHtml, lootRowsHtml,
   pillHtml, pillSelectHtml, familyHasMembers, itemColor, isRecipeKind, itemEcHex,
   qtyItemChip, itemChip, qtyChipList, speciesRef, npcRef, campRef, questRef,
   disambiguateQuestItems, disambiguatedItemName,

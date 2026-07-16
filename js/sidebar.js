@@ -286,15 +286,16 @@ function catStats(key) {
 }
 
 /* ── Le groupe « Décor » est DISSOUS (IA finale, décision utilisateur
-   2026-07-11, puis arbre PLAT 2026-07-14) : ses familles (S.decor, données
-   INCHANGÉES — data.js buildDecorGroups, couches decor:<fam>, hash decor.*)
-   sont désormais des LIGNES DE PREMIER NIVEAU des « Objets interactifs »,
-   une par famille, dans un ordre de présentation FIXE (voir
-   buildGroupContainers). L'ancien rangement par `category` cuite en 4 seaux
-   (decorFamsOfCategory) est RETIRÉ avec les seaux eux-mêmes : plus de
-   parent, chaque famille se lit d'un coup d'œil. Toujours toutes décochées
-   par défaut ( §1/§3.1) et pleinement recherchables
-   (search.js buildChestSearchIndex ne filtre jamais sur l'état on/off). */
+   2026-07-11) : ses familles (S.decor, données INCHANGÉES — data.js
+   buildDecorGroups, couches decor:<fam>, hash decor.*) vivent désormais dans
+   les « Objets interactifs ». La PLUPART sont des LIGNES DE PREMIER NIVEAU,
+   mais depuis la reorg PAR TYPE (2026-07-15) deux familles vivent sous un
+   parent repliable qui porte leur contexte : corpse sous CORPS ▸ (avec les
+   Placés) et legacy sous COFFRES ▸ (« Hérité ») — voir buildGroupContainers.
+   L'ancien rangement par `category` cuite en 4 seaux (decorFamsOfCategory) est
+   RETIRÉ. Toujours toutes décochées par défaut ( §1/§3.1) et
+   pleinement recherchables (search.js buildChestSearchIndex ne filtre jamais
+   sur l'état on/off). */
 /* Ligne de filtre d'UNE famille décor — ligne de PREMIER NIVEAU de l'arbre
    plat (extraClass '' fourni par l'appelant ; mêmes couche/hash/état). */
 function decorRow(fam, extraClass = 'filter-row-sub', label = null) {
@@ -481,6 +482,21 @@ function attachFamilyNode(li, fam) {
    WILD cochée (turkey…) vit dans le groupe Creeps, plus seulement
    #group-monsters-list. AUCUN mouvement caméra (le geste caméra
    reste goto/zone). */
+/* Révèle un nœud d'arbre DÉJÀ résolu : ouvre tout <details> ancêtre fermé,
+   flash bref, scroll dans la vue. No-op si le nœud est absent (el falsy).
+   Partagé mot pour mot par revealMonsterNode (ici) et layeractivate.js
+   revealCategoryNode — seule la RÉSOLUTION du nœud (sélecteurs propres à
+   chaque arbre) reste à l'appelant. L'ouverture programmatique de <details>
+   déclenche le 'toggle' natif → subOpen/localStorage restent synchrones. */
+function revealNode(el) {
+  if (!el) return;
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    if (p.tagName === 'DETAILS' && !p.open) p.open = true;
+  }
+  el.classList.add('node-flash');
+  setTimeout(() => el.classList.remove('node-flash'), 1600);
+  el.scrollIntoView({ block: 'nearest' });
+}
 function revealMonsterNode(kind, id) {
   let target = kind === 'species'
     ? document.querySelector(`#filters li[data-species="${CSS.escape(id)}"] .species-row`)
@@ -492,13 +508,7 @@ function revealMonsterNode(kind, id) {
     const fam = sp ? familyKey(sp.family || 'other') : null;
     if (fam) target = document.querySelector(`#filters li[data-fam="${CSS.escape(fam)}"] .filter-row`);
   }
-  if (!target) return;
-  for (let el = target.parentElement; el; el = el.parentElement) {
-    if (el.tagName === 'DETAILS' && !el.open) el.open = true;
-  }
-  target.classList.add('node-flash');
-  setTimeout(() => target.classList.remove('node-flash'), 1600);
-  target.scrollIntoView({ block: 'nearest' });
+  revealNode(target);
 }
 
 /* ── Lignes familles de monstres (le cœur du groupe Monsters — voir la doc
@@ -699,9 +709,13 @@ function catRow(key, extraClass = '', label = null) {
 function poiTypeStats(type) {
   return positionCounts((S.data.poi || []).filter(r => r.poiType === type));
 }
-function poiTypeLeaf(t) {
-  return { get: () => !!S.poiTypes[t]?.on, set: on => { if (S.poiTypes[t]) S.poiTypes[t].on = on; } };
-}
+/* Feuille de cascade générique : accès get/set d'un toggle `.on` sur un store
+   indexé par clé (S.poiTypes/S.camps/CATS/S.decor). Le store est capturé à la
+   CRÉATION de la feuille — sûr car toute réassignation d'un store scopé carte
+   (S.camps/S.decor, multimap.applyMapState) est immédiatement suivie d'un
+   buildFilters() qui recrée toutes les feuilles (onMapSwitch, main.js). */
+const makeLeaf = (store, key) => ({ get: () => !!store[key]?.on, set: on => { if (store[key]) store[key].on = on; } });
+function poiTypeLeaf(t) { return makeLeaf(S.poiTypes, t); }
 /* Feuilles de cascade POI : seulement quand la carte ACTIVE a des POI
    (Kwalat seule aujourd'hui — les bundles île/arène expédient poi: []) :
    une carte sans POI n'a ni sous-groupe (voir buildPoiSubGroup) ni feuilles
@@ -779,7 +793,7 @@ function loadingHintLi() {
    S.decor[f].on / S.poiTypes[t].on / S.monfam[f].on / S.monsp[id].on) ; les
    feuilles absentes de la carte active ne sont simplement pas listées
    (jamais un parent bloqué « ni tout ni rien » par une couche impossible). */
-const campLeaf = kind => ({ get: () => !!S.camps[kind]?.on, set: on => { if (S.camps[kind]) S.camps[kind].on = on; } });
+const campLeaf = kind => makeLeaf(S.camps, kind);
 const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
 /* Feuilles de cascade des couches CATS (camp_chest/searchable_chest) et décor
    (corpse/legacy) : ré-introduites pour les sous-groupes CORPS et COFFRES des
@@ -789,8 +803,8 @@ const campLeavesOf = kinds => kinds.filter(k => S.camps[k]).map(campLeaf);
    buildFilters (toutes ces couches sont denses, config.js — le rendu carte suit).
    L'appelant ne liste que les feuilles PRÉSENTES (une feuille sans couche figerait
    le parent en état partiel). */
-const catLeaf = key => ({ get: () => !!CATS[key]?.on, set: on => { if (CATS[key]) CATS[key].on = on; } });
-const decorLeaf = fam => ({ get: () => !!S.decor[fam]?.on, set: on => { if (S.decor[fam]) S.decor[fam].on = on; } });
+const catLeaf = key => makeLeaf(CATS, key);
+const decorLeaf = fam => makeLeaf(S.decor, fam);
 /* Familles (arbre) MIROIR du groupe Creeps — lignes famille d'un monstre que
    le moteur spawne sous CE kind ET sous un AUTRE (son foyer monsters) :
    « présence double assumée » (rat/ratmutant s'ils spawnent dans les deux),
@@ -814,16 +828,14 @@ function famsOfKind(kind) {
       return kinds.includes(kind) && kinds.some(k => k && k !== kind);
     });
 }
-/* (destroyableKinds/interactivesKinds/chestsLeaves/destroyableLeaves/
-   interactivesLeaves/interOtherLeaves — la composition des 4 ex-seaux
-   Interactables — RETIRÉS avec l'arbre plat 2026-07-14. buildGroupContainers
-   liste maintenant chaque kind/famille/couche DIRECTEMENT via
-   kindsOfCategory (camps dynamiques) + decorRow/catRow, sans seau parent.) */
+/* (Les 4 ex-seaux Interactables et leurs feuilles sont RETIRÉS avec l'arbre
+   plat 2026-07-14 : buildGroupContainers liste chaque kind/famille/couche
+   DIRECTEMENT (kindsOfCategory + decorRow/catRow), sans seau parent.) */
 
 /* Registre des pastilles parent de sous-groupe (reconstruites à chaque
-   rebuild de l'arbre). (L'ancien registre STATIQUE des groupes racine —
-   groupChecks/GROUP_LEAVES/.grp-check — est RETIRÉ : correction finale
-   utilisateur 2026-07-11, les en-têtes de groupe ne se cochent plus.) */
+   rebuild de l'arbre). (L'ancien registre STATIQUE des groupes racine est
+   RETIRÉ : correction finale utilisateur 2026-07-11, les en-têtes de groupe
+   ne se cochent plus.) */
 let subChecks = [];
 function wireParentCheck(input, leavesFn) {
   // stopPropagation : la case vit DANS un <summary> — son clic ne doit
@@ -1673,4 +1685,4 @@ $('#panel-toggle').addEventListener('click', () => {
   setTimeout(() => map.invalidateSize(), 280);
 });
 
-export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, syncEntityRefDots };
+export { buildFilters, renderTracked, toggleTrack, toggleDone, revealMonsterNode, revealNode, syncEntityRefDots };

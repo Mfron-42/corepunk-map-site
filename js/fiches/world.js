@@ -1,26 +1,11 @@
 /* Kwalat — fiches/world.js (issu du découpage de fiches.js, vague E'c-S).
    Fiches de monde : coffre placé, coffre fouillable, chronique (lore). */
 import { S } from '../state.js';
-import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
-  rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
-  statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
-  speciesLayerHex, familyLayerHex, entityColor,
-} from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
-import { tr, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
-import { clearLocator } from '../pins.js';
-import { unfocus } from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
-import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
-import { ref, refDot } from '../mapref.js';
+import { CATS, locationKindLabel, chestDisplayName, chestHex, chestKindLabel, prettyRegion, entityColor } from '../config.js';
+import { $, esc, iconTag } from '../utils.js';
+import { tr } from '../i18n/index.js';
+import { map } from '../mapview.js';
+import { ref } from '../mapref.js';
 
 import { ficheHeader, openFiche, setFicheHash, lootRowsHtml, badge, speciesRef } from './core.js';
 

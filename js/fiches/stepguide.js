@@ -3,26 +3,14 @@
    StepCard, séries numérotées, badge de position dynamique, désambiguïsation
    des objets de quête. Appelé par fiches/quest.js. */
 import { S } from '../state.js';
-import {
-  CATS, CAMP_COLORS, RARITY, MONSTER_HEX, ABILITY_HEX, RECIPE_HEX, ZONE_HEX, nodeHex,
-  actorKindLabel, campKindLabel, monsterAttackLabel, locationKindLabel,
-  rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
-  weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName,
-  campLabel, campQualifierChip, campModeLabel, chestDisplayName,
-  statLabel, statTierLabel, formulaTermLabel,
-  chestHex, chestKindLabel, prettyRegion, ecAttr, familyKey,
-  speciesLayerHex, familyLayerHex, entityColor,
-} from '../config.js';
-import { $, esc, fmtCoord, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
+import { CATS, CAMP_COLORS, MONSTER_HEX, ZONE_HEX, nodeHex, professionLabel, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg, mapName, familyKey, speciesLayerHex, familyLayerHex } from '../config.js';
+import { $, esc, fold, iconTag, itemGlyph, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
-import { map, toLL, canvasR, clearHighlight, showHighlight } from '../mapview.js';
-import { clearLocator, addCampTrace, removeCampTrace } from '../pins.js';
-import { unfocus } from '../urlstate.js';
-import { monsterKeyFor, npcIndexByName, loreIndexFor, lootTableItems } from '../data.js';
-import { campGroupByKey, speciesPoints, familyPoints, monsterFamilies, kindRestPoints } from '../pointsets.js';
-import { RARITY_ORDER, rarityGroupFor } from '../rarity.js';
-import { isHiddenTest, visibleQuestSlugs } from '../devcontent.js';
-import { ref, refDot } from '../mapref.js';
+import { map } from '../mapview.js';
+import { addCampTrace, removeCampTrace } from '../pins.js';
+import { monsterKeyFor, npcIndexByName } from '../data.js';
+import { speciesPoints, familyPoints, kindRestPoints } from '../pointsets.js';
+import { ref } from '../mapref.js';
 
 import { disambiguatedItemName, currentGoalZones, npcRef, questRef, isRecipeKind, itemEcHex, familyHasMembers, badge } from './core.js';
 import { regionFicheExists } from './zone.js';
@@ -1239,7 +1227,7 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
     const ni = npcName ? npcIndexByName(npcName) : -1;
     const canPing = t.x != null;
     const crossMap = !canPing && !!t.map;
-    const npcRef = npcName ? ref({
+    const npcTargetRef = npcName ? ref({
       kind: 'npc', key: ni >= 0 ? `npc:${ni}` : null, label: cleanLabel(npcName),
       hasFiche: ni >= 0, mode: 'L', drawable: canPing || crossMap,
       pos: canPing ? { x: posX, z: posZ }
@@ -1247,8 +1235,8 @@ function goalTargetChip(t, label, regionHint, isTestQuest) {
       subrole: posCat || null,
       meta: crossMap ? `· ${mapName(t.map)}` : null,
     }) : '';
-    const nameRow = npcRef ? `<div class="goal-target-row goal-target-row-rel">${npcRef}</div>` : '';
-    return `<div class="goal-target">${nameRow}${(canPing || (crossMap && npcRef)) ? '' : posRow}</div>`;
+    const nameRow = npcTargetRef ? `<div class="goal-target-row goal-target-row-rel">${npcTargetRef}</div>` : '';
+    return `<div class="goal-target">${nameRow}${(canPing || (crossMap && npcTargetRef)) ? '' : posRow}</div>`;
   }
 
   if (t.kind === 'dynamic') {

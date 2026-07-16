@@ -15,6 +15,18 @@ import { tr } from './i18n/index.js';
 import { map, toLL, toWorld, activeMap, findRenderedMarker, refreshIconLayer, canvasR } from './mapview.js';
 import { syncHash } from './urlstate.js';
 
+/* Signal « ce registre a changé » — factory PARTAGÉE (locates/campTraces/
+   drapeaux) : un Set d'abonnés + on/notify, jadis triplé mot pour mot plus
+   bas. `on(cb)` renvoie le Set (add), `notify()` diffuse à chaque abonné —
+   comportement identique aux 3 paires d'origine. */
+function makeChangeSignal() {
+  const listeners = new Set();
+  return {
+    on: cb => listeners.add(cb),
+    notify: () => listeners.forEach(cb => cb()),
+  };
+}
+
 /* `pinRef` (facultatif, {cat}) : le caller a déjà résolu la cible à une
    entité CONNUE dont un marqueur peut déjà être affiché sur la carte (PNJ,
    coffre placé, camp, coffre fouillable…) — voir resolveGotoMarker ci-dessous,
@@ -170,9 +182,7 @@ function clearLocator() {
 if (!S.locates) S.locates = new Map();   // posé ICI (pins.js possède le cycle de vie), state.js intact
 let locateLayer = null;                  // L.layerGroup monté pour S.map courante seulement
 const locateMarkers = new Map();         // clé -> L.marker, carte courante uniquement
-const locatesListeners = new Set();
-function onLocatesChange(cb) { locatesListeners.add(cb); }
-function notifyLocatesChange() { locatesListeners.forEach(cb => cb()); }
+const { on: onLocatesChange, notify: notifyLocatesChange } = makeChangeSignal();
 function locatePinPopupHtml(key, p) {
   return `<div class="pop">
     <h3>${esc(p.label || tr('locatorTitle'))}</h3>
@@ -258,9 +268,7 @@ function removeLocatePin(key) {
 if (!S.campTraces) S.campTraces = new Map();   // clé de lot -> {pts:[{x,z}], hex, label, kind, refKind, map}
 let campTraceLayer = null;                     // L.layerGroup parent, monté pour S.map courante
 const campTraceGroups = new Map();             // clé -> L.layerGroup (les cercles d'UN camp), carte courante
-const campTracesListeners = new Set();
-function onCampTracesChange(cb) { campTracesListeners.add(cb); }
-function notifyCampTracesChange() { campTracesListeners.forEach(cb => cb()); }
+const { on: onCampTracesChange, notify: notifyCampTracesChange } = makeChangeSignal();
 function mountCampTrace(key, t) {
   if (!campTraceLayer) campTraceLayer = L.layerGroup().addTo(map);
   const g = L.layerGroup();
@@ -362,9 +370,7 @@ function mountUserFlag(id, x, z) {
    sans qu'aucun appelant n'ait besoin de connaître ce module de plus).
    Set plutôt qu'un callback unique : robuste à un futur second abonné, coût
    nul aujourd'hui. */
-const userFlagsListeners = new Set();
-function onUserFlagsChange(cb) { userFlagsListeners.add(cb); }
-function notifyUserFlagsChange() { userFlagsListeners.forEach(cb => cb()); }
+const { on: onUserFlagsChange, notify: notifyUserFlagsChange } = makeChangeSignal();
 /* Lecture seule des drapeaux de la carte ACTIVE -- copie (jamais le tableau
    interne à localStorage) : le seul appelant à ce jour (sidebar.js, bloc
    "Suivi") ne doit muter l'état que via addUserFlag/removeUserFlag/
