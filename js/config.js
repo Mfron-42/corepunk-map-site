@@ -213,20 +213,37 @@ const locationKindLabel = key => tbl('locationKind', key) || pretty(key);
     "Monster stats" + js/fiches.js::openMonsterFiche(). */
 const statLabel = key => tbl('statLabel', key) || pretty(key);
 const statTierLabel = key => tbl('statTier', key) || key;
-/* Formules (item.artifact_formula / ability.formula, voir js/fiches.js) : le
-   code opérande-2 COURT du moteur (Ap/Arm/Sp…, 
+/* Résolveur PARTAGÉ code-de-stat moteur → étiquette HUMAINE. Entrée
+   {code, name?} — la forme que le pipeline attache désormais aux paramètres
+   d'effet, colonnes par rareté et modificateurs : rend le NOM joueur localisé
+   quand la légende du client en porte un, sinon le code moteur BRUT enveloppé
+   d'une affordance d'honnêteté (soulignement pointillé discret + curseur d'aide
+   + infobulle « code moteur », engineCodeHint) — MÊME signal honnête que les
+   pastilles effect-var. Jamais un nom inventé. Rend du HTML (nom échappé, ou
+   span code) → à insérer TEL QUEL, ne pas ré-échapper. Unique pont code→libellé
+   partout où un code de stat s'affiche ; formulaTermLabel s'y replie. */
+function statChip(entry) {
+  if (!entry) return '';
+  const code = entry.code == null ? '' : String(entry.code);
+  if (entry.name) return esc(entry.name);
+  if (!code) return '';
+  return `<span class="engine-code" title="${esc(tr('engineCodeHint'))}"`
+    + ` style="border-bottom:1px dotted var(--muted);cursor:help">${esc(code)}</span>`;
+}
+/* Terme de formule (item.artifact_formula / ability.formula, voir js/fiches.js) :
+   le code opérande-2 COURT du moteur (Ap/Arm/Sp…, 
    ) n'est PAS le our_stat_id snake_case utilisé par
-   stat_ranges/statLabel — cette petite table fait le pont pour les quelques
-   codes vus dans les formules décodées à ce jour. formulaTermLabel() reste
-   honnête sur ses replis : table statLabel (via l'alias) d'abord, puis le
-   nom anglais figé du terme (stat_name) SEULEMENT s'il n'existe aucune
-   entrée, puis pretty(code) en dernier recours — jamais un label inventé. */
+   stat_ranges/statLabel — FORMULA_STAT_ALIAS fait le pont pour résoudre un NOM
+   quand le pipeline n'a pas déjà localisé stat_name. formulaTermLabel se replie
+   sur statChip : nom localisé (stat_name cuit par le pipeline, ou statLabel via
+   l'alias) d'abord, sinon le code brut porté par l'affordance « code moteur » —
+   jamais un label inventé. Rend du HTML. */
 const FORMULA_STAT_ALIAS = { Ap: 'attack_power', Arm: 'armor', Sp: 'spell_power' };
 function formulaTermLabel(t) {
   const code = t.stat_code;
   const canon = code && (FORMULA_STAT_ALIAS[code] || code);
-  const known = canon && tbl('statLabel', canon);
-  return known || t.stat_name || pretty(code || '');
+  const name = t.stat_name || (canon && tbl('statLabel', canon)) || null;
+  return statChip({ code, name });
 }
 const RARITY = {
   Common:   { hex: '#b9c2c8' },
@@ -806,7 +823,7 @@ export {
   MONSTER_HEX, ZONE_HEX, LOCATION_HEX, ABILITY_HEX, EVENT_HEX, RECIPE_HEX, nodeHex,
   REGION_HEX, nodeTierBadge,
   interactableBucketLabel,
-  monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel,
+  monsterAttackLabel, locationKindLabel, statLabel, statTierLabel, formulaTermLabel, statChip,
   RARITY, rarityLabel, itemKindLabel, professionLabel, harvestMethodLabel,
   weaponTypeLabel, weaponTypeLine, weaponClassLabel, ACTION_META, actionVerb, actionIconSvg,
   mapName, ecAttr,

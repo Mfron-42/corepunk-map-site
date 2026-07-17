@@ -2,7 +2,7 @@
    Fiches d'objets : objet, recette, table de butin, nœud de récolte, capacité —
    plus les plages de jet/formules/effets/scaling et les sections farm/contenants. */
 import { S } from '../state.js';
-import { CATS, CAMP_COLORS, RARITY, RECIPE_HEX, nodeHex, campKindLabel, rarityLabel, itemKindLabel, professionLabel, weaponTypeLine, statLabel, formulaTermLabel, nodeTierBadge, familyKey, familyLayerHex, entityColor } from '../config.js';
+import { CATS, CAMP_COLORS, RARITY, RECIPE_HEX, nodeHex, campKindLabel, rarityLabel, itemKindLabel, professionLabel, weaponTypeLine, statLabel, formulaTermLabel, statChip, nodeTierBadge, familyKey, familyLayerHex, entityColor } from '../config.js';
 import { $, esc, fold, iconTag, initials, itemGlyph, npcIconUrl, pretty, capitalize, cleanLabel } from '../utils.js';
 import { tr, numberLocale } from '../i18n/index.js';
 import { map } from '../mapview.js';
@@ -316,7 +316,10 @@ function formulaEntries(formula) {
 function formulaHtml(formula, { rarityNote = false } = {}) {
   const entries = formulaEntries(formula);
   if (!entries.length) return '';
-  const lines = entries.map(e => `<p class="formula-line">${e.tag ? `<span class="formula-role">${esc(e.tag)}</span>` : ''}${esc(e.text)}${
+  // e.text est déjà du HTML sûr (nombres fmtNum + statChip, qui échappe nom et
+  // code lui-même) — inséré tel quel pour préserver l'affordance « code moteur »
+  // des termes non-nommables (ex. « 80 + 20×L ») ; seul e.tag reste à échapper.
+  const lines = entries.map(e => `<p class="formula-line">${e.tag ? `<span class="formula-role">${esc(e.tag)}</span>` : ''}${e.text}${
     e.hasExternal ? ` <span class="formula-partial" title="${esc(tr('formulaPartialNote'))}">†</span>` : ''
   }</p>`).join('');
   // Pastille "unknown" ( #12/re-check #2, task #67) :
@@ -418,19 +421,29 @@ function useEffectSection(it) {
   return `<div class="fiche-section"><h3>${esc(tr('useEffectTitle'))}</h3>${blocks}</div>`;
 }
 
-/* Grille par rareté partagée par les nouveaux blocs de scaling 0x62
-   (rune_ability_scaling / overclock_scaling --  :
-   même rendu EXACT que le bloc rarity_scaling historique de scalingSection
-   (colonnes = codes moteur bruts type AC1/ACP1, volontairement verbatim comme
-   lui -- ce ne sont pas des noms de stats joueur, on n'en invente pas). */
+/* Grille par rareté partagée par les blocs de scaling 0x62 (rune_ability_
+   scaling / overclock_scaling --  et par le
+   scaling de capacité/effet a.byRarity / v.byRarity. Lit DEUX formes :
+   - LISTE `[{code, name?, by_rarity}]` (a.byRarity / v.byRarity) — la colonne
+     rend statChip({code, name}) : NOM joueur quand la légende en porte un,
+     sinon le code moteur avec l'affordance « code moteur ».
+   - MAP `{code: {rarity:value}}` (it.rarity_scaling / rune_ability_scaling /
+     overclock_scaling, colonnes code-only) — colonne = statChip({code}) →
+     code moteur porté par la même affordance, jamais un nom inventé.
+   Colonne montrée seulement en multi-colonne (comme historiquement) ; en
+   colonne unique, on n'affiche le libellé de colonne que s'il porte un NOM. */
 function rarityColsGridHtml(scaling) {
-  const cols = Object.entries(scaling);
+  const cols = Array.isArray(scaling)
+    ? scaling.map(e => ({ code: e.code, name: e.name, byRarity: e.by_rarity }))
+    : Object.entries(scaling).map(([code, byRarity]) => ({ code, name: null, byRarity }));
   const multiCol = cols.length > 1;
-  return cols.flatMap(([col, byRarity]) => RARITY_BANDS.map(r => {
+  return cols.flatMap(({ code, name, byRarity }) => RARITY_BANDS.map(r => {
     const v = byRarity?.[r];
     if (v == null) return '';
-    const label = multiCol ? `${bandRarityLabel(r)} (${col})` : bandRarityLabel(r);
-    return `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
+    let label = esc(bandRarityLabel(r));
+    if (multiCol) label += ` (${statChip({ code, name })})`;
+    else if (name) label += ` — ${statChip({ code, name })}`;
+    return `<div class="stat-row-label">${label}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`;
   })).join('');
 }
 
@@ -583,13 +596,14 @@ function effectLinesSection(it) {
       const rows = rarityColsGridHtml(v.byRarity);
       if (rows) body += `<div class="stat-grid">${rows}</div>`;
     }
-    if (v.params) {
-      // face numérique brute d'une variante sans texte localisé : les
-      // paramètres scalaires pliés de SON enregistrement (codes moteur
-      // verbatim, même discipline que rarityColsGridHtml — pas des noms de
-      // stats joueur, on n'en invente pas).
-      const rows = Object.entries(v.params).map(([c, val]) =>
-        `<div class="stat-row-label">${esc(c)}</div><div class="stat-row-value">${esc(fmtNum(val))}</div>`).join('');
+    if (v.params?.length) {
+      // face numérique d'une variante sans texte localisé : les paramètres
+      // scalaires pliés de SON enregistrement, forme `[{code, value, name?}]`.
+      // statChip rend le NOM joueur quand la légende du client en porte un
+      // (ex. « Réduction du temps de recharge »), sinon le code moteur avec
+      // l'affordance « code moteur » — jamais un nom inventé.
+      const rows = v.params.map(p =>
+        `<div class="stat-row-label">${statChip(p)}</div><div class="stat-row-value">${esc(fmtNum(p.value))}</div>`).join('');
       if (rows) body += `<div class="stat-grid">${rows}</div>`;
     }
     if (!body) {
@@ -610,9 +624,10 @@ function effectLinesSection(it) {
    {class, duration?, modifiers?} décodée au build. Rendue dans la MÊME grammaire
    visuelle que les lignes d'effet d'objet (une ligne de durée en secondes par
    valeur distincte, puis une ligne par modificateur de stat, dans un stat-grid).
-   Discipline « codes moteur verbatim » (comme rarityColsGridHtml / effectLines
-   v.params) : le nom joueur du modificateur quand le client le porte (Movement
-   Speed…), sinon le code brut (ACP5) — jamais un nom inventé ; la magnitude
+   Résolution via statChip (comme rarityColsGridHtml / effectLines v.params) :
+   le nom joueur du modificateur quand le client le porte (Movement Speed…),
+   sinon le code moteur (ACP5) porté par l'affordance « code moteur » — jamais
+   un nom inventé ; la magnitude
    n'est affichée que lorsqu'elle existe (m.value), sinon la stat est listée
    seule (l'effet s'applique, son ampleur reste côté serveur). Les entrées sans
    durée NI modificateur (set_ai/shield/tick pur) ne rendent rien -> section
@@ -625,10 +640,10 @@ function abilityEffectSection(a) {
   for (const e of chain) {
     if (e.duration != null && !durations.includes(e.duration)) durations.push(e.duration);
     for (const m of e.modifiers || []) {
-      const label = m.name || m.code;
-      if (!label) continue;
+      if (!m.name && !m.code) continue;
+      const label = statChip({ code: m.code, name: m.name });   // nom joueur (Movement Speed…) sinon code moteur + affordance
       const val = m.value != null ? fmtNum(m.value) : '';
-      modRows += `<div class="stat-row-label">${esc(label)}</div><div class="stat-row-value">${esc(val)}</div>`;
+      modRows += `<div class="stat-row-label">${label}</div><div class="stat-row-value">${esc(val)}</div>`;
     }
   }
   const durRows = durations.map(d =>
@@ -639,26 +654,36 @@ function abilityEffectSection(a) {
   return `<div class="fiche-section"><h3>${esc(tr('abilityEffectTitle'))}</h3><div class="stat-grid">${rows}</div></div>`;
 }
 
-/* Mise à l'échelle par rareté (`byRarity`, 2 runes actives) + paramètres
-   scalaires bruts (`params`) d'une capacité : la grille par rareté réutilise le
-   helper partagé rarityColsGridHtml (colonnes = codes moteur verbatim, ex.
-   ACP1) ; les params sont les scalaires pliés de l'enregistrement (mêmes codes
-   verbatim, même discipline que effectLinesSection v.params) — jamais un nom de
-   stat joueur inventé. `C` (cooldown) est retiré de la grille params : déjà
-   surfacé en ligne « Cooldown » dédiée, pas répété. Section(s) absente(s) quand
-   le champ manque (null-safe). */
+/* Mise à l'échelle par rareté (`byRarity`) + paramètres scalaires (`params`)
+   d'une capacité : la grille par rareté réutilise le helper partagé
+   rarityColsGridHtml (forme liste `[{code, name?, by_rarity}]`) ; les params
+   sont les scalaires pliés de l'enregistrement, forme `[{code, value, name?}]`.
+   statChip rend le NOM joueur quand la légende du client en porte un (ex.
+   « Portée de capacité »), sinon le code moteur avec l'affordance « code
+   moteur » — jamais un nom inventé. `C` (cooldown) est retiré de la grille
+   params : déjà surfacé en ligne « Cooldown » dédiée, pas répété. La section
+   ne s'intitule « Paramètres bruts » (+ note verbatim) que si AUCUN code n'a
+   de nom ; dès qu'au moins un est nommé elle devient « Paramètres », les codes
+   non-nommables gardant leur affordance individuelle. Absente si champ manquant. */
 function abilityScalingSection(a) {
   const parts = [];
   if (a.byRarity) {
     const rows = rarityColsGridHtml(a.byRarity);
     if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityRarityScalingTitle'))}</h3><div class="stat-grid">${rows}</div></div>`);
   }
-  if (a.params) {
-    const rows = Object.entries(a.params)
-      .filter(([c]) => c !== 'C')
-      .map(([c, v]) => `<div class="stat-row-label">${esc(c)}</div><div class="stat-row-value">${esc(fmtNum(v))}</div>`)
-      .join('');
-    if (rows) parts.push(`<div class="fiche-section"><h3>${esc(tr('abilityParamsTitle'))}</h3><p class="hint">${esc(tr('abilityParamsHint'))}</p><div class="stat-grid">${rows}</div></div>`);
+  if (a.params?.length) {
+    const list = a.params.filter(p => p.code !== 'C');
+    const rows = list.map(p =>
+      `<div class="stat-row-label">${statChip(p)}</div><div class="stat-row-value">${esc(fmtNum(p.value))}</div>`).join('');
+    if (rows) {
+      // dès qu'un code est nommé, la section n'est plus « brute » : titre
+      // « Paramètres » sans la note verbatim (les codes non-nommables gardent
+      // leur affordance individuelle). Tout-code-brut → « Paramètres bruts » + note.
+      const anyNamed = list.some(p => p.name);
+      const title = anyNamed ? tr('abilityParamsNamedTitle') : tr('abilityParamsTitle');
+      const hint = anyNamed ? '' : `<p class="hint">${esc(tr('abilityParamsHint'))}</p>`;
+      parts.push(`<div class="fiche-section"><h3>${esc(title)}</h3>${hint}<div class="stat-grid">${rows}</div></div>`);
+    }
   }
   return parts.join('');
 }
